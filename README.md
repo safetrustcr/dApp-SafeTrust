@@ -1,36 +1,152 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌟 SafeTrust 🌟
 
-## Getting Started
+**SafeTrust** is a decentralized platform designed to revolutionize P2P transactions, providing secure deposits and payments powered by blockchain and trustless technologies. 🌐✨ Experience transparency and reliability in every cryptocurrency transaction. 💸🔒
 
-First, run the development server:
+---
+
+## 🚀 **Why Choose SafeTrust?**
+
+🔐 **Trustless Technology**: Secure and block deposits without intermediaries.  
+💾 **Blockchain-Powered Transparency**: Immutable, auditable, and verifiable transactions.  
+💱 **Crypto-Payment Support**: Manage cryptocurrency payments safely and efficiently.  
+✅ **Automated Refunds**: Streamlined processes ensure refunds and payment releases happen automatically.
+
+---
+
+## 🌟 **Key Features**
+
+🛠️ **Trustless Escrow**:  
+Funds are securely held in blockchain-based escrow accounts until all terms are met.
+
+🔎 **Blockchain Transparency**:  
+Every transaction is logged on the blockchain for full visibility and accountability. 📜
+
+💰 **Crypto Payments**:  
+Supports irreversible and secure cryptocurrency payments while reducing risks of fraud or disputes.
+
+🔗 **Trustline Process**:  
+Verified trustlines between parties add an extra layer of transaction security. 🔒
+
+📤 **Automated Refund System**:  
+Ensures funds are automatically released based on the terms of the agreement, with no manual intervention required.
+
+---
+
+## ⚙️ **How It Works**
+
+1. **Create Escrow**: The renter creates a secure escrow account. 🏗️
+2. **Fund Escrow**: The deposit is funded by the renter. 💵
+3. **Rental Agreement**: Terms are agreed upon and stored on the blockchain. 📃
+4. **Completion or Cancellation**: Funds are released based on contract outcomes. 🎯
+
+---
+
+## 📋 **Getting Started**
+
+### **Prerequisites**
+
+- Node.js v14 or later 🖥️
+- A blockchain wallet like **Albedo** for secure cryptocurrency transactions. 🔐
+- Trustless Work API access (details [here](https://docs.trustlesswork.com/trustless-work)). 📖
+
+### **Installation**
+
+1️⃣ Fork this repository
+
+2️⃣ Navigate to the project directory:
+
+```bash
+git clone https://github.com/<your_user>/Frontend
+```
+
+3️⃣ Add the remote repository upstream:
+
+```bash
+git remote add upstream https://github.com/safetrustcr/Frontend
+```
+
+4️⃣ Navigate to the project directory:
+
+```bash
+cd /Frontend
+```
+
+5️⃣ Set up environment variables **(make sure the .env file was created)**
+
+```bash
+echo "NEXT_PUBLIC_API_URL=https://api.trustlesswork.com" > .env
+```
+
+6️⃣ Install the app and start the development server:
+
+```bash
+npm install
+```
+
+7️⃣ Execute the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📡 **API Reference**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **`/escrow/initiate`**: Start the escrow process and create agreements.
+- **`/escrow/fund`**: Securely fund the escrow account.
+- **`/escrow/complete`**: Complete the process and release funds to the appropriate party.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🛠️ **Tech Stack**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Frontend**: 🧑‍💻 Built with **TypeScript** and styled using **Tailwind CSS** for rapid UI development.
+- **Blockchain**: 🛡️ Utilizes smart contracts for secure, immutable transactions.
+- **API Integration**: 🌐 Interacts with the Trustless Work API for seamless escrow management.
+- **Wallet Integration**: 🪙 Compatible with wallets like Albedo for secure payment handling.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🧪 **Testing Infrastructure**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This project uses Jest, React Testing Library, and Cypress for comprehensive testing of our Next.js application with App Router.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### **Running Tests**
+
+- Run unit and integration tests: `npm test`
+- Run E2E tests: `npm run test:e2e`
+- Generate test coverage report: `npm run test:coverage`
+
+### **Test Structure**
+
+- Unit and integration tests are located in `__tests__` directories or as `.test.ts(x)` files next to the code they're testing within the `app` directory.
+- E2E tests are located in the `cypress/e2e` directory.
+
+### **Mocking**
+
+We use Mock Service Worker (MSW) to mock API requests, including GraphQL queries. Mock handlers are defined in `mocks/handlers.ts`.
+
+### **Continuous Integration**
+
+We use GitHub Actions for CI. The workflow is defined in `.github/workflows/test.yml`.
+
+### **Coverage Reporting**
+
+Test coverage reports are generated using Jest's built-in coverage tool and uploaded to Codecov in the CI pipeline.
+
+### **Next.js Specific Testing Considerations**
+
+- Server Components: For testing Server Components, focus on integration and E2E tests rather than unit tests.
+- API Routes: Use MSW to mock API responses in your tests.
+- App Router: Ensure your tests account for the new file-based routing system in the App Router.
+
+---
+
+## 🎨 **Design Mockup**
+
+Check out our Figma design here: [SafeTrust Figma](https://www.figma.com/design/CVg9hoim0f1FIlozIar7ZZ/SafeTrust?node-id=0-1&node-type=canvas&t=LCzPmGeJfVxCMWTT-0).
+
+---
+
+🌟 **Join SafeTrust today and revolutionize the way you manage P2P transactions!** 🌟
