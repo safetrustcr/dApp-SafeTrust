@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Admin Dashboard",
-  description: "Secure Deposits Admin Dashboard",
+  title: "SafeTrust",
+  description: "Secure Deposits SafeTrust",
 };
 
 export default function RootLayout({
