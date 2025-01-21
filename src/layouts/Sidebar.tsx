@@ -85,7 +85,7 @@ const systemItems = [
   { icon: Bell, label: "Notification Center", href: "/notification-center" },
   {
     icon: BarChart2,
-    label: "Analytics Dashboard",
+    label: "Analytics",
     href: "/analytics-dashboard",
   },
   { icon: HelpCircle, label: "Help Center", href: "/help-center" },
