@@ -20,7 +20,7 @@ const ItemUserGuide = ({ title, description, link }: ItemUserGuideProps) => {
         <CardTitle className="text-sm">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
 
-        <Link className="font-semibold text-xs w-1/6" href={link}>
+        <Link className="font-semibold text-xs w-full md:w-1/6" href={link}>
           Read guide
         </Link>
       </div>
