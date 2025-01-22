@@ -18,14 +18,14 @@ const HelpCenter = () => {
         <CardHeader>
           <CardTitle className="text-2xl">Help Center</CardTitle>
           <div className="flex w-full justify-center">
-            <div className="flex w-1/3">
+            <div className="flex w-full md:w-1/3">
               <Input placeholder="Search for help..." />
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2 gap-3 mb-10 md:grid-cols-4">
               <TabsTrigger value="FAQ">FAQ</TabsTrigger>
               <TabsTrigger value="HelpTopics">Help Topics</TabsTrigger>
               <TabsTrigger value="ContactSupport">Contact Support</TabsTrigger>
