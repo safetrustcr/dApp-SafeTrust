@@ -31,12 +31,12 @@ export default function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <SidebarProvider>
-            <div className="flex min-h-screen flex-col">
+            <div className="flex min-h-screen flex-col w-full">
               <div className="flex flex-1">
                 <AdminSidebar />
                 <SidebarInset className="flex flex-col">
                   <Header />
-                  <main className="flex-1">{children}</main>
+                  <div className="flex-1">{children}</div>
                   <Footer />
                 </SidebarInset>
               </div>
