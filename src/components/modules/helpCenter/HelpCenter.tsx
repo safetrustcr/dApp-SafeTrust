@@ -14,7 +14,7 @@ const HelpCenter = () => {
 
   return (
     <div className="flex w-full justify-center">
-      <Card className="w-11/12 mt-6">
+      <Card className="w-11/12 mt-6 shadow-none border-none">
         <CardHeader>
           <CardTitle className="text-2xl">Help Center</CardTitle>
           <div className="flex w-full justify-center">
