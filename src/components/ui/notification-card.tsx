@@ -24,10 +24,10 @@ export function NotificationAnalyticsCard({
         {icon}
       </div>
       <div>
-        <h2 className="text-2xl text-black dar:text-gray-100 font-bold">
+        <h2 className="text-2xl  text-black dark:text-gray-100 font-bold">
           {total}
         </h2>
-        <p className="text-xs text-black dark:text-white text-muted-foreground">
+        <p className="text-xs text-black dark:text-white/50 text-muted-foreground">
           {unread} {subtitle}
         </p>
       </div>
@@ -61,11 +61,13 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row p-6 lg:gap-0 gap-3 justify-between border-gray-500 rounded-xl border bg-sidebar items-start w-full">
+    <div className="flex flex-col lg:flex-row p-6 lg:gap-0 gap-3 dark:bg-gray-500/25 justify-between border-gray-500 rounded-xl border bg-sidebar items-start w-full">
       <div className="flex flex-row gap-4">
         <div>{notificationIconColor[type]}</div>
         <div className="flex flex-col space-y-2">
-          <p className="text-sm font-semibold text-black">{title}</p>
+          <p className="text-sm font-semibold dark:text-white text-black">
+            {title}
+          </p>
           <p className="text-sm font-normal text-muted-foreground">{message}</p>
         </div>
       </div>
@@ -75,7 +77,9 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
             {priority}
           </p>
         )}
-        <p className="text-xs font-semibold text-black">{time}</p>
+        <p className="text-xs font-semibold dark:text-muted-foreground text-black">
+          {time}
+        </p>
       </div>
     </div>
   );
