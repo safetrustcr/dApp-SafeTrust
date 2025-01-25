@@ -1,6 +1,7 @@
 "use client";
 import AlertCard from "@/components/ui/alertCard";
-import { CustomInput } from "@/components/ui/customInput";
+import { CheckBox, CustomInput } from "@/components/ui/customInput";
+import CustomSelect from "@/components/ui/customSelect";
 import { BellDotIcon, DollarSign, Timer } from "lucide-react";
 import { useState } from "react";
 
@@ -9,12 +10,24 @@ function CreateAlert() {
   const [maximumAmount, setMaximumAmount] = useState(0);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  return (
-    <div className="flex flex-col space-y-4 p-8 w-full pt-6">
-      <p>Create Alert</p>
+  const [isChecked, setIsChecked] = useState(false);
+  const [selectedOption, setSelectedOption] = useState("");
 
-      <div className="w-full flex flex-col">
-        <p className="text-sm mb-3">Alert Type</p>
+  const options = [
+    { label: "Option 1", value: "1" },
+    { label: "Option 2", value: "2" },
+    { label: "Option 3", value: "3" },
+  ];
+  return (
+    <div className="flex flex-col dark:bg-black space-y-4 p-8 w-full pt-6">
+      <p className="font-bold dark:text-white text-black lg:text-2xl text-base">
+        Create Alert
+      </p>
+
+      <div className="w-full flex flex-col mt-4">
+        <p className="text-sm mb-3 text-black dark:text-white/50 lg:text-base">
+          Alert Type
+        </p>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 w-full">
           {alertCards.map((alertCard, index) => (
             <AlertCard
@@ -55,6 +68,43 @@ function CreateAlert() {
           onChange={(value) => setEndDate(value as string)}
         />
       </div>
+      <CustomSelect
+        options={options}
+        value={selectedOption}
+        onChange={(value) => setSelectedOption(value.toString())}
+        label="Reminder Frequency"
+        placeholder="Select an option"
+      />
+      <div>
+        <p>Notification Method</p>
+        <CheckBox
+          label="Email Notification"
+          name="terms"
+          inputValue={isChecked}
+          handleChange={setIsChecked}
+        />
+        <CheckBox
+          label="Push Notification"
+          name="terms"
+          inputValue={isChecked}
+          handleChange={setIsChecked}
+        />
+        <CheckBox
+          label="SMS Notification"
+          name="terms"
+          inputValue={isChecked}
+          handleChange={setIsChecked}
+        />
+      </div>
+      <CustomInput
+        type="textarea"
+        label="Additional Notes"
+        name="description"
+        placeholder="Add any additional notes or instructions...."
+        value=""
+        onChange={() => {}}
+        rows={4}
+      />
     </div>
   );
 }

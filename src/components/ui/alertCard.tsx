@@ -7,8 +7,8 @@ type Props = {
 
 function AlertCard({ icon, text }: Props) {
   return (
-    <div className="w-full items-center justify-center">
-      <div className="rounded-xl border bg-card p-6 w-full items-center justify-center">
+    <div className="w-full items-center justify-center ">
+      <div className="rounded-xl border bg-card p-6 w-full dark:bg-white/15 items-center justify-center">
         <div className="w-full flex flex-col justify-center gap-4 items-center">
           <p className="text-sm text-center font-semibold dark:text-white text-black">
             {icon}

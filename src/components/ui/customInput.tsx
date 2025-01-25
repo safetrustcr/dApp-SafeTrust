@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 
 type CustomInputProps = {
-  type: "textarea" | "text" | "number" | "currency" | "date";
+  type: "textarea" | "text" | "number" | "currency" | "date" | "checkbox";
   value: string | number;
   onChange: (value: string | number) => void;
   label?: string;
@@ -61,7 +61,11 @@ export function CustomInput({
 
   return (
     <div className="mb-4">
-      {label && <label className="block mb-1 font-medium">{label}</label>}
+      {label && (
+        <label className="block mb-1 lg:text-lg text-base font-medium dark:text-white">
+          {label}
+        </label>
+      )}
       {type === "textarea" ? (
         <textarea
           name={name}
@@ -81,10 +85,42 @@ export function CustomInput({
           name={name}
           placeholder={placeholder}
           value={inputValue}
+          min={0}
           onChange={handleChange}
-          className="border rounded-md p-2 w-full"
+          className="border rounded-md p-2 w-full dark:placeholder:text-white/50 "
         />
       )}
+    </div>
+  );
+}
+
+type CheckboxProps = {
+  label: string;
+  name: string;
+  inputValue: boolean;
+  handleChange: (value: boolean) => void;
+};
+
+export function CheckBox({
+  label,
+  name,
+  inputValue,
+  handleChange,
+}: CheckboxProps) {
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleChange(e.target.checked);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="checkbox"
+        name={name}
+        checked={Boolean(inputValue)}
+        onChange={onChange}
+        className="w-5 h-5 border rounded focus:ring-blue-500 focus:ring-2"
+      />
+      <span className="text-gray-700">{label}</span>
     </div>
   );
 }
