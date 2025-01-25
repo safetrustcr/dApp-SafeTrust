@@ -30,7 +30,18 @@ export default function RootLayout({
         className={`${inter.className} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <SidebarProvider>
+            <div className="flex min-h-screen flex-col">
+              <div className="flex flex-1">
+                <AdminSidebar />
+                <SidebarInset className="flex flex-col">
+                  <Header />
                   <main className="flex-1">{children}</main>
+                  <Footer />
+                </SidebarInset>
+              </div>
+            </div>
+          </SidebarProvider>
         </ThemeProvider>
       </body>
     </html>
