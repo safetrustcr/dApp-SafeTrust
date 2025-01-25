@@ -1,14 +1,149 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import { Download, Search } from "lucide-react"
+import { useState, useMemo } from "react";
+import { Download, Search, Calendar, Clock, Filter, Tag, User } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ServiceHistoryTable } from "@/components/ServiceManagement/service-history-table"
-import { serviceHistory } from "@/data/serviceHistory"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
+// Types
+export enum ServiceStatus {
+  Completed = "completed",
+  InProgress = "in-progress",
+  Pending = "pending",
+  Scheduled = "scheduled",
+  Cancelled = "cancelled",
+}
+
+export interface Service {
+  id: string
+  type: string
+  provider: string
+  status: ServiceStatus
+  date: string
+  cost: number
+  location: string
+  description: string
+}
+
+// Mock data
+export const serviceHistory: Service[] = [
+  {
+    id: "SRV-001",
+    type: "Maintenance",
+    provider: "Tech Solutions Inc",
+    status: ServiceStatus.Completed,
+    date: "2025-01-20",
+    cost: 450.00,
+    location: "New York, NY",
+    description: "Regular system maintenance and updates"
+  },
+  {
+    id: "SRV-002",
+    type: "Repair",
+    provider: "QuickFix Services",
+    status: ServiceStatus.Pending,
+    date: "2024-10-18",
+    cost: 850.00,
+    location: "Los Angeles, CA",
+    description: "Emergency hardware replacement"
+  },
+  {
+    id: "SRV-003",
+    type: "Installation",
+    provider: "Network Pro LLC",
+    status: ServiceStatus.InProgress,
+    date: "2024-11-15",
+    cost: 1200.00,
+    location: "Chicago, IL",
+    description: "New security system installation"
+  },
+  {
+    id: "SRV-004",
+    type: "Inspection",
+    provider: "Safety First Co",
+    status: ServiceStatus.Scheduled,
+    date: "2024-12-31",
+    cost: 300.00,
+    location: "Miami, FL",
+    description: "Annual safety inspection"
+  }
+]
+// ServiceHistoryTable component
+const statusStyles = {
+  completed: "bg-green-500/15 text-green-500",
+  "in-progress": "bg-blue-500/15 text-blue-500",
+  pending: "bg-yellow-500/15 text-yellow-500",
+  cancelled: "bg-red-500/15 text-red-500",
+  scheduled: "bg-gray-500/15 text-gray-500",
+}
+
+export function ServiceHistoryTable({ services }: { services: Service[] }) {
+  return (
+    <div className="rounded-lg border overflow-y-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="p-4">Service ID</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Provider</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Amount</TableHead>
+            <TableHead className="w-[50px] p-4">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {services.map((service) => (
+            <TableRow key={service.id}>
+              <TableCell className="p-4 min-w-[110px]">{service.id}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4" aria-hidden="true" />
+                  {service.type}
+                </div>
+              </TableCell>
+              <TableCell className="min-w-[170px]">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" aria-hidden="true" />
+                  {service.provider}
+                </div>
+              </TableCell>
+              <TableCell className="min-w-[120px]">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                  {service.date}
+                </div>
+              </TableCell>
+              <TableCell className="min-w-[140px]">
+                <Badge variant="secondary" className={statusStyles[service.status as ServiceStatus]}>
+                  <Clock className="h-3 w-3 mr-1" aria-hidden="true" />
+                  {service.status.charAt(0).toUpperCase() + service.status.slice(1)}
+                </Badge>
+              </TableCell>
+              <TableCell>${service.cost.toFixed(2)}</TableCell>
+              <TableCell align="center">
+                <Filter className="h-4 w-4" />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
+// ServiceHistoryPage component
 const getDiffDays = (date1: Date, date2: Date) =>
   Math.ceil(Math.abs(date1.getTime() - date2.getTime()) / (1000 * 60 * 60 * 24))
 
@@ -62,7 +197,7 @@ export default function ServiceHistoryPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-102px)] bg-background p-6 space-y-6">
+    <div className="min-h-[calc(100vh-129px)] bg-background p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Service History</h1>
         <div className="flex gap-2">
