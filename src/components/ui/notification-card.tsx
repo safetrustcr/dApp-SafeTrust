@@ -16,7 +16,7 @@ export function NotificationAnalyticsCard({
   title,
 }: NotificationAnalyticsCardProps) {
   return (
-    <div className="rounded-xl border bg-card p-6">
+    <div className="rounded-xl bg-transparent border  p-6">
       <div className="flex justify-between items-center">
         <p className="text-sm font-semibold dark:text-white text-black">
           {title}

@@ -64,7 +64,7 @@ function NotificationCenter() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card p-6">
+      <div className="rounded-xl bg-transparent border p-6">
         <h2 className="text-3xl font-bold text-black dark:text-white tracking-tight">
           Recent Notification
         </h2>
