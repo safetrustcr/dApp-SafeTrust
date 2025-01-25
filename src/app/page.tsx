@@ -1,5 +1,7 @@
 import MetricsCard from "@/components/modules/MetricsCard";
 import RecentContractsTable from "@/components/modules/RecentContractsTable";
+import { Button } from "@/components/ui/button";
+import { ArrowUpRight } from "lucide-react";
 import { FaLock, FaClock, FaBell, FaExclamationTriangle } from "react-icons/fa";
 
 export default function DashboardPage() {
@@ -8,6 +10,9 @@ export default function DashboardPage() {
       <div className="flex-1 space-y-4 p-8 pt-6">
         <div className="flex items-center justify-between space-y-2">
           <h2 className="text-3xl font-bold tracking-tight">Smart Contract Tracking</h2>
+          <Button className="rounded-xl bg-muted-900 text-primary hover:bg-muted-800">
+            Create Contract <ArrowUpRight className="ml-2 h-4 w-4" />
+          </Button>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Add your dashboard content here */}
