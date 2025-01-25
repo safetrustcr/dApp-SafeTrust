@@ -63,6 +63,11 @@ const securityItems = [
     label: "Dispute Resolution",
     href: "/dispute-resolution",
   },
+  {
+    icon: AlertTriangle,
+    label: "Create Alert",
+    href: "/create-alert",
+  },
 ];
 
 const servicesItems = [
@@ -85,7 +90,7 @@ const systemItems = [
   {
     icon: Bell,
     label: "Notification Center",
-    href: "/SystemManagement/notification-center",
+    href: "/notification-center",
   },
   {
     icon: BarChart2,
