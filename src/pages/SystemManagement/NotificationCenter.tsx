@@ -19,28 +19,35 @@ function NotificationCenter() {
     setActiveTab(tab);
   };
   return (
-    <div className="space-y-4 p-8 pt-6">
+
+    <div className="flex-1 space-y-4 p-8 pt-6 bg-transparent dark:bg-black">
+
       <div className="flex flex-row justify-between items-start">
         <div className="flex flex-col items-start space-y-2">
           <h2 className="text-3xl text-black dark:text-white font-bold tracking-tight">
             Notification Center
           </h2>
-          <h4 className="text-base text-black dark:text-gray-200 font-normal tracking-tight">
+
+          <h4 className="text-base text-black dark:text-white/50 font-normal tracking-tight">
+
             Manage and track all your contract notifications
           </h4>
         </div>
         <div className="w-auto items-end lg:items-center gap-3 lg:gap-8 flex flex-col lg:flex-row ">
           <button className="border-[1px] flex gap-2 lg:gap-4 rounded-md  items-center justify-center whitespace-nowrap p-2 lg:p-3 ">
-            <Filter color="black" size={16} />
+
+            <Filter className="text-black dark:text-white text-sm" />
+
             <span className="text-base text-black dark:text-gray-100">
               Filter
             </span>
           </button>
 
-          <button className="bg-transparent/15 gap-2 lg:gap-4 items-center flex flex-row p-2 lg:p-3 whitespace-nowrap rounded-md">
-            <Check size={20} color="black" className="text-black" />
+
+          <button className="bg-transparent/15 dark:bg-gray-500/25 gap-2 lg:gap-4 items-center flex flex-row p-2 lg:p-3 whitespace-nowrap rounded-md">
+            <Check className="text-black dark:text-white text-sm" />
             <span className="text-base text-black  dark:text-gray-100">
-              {" "}
+
               Mark As Read
             </span>
           </button>
@@ -65,18 +72,22 @@ function NotificationCenter() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card p-6">
+
+      <div className="rounded-xl bg-transparent border p-6">
+
         <h2 className="text-3xl font-bold text-black dark:text-white tracking-tight">
           Recent Notification
         </h2>
         <div className="w-full flex-col space-y-4">
-          <div className="flex flex-row items-center gap-2 my-3 p-2  bg-transparent/10 w-fit rounded-lg">
+
+          <div className="flex flex-row items-center gap-2 my-3 p-2  dark:bg-gray-500/25 bg-transparent/10 w-fit rounded-lg">
             <p
               onClick={() => handleTabClick("All")}
-              className={`cursor-pointer text-sm font-semibold p-1 rounded-lg ${
+              className={`cursor-pointer text-sm font-semibold p-2 rounded-md ${
                 activeTab === "All"
-                  ? "bg-gray-500 dark:bg-gray-200 text-white dark:text-gray-800"
-                  : "text-gray-500 dark:text-white"
+                  ? "bg-gray-500 dark:bg-black text-white dark:text-white"
+                  : "text-gray-500 dark:text-white/50"
+
               }`}
             >
               All
@@ -84,10 +95,12 @@ function NotificationCenter() {
 
             <p
               onClick={() => handleTabClick("Unread")}
-              className={`cursor-pointer text-sm font-semibold p-1 rounded-lg ${
+
+              className={`cursor-pointer text-sm font-semibold p-2 rounded-md ${
                 activeTab === "Unread"
-                  ? "bg-gray-500 dark:bg-gray-200 text-white dark:text-gray-800"
-                  : "text-gray-500 dark:text-white"
+                  ? "bg-gray-500 dark:bg-black text-white dark:text-white"
+                  : "text-gray-500 dark:text-white/50"
+
               }`}
             >
               Unread
@@ -95,10 +108,12 @@ function NotificationCenter() {
 
             <p
               onClick={() => handleTabClick("Important")}
-              className={`cursor-pointer text-sm font-semibold p-1 rounded-lg ${
+
+              className={`cursor-pointer text-sm font-semibold p-2 rounded-md ${
                 activeTab === "Important"
-                  ? "bg-gray-500 dark:bg-gray-200 text-white dark:text-gray-800"
-                  : "text-gray-500 dark:text-white"
+                  ? "bg-gray-500 dark:bg-black text-white dark:text-white"
+                  : "text-gray-500 dark:text-white/50"
+
               }`}
             >
               Important
@@ -131,22 +146,30 @@ const cardLabels: Record<string, CardLabel> = {
   allNotifications: {
     title: "All Notifications",
     subtitle: "unread messages",
-    icon: <Bell size={16} color="black" />,
+
+    icon: <Bell className="text-black dark:text-white text-sm " />,
+
   },
   contractUpdates: {
     title: "Contracts Update",
     subtitle: "required actions",
-    icon: <FileText size={16} color="black" />,
+
+    icon: <FileText className="text-black dark:text-white text-sm " />,
+
   },
   depositEvents: {
     title: "Deposit Events",
     subtitle: "pending confirmations",
-    icon: <CircleCheck size={16} color="black" />,
+
+    icon: <CircleCheck className="text-black dark:text-white text-sm " />,
+
   },
   disputes: {
     title: "Disputes",
     subtitle: "critical disputes",
-    icon: <AlertTriangle size={16} color="black" />,
+
+    icon: <AlertTriangle className="text-black dark:text-white text-sm " />,
+
   },
 };
 
