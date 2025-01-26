@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 type CustomInputProps = {
   type: "textarea" | "text" | "number" | "currency" | "date" | "checkbox";
@@ -11,6 +11,7 @@ type CustomInputProps = {
   rows?: number;
   error?: string;
   required?: boolean;
+  showRequired?: boolean;
 };
 
 export function CustomInput({
@@ -23,8 +24,13 @@ export function CustomInput({
   rows = 4,
   error,
   required,
+  showRequired = false,
 }: CustomInputProps) {
   const [inputValue, setInputValue] = useState(value);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -99,8 +105,8 @@ export function CustomInput({
         />
       )}
 
-      {required && !value && (
-<p className="text-red-500 text-xs">This field is required</p>
+      {required && !value && showRequired && (
+        <p className="text-red-500 text-xs">This field is required</p>
       )}
       {error && <p className="text-red-500 text-xs">{error}</p>}
     </div>

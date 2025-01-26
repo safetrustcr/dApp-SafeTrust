@@ -13,6 +13,7 @@ type CustomSelectProps = {
   placeholder?: string;
   name?: string;
   required?: boolean;
+  showRequired?: boolean;
 };
 
 function CustomSelect({
@@ -23,6 +24,7 @@ function CustomSelect({
   placeholder = "Select an option",
   name = "",
   required,
+  showRequired = false,
 }: CustomSelectProps) {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     onChange(e.target.value);
@@ -59,7 +61,7 @@ function CustomSelect({
           </option>
         ))}
       </select>
-      {required && !value && (
+      {required && !value && showRequired && (
         <p className="text-red-500 text-xs">This field is required</p>
       )}
     </div>

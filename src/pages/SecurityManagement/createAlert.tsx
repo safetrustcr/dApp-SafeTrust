@@ -17,7 +17,6 @@ function CreateAlert() {
     smsCheck: false,
     additionalNotes: "",
   });
-
   const [errors, setErrors] = useState({
     minimumAmount: "",
     maximumAmount: "",
@@ -28,8 +27,9 @@ function CreateAlert() {
     pushnotificationCheck: "",
     smsCheck: "",
   });
-
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const submitAlert = () => {
+    setIsSubmitted(true);
     if (
       errors.minimumAmount ||
       errors.maximumAmount ||
@@ -58,6 +58,17 @@ function CreateAlert() {
       smsCheck: false,
       additionalNotes: "",
     });
+    setErrors({
+      minimumAmount: "",
+      maximumAmount: "",
+      startDate: "",
+      endDate: "",
+      notificationMethods: "",
+      emailCheck: "",
+      pushnotificationCheck: "",
+      smsCheck: "",
+    });
+    setIsSubmitted(false);
   };
 
   const options = [
@@ -88,6 +99,7 @@ function CreateAlert() {
       <div className="grid gap-4 w-full md:grid-cols-2">
         <CustomInput
           error={errors.minimumAmount}
+          showRequired={isSubmitted}
           onChange={(value) => {
             const numValue = Number(value);
             setFormData((prev) => ({
@@ -108,6 +120,7 @@ function CreateAlert() {
         />
         <CustomInput
           error={errors.maximumAmount}
+          showRequired={isSubmitted}
           onChange={(value) => {
             const numValue = Number(value);
             setFormData((prev) => ({
@@ -131,6 +144,7 @@ function CreateAlert() {
         />
         <CustomInput
           error={errors.startDate}
+          showRequired={isSubmitted}
           type="date"
           required={true}
           label="Start Date"
@@ -144,6 +158,7 @@ function CreateAlert() {
         />
         <CustomInput
           error={errors.endDate}
+          showRequired={isSubmitted}
           type="date"
           label="End Date"
           value={formData.endDate}
@@ -167,6 +182,7 @@ function CreateAlert() {
       <CustomSelect
         options={options}
         required={true}
+        showRequired={isSubmitted}
         value={formData.selectedOption}
         onChange={(value) => {
           setFormData((prev) => ({
@@ -181,7 +197,7 @@ function CreateAlert() {
         <p>Notification Method</p>
         <CheckBox
           label="Email Notification"
-          name="terms"
+          name="emailCheck"
           inputValue={formData.emailCheck}
           handleChange={(value) => {
             setFormData((prev) => ({
@@ -192,7 +208,7 @@ function CreateAlert() {
         />
         <CheckBox
           label="Push Notification"
-          name="terms"
+          name="pushnotificationCheck"
           inputValue={formData.pushnotificationCheck}
           handleChange={(value) => {
             setFormData((prev) => ({
@@ -203,7 +219,7 @@ function CreateAlert() {
         />
         <CheckBox
           label="SMS Notification"
-          name="terms"
+          name="smsCheck"
           inputValue={formData.smsCheck}
           handleChange={(value) => {
             setFormData((prev) => ({
@@ -213,7 +229,7 @@ function CreateAlert() {
           }}
         />
         {errors.notificationMethods && (
-          <p className="text-red-500 text-sm">{errors.notificationMethods}</p>
+          <p className="text-red-500 text-xs">{errors.notificationMethods}</p>
         )}
       </div>
       <CustomInput
