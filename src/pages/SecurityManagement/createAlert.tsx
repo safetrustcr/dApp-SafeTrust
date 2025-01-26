@@ -72,9 +72,10 @@ function CreateAlert() {
   };
 
   const options = [
-    { label: "Option 1", value: "1" },
-    { label: "Option 2", value: "2" },
-    { label: "Option 3", value: "3" },
+    { label: "Once", value: "Once" },
+    { label: "Daily", value: "Daily" },
+    { label: "Weekly", value: "Weekly" },
+    { label: "Monthly", value: "Monthly" },
   ];
   return (
     <div className="flex flex-col dark:bg-black space-y-4 p-8 w-full pt-6">
