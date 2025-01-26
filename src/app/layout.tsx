@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
-import { Inter, Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { AdminSidebar } from "@/layouts/Sidebar";
-import { Header } from "@/layouts/Header";
-import { Footer } from "@/layouts/Footer";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Footer } from "@/layouts/Footer";
+import { Header } from "@/layouts/Header";
+import { AdminSidebar } from "@/layouts/Sidebar";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
+import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });

@@ -1,38 +1,9 @@
-import Link from "next/link";
-import {
-  Home,
-  Shield,
-  Search,
-  FileCheck,
-  History,
-  LayoutDashboard,
-  CreditCard,
-  UserCircle,
-  AlertTriangle,
-  Bell,
-  FileText,
-  BarChart2,
-  HelpCircle,
-  ChevronDown,
-  LogOut,
-  ChevronRight,
-} from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarFooter,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
-} from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,10 +13,39 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+} from "@/components/ui/sidebar";
+import {
+  AlertTriangle,
+  BarChart2,
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  CreditCard,
+  FileCheck,
+  FileText,
+  HelpCircle,
+  History,
+  Home,
+  LayoutDashboard,
+  LogOut,
+  Search,
+  Shield,
+  UserCircle,
+} from "lucide-react";
+import Link from "next/link";
 
 const securityItems = [
   {
@@ -82,7 +82,11 @@ const contractItems = [
 ];
 
 const systemItems = [
-  { icon: Bell, label: "Notification Center", href: "/notification-center" },
+  {
+    icon: Bell,
+    label: "Notification Center",
+    href: "/notification-center",
+  },
   {
     icon: BarChart2,
     label: "Analytics",
