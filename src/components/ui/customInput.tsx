@@ -9,6 +9,8 @@ type CustomInputProps = {
   placeholder?: string;
   name?: string;
   rows?: number;
+  error?: string;
+  required?: boolean;
 };
 
 export function CustomInput({
@@ -19,6 +21,8 @@ export function CustomInput({
   placeholder = "",
   name = "",
   rows = 4,
+  error,
+  required,
 }: CustomInputProps) {
   const [inputValue, setInputValue] = useState(value);
 
@@ -41,10 +45,11 @@ export function CustomInput({
       <input
         type="text"
         name={name}
+        required={required}
         placeholder={placeholder}
         value={inputValue}
         onChange={handleChange}
-        className="border rounded-md p-2 pl-8 w-full"
+        className="border rounded-md p-2 pl-8 w-full text:black dark:text-white/70"
       />
     </div>
   );
@@ -53,9 +58,10 @@ export function CustomInput({
     <input
       type="date"
       name={name}
+      required={required}
       value={inputValue}
       onChange={handleChange}
-      className="border rounded-md p-2 w-full"
+      className="border rounded-md p-2 w-full  text:black dark:text-white/70 dark:placeholder:text-white/70 placeholder:text-black"
     />
   );
 
@@ -72,6 +78,7 @@ export function CustomInput({
           placeholder={placeholder}
           value={inputValue}
           rows={rows}
+          required={required}
           onChange={handleChange}
           className="border rounded-md p-2 w-full"
         />
@@ -84,12 +91,18 @@ export function CustomInput({
           type={type}
           name={name}
           placeholder={placeholder}
+          required={required}
           value={inputValue}
           min={0}
           onChange={handleChange}
           className="border rounded-md p-2 w-full dark:placeholder:text-white/50 "
         />
       )}
+
+      {required && !value && (
+<p className="text-red-500 text-xs">This field is required</p>
+      )}
+      {error && <p className="text-red-500 text-xs">{error}</p>}
     </div>
   );
 }
@@ -118,9 +131,11 @@ export function CheckBox({
         name={name}
         checked={Boolean(inputValue)}
         onChange={onChange}
-        className="w-5 h-5 border rounded focus:ring-blue-500 focus:ring-2"
+        className="w-5 h-5 border rounded dark:focus:ring-white/70 focus:ring-black focus:ring-2"
       />
-      <span className="text-gray-700">{label}</span>
+      <span className="text-black dark:text-white/70 text-base font-normal lg:text-lg">
+        {label}
+      </span>
     </div>
   );
 }

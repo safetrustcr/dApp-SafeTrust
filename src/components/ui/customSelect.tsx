@@ -12,6 +12,7 @@ type CustomSelectProps = {
   label?: string;
   placeholder?: string;
   name?: string;
+  required?: boolean;
 };
 
 function CustomSelect({
@@ -21,6 +22,7 @@ function CustomSelect({
   label,
   placeholder = "Select an option",
   name = "",
+  required,
 }: CustomSelectProps) {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     onChange(e.target.value);
@@ -37,7 +39,8 @@ function CustomSelect({
         name={name}
         value={value}
         onChange={handleChange}
-        className="border active:border-none  rounded-md p-2 w-full bg-transparent focus:ring-none "
+        required={required}
+        className="border active:border-none dark:placeholder:text-white/70 placeholder:text-black rounded-md p-2 w-full bg-transparent focus:ring-none "
       >
         <option
           className="dark:bg-black/50 dark:text-white/70 text-black bg-white/30"
@@ -56,6 +59,9 @@ function CustomSelect({
           </option>
         ))}
       </select>
+      {required && !value && (
+        <p className="text-red-500 text-xs">This field is required</p>
+      )}
     </div>
   );
 }
