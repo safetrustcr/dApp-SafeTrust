@@ -252,7 +252,7 @@ function CreateAlert() {
       <div>
         <button
           onClick={submitAlert}
-          className="bg-blue-500 text-white py-2 px-4 rounded-lg "
+          className="bg-black dark:bg-white py-2 px-4 rounded-lg text-white dark:text-black "
         >
           Submit
         </button>
