@@ -1,14 +1,13 @@
 "use client";
 
-
 import { AdminSidebar } from "@/layouts/Sidebar";
 import { DashboardHeader } from "@/layouts/Header";
 import { DashboardFooter } from "@/layouts/Footer";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
-import NotificationCenter from "@/pages/SystemManagement/NotificationCenter";
+import HelpCenter from "@/components/modules/helpCenter/HelpCenter";
 
-export default function NotificationCenterPage() {
+const HelpCenterPage = () => {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <SidebarProvider>
@@ -18,7 +17,7 @@ export default function NotificationCenterPage() {
             <SidebarInset className="flex flex-col w-full">
               <DashboardHeader />
               <main className="flex-1 p-8 pt-6 space-y-4">
-                <NotificationCenter />
+                <HelpCenter />
               </main>
               <DashboardFooter />
             </SidebarInset>
@@ -27,5 +26,6 @@ export default function NotificationCenterPage() {
       </SidebarProvider>
     </ThemeProvider>
   );
-}
+};
 
+export default HelpCenterPage;

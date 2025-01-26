@@ -122,7 +122,7 @@ export function AdminSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="/">
+                  <Link href="/dashboard">
                     <Home className="mr-2 h-4 w-4" />
                     Dashboard
                   </Link>

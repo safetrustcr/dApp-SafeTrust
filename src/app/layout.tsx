@@ -4,11 +4,8 @@ import { Footer } from "@/layouts/Footer";
 import { Header } from "@/layouts/Header";
 import { AdminSidebar } from "@/layouts/Sidebar";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
-import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
@@ -16,7 +13,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SafeTrust",
-  description: "Secure Deposits SafeTrust",
+  description: "SafeTrust is a decentralized and secure platform P2P",
 };
 
 export default function RootLayout({
@@ -25,24 +22,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body
-        className={`${inter.className} ${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-[#18181B]`}
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <SidebarProvider>
-            <div className="flex min-h-screen flex-col">
-              <div className="flex flex-1">
-                <AdminSidebar />
-                <SidebarInset className="flex flex-col">
-                  <Header />
-                  <main className="flex-1">{children}</main>
-                  <Footer />
-                </SidebarInset>
-              </div>
-            </div>
-          </SidebarProvider>
-        </ThemeProvider>
+        {children}
       </body>
     </html>
   );
