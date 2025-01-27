@@ -10,7 +10,7 @@ import {
   FileText,
   Filter,
 } from "lucide-react";
-import { JSX, useState } from "react";
+import { type JSX, useState } from "react";
 
 function NotificationCenter() {
   const [activeTab, setActiveTab] = useState("All");
@@ -30,16 +30,22 @@ function NotificationCenter() {
           </h4>
         </div>
         <div className="w-auto items-end lg:items-center gap-3 lg:gap-8 flex flex-col lg:flex-row ">
-          <button className="border-[1px] flex gap-2 lg:gap-4 rounded-md  items-center justify-center whitespace-nowrap p-2 lg:p-3 ">
+          <button
+            type="button"
+            className="border-[1px] flex gap-2 lg:gap-4 rounded-md items-center justify-center whitespace-nowrap p-2 lg:p-3"
+          >
             <Filter className="text-black dark:text-white text-sm" />
             <span className="text-base text-black dark:text-gray-100">
               Filter
             </span>
           </button>
 
-          <button className="bg-transparent/15 dark:bg-gray-500/25 gap-2 lg:gap-4 items-center flex flex-row p-2 lg:p-3 whitespace-nowrap rounded-md">
+          <button
+            type="button"
+            className="bg-transparent/15 dark:bg-gray-500/25 gap-2 lg:gap-4 items-center flex flex-row p-2 lg:p-3 whitespace-nowrap rounded-md"
+          >
             <Check className="text-black dark:text-white text-sm" />
-            <span className="text-base text-black  dark:text-gray-100">
+            <span className="text-base text-black dark:text-gray-100">
               Mark As Read
             </span>
           </button>
@@ -70,7 +76,8 @@ function NotificationCenter() {
         </h2>
         <div className="w-full flex-col space-y-4">
           <div className="flex flex-row items-center gap-2 my-3 p-2  dark:bg-gray-500/25 bg-transparent/10 w-fit rounded-lg">
-            <p
+            <button
+              type="button"
               onClick={() => handleTabClick("All")}
               className={`cursor-pointer text-sm font-semibold p-2 rounded-md ${
                 activeTab === "All"
@@ -79,9 +86,10 @@ function NotificationCenter() {
               }`}
             >
               All
-            </p>
+            </button>
 
-            <p
+            <button
+              type="button"
               onClick={() => handleTabClick("Unread")}
               className={`cursor-pointer text-sm font-semibold p-2 rounded-md ${
                 activeTab === "Unread"
@@ -90,9 +98,10 @@ function NotificationCenter() {
               }`}
             >
               Unread
-            </p>
+            </button>
 
-            <p
+            <button
+              type="button"
               onClick={() => handleTabClick("Important")}
               className={`cursor-pointer text-sm font-semibold p-2 rounded-md ${
                 activeTab === "Important"
@@ -101,7 +110,7 @@ function NotificationCenter() {
               }`}
             >
               Important
-            </p>
+            </button>
           </div>
           {notifications.map((notification) => (
             <NotificationCard key={notification.id} {...notification} />

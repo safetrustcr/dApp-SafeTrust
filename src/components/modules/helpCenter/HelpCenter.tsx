@@ -1,13 +1,13 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useHelpCenter } from "./hooks/useHelpCenter";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ContactSupport from "./ContactSupport";
 import FAQ from "./FAQ";
 import HelpTopics from "./HelpTopics";
-import ContactSupport from "./ContactSupport";
 import UserGuides from "./UserGuides";
+import { useHelpCenter } from "./hooks/useHelpCenter";
 
 const HelpCenter = () => {
   const { activeTab, setActiveTab } = useHelpCenter();

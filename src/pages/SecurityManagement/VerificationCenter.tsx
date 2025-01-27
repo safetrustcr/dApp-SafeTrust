@@ -1,20 +1,21 @@
 "use client";
-import React, { useState } from "react";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ThemeProvider } from "@/components/theme-provider";
 import {
-  FileText,
-  Upload,
-  CheckCircle,
   Building2,
-  Shield,
-  User,
+  CheckCircle,
+  FileText,
   Menu,
+  Shield,
+  Upload,
+  User,
   X,
 } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
 
 const ThemeToggle = () => {
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -124,7 +125,7 @@ const VerificationCenter = () => {
 
   const updateVerificationData = (
     section: keyof typeof verificationData,
-    data: Partial<(typeof verificationData)[keyof typeof verificationData]>
+    data: Partial<(typeof verificationData)[keyof typeof verificationData]>,
   ) => {
     setVerificationData((prev: typeof verificationData) => ({
       ...prev,
@@ -144,7 +145,7 @@ const VerificationCenter = () => {
       <main className="container w-[1110px] px-4 py-6 max-w-4xl">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl md:text-2xl font-bold">Verification Center</h1>
-          <div className="hidden md:block"></div>
+          <div className="hidden md:block" />
           <div className="md:hidden">
             <Button
               variant="outline"
