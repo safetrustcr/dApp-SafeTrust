@@ -1,11 +1,13 @@
 "use client";
 
+import { useGlobalAuthenticationStore } from "@/components/auth/store/data";
 import { DashboardFooter } from "@/layouts/Footer";
 import { DashboardHeader } from "@/layouts/Header";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const router = useRouter();
+
   return (
     <div className="h-screen flex flex-col">
       <header className="flex justify-between items-center p-4 bg-white dark:bg-[#0F172A] text-black dark:text-gray-100 shadow-md">
