@@ -1,11 +1,11 @@
 "use client";
 
-import { AdminSidebar } from "@/layouts/Sidebar";
-import { DashboardHeader } from "@/layouts/Header";
-import { DashboardFooter } from "@/layouts/Footer";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { ThemeProvider } from "@/components/theme-provider";
 import HelpCenter from "@/components/modules/helpCenter/HelpCenter";
+import { ThemeProvider } from "@/components/theme-provider";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { DashboardFooter } from "@/layouts/Footer";
+import { DashboardHeader } from "@/layouts/Header";
+import { AdminSidebar } from "@/layouts/Sidebar";
 
 const HelpCenterPage = () => {
   return (

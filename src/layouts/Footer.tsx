@@ -1,5 +1,5 @@
-import { Github, Twitter } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Github, Twitter } from "lucide-react";
 
 export function DashboardFooter() {
   return (

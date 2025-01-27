@@ -1,12 +1,26 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Download, Search, Calendar, Clock, Filter, Tag, User } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  Download,
+  Filter,
+  Search,
+  Tag,
+  User,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -26,14 +40,14 @@ export enum ServiceStatus {
 }
 
 export interface Service {
-  id: string
-  type: string
-  provider: string
-  status: ServiceStatus
-  date: string
-  cost: number
-  location: string
-  description: string
+  id: string;
+  type: string;
+  provider: string;
+  status: ServiceStatus;
+  date: string;
+  cost: number;
+  location: string;
+  description: string;
 }
 
 // Mock data
@@ -44,9 +58,9 @@ export const serviceHistory: Service[] = [
     provider: "Tech Solutions Inc",
     status: ServiceStatus.Completed,
     date: "2025-01-20",
-    cost: 450.00,
+    cost: 450.0,
     location: "New York, NY",
-    description: "Regular system maintenance and updates"
+    description: "Regular system maintenance and updates",
   },
   {
     id: "SRV-002",
@@ -54,9 +68,9 @@ export const serviceHistory: Service[] = [
     provider: "QuickFix Services",
     status: ServiceStatus.Pending,
     date: "2024-10-18",
-    cost: 850.00,
+    cost: 850.0,
     location: "Los Angeles, CA",
-    description: "Emergency hardware replacement"
+    description: "Emergency hardware replacement",
   },
   {
     id: "SRV-003",
@@ -64,9 +78,9 @@ export const serviceHistory: Service[] = [
     provider: "Network Pro LLC",
     status: ServiceStatus.InProgress,
     date: "2024-11-15",
-    cost: 1200.00,
+    cost: 1200.0,
     location: "Chicago, IL",
-    description: "New security system installation"
+    description: "New security system installation",
   },
   {
     id: "SRV-004",
@@ -74,11 +88,11 @@ export const serviceHistory: Service[] = [
     provider: "Safety First Co",
     status: ServiceStatus.Scheduled,
     date: "2024-12-31",
-    cost: 300.00,
+    cost: 300.0,
     location: "Miami, FL",
-    description: "Annual safety inspection"
-  }
-]
+    description: "Annual safety inspection",
+  },
+];
 // ServiceHistoryTable component
 const statusStyles = {
   completed: "bg-green-500/15 text-green-500",
@@ -86,7 +100,7 @@ const statusStyles = {
   pending: "bg-yellow-500/15 text-yellow-500",
   cancelled: "bg-red-500/15 text-red-500",
   scheduled: "bg-gray-500/15 text-gray-500",
-}
+};
 
 export function ServiceHistoryTable({ services }: { services: Service[] }) {
   return (
@@ -126,9 +140,13 @@ export function ServiceHistoryTable({ services }: { services: Service[] }) {
                 </div>
               </TableCell>
               <TableCell className="min-w-[140px]">
-                <Badge variant="secondary" className={statusStyles[service.status as ServiceStatus]}>
+                <Badge
+                  variant="secondary"
+                  className={statusStyles[service.status as ServiceStatus]}
+                >
                   <Clock className="h-3 w-3 mr-1" aria-hidden="true" />
-                  {service.status.charAt(0).toUpperCase() + service.status.slice(1)}
+                  {service.status.charAt(0).toUpperCase() +
+                    service.status.slice(1)}
                 </Badge>
               </TableCell>
               <TableCell>${service.cost.toFixed(2)}</TableCell>
@@ -140,68 +158,76 @@ export function ServiceHistoryTable({ services }: { services: Service[] }) {
         </TableBody>
       </Table>
     </div>
-  )
+  );
 }
 
 // ServiceHistoryPage component
 const getDiffDays = (date1: Date, date2: Date) =>
-  Math.ceil(Math.abs(date1.getTime() - date2.getTime()) / (1000 * 60 * 60 * 24))
+  Math.ceil(
+    Math.abs(date1.getTime() - date2.getTime()) / (1000 * 60 * 60 * 24),
+  );
 
 export default function ServiceHistoryPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [dateFilter, setDateFilter] = useState("all")
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
 
   const filteredServices = useMemo(() => {
     return serviceHistory.filter((service) => {
       const matchesSearch =
         service.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         service.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        service.provider.toLowerCase().includes(searchQuery.toLowerCase())
+        service.provider.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesStatus = statusFilter === "all" || service.status === statusFilter
+      const matchesStatus =
+        statusFilter === "all" || service.status === statusFilter;
 
-      if (dateFilter === "all") return matchesSearch && matchesStatus
+      if (dateFilter === "all") return matchesSearch && matchesStatus;
 
-      const serviceDate = new Date(service.date)
-      const today = new Date()
-      const diffDays = getDiffDays(today, serviceDate)
+      const serviceDate = new Date(service.date);
+      const today = new Date();
+      const diffDays = getDiffDays(today, serviceDate);
 
       switch (dateFilter) {
         case "7days":
-          return matchesSearch && matchesStatus && diffDays <= 7
+          return matchesSearch && matchesStatus && diffDays <= 7;
         case "30days":
-          return matchesSearch && matchesStatus && diffDays <= 30
+          return matchesSearch && matchesStatus && diffDays <= 30;
         case "90days":
-          return matchesSearch && matchesStatus && diffDays <= 90
+          return matchesSearch && matchesStatus && diffDays <= 90;
         case "365days":
-          return matchesSearch && matchesStatus && diffDays <= 365
+          return matchesSearch && matchesStatus && diffDays <= 365;
         default:
-          return matchesSearch && matchesStatus
+          return matchesSearch && matchesStatus;
       }
-    })
-  }, [searchQuery, statusFilter, dateFilter])
+    });
+  }, [searchQuery, statusFilter, dateFilter]);
 
   const handleDownload = () => {
-    const headers = ["Service ID,Type,Provider,Date,Status,Amount\n"]
+    const headers = ["Service ID,Type,Provider,Date,Status,Amount\n"];
     const csvData = filteredServices.map(
       (service) =>
         `${service.id},${service.type},${service.provider},${service.date},${service.status},${service.cost}\n`,
-    )
-    const blob = new Blob([...headers, ...csvData], { type: "text/csv" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.setAttribute("href", url)
-    a.setAttribute("download", "service-history.csv")
-    a.click()
-  }
+    );
+    const blob = new Blob([...headers, ...csvData], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.setAttribute("href", url);
+    a.setAttribute("download", "service-history.csv");
+    a.click();
+  };
 
   return (
     <div className="min-h-[calc(100vh-129px)] bg-background p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Service History</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={handleDownload} aria-label="Download service history">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleDownload}
+            aria-label="Download service history"
+          >
             <Download className="h-4 w-4" aria-hidden="true" />
           </Button>
           <Button>New Service Request</Button>
@@ -251,5 +277,5 @@ export default function ServiceHistoryPage() {
 
       <ServiceHistoryTable services={filteredServices} />
     </div>
-  )
+  );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { Bell, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Bell, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
 export function DashboardHeader() {
@@ -9,7 +9,7 @@ export function DashboardHeader() {
 
   return (
     <header className="flex h-16 items-center justify-between border-b px-4 lg:px-6">
-      <div className="flex items-center gap-4"></div>
+      <div className="flex items-center gap-4" />
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
