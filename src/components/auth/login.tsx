@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -13,10 +10,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-export function Login() {
+interface LoginProps {
+  onSwitchToRegister: () => void;
+  onForgotPassword: () => void;
+  onLogin: (credentials: { email: string; password: string }) => void;
+}
+
+export const Login: React.FC<LoginProps> = ({
+  onSwitchToRegister,
+  onForgotPassword,
+  onLogin,
+}) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -112,9 +122,9 @@ export function Login() {
           className="text-gray-700 dark:text-gray-400"
           onClick={handleSwitchToRegister}
         >
-          Don’t have an account? Register here
+          Don't have an account? Register here
         </Button>
       </CardFooter>
     </Card>
   );
-}
+};

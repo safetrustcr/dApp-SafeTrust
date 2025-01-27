@@ -1,8 +1,8 @@
 "use client";
 
-import { DashboardHeader } from "@/layouts/Header";
-import { DashboardFooter } from "@/layouts/Footer";
 import { Login } from "@/components/auth/login";
+import { DashboardFooter } from "@/layouts/Footer";
+import { DashboardHeader } from "@/layouts/Header";
 
 interface LoginCredentials {
   email: string;

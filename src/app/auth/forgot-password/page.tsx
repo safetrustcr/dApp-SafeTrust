@@ -1,8 +1,8 @@
 "use client";
 
-import { DashboardHeader } from "@/layouts/Header";
-import { DashboardFooter } from "@/layouts/Footer";
 import { ForgotPassword } from "@/components/auth/forgot-password";
+import { DashboardFooter } from "@/layouts/Footer";
+import { DashboardHeader } from "@/layouts/Header";
 
 export default function ForgotPasswordPage() {
   const handleBackToLogin = () => {

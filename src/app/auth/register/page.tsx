@@ -1,8 +1,8 @@
 "use client";
 
-import { DashboardHeader } from "@/layouts/Header";
-import { DashboardFooter } from "@/layouts/Footer";
 import { Register } from "@/components/auth/register";
+import { DashboardFooter } from "@/layouts/Footer";
+import { DashboardHeader } from "@/layouts/Header";
 
 export default function RegisterPage() {
   const handleSwitchToLogin = () => {
