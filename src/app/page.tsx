@@ -1,10 +1,14 @@
+
 import MetricsCard from "@/components/modules/MetricsCard";
 import RecentContractsTable from "@/components/modules/RecentContractsTable";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight } from "lucide-react";
 import { FaLock, FaClock, FaBell, FaExclamationTriangle } from "react-icons/fa";
 
+
 export default function DashboardPage() {
+  const router = useRouter();
+
   return (
     <div className="flex flex-col">
       <div className="flex-1 space-y-4 p-8 pt-6">
@@ -45,6 +49,7 @@ export default function DashboardPage() {
           <RecentContractsTable />
         </div>
       </div>
+
     </div>
   );
 }
