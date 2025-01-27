@@ -1,4 +1,4 @@
-import PaymentGateway from "@/pages/ContractManagement/payment-gateway/payment-gateway"
+import PaymentGateway from "@/pages/ContractManagement/PaymentGateway/payment-gateway"
 import { Suspense } from "react"
 
 
