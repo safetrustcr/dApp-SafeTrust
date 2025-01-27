@@ -14,7 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useWallet } from "./hooks/useWallet.hook";
+import { useGlobalAuthenticationStore } from "./store/data";
 
 interface LoginProps {
   onSwitchToRegister: () => void;
@@ -48,6 +50,15 @@ export const Login: React.FC<LoginProps> = ({
     console.log("Redirecting to register...");
     router.push("/auth/register");
   };
+
+    const address = useGlobalAuthenticationStore((state) => state.address);
+  const { handleConnect } = useWallet();
+
+    useEffect(() => {
+      if (address) {
+        router.push("/dashboard");
+      }
+    }, [address, router]);
 
   return (
     <Card className="w-full max-w-md mx-auto bg-white dark:bg-[#18181B]">
@@ -104,9 +115,13 @@ export const Login: React.FC<LoginProps> = ({
           >
             Log In
           </Button>
-          <Button className="w-full text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center mt-2">
+
+          {!address && (
+            <Button onClick={handleConnect} type="button"  className="w-full text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center mt-2">
             Wallet
           </Button>
+          )}
+          
         </form>
       </CardContent>
       <CardFooter className="flex flex-col items-center space-y-2">
