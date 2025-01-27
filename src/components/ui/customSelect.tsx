@@ -33,7 +33,7 @@ function CustomSelect({
   return (
     <div className="flex flex-col gap-2">
       {label && (
-        <label className="block mb-1 lg:text-lg text-base text-black font-medium dark:text-white">
+        <label className="block mb-1 lg:text-sm text-xs text-black font-medium dark:text-white">
           {label}
         </label>
       )}

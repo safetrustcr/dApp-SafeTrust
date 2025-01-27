@@ -78,12 +78,12 @@ function CreateAlert() {
     { label: "Monthly", value: "Monthly" },
   ];
   return (
-    <div className="flex flex-col dark:bg-black space-y-4 p-8 w-full pt-6">
+    <div className="flex flex-col dark:bg-black space-y-4 p-8 w-full ">
       <p className="font-bold dark:text-white text-black lg:text-2xl text-base">
         Create Alert
       </p>
 
-      <div className="w-full flex flex-col mt-4">
+      <div className="w-full flex flex-col mt-2">
         <p className="text-sm mb-3 text-black dark:text-white/50 lg:text-base">
           Alert Type
         </p>
@@ -97,7 +97,7 @@ function CreateAlert() {
           ))}
         </div>
       </div>
-      <div className="grid gap-4 w-full md:grid-cols-2">
+      <div className="grid gap-3 w-full md:grid-cols-2">
         <CustomInput
           error={errors.minimumAmount}
           showRequired={isSubmitted}
@@ -194,7 +194,7 @@ function CreateAlert() {
         label="Reminder Frequency"
         placeholder="Select an option"
       />
-      <div className="flex flex-col gap-4 my-5">
+      <div className="flex flex-col gap-3 my-5">
         <p>Notification Method</p>
         <CheckBox
           label="Email Notification"

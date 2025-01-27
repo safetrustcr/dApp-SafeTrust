@@ -1,11 +1,11 @@
 "use client";
 
-import { AdminSidebar } from "@/layouts/Sidebar";
-import { DashboardHeader } from "@/layouts/Header";
-import { DashboardFooter } from "@/layouts/Footer";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
-import CreateAlert from "@/pages/SecurityManagement/createAlert";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { DashboardFooter } from "@/layouts/Footer";
+import { DashboardHeader } from "@/layouts/Header";
+import { AdminSidebar } from "@/layouts/Sidebar";
+import CreateAlert from "@/pages/SecurityManagement/CreateAlert";
 
 export default function CreateAlertPage() {
   return (

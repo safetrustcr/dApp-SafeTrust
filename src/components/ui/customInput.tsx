@@ -74,7 +74,7 @@ export function CustomInput({
   return (
     <div className="mb-4">
       {label && (
-        <label className="block mb-1 lg:text-lg text-base font-medium dark:text-white">
+        <label className="block mb-1 lg:text-sm text-xs font-normal dark:text-white">
           {label}
         </label>
       )}
@@ -139,7 +139,7 @@ export function CheckBox({
         onChange={onChange}
         className="w-5 h-5 border rounded dark:focus:ring-white/70 focus:ring-black focus:ring-2"
       />
-      <span className="text-black dark:text-white/70 text-base font-normal lg:text-lg">
+      <span className="text-black dark:text-white/70 text-xs font-normal lg:text-sm">
         {label}
       </span>
     </div>
