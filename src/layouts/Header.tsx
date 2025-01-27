@@ -3,11 +3,10 @@
 import { useWallet } from "@/components/auth/hooks/useWallet.hook";
 import { useGlobalAuthenticationStore } from "@/components/auth/store/data";
 import { Button } from "@/components/ui/button";
-import { Bell, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Bell } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
 export function DashboardHeader() {
-  const { theme, setTheme } = useTheme();
   const address = useGlobalAuthenticationStore((state) => state.address);
     const { handleDisconnect } = useWallet();
 
@@ -15,17 +14,9 @@ export function DashboardHeader() {
     <header className="flex h-16 items-center justify-between border-b px-4 lg:px-6">
       <div className="flex items-center gap-4" />
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        >
-          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">Toggle theme</span>
-        </Button>
+        <ThemeToggle />
         <Button variant="ghost" size="icon">
-          <Bell className="h-5 w-5" />
+          <Bell className="h-[1.2rem] w-[1.2rem]" />
           <span className="sr-only">Notifications</span>
         </Button>
 
