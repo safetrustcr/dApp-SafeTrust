@@ -41,13 +41,13 @@ const metricsData = [
     title: "Total Value Locked",
     value: "$45,231.89",
     description: "+20.1% from last month",
-    icon: <Lock className="w-5 h-5"/>,
+    icon: <Lock className="w-5 h-5" />,
   },
   {
     title: "Active Contracts",
     value: "24",
     description: "3 pending execution",
-    icon: <Clock className="w-5 h-5"/>,
+    icon: <Clock className="w-5 h-5" />,
   },
   {
     title: "Contract Events",
@@ -84,22 +84,29 @@ export default function SmartContract() {
             Create Contract <ArrowUpRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {/* Add your dashboard content here */}
-          {metricsData.map((metric, index) => (
-        <Card key={index} className="bg-background rounded-lg shadow-lg relative w-64">
-          <CardHeader>
-            <CardTitle className="flex justify-between items-center text-md font-semibold">
-              {metric.title}
-              <span className="text-gray-400 text-md">{metric.icon}</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{metric.value}</p>
-            <p className="text-sm text-gray-400 mt-2">{metric.description}</p>
-          </CardContent>
-        </Card>
-      ))}
+        <div className="flex w-full justify-center">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Add your dashboard content here */}
+            {metricsData.map((metric, index) => (
+              <Card
+                key={index}
+                className="bg-background rounded-lg shadow-lg relative w-64"
+              >
+                <CardHeader>
+                  <CardTitle className="flex justify-between items-center text-md font-semibold">
+                    {metric.title}
+                    <span className="text-gray-400 text-md">{metric.icon}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{metric.value}</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {metric.description}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
         <div>
           <div className="p-6 bg-background text-card-foreground shadow-lg rounded-lg border">
