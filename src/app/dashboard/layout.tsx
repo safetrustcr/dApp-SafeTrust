@@ -1,16 +1,21 @@
 "use client";
 
+import { useGlobalAuthenticationStore } from "@/components/auth/store/data";
+import { redirect } from "next/navigation";
+import React from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { DashboardFooter } from "@/layouts/Footer";
 import { DashboardHeader } from "@/layouts/Header";
 import { AdminSidebar } from "@/layouts/Sidebar";
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+const Layout = ({ children }: { children: React.ReactNode }) => {
+  const { address } = useGlobalAuthenticationStore();
+
+  if (address === "") {
+    redirect("/");
+  }
+
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <SidebarProvider>
@@ -19,9 +24,7 @@ export default function RootLayout({
             <AdminSidebar />
             <SidebarInset className="flex flex-col w-full">
               <DashboardHeader />
-              <div className="flex-1 space-y-4">
-              {children}
-              </div>
+              <div className="flex-1 space-y-4">{children}</div>
               <DashboardFooter />
             </SidebarInset>
           </div>
@@ -29,4 +32,6 @@ export default function RootLayout({
       </SidebarProvider>
     </ThemeProvider>
   );
-}
+};
+
+export default Layout;

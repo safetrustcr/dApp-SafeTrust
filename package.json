@@ -10,6 +10,7 @@
     "lint:fix": "biome check . --write"
   },
   "dependencies": {
+    "@creit.tech/stellar-wallets-kit": "^1.4.1",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-avatar": "^1.1.2",
     "@radix-ui/react-collapsible": "^1.1.2",

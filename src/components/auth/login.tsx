@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { useWallet } from "./hooks/useWallet.hook";
+import { useGlobalAuthenticationStore } from "./store/data";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -23,7 +25,16 @@ export function Login() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const address = useGlobalAuthenticationStore((state) => state.address);
+  const { handleConnect } = useWallet();
+
+  useEffect(() => {
+    if (address) {
+      router.push("/dashboard");
+    }
+  }, [address, router]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     console.log("Login attempt with:", { email, password });
@@ -85,6 +96,16 @@ export function Login() {
           >
             Log In
           </Button>
+
+          {!address && (
+            <Button
+              onClick={handleConnect}
+              type="button"
+              className="w-full text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center mt-2"
+            >
+              Wallet
+            </Button>
+          )}
         </form>
       </CardContent>
       <CardFooter className="flex flex-col items-center space-y-2">
