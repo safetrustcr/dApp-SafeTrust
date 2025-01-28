@@ -51,24 +51,24 @@ const securityItems = [
   {
     icon: Shield,
     label: "Security Deposit",
-    href: "/security-deposit-types",
+    href: "/dashboard/security-management/security-deposit-types",
   },
   {
     icon: FileCheck,
     label: "Verification Center",
-    href: "/verification-center",
+    href: "/dashboard/security-management/verification-center",
   },
   {
     icon: AlertTriangle,
     label: "Dispute Resolution",
-    href: "/dispute-resolution",
+    href: "/dashboard/security-management/dispute-resolution",
   },
 ];
 
 const servicesItems = [
-  { icon: Search, label: "Service Search", href: "/service-search" },
-  { icon: History, label: "Service History", href: "/service-history" },
-  { icon: UserCircle, label: "Provider Profile", href: "/provider-profile" },
+  { icon: Search, label: "Service Search", href: "/dashboard/service-management/service-search" },
+  { icon: History, label: "Service History", href: "/dashboard/service-management/service-history" },
+  { icon: UserCircle, label: "Provider Profile", href: "/dashboard/service-management/service-history" },
 ];
 
 const contractItems = [
@@ -85,14 +85,14 @@ const systemItems = [
   {
     icon: Bell,
     label: "Notification Center",
-    href: "/notification-center",
+    href: "/dashboard/system-management/notification-center",
   },
   {
     icon: BarChart2,
     label: "Analytics",
-    href: "/analytics-dashboard",
+    href: "/dashboard/system-management/analytics-dashboard",
   },
-  { icon: HelpCircle, label: "Help Center", href: "/help-center" },
+  { icon: HelpCircle, label: "Help Center", href: "/dashboard/system-management/help-center" },
 ];
 
 export function AdminSidebar() {
