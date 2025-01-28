@@ -19,7 +19,7 @@ function NotificationCenter() {
     setActiveTab(tab);
   };
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6 bg-transparent dark:bg-black">
+    <div className="flex-1 space-y-4 p-8 pt-6 bg-transparent dark:bg-background">
       <div className="flex flex-row justify-between items-start">
         <div className="flex flex-col items-start space-y-2">
           <h2 className="text-3xl text-black dark:text-white font-bold tracking-tight">
