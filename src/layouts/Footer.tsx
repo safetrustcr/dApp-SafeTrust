@@ -1,9 +1,9 @@
-import { Github, Twitter } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Github, Twitter } from "lucide-react";
 
 export function DashboardFooter() {
   return (
-    <footer className="bg-white dark:bg-[#18181B] text-black dark:text-white">
+    <footer className="bg-white dark:bg-background text-black dark:text-white">
       <div className="mx-auto w-full max-w-7xl px-6 py-4">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex flex-col items-center gap-4 px-8 sm:flex-row sm:gap-6">

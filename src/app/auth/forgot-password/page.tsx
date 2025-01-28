@@ -1,21 +1,7 @@
 "use client";
 
-import { DashboardHeader } from "@/layouts/Header";
-import { DashboardFooter } from "@/layouts/Footer";
 import { ForgotPassword } from "@/components/auth/forgot-password";
 
 export default function ForgotPasswordPage() {
-  const handleBackToLogin = () => {
-    console.log("Returning to login");
-  };
-
-  return (
-    <div className="flex flex-col min-h-screen">
-      <DashboardHeader />
-      <main className="flex-1 p-8 pt-6 space-y-4 flex items-center justify-center">
-        <ForgotPassword onBackToLogin={handleBackToLogin} />
-      </main>
-      <DashboardFooter />
-    </div>
-  );
+  return <ForgotPassword />;
 }

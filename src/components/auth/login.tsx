@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { useWallet } from "./hooks/useWallet.hook";
+import { useGlobalAuthenticationStore } from "./store/data";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -22,29 +25,28 @@ export function Login() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const address = useGlobalAuthenticationStore((state) => state.address);
+  const { handleConnect } = useWallet();
+
+  useEffect(() => {
+    if (address) {
+      router.push("/dashboard");
+    }
+  }, [address, router]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     console.log("Login attempt with:", { email, password });
     router.push("/dashboard");
   };
 
-  const handleForgotPassword = () => {
-    console.log("Redirecting to forgot password...");
-    router.push("/auth/forgot-password");
-  };
-
-  const handleSwitchToRegister = () => {
-    console.log("Redirecting to register...");
-    router.push("/auth/register");
-  };
-
   return (
-    <Card className="w-full max-w-md mx-auto bg-white dark:bg-[#18181B]">
+    <Card className="w-full max-w-md mx-auto bg-white dark:bg-background overflow-hidden">
       <CardHeader>
         <CardTitle className="text-black dark:text-gray-100">Log In</CardTitle>
         <CardDescription className="text-gray-600 dark:text-gray-400">
-          Access your blockchain microloans account
+          Access your employee account
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -60,7 +62,7 @@ export function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="bg-white dark:bg-[#18181B] text-black dark:text-gray-100 border border-gray-300 dark:border-gray-700"
+              className="bg-white dark:bg-background text-black dark:text-gray-100 border border-gray-300 dark:border-gray-700"
             />
           </div>
           <div className="space-y-2">
@@ -76,7 +78,7 @@ export function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="bg-white dark:bg-[#18181B] text-black dark:text-gray-100 border border-gray-300 dark:border-gray-700"
+              className="bg-white dark:bg-background text-black dark:text-gray-100 border border-gray-300 dark:border-gray-700"
             />
           </div>
           {error && (
@@ -94,26 +96,31 @@ export function Login() {
           >
             Log In
           </Button>
-          <Button className="w-full text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center mt-2">
-            Wallet
-          </Button>
+
+          {!address && (
+            <Button
+              onClick={handleConnect}
+              type="button"
+              className="w-full text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center mt-2"
+            >
+              Wallet
+            </Button>
+          )}
         </form>
       </CardContent>
       <CardFooter className="flex flex-col items-center space-y-2">
-        <Button
-          variant="link"
+        <Link
+          href="/auth/register"
           className="text-gray-700 dark:text-gray-400"
-          onClick={handleForgotPassword}
-        >
-          Forgot your password?
-        </Button>
-        <Button
-          variant="link"
-          className="text-gray-700 dark:text-gray-400"
-          onClick={handleSwitchToRegister}
         >
           Don’t have an account? Register here
-        </Button>
+        </Link>
+        <Link
+          href="/auth/forgot-password"
+          className="text-gray-700 dark:text-gray-400"
+        >
+          Forgot your password?
+        </Link>
       </CardFooter>
     </Card>
   );

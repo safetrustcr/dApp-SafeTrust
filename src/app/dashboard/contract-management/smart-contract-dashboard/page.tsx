@@ -6,9 +6,9 @@ import { DashboardHeader } from "@/layouts/Header";
 import { DashboardFooter } from "@/layouts/Footer";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
-import NotificationCenter from "@/pages/SystemManagement/NotificationCenter";
+import SmartContract from "@/pages/ContractManagement/SmartContract";
 
-export default function NotificationCenterPage() {
+export default function SmartContractPage() {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <SidebarProvider>
@@ -18,7 +18,7 @@ export default function NotificationCenterPage() {
             <SidebarInset className="flex flex-col w-full">
               <DashboardHeader />
               <main className="flex-1 p-8 pt-6 space-y-4">
-                <NotificationCenter />
+                <SmartContract />
               </main>
               <DashboardFooter />
             </SidebarInset>

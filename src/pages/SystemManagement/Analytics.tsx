@@ -1,9 +1,16 @@
-"use client"
+"use client";
 
-import { AlertTriangle, FileText, BadgeDollarSign, AlertCircle, ShieldCheck } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertCircle,
+  AlertTriangle,
+  BadgeDollarSign,
+  FileText,
+  ShieldCheck,
+} from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
 
 export default function Analytics() {
   const recentDeposits = [
@@ -42,7 +49,7 @@ export default function Analytics() {
       amount: 9400.0,
       date: "2023-12-16",
     },
-  ]
+  ];
 
   const contractStatus = [
     {
@@ -69,13 +76,18 @@ export default function Analytics() {
       status: "Active",
       amount: 3200.0,
     },
-  ]
+  ];
+
+  const ITEMS = recentDeposits.map((item) => ({
+    ...item,
+    id: uuidv4(),
+  }));
 
   return (
     <div className="w-full max-w-[1600px] mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-        <div className="flex items-center space-x-4"></div>
+        <div className="flex items-center space-x-4" />
       </div>
 
       <Tabs defaultValue="overview" className="space-y-8">
@@ -88,17 +100,23 @@ export default function Analytics() {
         <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Deposits</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total Deposits
+              </CardTitle>
               <BadgeDollarSign className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">$45,231.89</div>
-              <p className="text-xs text-muted-foreground">+$20.1k from last month</p>
+              <p className="text-xs text-muted-foreground">
+                +$20.1k from last month
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Contracts</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Active Contracts
+              </CardTitle>
               <FileText className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -108,17 +126,23 @@ export default function Analytics() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Verifications</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Pending Verifications
+              </CardTitle>
               <ShieldCheck className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">Requires attention</p>
+              <p className="text-xs text-muted-foreground">
+                Requires attention
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Open Disputes</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Open Disputes
+              </CardTitle>
               <AlertTriangle className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -134,23 +158,33 @@ export default function Analytics() {
               <CardTitle>Recent Deposits</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {recentDeposits.map((deposit, i) => (
+              {ITEMS.map((deposit) => (
                 <div
-                  key={i}
+                  key={deposit.id}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg bg-background gap-2 sm:gap-4"
                 >
                   <div className="w-[70%] sm:w-auto">
                     <p className="font-medium">{deposit.type}</p>
-                    <p className="text-sm text-muted-foreground">Contract #{deposit.contract}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Contract #{deposit.contract}
+                    </p>
                   </div>
                   <Badge
-                    variant={deposit.status === "completed" ? "default" : "secondary"}
-                    className={deposit.status === "completed" ? "bg-black text-white" : "bg-gray-200 text-gray-700"}
+                    variant={
+                      deposit.status === "completed" ? "default" : "secondary"
+                    }
+                    className={
+                      deposit.status === "completed"
+                        ? "bg-black text-white"
+                        : "bg-gray-200 text-gray-700"
+                    }
                   >
                     {deposit.status}
                   </Badge>
                   <div className="flex items-center justify-between sm:justify-end gap-4">
-                    <p className="font-medium">${deposit.amount.toLocaleString()}</p>
+                    <p className="font-medium">
+                      ${deposit.amount.toLocaleString()}
+                    </p>
                     <p className="text-[12px]">{deposit.date}</p>
                   </div>
                 </div>
@@ -165,7 +199,7 @@ export default function Analytics() {
             <CardContent className="space-y-6">
               {contractStatus.map((contract, i) => (
                 <div
-                  key={i}
+                  key={uuidv4()}
                   className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg bg-background gap-2 sm:gap-4 ${
                     contract.status === "Warning" ? "border-destructive" : ""
                   }`}
@@ -178,7 +212,10 @@ export default function Analytics() {
                       <div className="flex items-center space-x-2">
                         <p className="font-medium">Contract #{contract.id}</p>
                         {contract.status === "Active" && (
-                          <Badge variant="secondary" className="bg-white text-black">
+                          <Badge
+                            variant="secondary"
+                            className="bg-white text-black"
+                          >
                             Active
                           </Badge>
                         )}
@@ -191,7 +228,9 @@ export default function Analytics() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`font-medium ${contract.status === "Warning" ? "text-red-600" : ""}`}>
+                    <p
+                      className={`font-medium ${contract.status === "Warning" ? "text-red-600" : ""}`}
+                    >
                       ${contract.amount.toLocaleString()}
                     </p>
                   </div>
@@ -202,5 +241,5 @@ export default function Analytics() {
         </div>
       </Tabs>
     </div>
-  )
+  );
 }

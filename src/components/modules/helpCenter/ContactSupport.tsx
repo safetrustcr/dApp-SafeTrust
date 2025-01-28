@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -7,9 +8,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ContainerHelpCenter } from "../utils/Containers";
-import { Button } from "@/components/ui/button";
 import { MoveRight } from "lucide-react";
+import { ContainerHelpCenter } from "../utils/Containers";
 
 const ContactSupport = () => {
   return (

@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -12,14 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
-export function ForgotPassword({
-  onBackToLogin,
-}: {
-  onBackToLogin: () => void;
-}) {
+export function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -88,13 +85,12 @@ export function ForgotPassword({
         )}
       </CardContent>
       <CardFooter className="flex justify-center">
-        <Button
-          variant="link"
+        <Link
           className="text-gray-700 dark:text-gray-300"
-          onClick={onBackToLogin}
+          href="login"
         >
           Back to login
-        </Button>
+        </Link>
       </CardFooter>
     </Card>
   );

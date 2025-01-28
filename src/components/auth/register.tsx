@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -12,10 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
-export function Register({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
+export function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,7 +35,7 @@ export function Register({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto bg-white dark:bg-[#18181B] border border-gray-200 dark:border-none">
+    <Card className="w-full max-w-md mx-auto bg-white dark:bg-background ">
       <CardHeader>
         <CardTitle className="text-gray-900 dark:text-gray-100">
           Register
@@ -122,13 +123,12 @@ export function Register({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
         </form>
       </CardContent>
       <CardFooter className="flex justify-center">
-        <Button
-          variant="link"
+        <Link
           className="text-gray-700 dark:text-gray-300"
-          onClick={onSwitchToLogin}
+          href="login"
         >
           Already have an account? Log in here
-        </Button>
+        </Link>
       </CardFooter>
     </Card>
   );

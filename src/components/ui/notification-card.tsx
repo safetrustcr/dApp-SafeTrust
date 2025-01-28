@@ -1,5 +1,5 @@
 import { AlertCircle, Bell, CircleCheck, XCircle } from "lucide-react";
-import { JSX } from "react";
+import type { JSX } from "react";
 interface NotificationAnalyticsCardProps {
   total: string | number;
   subtitle: string;
