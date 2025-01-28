@@ -1,7 +1,10 @@
 "use client";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -10,23 +13,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import Link from "next/link";
 
-interface LoginProps {
-  onSwitchToRegister: () => void;
-  onForgotPassword: () => void;
-  onLogin: (credentials: { email: string; password: string }) => void;
-}
-
-export const Login: React.FC<LoginProps> = ({
-  onSwitchToRegister,
-  onForgotPassword,
-  onLogin,
-}) => {
+export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -39,22 +30,12 @@ export const Login: React.FC<LoginProps> = ({
     router.push("/dashboard");
   };
 
-  const handleForgotPassword = () => {
-    console.log("Redirecting to forgot password...");
-    router.push("/auth/forgot-password");
-  };
-
-  const handleSwitchToRegister = () => {
-    console.log("Redirecting to register...");
-    router.push("/auth/register");
-  };
-
   return (
-    <Card className="w-full max-w-md mx-auto bg-white dark:bg-[#18181B]">
+    <Card className="w-full max-w-md mx-auto bg-white dark:bg-background overflow-hidden">
       <CardHeader>
         <CardTitle className="text-black dark:text-gray-100">Log In</CardTitle>
         <CardDescription className="text-gray-600 dark:text-gray-400">
-          Access your blockchain microloans account
+          Access your employee account
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -70,7 +51,7 @@ export const Login: React.FC<LoginProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="bg-white dark:bg-[#18181B] text-black dark:text-gray-100 border border-gray-300 dark:border-gray-700"
+              className="bg-white dark:bg-background text-black dark:text-gray-100 border border-gray-300 dark:border-gray-700"
             />
           </div>
           <div className="space-y-2">
@@ -86,7 +67,7 @@ export const Login: React.FC<LoginProps> = ({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="bg-white dark:bg-[#18181B] text-black dark:text-gray-100 border border-gray-300 dark:border-gray-700"
+              className="bg-white dark:bg-background text-black dark:text-gray-100 border border-gray-300 dark:border-gray-700"
             />
           </div>
           {error && (
@@ -104,27 +85,22 @@ export const Login: React.FC<LoginProps> = ({
           >
             Log In
           </Button>
-          <Button className="w-full text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center mt-2">
-            Wallet
-          </Button>
         </form>
       </CardContent>
       <CardFooter className="flex flex-col items-center space-y-2">
-        <Button
-          variant="link"
+        <Link
+          href="/auth/register"
           className="text-gray-700 dark:text-gray-400"
-          onClick={handleForgotPassword}
+        >
+          Don’t have an account? Register here
+        </Link>
+        <Link
+          href="/auth/forgot-password"
+          className="text-gray-700 dark:text-gray-400"
         >
           Forgot your password?
-        </Button>
-        <Button
-          variant="link"
-          className="text-gray-700 dark:text-gray-400"
-          onClick={handleSwitchToRegister}
-        >
-          Don't have an account? Register here
-        </Button>
+        </Link>
       </CardFooter>
     </Card>
   );
-};
+}
