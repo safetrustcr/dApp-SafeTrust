@@ -1,10 +1,8 @@
 "use client";
 
-import { useGlobalAuthenticationStore } from "@/components/auth/store/data";
 import { DashboardFooter } from "@/layouts/Footer";
-import { DashboardHeader } from "@/layouts/Header";
 import ThemeToggle from "@/layouts/ThemeToggle";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -15,7 +13,7 @@ export default function DashboardPage() {
         <ThemeToggle/>
         <button
           type="button"
-          className="text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-green-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
+          className="text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-green-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
           onClick={() => router.push("/auth/login")}
         >
           Sign Up

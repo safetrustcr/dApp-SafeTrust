@@ -1,6 +1,7 @@
 "use client";
-import { ThemeProvider } from "@/components/theme-provider";
+
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,16 +17,6 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-
-const ThemeToggle = () => {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
-  };
-};
 
 const FileUpload = ({
   allowedTypes,
@@ -125,7 +116,7 @@ const VerificationCenter = () => {
 
   const updateVerificationData = (
     section: keyof typeof verificationData,
-    data: Partial<(typeof verificationData)[keyof typeof verificationData]>,
+    data: Partial<(typeof verificationData)[keyof typeof verificationData]>
   ) => {
     setVerificationData((prev: typeof verificationData) => ({
       ...prev,
@@ -141,9 +132,9 @@ const VerificationCenter = () => {
   ];
 
   return (
-    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-      <main className="container w-[1110px] px-4 py-6 max-w-4xl">
-        <div className="flex justify-between items-center mb-4">
+    <div className="flex w-full justify-center">
+      <Card className="w-11/12 mt-6 shadow-none border-none">
+        <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl md:text-2xl font-bold">Verification Center</h1>
           <div className="hidden md:block" />
           <div className="md:hidden">
@@ -376,8 +367,8 @@ const VerificationCenter = () => {
             </div>
           </TabsContent>
         </Tabs>
-      </main>
-    </ThemeProvider>
+      </Card>
+    </div>
   );
 };
 

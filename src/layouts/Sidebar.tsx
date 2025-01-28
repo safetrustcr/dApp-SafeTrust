@@ -63,11 +63,6 @@ const securityItems = [
     label: "Dispute Resolution",
     href: "/dashboard/security-management/dispute-resolution",
   },
-  {
-    icon: AlertTriangle,
-    label: "Create Alert",
-    href: "/create-alert",
-  },
 ];
 
 const servicesItems = [
@@ -80,10 +75,10 @@ const contractItems = [
   {
     icon: LayoutDashboard,
     label: "Smart Contract",
-    href: "/smart-contract-dashboard",
+    href: "/dashboard/contract-management/smart-contract-dashboard",
   },
-  { icon: FileText, label: "Deposit Terms", href: "/deposit-terms" },
-  { icon: CreditCard, label: "Payment Gateway", href: "/payment-gateway" },
+  { icon: FileText, label: "Deposit Terms", href: "/dashboard/contract-management/deposit-terms" },
+  { icon: CreditCard, label: "Payment Gateway", href: "/dashboard/contract-management/paid-gateway" },
 ];
 
 const systemItems = [
