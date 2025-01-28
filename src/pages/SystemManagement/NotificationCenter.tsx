@@ -25,7 +25,9 @@ function NotificationCenter() {
           <h2 className="text-3xl text-black dark:text-white font-bold tracking-tight">
             Notification Center
           </h2>
+
           <h4 className="text-base text-black dark:text-white/50 font-normal tracking-tight">
+
             Manage and track all your contract notifications
           </h4>
         </div>
@@ -70,11 +72,14 @@ function NotificationCenter() {
         </div>
       </div>
 
+
       <div className="rounded-xl bg-transparent border p-6">
+
         <h2 className="text-3xl font-bold text-black dark:text-white tracking-tight">
           Recent Notification
         </h2>
         <div className="w-full flex-col space-y-4">
+
           <div className="flex flex-row items-center gap-2 my-3 p-2  dark:bg-gray-500/25 bg-transparent/10 w-fit rounded-lg">
             <button
               type="button"
@@ -83,6 +88,7 @@ function NotificationCenter() {
                 activeTab === "All"
                   ? "bg-gray-500 dark:bg-black text-white dark:text-white"
                   : "text-gray-500 dark:text-white/50"
+
               }`}
             >
               All
@@ -91,10 +97,12 @@ function NotificationCenter() {
             <button
               type="button"
               onClick={() => handleTabClick("Unread")}
+
               className={`cursor-pointer text-sm font-semibold p-2 rounded-md ${
                 activeTab === "Unread"
                   ? "bg-gray-500 dark:bg-black text-white dark:text-white"
                   : "text-gray-500 dark:text-white/50"
+
               }`}
             >
               Unread
@@ -103,10 +111,12 @@ function NotificationCenter() {
             <button
               type="button"
               onClick={() => handleTabClick("Important")}
+
               className={`cursor-pointer text-sm font-semibold p-2 rounded-md ${
                 activeTab === "Important"
                   ? "bg-gray-500 dark:bg-black text-white dark:text-white"
                   : "text-gray-500 dark:text-white/50"
+
               }`}
             >
               Important
@@ -139,22 +149,30 @@ const cardLabels: Record<string, CardLabel> = {
   allNotifications: {
     title: "All Notifications",
     subtitle: "unread messages",
+
     icon: <Bell className="text-black dark:text-white text-sm " />,
+
   },
   contractUpdates: {
     title: "Contracts Update",
     subtitle: "required actions",
+
     icon: <FileText className="text-black dark:text-white text-sm " />,
+
   },
   depositEvents: {
     title: "Deposit Events",
     subtitle: "pending confirmations",
+
     icon: <CircleCheck className="text-black dark:text-white text-sm " />,
+
   },
   disputes: {
     title: "Disputes",
     subtitle: "critical disputes",
+
     icon: <AlertTriangle className="text-black dark:text-white text-sm " />,
+
   },
 };
 

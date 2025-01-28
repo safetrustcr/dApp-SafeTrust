@@ -63,6 +63,11 @@ const securityItems = [
     label: "Dispute Resolution",
     href: "/dashboard/security-management/dispute-resolution",
   },
+  {
+    icon: AlertTriangle,
+    label: "Create Alert",
+    href: "/create-alert",
+  },
 ];
 
 const servicesItems = [

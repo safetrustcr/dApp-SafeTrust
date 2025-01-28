@@ -1,14 +1,13 @@
 "use client";
 
-
-import { AdminSidebar } from "@/layouts/Sidebar";
-import { DashboardHeader } from "@/layouts/Header";
-import { DashboardFooter } from "@/layouts/Footer";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
-import SmartContract from "@/pages/ContractManagement/SmartContract";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { DashboardFooter } from "@/layouts/Footer";
+import { DashboardHeader } from "@/layouts/Header";
+import { AdminSidebar } from "@/layouts/Sidebar";
+import CreateAlert from "@/pages/SecurityManagement/CreateAlert";
 
-export default function SmartContractPage() {
+export default function CreateAlertPage() {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <SidebarProvider>
@@ -18,7 +17,7 @@ export default function SmartContractPage() {
             <SidebarInset className="flex flex-col w-full">
               <DashboardHeader />
               <main className="flex-1 p-8 pt-6 space-y-4">
-                <SmartContract />
+                <CreateAlert />
               </main>
               <DashboardFooter />
             </SidebarInset>
@@ -28,4 +27,3 @@ export default function SmartContractPage() {
     </ThemeProvider>
   );
 }
-
