@@ -1,8 +1,9 @@
 "use client";
 
+import { useGlobalAuthenticationStore } from "@/components/auth/store/data";
 import { DashboardFooter } from "@/layouts/Footer";
 import { DashboardHeader } from "@/layouts/Header";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const router = useRouter();
