@@ -1,38 +1,9 @@
-import Link from "next/link";
-import {
-  Home,
-  Shield,
-  Search,
-  FileCheck,
-  History,
-  LayoutDashboard,
-  CreditCard,
-  UserCircle,
-  AlertTriangle,
-  Bell,
-  FileText,
-  BarChart2,
-  HelpCircle,
-  ChevronDown,
-  LogOut,
-  ChevronRight,
-} from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarFooter,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
-} from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,53 +13,86 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+} from "@/components/ui/sidebar";
+import {
+  AlertTriangle,
+  BarChart2,
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  CreditCard,
+  FileCheck,
+  FileText,
+  HelpCircle,
+  History,
+  Home,
+  LayoutDashboard,
+  LogOut,
+  Search,
+  Shield,
+  UserCircle,
+} from "lucide-react";
+import Link from "next/link";
 
 const securityItems = [
   {
     icon: Shield,
     label: "Security Deposit",
-    href: "/security-deposit-types",
+    href: "/dashboard/security-management/security-deposit-types",
   },
   {
     icon: FileCheck,
     label: "Verification Center",
-    href: "/verification-center",
+    href: "/dashboard/security-management/verification-center",
   },
   {
     icon: AlertTriangle,
     label: "Dispute Resolution",
-    href: "/dispute-resolution",
+    href: "/dashboard/security-management/dispute-resolution",
   },
 ];
 
 const servicesItems = [
-  { icon: Search, label: "Service Search", href: "/service-search" },
-  { icon: History, label: "Service History", href: "/service-history" },
-  { icon: UserCircle, label: "Provider Profile", href: "/provider-profile" },
+  { icon: Search, label: "Service Search", href: "/dashboard/service-management/service-search" },
+  { icon: History, label: "Service History", href: "/dashboard/service-management/service-history" },
+  { icon: UserCircle, label: "Provider Profile", href: "/dashboard/service-management/service-history" },
 ];
 
 const contractItems = [
   {
     icon: LayoutDashboard,
     label: "Smart Contract",
-    href: "/smart-contract-dashboard",
+    href: "/dashboard/contract-management/smart-contract-dashboard",
   },
-  { icon: FileText, label: "Deposit Terms", href: "/deposit-terms" },
-  { icon: CreditCard, label: "Payment Gateway", href: "/payment-gateway" },
+  { icon: FileText, label: "Deposit Terms", href: "/dashboard/contract-management/deposit-terms" },
+  { icon: CreditCard, label: "Payment Gateway", href: "/dashboard/contract-management/paid-gateway" },
 ];
 
 const systemItems = [
-  { icon: Bell, label: "Notification Center", href: "/notification-center" },
+  {
+    icon: Bell,
+    label: "Notification Center",
+    href: "/dashboard/system-management/notification-center",
+  },
   {
     icon: BarChart2,
     label: "Analytics",
-    href: "/analytics-dashboard",
+    href: "/dashboard/system-management/analytics-dashboard",
   },
-  { icon: HelpCircle, label: "Help Center", href: "/help-center" },
+  { icon: HelpCircle, label: "Help Center", href: "/dashboard/system-management/help-center" },
 ];
 
 export function AdminSidebar() {
@@ -113,7 +117,7 @@ export function AdminSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="/">
+                  <Link href="/dashboard">
                     <Home className="mr-2 h-4 w-4" />
                     Dashboard
                   </Link>

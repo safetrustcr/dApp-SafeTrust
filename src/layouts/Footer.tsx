@@ -1,23 +1,56 @@
-import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Github, Twitter } from "lucide-react";
 
-export function Footer() {
+export function DashboardFooter() {
   return (
-    <footer className="border-t bg-background">
-      <div className="container flex h-16 items-center justify-between px-4 md:px-6">
-        <div className="flex items-center gap-2">
-          <Image
-            src="/placeholder.svg"
-            alt="Company Logo"
-            width={32}
-            height={32}
-            className="rounded"
-          />
-          <span className="text-sm font-semibold">SafeTrust</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} SafeTrust. All rights reserved.
-          </p>
+    <footer className="bg-white dark:bg-background text-black dark:text-white">
+      <div className="mx-auto w-full max-w-7xl px-6 py-4">
+        <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+          <div className="flex flex-col items-center gap-4 px-8 sm:flex-row sm:gap-6">
+            <p className="text-center text-sm leading-loose text-gray-600 dark:text-gray-400">
+              Built by{" "}
+              <a
+                href="https://safetrust.vercel.app/"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium underline underline-offset-4"
+              >
+                SafeTrust
+              </a>
+              . The source code is available on{" "}
+              <a
+                href="https://github.com/safetrustcr"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium underline underline-offset-4"
+              >
+                GitHub
+              </a>
+              .
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-black dark:text-white"
+              onClick={() =>
+                window.open("https://github.com/safetrustcr", "_blank")
+              }
+            >
+              <Github className="h-4 w-4" />
+              <span className="sr-only">GitHub</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-black dark:text-white"
+              onClick={() => window.open("https://x.com/SafeTrustCR", "_blank")}
+            >
+              <Twitter className="h-4 w-4" />
+              <span className="sr-only">Twitter</span>
+            </Button>
+          </div>
         </div>
       </div>
     </footer>

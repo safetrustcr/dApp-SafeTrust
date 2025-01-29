@@ -1,44 +1,40 @@
 "use client";
 
-import { Bell, Search, Moon, Sun } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useWallet } from "@/components/auth/hooks/useWallet.hook";
+import { useGlobalAuthenticationStore } from "@/components/auth/store/data";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "next-themes";
+import { Bell } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
-export function Header() {
-  const { theme, setTheme } = useTheme();
+export function DashboardHeader() {
+  const isMobile = useIsMobile();
+  const address = useGlobalAuthenticationStore((state) => state.address);
+  const { handleDisconnect } = useWallet();
 
   return (
     <header className="flex h-16 items-center justify-between border-b px-4 lg:px-6">
-      <div className="flex items-center gap-4">
-        <form className="hidden sm:block">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              className="w-full bg-white pl-8 sm:w-[300px] dark:bg-gray-800"
-              placeholder="Search..."
-              type="search"
-            />
-          </div>
-        </form>
-      </div>
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        >
-          {theme === "dark" ? (
-            <Sun className="h-5 w-5" />
-          ) : (
-            <Moon className="h-5 w-5" />
-          )}
-          <span className="sr-only">Toggle theme</span>
-        </Button>
+      <SidebarTrigger
+        className={cn("h-10 w-10 p-3 z-0", isMobile ? "left-0" : "relative")}
+      />
+      <div className="flex items-center gap-4 ml-auto">
+        <ThemeToggle />
         <Button variant="ghost" size="icon">
-          <Bell className="h-5 w-5" />
+          <Bell className="h-[1.2rem] w-[1.2rem]" />
           <span className="sr-only">Notifications</span>
         </Button>
+
+        {address && (
+          <Button
+            onClick={handleDisconnect}
+            type="button"
+            className="w-full text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
+          >
+            Disconnect
+          </Button>
+        )}
       </div>
     </header>
   );
