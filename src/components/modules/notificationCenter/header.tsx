@@ -1,6 +1,6 @@
+import { Button } from "@/components/ui/button";
+import { CardDescription, CardTitle } from "@/components/ui/card";
 import { Check, Filter } from "lucide-react";
-import { CardDescription, CardTitle } from "../ui/card";
-import { Button } from "../ui/button";
 
 const Header = () => {
   return (

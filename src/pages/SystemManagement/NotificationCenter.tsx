@@ -1,6 +1,6 @@
-import NotificationCenterHeader from "@/components/notification-center/header";
-import MetricCards from "@/components/notification-center/metric-cards";
-import NotificationLists from "@/components/notification-center/notification-lists";
+import NotificationCenterHeader from "@/components/modules/notificationCenter/header";
+import MetricCards from "@/components/modules/notificationCenter/metric-cards";
+import NotificationLists from "@/components/modules/notificationCenter/notification-lists";
 
 const NotificationCenterPage = () => {
   return (

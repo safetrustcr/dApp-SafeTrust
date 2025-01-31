@@ -1,7 +1,7 @@
 import * as Tabs from "@radix-ui/react-tabs";
-import { Card, CardDescription, CardTitle } from "../ui/card";
 import { notifications } from "@/lib/data";
 import { INotification } from "@/types";
+import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 
 const NotificationCard = (data: INotification) => {
   const { title, message, status, time } = data;
