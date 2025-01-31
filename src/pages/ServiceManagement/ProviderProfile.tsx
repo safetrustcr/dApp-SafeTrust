@@ -1,6 +1,5 @@
 "use client";
-import { Star, Phone, Mail } from "lucide-react";
-import { FaShieldAlt, FaGlobe } from "react-icons/fa";
+import { Star, Phone, Mail, FileText, Shield, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge"
 
 import { useState } from "react";
@@ -13,7 +12,6 @@ import { ReviewSection } from "./ReviewsSection";
 import { CertificationSection } from "./CertificationsSection";
 
 
-import { FaFileContract } from "react-icons/fa";
 
 import Header from "./Header";
 import { Avatar } from "@/components/ui/avatar";
@@ -81,7 +79,7 @@ export function ProviderProfile() {
                     <Badge variant="secondary">Verified</Badge>
                   </div>
                   <div className="flex items-center gap-1 ">
-                    <FaFileContract />
+                    <FileText />
 
                     <p className="text-muted-foreground">
                       Smart Contract Development
@@ -105,7 +103,7 @@ export function ProviderProfile() {
                   </div>
                   <div className="flex items-center gap-2">
                     {" "}
-                    <FaGlobe className="h-4 w-4 text-primary" />{" "}
+                    <Globe className="h-4 w-4 text-primary" />{" "}
                     {/* Phone icon */}
                     <p>{providerData.website}</p>
                   </div>
@@ -118,7 +116,7 @@ export function ProviderProfile() {
                   </div>
                   <div className="flex items-center gap-2">
                     {" "}
-                    <FaShieldAlt className="h-4 w-4 text-primary" />{" "}
+                    <Shield className="h-4 w-4 text-primary" />{" "}
                     <p>License: {providerData.license}</p>
                   </div>
                 </div>

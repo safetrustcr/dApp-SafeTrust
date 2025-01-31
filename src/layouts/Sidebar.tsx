@@ -68,7 +68,7 @@ const securityItems = [
 const servicesItems = [
   { icon: Search, label: "Service Search", href: "/dashboard/service-management/service-search" },
   { icon: History, label: "Service History", href: "/dashboard/service-management/service-history" },
-  { icon: UserCircle, label: "Provider Profile", href: "/dashboard/provider-profile" },
+  { icon: UserCircle, label: "Provider Profile", href: "/dashboard/service-management/provider-profile" },
 ];
 
 const contractItems = [
