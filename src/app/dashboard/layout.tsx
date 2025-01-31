@@ -12,9 +12,9 @@ import { AdminSidebar } from "@/layouts/Sidebar";
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const { address } = useGlobalAuthenticationStore();
 
-  // if (address === "") {
-  //   redirect("/");
-  // }
+  if (address === "") {
+    redirect("/");
+  }
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
