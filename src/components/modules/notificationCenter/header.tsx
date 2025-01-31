@@ -15,16 +15,14 @@ const Header = () => {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant="tertiary" className="font-semibold">
-          Create Alert
-        </Button>
+        <Button variant="tertiary">Create Alert</Button>
 
-        <Button variant="secondary" className="font-semibold">
+        <Button variant="secondary">
           <Filter className="h-5 w-5" />
           Filter
         </Button>
 
-        <Button className="font-semibold" variant="secondary">
+        <Button variant="secondary">
           <Check className="h-5 w-5" />
           Mark all as read
         </Button>
