@@ -13,7 +13,7 @@ import { CertificationSection } from "./CertificationsSection";
 
 
 
-import Header from "./Header";
+import Header from "./HeaderProviderProfile";
 import { Avatar } from "@/components/ui/avatar";
 import { ProviderData } from "@/lib/types";
 import { Card } from "@/components/ui/card";
