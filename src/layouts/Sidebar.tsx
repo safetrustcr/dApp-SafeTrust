@@ -52,12 +52,7 @@ const securityItems = [
     icon: Shield,
     label: "Security Deposit",
     href: "/dashboard/security-management/security-deposit-types",
-  },
-  {
-    icon: FileCheck,
-    label: "Verification Center",
-    href: "/dashboard/security-management/verification-center",
-  },
+  },  
   {
     icon: AlertTriangle,
     label: "Dispute Resolution",
