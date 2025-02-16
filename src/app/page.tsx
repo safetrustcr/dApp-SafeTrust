@@ -3,14 +3,16 @@
 import { DashboardFooter } from "@/layouts/Footer";
 import ThemeToggle from "@/layouts/ThemeToggle";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Github } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
 
   return (
-    <div className={`h-screen flex flex-col`}>
+    <div className="h-screen flex flex-col">
       <header className="flex justify-between items-center p-6 bg-white dark:bg-background text-black dark:text-gray-100 shadow-md">
-        <ThemeToggle/>
+        <ThemeToggle />
         <button
           type="button"
           className="text-white bg-gradient-to-br from-blue-600 to-blue-800 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-green-200 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
@@ -19,24 +21,45 @@ export default function DashboardPage() {
           Sign Up
         </button>
       </header>
-      <main className=" p-8 md:p-8 flex-1 flex flex-col sm:flex-row justify-center items-center bg-white dark:bg-background text-black dark:text-gray-100 gap-16 md:px-20 lg:px-32 xl:px-48">
-        <h1 className="text-4xl md:text-6xl font-bold text-center md:text-left text-black dark:text-gray-100 leading-tight">
-          Welcome to <br /> SafeTrust
+
+      <main className="flex-1 flex flex-col justify-center items-center text-center px-6 md:px-20 lg:px-32">
+        <h1 className="text-4xl md:text-6xl font-bold text-black dark:text-gray-100">
+          Secure Your Transactions with <br /> SafeTrust
         </h1>
-        <hr className="hidden md:block bg-gray-300 dark:bg-gray-600 w-0.5 h-96" />
-        <p className="text-lg md:text-xl md:w-1/2 text-gray-700 dark:text-gray-300 leading-relaxed text-center md:text-left">
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-blue-700 font-bold">
-            SafeTrust is a decentralized and secure platform
-          </span>{" "}
-          designed to transform the <strong>P2P transaction</strong> experience,
-          safeguarding deposits and payments between parties. Leveraging
-          <strong> blockchain and trustless technologies</strong>, SafeTrust
-          addresses key challenges to build trust among users, especially in
-          transactions involving <strong>cryptocurrency</strong>, providing
-          <strong> transparency and security</strong> in every peer-to-peer
-          operation.
+        <p className="mt-6 text-lg md:text-xl text-gray-700 dark:text-gray-300 max-w-2xl">
+          A decentralized platform ensuring trust in peer-to-peer transactions. 
+          SafeTrust leverages blockchain technology to safeguard deposits, enhance security, 
+          and provide seamless cryptocurrency payments.
         </p>
+
+        <div className="mt-6 flex gap-4">
+  <a
+    href="https://app.onlydust.com/projects/safetrust/overview"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="flex items-center gap-2 text-white bg-gray-800 hover:bg-gray-900 focus:ring-4 focus:outline-none focus:ring-gray-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
+  >
+    <Image 
+      src="/img/onlydust.png" 
+      alt="OnlyDust" 
+      width={28} 
+      height={28} 
+      className="w-6 h-6"
+    />
+    OnlyDust
+  </a>
+  <a
+    href="https://github.com/safetrustcr"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="flex items-center gap-2 text-white bg-gray-800 hover:bg-gray-900 focus:ring-4 focus:outline-none focus:ring-gray-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
+  >
+    <Github size={20} />
+    GitHub
+  </a>
+</div>
       </main>
+
       <DashboardFooter />
     </div>
   );
