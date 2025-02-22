@@ -1,8 +1,6 @@
 "use client";
 
 import { HeroSection } from "@/components/home/HeroSection";
-import { FeaturesSection } from "@/components/home/FeaturesSection";
-import { ServicesSection } from "@/components/home/ServicesSection";
 import { CTASection } from "@/components/home/CTASection";
 import { DashboardFooter } from "@/layouts/Footer";
 import ThemeToggle from "@/layouts/ThemeToggle";
@@ -38,8 +36,6 @@ export default function DashboardPage() {
       {/* Añadir padding-top para compensar el header fijo */}
       <main className="flex-1 pt-16">
         <HeroSection />
-        <FeaturesSection />
-        <ServicesSection />
         <CTASection />
       </main>
 
