@@ -34,7 +34,7 @@ Describe what should happen instead.
 ## Environment Details
 - Project Version: [e.g., v2.1.0]
 - Operating System: [e.g., Ubuntu 22.04, Windows 11]
-- Browser/Runtime: [e.g., Chrome 120, Node.js 20.0]
+- Browser/Runtime: [e.g., Chrome 120, Node.js 20.18.0]
 - Additional Tools: [e.g., npm 9.0, yarn 1.22]
 
 ## Supporting Information
