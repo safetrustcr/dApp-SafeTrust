@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check .",
-    "lint:fix": "biome check . --write"
+    "lint:fix": "biome check . --write",
+    "deps:check": "npm outdated",
+    "deps:update": "npm update",
+    "deps:audit": "npm audit"
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^1.5.0",
