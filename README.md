@@ -45,7 +45,7 @@ Ensures funds are automatically released based on the terms of the agreement, wi
 
 ### **Prerequisites**
 
-- Node.js v14 or later 🖥️
+- Node.js v20.18.0 or later 🖥️
 - A blockchain wallet like **Albedo** for secure cryptocurrency transactions. 🔐
 - Trustless Work API access (details [here](https://docs.trustlesswork.com/trustless-work)). 📖
 
