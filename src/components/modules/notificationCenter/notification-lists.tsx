@@ -1,6 +1,5 @@
 import * as Tabs from "@radix-ui/react-tabs";
 import { useState } from "react";
-import { notifications } from "@/lib/data";
 import { INotification } from "@/types";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,7 @@ const NotificationCard = ({ data, onEdit }: { data: INotification, onEdit: (noti
     ) : null;
 
   return (
-     <Card className="flex flex-col lg:flex-row justify-between items-start p-6">
+    <Card className="flex flex-col lg:flex-row justify-between items-start p-6">
       <div className="flex">
         {statusIndicator}
         <div className="flex flex-col gap-y-2">

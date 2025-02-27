@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { INotification } from "@/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface EditNotificationModalProps {
@@ -28,10 +28,12 @@ export function EditNotificationModal({
 }: EditNotificationModalProps) {
   const [editedNotification, setEditedNotification] = useState<INotification | null>(notification);
 
-  // Update local state when the notification prop changes
-  useState(() => {
-    setEditedNotification(notification);
-  });
+  // Update local state when the notification prop changes or when modal opens
+  useEffect(() => {
+    if (isOpen && notification) {
+      setEditedNotification(notification);
+    }
+  }, [isOpen, notification]);
 
   if (!notification) return null;
 
