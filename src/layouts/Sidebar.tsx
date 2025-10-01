@@ -44,6 +44,7 @@ import {
   Search,
   Shield,
   UserCircle,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -64,6 +65,7 @@ const servicesItems = [
   { icon: Search, label: "Service Search", href: "/dashboard/service-management/service-search" },
   { icon: History, label: "Service History", href: "/dashboard/service-management/service-history" },
   { icon: UserCircle, label: "Provider Profile", href: "/dashboard/service-management/provider-profile" },
+  { icon: Users, label: "Departments", href: "/dashboard/service-management/departments" },
 ];
 
 const contractItems = [
