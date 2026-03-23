@@ -4,7 +4,7 @@
 
 # dApp-SafeTrust
 
-**Decentralized P2P Escrow · Stellar Blockchain · MVP Monorepo**
+**Decentralized P2P Escrow · Stellar Blockchain · MVP monorepo (monorepository)**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg)](https://opensource.org/licenses/MIT)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-orange?logo=pnpm)](https://pnpm.io)
