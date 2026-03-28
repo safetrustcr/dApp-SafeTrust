@@ -237,6 +237,49 @@ postgres → hasura (applies migrations + seeds) → api → web
 | Hasura Console | http://localhost:8080/console | Tables visible |
 | API health | http://localhost:3000/health | `{ "status": "ok" }` |
 
+### 5. Run SQL acceptance checks
+
+Run UP checks with the PowerShell orchestrator (from the repo root):
+
+```powershell
+.\infra\hasura\verification\run_checks.ps1
+```
+
+The script discovers `verify_*.sql` files under `infra/hasura/verification/`, executes each via `docker compose exec`, and prints a colour-coded pass / FAIL summary. It exits with code 1 if any check fails, making it suitable for CI.
+
+**Available checks**
+
+| Script | What it verifies |
+|---|---|
+| `verify_user_wallets.sql` | UP migration — table exists with correct columns, types, defaults, PK, unique, check, and FK constraints |
+| `verify_down_user_wallets.sql` | DOWN migration — `public.user_wallets` is absent after rollback |
+
+By default it runs only UP checks (`-Phase up`) so it does not mix contradictory assertions.
+
+You can also run a single check directly:
+
+```bash
+# Up migration shape check (wraps assertions in a transaction then ROLLBACK)
+docker compose exec -T postgres psql -U postgres -d postgres \
+  -v ON_ERROR_STOP=1 -f infra/hasura/verification/verify_user_wallets.sql
+
+# Down migration check (run only after applying the down migration)
+docker compose exec -T postgres psql -U postgres -d postgres \
+  -v ON_ERROR_STOP=1 -f infra/hasura/verification/verify_down_user_wallets.sql
+```
+
+Run the DOWN phase through the orchestrator:
+
+```powershell
+.\infra\hasura\verification\run_checks.ps1 -Phase down
+```
+
+Override defaults when your compose service name or database differ:
+
+```powershell
+.\infra\hasura\verification\run_checks.ps1 -Phase up -PgService db -PgDatabase safetrust
+```
+
 ---
 
 ## 🛠️ Development
