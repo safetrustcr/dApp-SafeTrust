@@ -10,7 +10,6 @@
 
 import { ProcessStepper } from '@/components/escrow/ProcessStepper';
 import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
-import { XDRSigningFlowStub } from '@/components/escrow/XDRSigningFlowStub';
 
 export default function EscrowCreatePage({
     params,
