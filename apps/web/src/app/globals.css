@@ -21,3 +21,9 @@ a {
     display: block !important;
   }
 }
+
+@media (min-width: 768px) {
+  .dashboard-sidebar {
+    display: block !important;
+  }
+}
