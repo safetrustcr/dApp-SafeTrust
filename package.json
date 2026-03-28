@@ -1,0 +1,8 @@
+{
+  "name": "dapp-safetrust",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}
