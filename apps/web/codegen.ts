@@ -1,9 +1,21 @@
+import path from 'node:path';
+
 import type { CodegenConfig } from '@graphql-codegen/cli';
 
+const stubSchemaPath = path.join(process.cwd(), 'graphql-codegen.schema.graphql');
+
+/**
+ * Schema source for graphql-codegen:
+ * - CODEGEN_SCHEMA_URL — HTTP(S) GraphQL endpoint or path to a .graphql file (e.g. when Hasura is running)
+ * - Otherwise — committed stub so codegen succeeds in CI / without Docker
+ */
+const schema =
+  process.env.CODEGEN_SCHEMA_URL ?? stubSchemaPath;
+
 const config: CodegenConfig = {
-  schema: process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL ?? 'http://localhost:8080/v1/graphql',
+  schema,
   generates: {
-    '../packages/graphql/generated/index.ts': {
+    '../../packages/graphql/generated/index.ts': {
       plugins: ['typescript'],
     },
   },
