@@ -1,0 +1,31 @@
+{
+  "name": "@safetrust/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "codegen": "graphql-codegen --config codegen.ts"
+  },
+  "dependencies": {
+    "@safetrust/types": "workspace:*",
+    "@safetrust/graphql": "workspace:*",
+    "next": "14.2.x",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@apollo/client": "^4.0.0",
+    "firebase": "^10.0.0",
+    "lucide-react": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "tailwindcss": "^3",
+    "autoprefixer": "^10",
+    "postcss": "^8",
+    "@graphql-codegen/cli": "^5",
+    "@graphql-codegen/typescript": "^4.1.0"
+  }
+}
