@@ -1,7 +1,7 @@
 -- Migration: Create Trustless Work Escrows Table
 -- Description: Sets up the main table for tracking escrow transactions between 
 --              Hotels, Guests, and the Platform using Trustless Work protocols.
--- Author: Antigravity Refactor
+-- Author: emarc99
 
 -- ============================================================================
 -- 1. TABLE DEFINITION

@@ -1,7 +1,7 @@
 -- Migration: Create Trustless Work Webhook Events Table
 -- Description: Sets up the infrastructure for receiving, tracking, and retrying 
 --              webhook events from the Trustless Work platform.
--- Author: Antigravity Refactor
+-- Author: emarc99
 
 -- ============================================================================
 -- 1. TABLE DEFINITION

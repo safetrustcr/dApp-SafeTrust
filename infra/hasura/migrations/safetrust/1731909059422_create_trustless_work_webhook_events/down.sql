@@ -1,6 +1,6 @@
 -- Migration: Drop Trustless Work Webhook Events Table
 -- Description: Reverses the webhook events infrastructure.
--- Author: Antigravity Refactor
+-- Author: emarc99
 
 -- ============================================================================
 -- 1. DROP INDEXES

@@ -1,6 +1,6 @@
 -- Migration: Drop Trustless Work Escrows Table
 -- Description: Reverses the escrow tracking infrastructure.
--- Author: Antigravity Refactor
+-- Author: emarc99
 
 -- ============================================================================
 -- 1. DROP INDEXES (Dropped automatically with table, keeping for clarity)
