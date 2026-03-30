@@ -1,0 +1,19 @@
+{
+  "name": "@safetrust/graphql",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./generated/index.ts",
+  "types": "./generated/index.ts",
+  "exports": {
+    ".": "./generated/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "echo \"no lint configured\"",
+    "test": "echo \"no tests\"",
+    "codegen": "echo \"no codegen\""
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

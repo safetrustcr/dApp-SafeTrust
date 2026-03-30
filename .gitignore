@@ -1,0 +1,45 @@
+# Dependencies (never commit — huge and machine-specific)
+node_modules/
+
+# Turborepo cache
+.turbo/
+
+# Build / generated output
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Next.js (also covered in apps/web/.gitignore; listed here for clarity at repo root)
+**/.next/
+
+# Environment & secrets (commit only *.example templates)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Logs & debug
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+coverage/
+
+# IDE (optional — remove if your team commits shared VS Code settings)
+.idea/
+*.swp
+*.swo
+
+# Vercel
+.vercel
