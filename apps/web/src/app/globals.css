@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media (min-width: 768px) {
+  .dashboard-sidebar {
+    display: block !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .desktop-suggestions {
+    display: block !important;
+  }
+}
