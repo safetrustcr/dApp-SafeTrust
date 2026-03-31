@@ -10,7 +10,6 @@ const styles = {
     backgroundColor: '#fff7ed',
   } satisfies CSSProperties,
   aside: {
-    display: 'none',
     width: '16rem',
     flexShrink: 0,
     borderRight: '1px solid #fed7aa',
