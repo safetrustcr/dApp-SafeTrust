@@ -20,8 +20,8 @@ const STUB_APARTMENT = {
   petFriendly: true,
   owner: {
     name: 'Alberto Casas',
-    email: 'albertoCasas100@gmail.com',
-    phone: '+506 64852179',
+    email: 'owner@example.com',
+    phone: '+1 555-0100',
   },
   description:
     'Beautiful apartment in the heart of San José with modern amenities and stunning views.',
@@ -158,7 +158,7 @@ export default function ApartmentDetailPage({
             </p>
           </div>
 
-          <Link href={`/hotel/${params.id}/escrow/create`} style={styles.button}>
+          <Link href={`/hotel/${params.id}/escrow/temp-escrow-id`} style={styles.button}>
             BOOK
           </Link>
         </div>
