@@ -1,26 +1,22 @@
-import type { Metadata } from 'next';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
 
-import './globals.css';
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'SafeTrust',
-  description: 'Decentralized P2P escrow on Stellar',
+  title: "SafeTrust",
+  description: "Decentralized P2P Escrow on Stellar Blockchain",
 };
-
-function Providers({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body>
-        <Providers>{children}</Providers>
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }
