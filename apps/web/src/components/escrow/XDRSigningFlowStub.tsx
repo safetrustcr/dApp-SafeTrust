@@ -7,15 +7,32 @@
 
 export function XDRSigningFlowStub() {
   return (
-    <div className="border rounded-lg p-4 bg-card space-y-2">
-      <h3 className="font-semibold">Wallet signing</h3>
-      <p className="text-sm text-muted-foreground">
+    <div
+      style={{
+        border: '1px solid #fed7aa',
+        borderRadius: '1rem',
+        backgroundColor: '#ffffff',
+        padding: '1rem',
+      }}
+    >
+      <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Wallet signing</h3>
+      <p style={{ margin: 0, color: '#6b7280', fontSize: '0.9rem' }}>
         XDR signing flow placeholder. Freighter integration will be wired in a follow-up merge.
       </p>
       <button
         type="button"
         disabled
-        className="bg-orange-400 text-white font-bold px-4 py-2 rounded opacity-60 cursor-not-allowed"
+        style={{
+          marginTop: '0.75rem',
+          border: '1px solid #f97316',
+          backgroundColor: '#f97316',
+          color: '#ffffff',
+          fontWeight: 700,
+          padding: '0.55rem 1rem',
+          borderRadius: '0.75rem',
+          opacity: 0.6,
+          cursor: 'not-allowed',
+        }}
         title="Wallet signing - coming soon"
       >
         Sign with wallet

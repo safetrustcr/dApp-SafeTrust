@@ -2,31 +2,56 @@
 // Source: frontend-SafeTrust/src/components/escrow/ProcessStepper.tsx
 // Steps: 1-Escrow created - 2-Payment sent - 3-Deposit blocked - 4-Deposit released
 
+import type { CSSProperties } from 'react';
+
 const STEPS = ['Escrow created', 'Payment sent', 'Deposit blocked', 'Deposit released'];
 
 export function ProcessStepper({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
   return (
-    <div className="border rounded-lg p-4 bg-card">
-      <h3 className="font-semibold mb-3">Process</h3>
-      <div className="space-y-3">
+    <div
+      style={{
+        border: '1px solid #fed7aa',
+        borderRadius: '1rem',
+        backgroundColor: '#ffffff',
+        padding: '1.25rem',
+      }}
+    >
+      <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1rem' }}>Process</h3>
+      <div style={{ display: 'grid', gap: '0.9rem' }}>
         {STEPS.map((label, index) => {
           const stepNum = index + 1;
-          const isActive = stepNum <= currentStep;
+          const isActive = stepNum === currentStep;
+          const isComplete = stepNum < currentStep;
+          const markerStyle: CSSProperties = isActive
+            ? { backgroundColor: '#22c55e', color: '#ffffff', border: '1px solid #22c55e' }
+            : isComplete
+              ? { backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac' }
+              : { backgroundColor: '#ffffff', color: '#9ca3af', border: '1px solid #d1d5db' };
+
           return (
-            <div key={label} className="flex items-center gap-3">
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  isActive
-                    ? 'bg-green-500 text-white'
-                    : 'bg-muted text-muted-foreground border'
-                }`}
+                style={{
+                  ...markerStyle,
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: '999px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
               >
                 {stepNum}
               </div>
               <span
-                className={`text-sm ${
-                  isActive ? 'text-foreground font-medium' : 'text-muted-foreground'
-                }`}
+                style={{
+                  fontSize: '0.9rem',
+                  color: isActive || isComplete ? '#111827' : '#6b7280',
+                  fontWeight: isActive ? 700 : 500,
+                }}
               >
                 {label}
               </span>
