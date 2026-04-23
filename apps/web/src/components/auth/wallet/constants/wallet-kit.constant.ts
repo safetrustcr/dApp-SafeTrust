@@ -13,9 +13,28 @@ const createWalletKit = () =>
     modules: allowAllModules(),
   });
 
+const STELLAR_WALLETS_KIT_BROWSER_ONLY_ERROR =
+  "StellarWalletsKit is only available in the browser";
+
+const createWalletKitSSRStub = (): StellarWalletsKit => {
+  const throwBrowserOnlyError = (): never => {
+    throw new Error(STELLAR_WALLETS_KIT_BROWSER_ONLY_ERROR);
+  };
+
+  const target = function stellarWalletKitSSRStub() {
+    throwBrowserOnlyError();
+  };
+
+  return new Proxy(target, {
+    get: () => throwBrowserOnlyError(),
+    apply: () => throwBrowserOnlyError(),
+    construct: () => throwBrowserOnlyError(),
+  }) as unknown as StellarWalletsKit;
+};
+
 export const kit: StellarWalletsKit =
   typeof window === "undefined"
-    ? ({} as StellarWalletsKit)
+    ? createWalletKitSSRStub()
     : createWalletKit();
 
 export const WALLET_IDS = {

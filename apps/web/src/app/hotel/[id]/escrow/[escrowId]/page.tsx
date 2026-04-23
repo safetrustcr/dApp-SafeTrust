@@ -78,8 +78,8 @@ const styles = {
     fontWeight: 600,
   } satisfies CSSProperties,
   primaryButton: {
-    border: '1px solid #f97316',
-    backgroundColor: '#f97316',
+    border: '1px solid #22c55e',
+    backgroundColor: '#22c55e',
     color: '#ffffff',
     borderRadius: '0.75rem',
     padding: '0.6rem 1rem',

@@ -2,9 +2,18 @@ interface EthereumLikeProvider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 }
 
-interface WalletConnectSession {
+interface InjectedEthereumSession {
   address: string;
   chainId: number;
+}
+
+interface ProviderRequestError {
+  code?: number | string;
+  message?: string;
+  data?: {
+    code?: number | string;
+    message?: string;
+  };
 }
 
 function getEthereumProvider(): EthereumLikeProvider | null {
@@ -25,22 +34,53 @@ function getEthereumProvider(): EthereumLikeProvider | null {
   return ethereum as EthereumLikeProvider;
 }
 
-export async function connectWalletConnect(): Promise<WalletConnectSession | null> {
+function isUserRejectedRequest(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const providerError = error as ProviderRequestError;
+  const errorCodes = [providerError.code, providerError.data?.code];
+  if (errorCodes.some((code) => code === 4001 || code === "4001" || code === "ACTION_REJECTED")) {
+    return true;
+  }
+
+  const messages = [providerError.message, providerError.data?.message]
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.toLowerCase());
+
+  return messages.some((message) => message.includes("user rejected") || message.includes("user denied"));
+}
+
+export async function connectInjectedEthereum(): Promise<InjectedEthereumSession | null> {
   const provider = getEthereumProvider();
 
   if (!provider) {
-    throw new Error("Wallet provider not available");
+    return null;
   }
 
-  const accountsResult = await provider.request({ method: "eth_requestAccounts" });
-  const chainIdResult = await provider.request({ method: "eth_chainId" });
+  let accountsResult: unknown;
+  let chainIdResult: unknown;
+  try {
+    accountsResult = await provider.request({ method: "eth_requestAccounts" });
+    chainIdResult = await provider.request({ method: "eth_chainId" });
+  } catch (error) {
+    if (isUserRejectedRequest(error)) {
+      return null;
+    }
+    throw error;
+  }
 
   if (!Array.isArray(accountsResult)) {
     throw new Error("Wallet provider returned an invalid accounts payload");
   }
 
-  const accounts = accountsResult.filter((value): value is string => typeof value === "string");
-  if (accounts.length === 0) {
+  const accounts = accountsResult
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  const primaryAccount = accounts[0];
+  if (!primaryAccount) {
     return null;
   }
 
@@ -52,12 +92,12 @@ export async function connectWalletConnect(): Promise<WalletConnectSession | nul
   }
 
   return {
-    address: accounts[0],
+    address: primaryAccount,
     chainId: Number.isFinite(chainId) ? chainId : 0,
   };
 }
 
-export async function disconnectWalletConnect(): Promise<void> {
+export async function disconnectInjectedEthereum(): Promise<void> {
   const provider = getEthereumProvider();
   if (!provider) {
     return;

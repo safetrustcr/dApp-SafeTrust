@@ -1,3 +1,4 @@
+import { StrKey } from "@stellar/stellar-sdk";
 import { WalletType } from "../types/wallet.types";
 
 interface ValidationInput {
@@ -11,12 +12,11 @@ interface ValidationResult {
   errors: string[];
 }
 
-const STELLAR_PUBLIC_KEY_REGEX = /^G[A-Z2-7]{55}$/;
 const ETHEREUM_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
 function isValidAddressForChain(address: string, chain: "stellar" | "ethereum"): boolean {
   if (chain === "stellar") {
-    return STELLAR_PUBLIC_KEY_REGEX.test(address);
+    return StrKey.isValidEd25519PublicKey(address);
   }
 
   return ETHEREUM_ADDRESS_REGEX.test(address);

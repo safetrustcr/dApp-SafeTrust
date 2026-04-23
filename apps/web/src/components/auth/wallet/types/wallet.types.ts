@@ -43,7 +43,12 @@ export interface StellarBalance {
   selling_liabilities?: string;
 }
 
-export type Balance = StellarBalance;
+export interface EthereumBalance {
+  balance: string;
+  symbol: string;
+  tokenContract?: string;
+  decimals?: number;
+}
 
 interface BaseWalletInfo {
   address: string;
@@ -55,28 +60,40 @@ interface BaseWalletInfo {
 
 export interface StellarWalletInfo extends BaseWalletInfo {
   chain: "stellar";
-  balances: Balance[];
+  balances: StellarBalance[];
   publicKey: string;
 }
 
 export interface EthereumWalletInfo extends BaseWalletInfo {
   chain: "ethereum";
   chainId: number;
+  balances: EthereumBalance[];
 }
 
 export type WalletInfo = StellarWalletInfo | EthereumWalletInfo;
+
+export interface MultiChainBalances {
+  stellar?: StellarBalance[];
+  ethereum?: EthereumBalance[];
+}
 
 export interface MultiWalletState {
   connectedWallets: WalletInfo[];
   selectedWallet?: WalletInfo;
   isConnecting: boolean;
   error?: WalletError;
-  balances: Balance[];
+  balances: MultiChainBalances;
 }
 
-export interface PaymentOptions {
+export interface StellarPaymentOptions {
   to: string;
   amount: string;
   memo?: string;
   asset?: "XLM" | { code: string; issuer: string };
+}
+
+export interface EvmPaymentOptions {
+  to: string;
+  amountWei: string;
+  tokenContract?: string;
 }
