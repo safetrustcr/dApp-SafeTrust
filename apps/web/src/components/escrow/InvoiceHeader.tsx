@@ -1,93 +1,40 @@
-import type { CSSProperties } from 'react';
+// TODO: replace with real InvoiceHeader once merged in frontend-SafeTrust
+// Source: frontend-SafeTrust/src/components/escrow/InvoiceHeader.tsx
 
-type InvoiceStatus = 'paid' | 'blocked' | 'released';
-
-const STATUS_STYLES: Record<InvoiceStatus, { label: string; style: CSSProperties }> = {
-  paid: {
-    label: 'Paid',
-    style: {
-      backgroundColor: '#ffedd5',
-      color: '#9a3412',
-      border: '1px solid #fdba74',
-    },
-  },
-  blocked: {
-    label: 'Deposit blocked',
-    style: {
-      backgroundColor: '#fef3c7',
-      color: '#92400e',
-      border: '1px solid #fcd34d',
-    },
-  },
-  released: {
-    label: 'Deposit released',
-    style: {
-      backgroundColor: '#dcfce7',
-      color: '#166534',
-      border: '1px solid #86efac',
-    },
-  },
+const STATUS_STYLES: Record<string, string> = {
+  pending: 'bg-pink-100 text-pink-800',
+  paid: 'bg-green-100 text-green-800',
+  blocked: 'bg-blue-100 text-blue-800',
+  released: 'bg-lime-100 text-lime-800',
 };
 
 export function InvoiceHeader({
   invoiceNumber,
-  paidAt,
   status,
+  paidAt,
 }: {
   invoiceNumber: string;
-  paidAt: string;
-  status: InvoiceStatus;
+  status: 'pending' | 'paid' | 'blocked' | 'released';
+  paidAt?: string;
 }) {
-  const badge = STATUS_STYLES[status];
+  const label =
+    status === 'pending'
+      ? 'Pending'
+      : status === 'paid'
+        ? 'Paid'
+        : status === 'blocked'
+          ? 'Deposit blocked'
+          : 'Deposit released';
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '1rem',
-        padding: '1.25rem 1.5rem',
-        borderRadius: '1rem',
-        border: '1px solid #fed7aa',
-        backgroundColor: '#ffffff',
-      }}
-    >
-      <div>
-        <p
-          style={{
-            margin: 0,
-            fontSize: '0.8rem',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: '#9ca3af',
-          }}
-        >
-          Invoice number
-        </p>
-        <h1 style={{ margin: '0.35rem 0 0', fontSize: '1.75rem' }}>{invoiceNumber}</h1>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <span
-          style={{
-            ...badge.style,
-            display: 'inline-flex',
-            alignItems: 'center',
-            borderRadius: '999px',
-            padding: '0.35rem 0.75rem',
-            fontSize: '0.875rem',
-            fontWeight: 700,
-          }}
-        >
-          {badge.label}
+    <div>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-bold">{invoiceNumber}</h1>
+        <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_STYLES[status]}`}>
+          {label}
         </span>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>Updated</p>
-          <p style={{ margin: '0.25rem 0 0', fontWeight: 600 }}>{paidAt}</p>
-        </div>
       </div>
+      {paidAt && <p className="text-xs text-muted-foreground mt-1">Paid at {paidAt}</p>}
     </div>
   );
 }

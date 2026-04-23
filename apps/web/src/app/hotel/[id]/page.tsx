@@ -158,7 +158,7 @@ export default function ApartmentDetailPage({
             </p>
           </div>
 
-          <Link href={`/hotel/${params.id}/escrow/temp-escrow-id`} style={styles.button}>
+          <Link href={`/hotel/${params.id}/escrow/create`} style={styles.button}>
             BOOK
           </Link>
         </div>
