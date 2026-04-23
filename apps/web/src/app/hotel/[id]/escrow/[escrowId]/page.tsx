@@ -9,7 +9,7 @@
 //   funded      -> EscrowPaidView     (Payment batch)
 //   active      -> EscrowBlockedView  (Deposit blocked)
 //   completed   -> EscrowReleasedView (Deposit released)
-//   default     -> redirect to /hotel/[id]/escrow/create
+//   default     -> EscrowPaidView
 //
 // Real-time: RealTimeEscrowStatus (Hasura subscription) drives automatic transitions
 
@@ -285,8 +285,7 @@ export default function EscrowDetailPage({
       </div>
 
       <p style={{ marginTop: '1rem', color: '#6b7280', fontSize: '0.85rem' }}>
-        Dev: append <code>?status=paid</code>, <code>?status=blocked</code>, or{' '}
-        <code>?status=released</code> to preview each view state.
+        Dev: append ?status=paid|blocked|released
       </p>
     </div>
   );

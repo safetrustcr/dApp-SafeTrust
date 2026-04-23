@@ -1,3 +1,6 @@
+// TODO: replace with real component once merged in frontend-SafeTrust
+// Source: frontend-SafeTrust/src/components/escrow/ProcessStepper.tsx
+
 import type { CSSProperties } from 'react';
 
 const STEPS = [
@@ -23,9 +26,9 @@ export function ProcessStepper({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) 
           const isActive = step === currentStep;
           const isComplete = step < currentStep;
           const markerStyle: CSSProperties = isActive
-            ? { backgroundColor: '#f97316', color: '#ffffff', border: '1px solid #f97316' }
+            ? { backgroundColor: '#22c55e', color: '#ffffff', border: '1px solid #22c55e' }
             : isComplete
-              ? { backgroundColor: '#ffedd5', color: '#9a3412', border: '1px solid #fdba74' }
+              ? { backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac' }
               : { backgroundColor: '#ffffff', color: '#9ca3af', border: '1px solid #d1d5db' };
 
           return (
