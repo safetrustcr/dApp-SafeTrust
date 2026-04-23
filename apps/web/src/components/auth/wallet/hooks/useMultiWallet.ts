@@ -7,7 +7,7 @@ import {
   Asset,
   Memo,
   BASE_FEE,
-} from "stellar-sdk";
+} from "@stellar/stellar-sdk";
 import { ISupportedWallet } from "@creit.tech/stellar-wallets-kit";
 import { kit } from "../constants/wallet-kit.constant";
 import {
