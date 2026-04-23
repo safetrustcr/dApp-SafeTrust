@@ -6,12 +6,17 @@ import {
   XBULL_ID
 } from "@creit.tech/stellar-wallets-kit";
 
-export const kit: StellarWalletsKit = new StellarWalletsKit({
-  network: WalletNetwork.TESTNET,
-  selectedWalletId: FREIGHTER_ID,
-  modules: allowAllModules(),
-  
-});
+const createWalletKit = () =>
+  new StellarWalletsKit({
+    network: WalletNetwork.TESTNET,
+    selectedWalletId: FREIGHTER_ID,
+    modules: allowAllModules(),
+  });
+
+export const kit: StellarWalletsKit =
+  typeof window === "undefined"
+    ? ({} as StellarWalletsKit)
+    : createWalletKit();
 
 export const WALLET_IDS = {
   FREIGHTER: FREIGHTER_ID,
