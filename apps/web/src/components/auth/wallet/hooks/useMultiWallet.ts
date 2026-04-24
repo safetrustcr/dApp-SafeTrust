@@ -14,6 +14,7 @@ import {
   WalletInfo,
   WalletError,
   WalletType,
+  StellarWalletType,
   MultiChainBalances,
   StellarPaymentOptions,
   StellarWalletInfo,
@@ -23,6 +24,21 @@ import { validateWalletConnection } from "../utils/walletValidation";
 
 const Server = Horizon.Server;
 
+const STELLAR_WALLET_TYPES: StellarWalletType[] = [
+  "freighter",
+  "albedo",
+  "lobstr",
+  "walletconnect",
+  "rabet",
+  "xbull",
+  "hana",
+];
+
+const isStellarWalletType = (
+  walletType: string,
+): walletType is StellarWalletType =>
+  STELLAR_WALLET_TYPES.includes(walletType as StellarWalletType);
+
 export const useMultiWallet = (
   horizonUrl: string = "https://horizon-testnet.stellar.org",
   network: string = Networks.TESTNET,
@@ -31,7 +47,10 @@ export const useMultiWallet = (
   const [selectedWallet, setSelectedWallet] = useState<WalletInfo>();
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<WalletError>();
-  const [balances, setBalances] = useState<MultiChainBalances>({ stellar: [] });
+  const [balances, setBalances] = useState<MultiChainBalances>({
+    stellar: [],
+    ethereum: [],
+  });
   const [server] = useState(() => new Server(horizonUrl));
 
   const connectStellarWallet = useCallback(async () => {
@@ -42,6 +61,11 @@ export const useMultiWallet = (
       await kit.openModal({
         modalTitle: "Connect to your favorite Stellar wallet",
         onWalletSelected: async (option: ISupportedWallet) => {
+          const walletType = option.id;
+          if (!isStellarWalletType(walletType)) {
+            throw new Error(`Unsupported Stellar wallet type: ${walletType}`);
+          }
+
           kit.setWallet(option.id);
 
           const { address } = await kit.getAddress();
@@ -52,7 +76,7 @@ export const useMultiWallet = (
             name,
             chain: "stellar",
             connectionStatus: "connected",
-            walletType: option.id as WalletType,
+            walletType,
             balances: [],
             publicKey: address,
           };
@@ -60,7 +84,7 @@ export const useMultiWallet = (
           const validation = validateWalletConnection({
             address,
             chain: "stellar",
-            walletType: option.id,
+            walletType,
           });
 
           if (!validation.isValid) {
@@ -68,7 +92,7 @@ export const useMultiWallet = (
           }
 
           setConnectedWallets((prev) => {
-            const filtered = prev.filter((w) => w.walletType !== option.id);
+            const filtered = prev.filter((w) => w.walletType !== walletType);
             return [...filtered, walletInfo];
           });
 
@@ -167,6 +191,9 @@ export const useMultiWallet = (
         case "freighter":
         case "albedo":
         case "lobstr":
+        case "rabet":
+        case "xbull":
+        case "hana":
           await connectStellarWallet();
           break;
         case "metamask":
@@ -189,7 +216,7 @@ export const useMultiWallet = (
   const disconnectWallet = useCallback(
     async (walletType: WalletType) => {
       try {
-        if (["freighter", "albedo", "lobstr"].includes(walletType)) {
+        if (walletType !== "metamask" && walletType !== "walletconnect") {
           await kit.disconnect();
         }
 
@@ -205,7 +232,7 @@ export const useMultiWallet = (
         }
 
         if (connectedWallets.length <= 1) {
-          setBalances({ stellar: [] });
+          setBalances({ stellar: [], ethereum: [] });
         }
       } catch (error: any) {
         const walletError: WalletError = {
@@ -237,7 +264,7 @@ export const useMultiWallet = (
     setConnectedWallets([]);
     setSelectedWallet(undefined);
     setError(undefined);
-    setBalances({ stellar: [] });
+    setBalances({ stellar: [], ethereum: [] });
     setIsConnecting(false);
   }, []);
 

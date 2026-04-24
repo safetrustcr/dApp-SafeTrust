@@ -26,7 +26,26 @@ const createWalletKitSSRStub = (): StellarWalletsKit => {
   };
 
   return new Proxy(target, {
-    get: () => throwBrowserOnlyError(),
+    get: (_target, prop) => {
+      if (
+        typeof prop === "symbol" ||
+        prop === "then" ||
+        prop === "toJSON" ||
+        prop === "inspect"
+      ) {
+        return undefined;
+      }
+
+      if (prop === "toString") {
+        return () => "stellarWalletKitSSRStub";
+      }
+
+      if (prop === "valueOf") {
+        return () => target;
+      }
+
+      return throwBrowserOnlyError();
+    },
     apply: () => throwBrowserOnlyError(),
     construct: () => throwBrowserOnlyError(),
   }) as unknown as StellarWalletsKit;

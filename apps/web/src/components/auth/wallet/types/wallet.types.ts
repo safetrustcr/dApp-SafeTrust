@@ -8,6 +8,9 @@ export type WalletType =
   | "xbull"
   | "hana";
 
+export type StellarWalletType = Exclude<WalletType, "metamask">;
+export type EthereumWalletType = Extract<WalletType, "metamask" | "walletconnect">;
+
 export type WalletChain = "stellar" | "ethereum";
 
 export type WalletConnectionStatus =
@@ -16,16 +19,7 @@ export type WalletConnectionStatus =
   | "disconnected"
   | "error";
 
-export interface WalletDetectionResult {
-  freighter: boolean;
-  albedo: boolean;
-  lobstr: boolean;
-  metamask: boolean;
-  walletconnect: boolean;
-  rabet?: boolean;
-  xbull?: boolean;
-  hana?: boolean;
-}
+export type WalletDetectionResult = Record<WalletType, boolean>;
 
 export interface WalletError {
   code: string;
@@ -50,21 +44,23 @@ export interface EthereumBalance {
   decimals?: number;
 }
 
-interface BaseWalletInfo {
+interface BaseWalletInfo<TChain extends WalletChain, TWalletType extends WalletType> {
   address: string;
   name: string;
-  chain: WalletChain;
+  chain: TChain;
   connectionStatus: WalletConnectionStatus;
-  walletType: WalletType;
+  walletType: TWalletType;
 }
 
-export interface StellarWalletInfo extends BaseWalletInfo {
+export interface StellarWalletInfo
+  extends BaseWalletInfo<"stellar", StellarWalletType> {
   chain: "stellar";
   balances: StellarBalance[];
   publicKey: string;
 }
 
-export interface EthereumWalletInfo extends BaseWalletInfo {
+export interface EthereumWalletInfo
+  extends BaseWalletInfo<"ethereum", EthereumWalletType> {
   chain: "ethereum";
   chainId: number;
   balances: EthereumBalance[];
@@ -73,8 +69,8 @@ export interface EthereumWalletInfo extends BaseWalletInfo {
 export type WalletInfo = StellarWalletInfo | EthereumWalletInfo;
 
 export interface MultiChainBalances {
-  stellar?: StellarBalance[];
-  ethereum?: EthereumBalance[];
+  stellar: StellarBalance[];
+  ethereum: EthereumBalance[];
 }
 
 export interface MultiWalletState {
@@ -92,6 +88,10 @@ export interface StellarPaymentOptions {
   asset?: "XLM" | { code: string; issuer: string };
 }
 
+/**
+ * Reserved for the upcoming EVM `sendPayment` implementation.
+ * Currently unused. `amountWei` must be a wei-denominated bigint-as-string.
+ */
 export interface EvmPaymentOptions {
   to: string;
   amountWei: string;
