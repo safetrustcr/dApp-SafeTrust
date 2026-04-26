@@ -1,10 +1,9 @@
-import { StrKey } from "@stellar/stellar-sdk";
-import { WalletType } from "../types/wallet.types";
+// TODO: replace with real validation once merged — frontend-SafeTrust/src/components/auth/wallet/utils/walletValidation.ts
 
 interface ValidationInput {
   address: string;
   chain: "stellar" | "ethereum";
-  walletType: WalletType | string;
+  walletType: string;
 }
 
 interface ValidationResult {
@@ -12,35 +11,30 @@ interface ValidationResult {
   errors: string[];
 }
 
-const ETHEREUM_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
-
-function isValidAddressForChain(address: string, chain: "stellar" | "ethereum"): boolean {
-  if (chain === "stellar") {
-    return StrKey.isValidEd25519PublicKey(address);
-  }
-
-  return ETHEREUM_ADDRESS_REGEX.test(address);
-}
-
-export function validateWalletConnection({
-  address,
-  chain,
-  walletType,
-}: ValidationInput): ValidationResult {
+export function validateWalletConnection(
+  input: ValidationInput,
+): ValidationResult {
   const errors: string[] = [];
 
-  if (!address) {
+  if (!input.address || input.address.trim() === "") {
     errors.push("Wallet address is required");
-  } else if (!isValidAddressForChain(address, chain)) {
-    errors.push(`Invalid ${chain} wallet address`);
   }
 
-  if (!walletType) {
-    errors.push("Wallet type is required");
+  if (
+    input.chain === "stellar" &&
+    input.address &&
+    !input.address.startsWith("G")
+  ) {
+    errors.push("Invalid Stellar address format");
   }
 
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
+  if (
+    input.chain === "ethereum" &&
+    input.address &&
+    !input.address.startsWith("0x")
+  ) {
+    errors.push("Invalid Ethereum address format");
+  }
+
+  return { isValid: errors.length === 0, errors };
 }
