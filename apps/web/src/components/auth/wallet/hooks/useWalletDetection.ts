@@ -14,6 +14,9 @@ export const useWalletDetection = (): WalletDetectionResult & {
     lobstr: false,
     metamask: false,
     walletconnect: true, // WalletConnect is always available as it's a protocol
+    rabet: false,
+    xbull: false,
+    hana: false,
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -29,6 +32,9 @@ export const useWalletDetection = (): WalletDetectionResult & {
           lobstr: await detectLobstr(),
           metamask: await detectMetaMask(),
           walletconnect: true, // Always available
+          rabet: false,
+          xbull: false,
+          hana: false,
         };
 
         setDetection(results);
