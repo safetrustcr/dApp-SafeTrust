@@ -1,48 +1,55 @@
-// TODO: replace with real InvoiceHeader once merged in frontend-SafeTrust
+// TODO: replace with real component once merged in frontend-SafeTrust
 // Source: frontend-SafeTrust/src/components/escrow/InvoiceHeader.tsx
 
 import type { CSSProperties } from 'react';
 
-const STATUS_STYLES: Record<string, CSSProperties> = {
+type InvoiceStatus = 'pending' | 'paid' | 'blocked' | 'released';
+
+const STATUS_STYLES: Record<InvoiceStatus, { label: string; style: CSSProperties }> = {
   pending: {
-    backgroundColor: '#fce7f3',
-    color: '#9d174d',
-    border: '1px solid #f9a8d4',
+    label: 'Pending',
+    style: {
+      backgroundColor: '#fce7f3',
+      color: '#9d174d',
+      border: '1px solid #f9a8d4',
+    },
   },
   paid: {
-    backgroundColor: '#dcfce7',
-    color: '#166534',
-    border: '1px solid #86efac',
+    label: 'Paid',
+    style: {
+      backgroundColor: '#dcfce7',
+      color: '#166534',
+      border: '1px solid #86efac',
+    },
   },
   blocked: {
-    backgroundColor: '#dbeafe',
-    color: '#1d4ed8',
-    border: '1px solid #93c5fd',
+    label: 'Deposit blocked',
+    style: {
+      backgroundColor: '#dbeafe',
+      color: '#1d4ed8',
+      border: '1px solid #93c5fd',
+    },
   },
   released: {
-    backgroundColor: '#ecfccb',
-    color: '#3f6212',
-    border: '1px solid #bef264',
+    label: 'Deposit released',
+    style: {
+      backgroundColor: '#ecfccb',
+      color: '#3f6212',
+      border: '1px solid #bef264',
+    },
   },
 };
 
 export function InvoiceHeader({
   invoiceNumber,
-  status,
   paidAt,
+  status,
 }: {
   invoiceNumber: string;
-  status: 'pending' | 'paid' | 'blocked' | 'released';
   paidAt?: string;
+  status: InvoiceStatus;
 }) {
-  const label =
-    status === 'pending'
-      ? 'Pending'
-      : status === 'paid'
-        ? 'Paid'
-        : status === 'blocked'
-          ? 'Deposit blocked'
-          : 'Deposit released';
+  const badge = STATUS_STYLES[status];
 
   return (
     <div
@@ -72,10 +79,11 @@ export function InvoiceHeader({
         </p>
         <h1 style={{ margin: '0.35rem 0 0', fontSize: '1.75rem' }}>{invoiceNumber}</h1>
       </div>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <span
           style={{
-            ...STATUS_STYLES[status],
+            ...badge.style,
             display: 'inline-flex',
             alignItems: 'center',
             borderRadius: '999px',
@@ -84,10 +92,15 @@ export function InvoiceHeader({
             fontWeight: 700,
           }}
         >
-          {label}
+          {badge.label}
         </span>
+        {paidAt && (
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>Updated</p>
+            <p style={{ margin: '0.25rem 0 0', fontWeight: 600 }}>{paidAt}</p>
+          </div>
+        )}
       </div>
-      {paidAt && <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>Paid at {paidAt}</p>}
     </div>
   );
 }
