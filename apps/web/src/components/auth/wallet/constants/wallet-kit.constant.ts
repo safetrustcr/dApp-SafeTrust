@@ -6,12 +6,23 @@ import {
   XBULL_ID
 } from "@creit.tech/stellar-wallets-kit";
 
-export const kit: StellarWalletsKit = new StellarWalletsKit({
-  network: WalletNetwork.TESTNET,
-  selectedWalletId: FREIGHTER_ID,
-  modules: allowAllModules(),
-  
-});
+let walletKit: StellarWalletsKit | null = null;
+
+export const getWalletKit = (): StellarWalletsKit => {
+  if (typeof window === "undefined") {
+    throw new Error("Stellar wallet kit is only available in the browser");
+  }
+
+  if (!walletKit) {
+    walletKit = new StellarWalletsKit({
+      network: WalletNetwork.TESTNET,
+      selectedWalletId: FREIGHTER_ID,
+      modules: allowAllModules(),
+    });
+  }
+
+  return walletKit;
+};
 
 export const WALLET_IDS = {
   FREIGHTER: FREIGHTER_ID,
@@ -29,6 +40,8 @@ export const signTransaction = async ({
   address,
   network = WalletNetwork.TESTNET,
 }: SignTransactionProps): Promise<string> => {
+  const kit = getWalletKit();
+
   const { signedTxXdr } = await kit.signTransaction(unsignedTransaction, {
     address,
     networkPassphrase: network,

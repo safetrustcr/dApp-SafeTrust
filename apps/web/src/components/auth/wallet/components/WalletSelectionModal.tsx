@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ISupportedWallet } from '@creit.tech/stellar-wallets-kit';
-import { kit } from '../constants/wallet-kit.constant';
+import { getWalletKit } from '../constants/wallet-kit.constant';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,7 +38,7 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
   const loadWallets = async () => {
     try {
       setLoading(true);
-      const supportedWallets = await kit.getSupportedWallets();      
+      const supportedWallets = await getWalletKit().getSupportedWallets();
       const enhancedWallets = supportedWallets.map(wallet => ({
         ...wallet,
         isInstalled: wallet.isAvailable
