@@ -104,7 +104,6 @@ export default function ApartmentDetailPage({
 }) {
   return (
     <div style={styles.page}>
-      {/* TODO: replace with <SuggestionsList /> */}
       <aside
         style={styles.aside}
         className="desktop-suggestions hidden lg:block"
@@ -118,15 +117,7 @@ export default function ApartmentDetailPage({
         >
           Suggestions
         </p>
-        <p
-          style={{
-            marginBottom: "1rem",
-            fontSize: "0.75rem",
-            color: "#78716c",
-          }}
-        >
-          More than 200 available
-        </p>
+
         {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} style={styles.suggestionCard}>
             <div
@@ -152,11 +143,11 @@ export default function ApartmentDetailPage({
       </aside>
 
       <main style={styles.main}>
-        {/* TODO: replace with <ImageGallery images={apartment.images} /> */}
         <div style={styles.gallery}>
           <div style={{ ...styles.imagePlaceholder, minHeight: "16rem" }}>
             <span style={{ fontSize: "0.75rem" }}>Main image</span>
           </div>
+
           <div style={styles.thumbs}>
             {[1, 2, 3].map((i) => (
               <div
@@ -178,6 +169,7 @@ export default function ApartmentDetailPage({
             <h1 style={{ margin: 0, fontSize: "2rem", fontWeight: 700 }}>
               {STUB_APARTMENT.name}
             </h1>
+
             <p
               style={{ marginTop: "0.5rem", color: "#ea580c", fontWeight: 600 }}
             >
@@ -193,12 +185,12 @@ export default function ApartmentDetailPage({
           </Link>
         </div>
 
-        {/* TODO: replace with <AmenityIcons /> */}
         <div
           style={{ ...styles.metaRow, color: "#57534e", fontSize: "0.95rem" }}
         >
           <span>📍 {STUB_APARTMENT.address}</span>
         </div>
+
         <div style={{ ...styles.metaRow, fontSize: "0.95rem" }}>
           <span>🛏 {STUB_APARTMENT.bedrooms} bd</span>
           <span>
@@ -217,6 +209,7 @@ export default function ApartmentDetailPage({
           <h2 style={{ marginBottom: "0.25rem", fontWeight: 600 }}>
             Apartment details
           </h2>
+
           <p style={{ color: "#57534e", lineHeight: 1.6 }}>
             {STUB_APARTMENT.description}
           </p>
