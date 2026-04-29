@@ -8,7 +8,6 @@ type DeployRequestBody = {
   tenantAddress?: string;
   ownerAddress?: string;
   amount?: number;
-  engagementId?: string;
 };
 
 type InitializeSingleReleaseEscrowResponse = {
@@ -21,14 +20,23 @@ type InitializeSingleReleaseEscrowResponse = {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as DeployRequestBody;
-    const { apartmentId, tenantAddress, ownerAddress, amount, engagementId } = body;
+    const { apartmentId, tenantAddress, ownerAddress, amount } = body;
 
-    if (!apartmentId || !tenantAddress || !ownerAddress || !amount || !engagementId) {
+    if (!apartmentId || !tenantAddress || !ownerAddress) {
       return NextResponse.json(
         { error: 'Missing required escrow deployment fields.' },
         { status: 400 },
       );
     }
+
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json(
+        { error: 'Invalid amount: must be a positive number.' },
+        { status: 400 },
+      );
+    }
+
+    const engagementId = crypto.randomUUID();
 
     const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS ?? ownerAddress;
     const trustlineAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS;
@@ -69,6 +77,13 @@ export async function POST(request: NextRequest) {
         body: payload,
       },
     );
+
+    if (result.status !== 'SUCCESS' || !result.unsignedTransaction) {
+      return NextResponse.json(
+        { error: result.message ?? 'TrustlessWork escrow deploy failed.', payload: result },
+        { status: 502 },
+      );
+    }
 
     return NextResponse.json({
       status: result.status,

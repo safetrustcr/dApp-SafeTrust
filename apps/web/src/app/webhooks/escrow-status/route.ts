@@ -28,8 +28,12 @@ function normalizeSignature(signature: string) {
 function verifySignature(rawBody: string, signature: string, secret: string) {
   const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
   const actual = normalizeSignature(signature);
-
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(actual));
+  const expectedBuf = Buffer.from(expected, 'utf8');
+  const actualBuf = Buffer.from(actual, 'utf8');
+  if (expectedBuf.length !== actualBuf.length) {
+    return false;
+  }
+  return timingSafeEqual(expectedBuf, actualBuf);
 }
 
 export async function POST(request: NextRequest) {
@@ -48,11 +52,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
   }
 
-  const body = JSON.parse(rawBody) as {
-    contractId?: string;
-    engagementId?: string;
-    status?: string;
-  };
+  let body: { contractId?: string; engagementId?: string; status?: string };
+  try {
+    body = JSON.parse(rawBody) as {
+      contractId?: string;
+      engagementId?: string;
+      status?: string;
+    };
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+}
 
   const mappedStatus = body.status ? STATUS_MAP[body.status] : undefined;
   if (!body.engagementId || !body.contractId || !body.status) {

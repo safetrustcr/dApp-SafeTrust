@@ -9,7 +9,7 @@ const STUB_APARTMENT = {
   address: '329 Calle santos, paseo colon, San Jose',
   price: 4000,
   owner: {
-    walletAddress: 'GD4FWTW7OWNERADDRESSPLACEHOLDERXQXNB5QY3Q5YQG3D2G7A',
+    walletAddress: 'GDUMR3GDOAWAJXFYB7BLMCQQX4FGXJQ3NGPBHPBWKWJRG4ZL2RKIUJL',
   },
 };
 

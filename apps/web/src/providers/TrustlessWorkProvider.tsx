@@ -12,6 +12,13 @@ const baseURL =
     ? mainNet
     : development;
 
+if (!process.env.NEXT_PUBLIC_TRUSTLESS_WORK_API_KEY) {
+  console.warn(
+    "[TrustlessWorkProvider] NEXT_PUBLIC_TRUSTLESS_WORK_API_KEY is not set. " +
+      "All TrustlessWork requests will fail with 401."
+  );
+}
+
 export function TrustlessWorkProvider({
   children,
 }: {

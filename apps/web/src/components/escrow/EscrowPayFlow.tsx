@@ -83,7 +83,6 @@ export function EscrowPayFlow({
       return;
     }
 
-    const engagementId = `ST-${apartmentId}-${Date.now()}`;
     setDeploying(true);
     setDeployState(null);
     setErrorMessages([]);
@@ -99,7 +98,6 @@ export function EscrowPayFlow({
           tenantAddress: address,
           ownerAddress,
           amount,
-          engagementId,
         }),
       });
 
@@ -193,8 +191,8 @@ export function EscrowPayFlow({
         )}
         {errorMessages.length > 0 && (
           <ul style={flowStyles.errorList}>
-            {errorMessages.map((message) => (
-              <li key={message}>{message}</li>
+            {errorMessages.map((message, index) => (
+              <li key={index}>{message}</li>
             ))}
           </ul>
         )}

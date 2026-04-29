@@ -52,9 +52,13 @@ async function hasuraRequest<T>(query: string, variables: Record<string, unknown
     cache: 'no-store',
   });
 
-  const payload = await response.json();
-  if (!response.ok || payload.errors) {
-    throw new Error(JSON.stringify(payload.errors ?? payload));
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || payload?.errors) {
+    console.error('[hasura] request failed', {
+      status: response.status,
+      errors: payload?.errors ?? payload,
+    });
+    throw new Error(`Hasura request failed (status ${response.status})`);
   }
 
   return payload.data as T;

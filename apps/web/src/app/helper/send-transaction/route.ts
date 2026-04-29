@@ -42,11 +42,17 @@ export async function POST(request: NextRequest) {
       !engagementId ||
       !propertyId ||
       !senderAddress ||
-      !receiverAddress ||
-      !amount
+      !receiverAddress
     ) {
       return NextResponse.json(
         { error: 'Missing required signed transaction fields.' },
+        { status: 400 },
+      );
+    }
+
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json(
+        { error: 'Invalid amount: must be a positive number.' },
         { status: 400 },
       );
     }

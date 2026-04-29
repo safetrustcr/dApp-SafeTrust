@@ -104,7 +104,7 @@ export const useWallet = () => {
   };
 
   return {
-    kit: getWalletKit,
+    getKit: getWalletKit,
     connectWallet,
     disconnectWallet,
     handleConnect,
