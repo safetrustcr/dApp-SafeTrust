@@ -1,11 +1,13 @@
 // TODO: replace with real types once merged — frontend-SafeTrust/src/components/auth/wallet/types/wallet.types.ts
-
 export type WalletType =
   | "freighter"
   | "albedo"
   | "lobstr"
   | "metamask"
-  | "walletconnect";
+  | "walletconnect"
+  | "rabet"
+  | "xbull"
+  | "hana";
 
 export interface WalletInfo {
   address: string;
@@ -59,4 +61,7 @@ export interface WalletDetectionResult {
   lobstr: boolean;
   metamask: boolean;
   walletconnect: boolean;
+  rabet: boolean;
+  xbull: boolean;
+  hana: boolean;
 }

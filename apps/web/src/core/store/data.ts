@@ -4,10 +4,10 @@ import { create } from "zustand";
 interface AuthState {
   address: string | null;
   name: string | null;
+  setAddress: (address: string | null) => void;
   walletType: string | null;
   isConnected: boolean;
-  setAddress: (address: string | null) => void;
-  connectWalletStore: (address: string, walletType: string) => void;
+  connectWalletStore: (address: string, name: string) => void;
   disconnectWalletStore: () => void;
   disconnect: () => void;
 }
@@ -18,8 +18,8 @@ export const useGlobalAuthenticationStore = create<AuthState>((set) => ({
   walletType: null,
   isConnected: false,
   setAddress: (address) => set({ address }),
-  connectWalletStore: (address, walletType) =>
-    set({ address, name: walletType, walletType, isConnected: true }),
+  connectWalletStore: (address, name) =>
+    set({ address, name, walletType: name, isConnected: true }),
   disconnectWalletStore: () =>
     set({ address: null, name: null, walletType: null, isConnected: false }),
   disconnect: () =>

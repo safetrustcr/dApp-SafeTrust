@@ -181,12 +181,13 @@ export const useMetaMaskWallet = () => {
   useEffect(() => {
     if (!window.ethereum) return;
 
-    const handleAccountsChanged = (accounts: unknown) => {
-      const accs = accounts as string[];
-      if (accs.length === 0) {
+    const handleAccountsChanged = (...args: unknown[]) => {
+      const accounts = Array.isArray(args[0]) ? (args[0] as string[]) : [];
+
+      if (accounts.length === 0) {
         disconnectWallet();
       } else if (walletState.isConnected) {
-        setWalletState((prev) => ({ ...prev, address: accs[0] }));
+        setWalletState((prev) => ({ ...prev, address: accounts[0] }));
       }
     };
 

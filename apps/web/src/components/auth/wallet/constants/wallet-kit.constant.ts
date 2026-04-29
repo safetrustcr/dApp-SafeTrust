@@ -6,55 +6,23 @@ import {
   XBULL_ID
 } from "@creit.tech/stellar-wallets-kit";
 
-const createWalletKit = () =>
-  new StellarWalletsKit({
-    network: WalletNetwork.TESTNET,
-    selectedWalletId: FREIGHTER_ID,
-    modules: allowAllModules(),
-  });
+let walletKit: StellarWalletsKit | null = null;
 
-const STELLAR_WALLETS_KIT_BROWSER_ONLY_ERROR =
-  "StellarWalletsKit is only available in the browser";
+export const getWalletKit = (): StellarWalletsKit => {
+  if (typeof window === "undefined") {
+    throw new Error("Stellar wallet kit is only available in the browser");
+  }
 
-const createWalletKitSSRStub = (): StellarWalletsKit => {
-  const throwBrowserOnlyError = (): never => {
-    throw new Error(STELLAR_WALLETS_KIT_BROWSER_ONLY_ERROR);
-  };
+  if (!walletKit) {
+    walletKit = new StellarWalletsKit({
+      network: WalletNetwork.TESTNET,
+      selectedWalletId: FREIGHTER_ID,
+      modules: allowAllModules(),
+    });
+  }
 
-  const target = function stellarWalletKitSSRStub() {
-    throwBrowserOnlyError();
-  };
-
-  return new Proxy(target, {
-    get: (_target, prop) => {
-      if (
-        typeof prop === "symbol" ||
-        prop === "then" ||
-        prop === "toJSON" ||
-        prop === "inspect"
-      ) {
-        return undefined;
-      }
-
-      if (prop === "toString") {
-        return () => "stellarWalletKitSSRStub";
-      }
-
-      if (prop === "valueOf") {
-        return () => target;
-      }
-
-      return throwBrowserOnlyError();
-    },
-    apply: () => throwBrowserOnlyError(),
-    construct: () => throwBrowserOnlyError(),
-  }) as unknown as StellarWalletsKit;
+  return walletKit;
 };
-
-export const kit: StellarWalletsKit =
-  typeof window === "undefined"
-    ? createWalletKitSSRStub()
-    : createWalletKit();
 
 export const WALLET_IDS = {
   FREIGHTER: FREIGHTER_ID,
@@ -72,6 +40,8 @@ export const signTransaction = async ({
   address,
   network = WalletNetwork.TESTNET,
 }: SignTransactionProps): Promise<string> => {
+  const kit = getWalletKit();
+
   const { signedTxXdr } = await kit.signTransaction(unsignedTransaction, {
     address,
     networkPassphrase: network,

@@ -2,7 +2,7 @@ import {
   ISupportedWallet,
   WalletNetwork,
 } from "@creit.tech/stellar-wallets-kit";
-import { kit } from "../constants/wallet-kit.constant";
+import { getWalletKit } from "../constants/wallet-kit.constant";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
@@ -26,6 +26,8 @@ export const useWallet = () => {
 
   const handleWalletSelected = async (option: ISupportedWallet) => {
     try {
+      const kit = getWalletKit();
+
       kit.setWallet(option.id);
       const { address } = await kit.getAddress();
       const { name } = option;
@@ -42,6 +44,8 @@ export const useWallet = () => {
   };
 
   const disconnectWallet = async () => {
+    const kit = getWalletKit();
+
     await kit.disconnect();
     disconnectWalletStore();
     router.push("/");
@@ -100,7 +104,7 @@ export const useWallet = () => {
   };
 
   return {
-    kit,
+    getKit: getWalletKit,
     connectWallet,
     disconnectWallet,
     handleConnect,

@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { WalletType } from "../components/MainWalletSelectionModal";
 import { useMetaMaskWallet } from "./metamask-wallet.hook";
-import { kit } from "../constants/wallet-kit.constant";
+import { getWalletKit } from "../constants/wallet-kit.constant";
 
 export const useMultiWallet = () => {
   const router = useRouter();
@@ -84,6 +84,8 @@ export const useMultiWallet = () => {
     try {
       setError(null);
 
+      const kit = getWalletKit();
+
       kit.setWallet(wallet.id);
 
       const { address } = await kit.getAddress();
@@ -113,6 +115,8 @@ export const useMultiWallet = () => {
 
   const disconnectWallet = async () => {
     try {
+      const kit = getWalletKit();
+
       disconnectWalletStore();
 
       if (metaMaskWallet.isConnected) {
@@ -132,6 +136,14 @@ export const useMultiWallet = () => {
     openMainModal();
   };
 
+  const reset = () => {
+    setError(null);
+    setIsMainModalOpen(false);
+    setIsStellarModalOpen(false);
+    setIsMetaMaskModalOpen(false);
+    setSelectedWalletType(null);
+  };
+
   return {
     isMainModalOpen,
     isStellarModalOpen,
@@ -147,6 +159,7 @@ export const useMultiWallet = () => {
     handleMetaMaskSelected,
     handleConnect,
     disconnectWallet,
+    reset,
     error,
     setError,
     metaMaskWallet,

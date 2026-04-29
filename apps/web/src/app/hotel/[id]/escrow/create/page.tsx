@@ -1,17 +1,17 @@
-// TODO: replace PAY button with real XDRSigningFlow once merged in frontend-SafeTrust
-// Sources:
-//   frontend-SafeTrust/src/components/escrow/XDRSigningFlow.tsx
-//   frontend-SafeTrust/src/components/escrow/ProcessStepper.tsx
-//   frontend-SafeTrust/src/components/escrow/InvoiceHeader.tsx
-//
-// Flow (when wired):
-//   PAY -> signXDR() via Freighter -> POST /helper/send-transaction
-//   -> router.push(`/hotel/${id}/escrow/${newEscrowId}`)
-
+import { EscrowPayFlow } from '@/components/escrow/EscrowPayFlow';
 import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
 import { ProcessStepper } from '@/components/escrow/ProcessStepper';
-import { XDRSigningFlowStub } from '@/components/escrow/XDRSigningFlowStub';
 import type { CSSProperties } from 'react';
+
+const STUB_APARTMENT = {
+  id: 'la-sabana',
+  name: 'La sabana',
+  address: '329 Calle santos, paseo colon, San Jose',
+  price: 4000,
+  owner: {
+    walletAddress: 'GDUMR3GDOAWAJXFYB7BLMCQQX4FGXJQ3NGPBHPBWKWJRG4ZL2RKIUJL',
+  },
+};
 
 const styles = {
   page: {
@@ -39,14 +39,9 @@ const styles = {
     flexWrap: 'wrap',
   } satisfies CSSProperties,
   payButton: {
-    border: '1px solid #f97316',
-    backgroundColor: '#f97316',
-    color: '#ffffff',
-    fontWeight: 700,
-    padding: '0.6rem 1.5rem',
-    borderRadius: '0.75rem',
-    opacity: 0.6,
-    cursor: 'not-allowed',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
   } satisfies CSSProperties,
   imageGrid: {
     display: 'grid',
@@ -105,15 +100,16 @@ export default function EscrowCreatePage({
               <p style={{ margin: 0, fontSize: '0.8rem', letterSpacing: '0.08em', color: '#9ca3af' }}>
                 HOTEL {params.id}
               </p>
-              <h2 style={{ marginTop: '0.35rem', marginBottom: 0, fontSize: '1.5rem' }}>La sabana</h2>
+              <h2 style={{ marginTop: '0.35rem', marginBottom: 0, fontSize: '1.5rem' }}>{STUB_APARTMENT.name}</h2>
             </div>
-            <button
-              disabled
-              style={styles.payButton}
-              title="Wallet signing - coming soon"
-            >
-              PAY
-            </button>
+            <div style={styles.payButton}>
+              <EscrowPayFlow
+                apartmentId={params.id}
+                apartmentName={STUB_APARTMENT.name}
+                ownerAddress={STUB_APARTMENT.owner.walletAddress}
+                amount={STUB_APARTMENT.price}
+              />
+            </div>
           </div>
 
           <div style={styles.imageGrid}>
@@ -122,7 +118,7 @@ export default function EscrowCreatePage({
             ))}
           </div>
 
-          <p style={styles.mutedText}>Address: 329 Calle santos, paseo colon, San Jose</p>
+          <p style={styles.mutedText}>Address: {STUB_APARTMENT.address}</p>
           <div style={styles.detailsRow}>
             <span>2 bd</span>
             <span>pet friendly</span>
@@ -142,7 +138,6 @@ export default function EscrowCreatePage({
             <p style={{ margin: '0.35rem 0 0', fontSize: '0.95rem' }}>Email: owner@example.com</p>
           </div>
 
-          <XDRSigningFlowStub />
         </div>
 
         <div style={styles.sidebar}>
