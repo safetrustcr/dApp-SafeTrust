@@ -1,7 +1,0 @@
-"""
-Minimal schema so `pnpm codegen` works without a running Hasura instance.
-For real types, start Hasura and set CODEGEN_SCHEMA_URL to its GraphQL endpoint.
-"""
-type Query {
-  _empty: String
-}

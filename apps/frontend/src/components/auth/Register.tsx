@@ -1,5 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { FirebaseError } from "firebase/app";
+import { auth } from "@/lib/firebase";
+import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +20,69 @@ import {
 } from "@/components/ui/select";
 import Illustration from "@/components/auth/ui/Illustration";
 
+const ERROR_MESSAGES: Record<string, string> = {
+  "auth/email-already-in-use": "An account with this email already exists",
+  "auth/weak-password": "Password must be at least 6 characters",
+  "auth/invalid-email": "Invalid email address",
+};
+
 export default function RegisterPage() {
+  const router = useRouter();
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+506");
+  const [phone, setPhone] = useState("");
+  const [location, setLocation] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const clearError = () => setError("");
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const credential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+
+      await updateProfile(credential.user, { displayName: fullName });
+
+      const token = await credential.user.getIdToken();
+
+      // Sync user to PostgreSQL via webhook service
+      const syncRes = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/sync-user`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (!syncRes.ok) {
+        throw new Error("SYNC_USER_FAILED");
+      }
+
+      useGlobalAuthenticationStore.getState().setToken(token);
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      if (err instanceof FirebaseError) {
+        setError(
+          ERROR_MESSAGES[err.code] ?? "Registration failed — please try again",
+        );
+      } else {
+        setError("Registration failed — please try again");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen">
       <div className="flex w-full flex-col items-center justify-center px-4 md:w-1/2">
@@ -22,16 +92,25 @@ export default function RegisterPage() {
             <h1 className="text-2xl font-bold">SafeTrust</h1>
           </div>
 
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleRegister}>
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" placeholder="Enter your full name" required />
+              <Input
+                id="name"
+                placeholder="Enter your full name"
+                required
+                value={fullName}
+                onChange={(e) => { setFullName(e.target.value); clearError(); }}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number</Label>
               <div className="flex gap-2">
-                <Select defaultValue="+506">
+                <Select
+                  value={phoneCountryCode}
+                  onValueChange={(v) => { setPhoneCountryCode(v); clearError(); }}
+                >
                   <SelectTrigger className="w-[100px]">
                     <SelectValue placeholder="Code" />
                   </SelectTrigger>
@@ -47,13 +126,18 @@ export default function RegisterPage() {
                   type="tel"
                   placeholder="Enter your phone number"
                   required
+                  value={phone}
+                  onChange={(e) => { setPhone(e.target.value); clearError(); }}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
-              <Select>
+              <Select
+                value={location || undefined}
+                onValueChange={(v) => { setLocation(v); clearError(); }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select your location" />
                 </SelectTrigger>
@@ -73,6 +157,8 @@ export default function RegisterPage() {
                 type="email"
                 placeholder="Enter your email"
                 required
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); clearError(); }}
               />
             </div>
 
@@ -83,15 +169,24 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="Enter your password"
                 required
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); clearError(); }}
               />
             </div>
 
             <Button
               type="submit"
               className="w-full bg-[#2857B8] hover:bg-[#2857B8]/90"
+              disabled={isLoading}
             >
               Sign Up
             </Button>
+
+            {error ? (
+              <p className="text-center text-sm text-red-600">
+                {error}
+              </p>
+            ) : null}
           </form>
 
           <div className="text-center text-sm">

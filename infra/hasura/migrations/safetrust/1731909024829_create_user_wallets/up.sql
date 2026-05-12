@@ -1,6 +1,6 @@
-CREATE TABLE user_wallets (
+CREATE TABLE public.user_wallets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    user_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
     wallet_address TEXT NOT NULL,
     chain_type TEXT NOT NULL,
     is_primary BOOLEAN DEFAULT false,
