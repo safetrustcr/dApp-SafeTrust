@@ -1,0 +1,44 @@
+table:
+  name: users
+  schema: public
+array_relationships:
+  - name: user_wallets
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: user_wallets
+          schema: public
+select_permissions:
+  - role: users
+    permission:
+      columns:
+        - id
+        - firebase_uid
+        - email
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
+        - last_seen
+      filter:
+        id:
+          _eq: X-Hasura-User-Id
+    comment: ""
+update_permissions:
+  - role: users
+    permission:
+      columns:
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
+      filter:
+        id:
+          _eq: X-Hasura-User-Id
+      check:
+        id:
+          _eq: X-Hasura-User-Id
+    comment: ""
