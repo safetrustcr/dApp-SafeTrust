@@ -70,10 +70,18 @@ export default function RegisterPage() {
       `${backendUrl}/api/auth/sync-user`,
       {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          phone_number: phone,
+          country_code: phoneCountryCode,
+          location,
+        }),
       },
     );
+
     clearTimeout(timeoutId);
 
     if (!syncRes.ok) {
