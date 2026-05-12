@@ -46,7 +46,7 @@ router.post('/sync-user', async (req, res) => {
     const result = await db.query(query, values);
     const user = result.rows[0];
 
-    console.log(`[sync-user] ✅ user synced — uid: ${user.firebase_uid}`);
+    console.log('[sync-user] ✅ user synced');
 
     res.status(200).json({ user });
   } catch (error) {

@@ -1,6 +1,6 @@
 import { auth } from "@/lib/firebase";
 
-connectionParams: async () => {
+export const connectionParams = async () => {
   const currentUser = auth.currentUser;
   const token = currentUser ? await currentUser.getIdToken() : null;
   return {
@@ -8,4 +8,4 @@ connectionParams: async () => {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   };
-},
+};
