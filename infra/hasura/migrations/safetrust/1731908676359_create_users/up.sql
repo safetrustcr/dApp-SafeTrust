@@ -1,6 +1,6 @@
 CREATE TABLE public.users (
     id TEXT PRIMARY KEY,
-    firebase_uid TEXT,
+    firebase_uid TEXT NOT NULL,
     email TEXT NOT NULL,
     first_name TEXT,
     last_name TEXT,
@@ -14,4 +14,4 @@ ALTER TABLE public.users
     ADD CONSTRAINT users_email_unique UNIQUE (email);
 
 CREATE INDEX idx_users_email ON public.users(email);
-CREATE INDEX idx_users_firebase_uid ON public.users(firebase_uid);
+CREATE UNIQUE INDEX idx_users_firebase_uid ON public.users(firebase_uid);

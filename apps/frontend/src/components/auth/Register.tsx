@@ -39,49 +39,63 @@ export default function RegisterPage() {
 
   const clearError = () => setError("");
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
+ const handleRegister = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
+  setError("");
 
-    try {
-      const credential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password,
-      );
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (!backendUrl) {
+    setError("Server configuration error — please contact support");
+    setIsLoading(false);
+    return;
+  }
 
-      await updateProfile(credential.user, { displayName: fullName });
+  try {
+    const credential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password,
+    );
 
-      const token = await credential.user.getIdToken();
+    await updateProfile(credential.user, { displayName: fullName });
 
-      // Sync user to PostgreSQL via webhook service
-      const syncRes = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/sync-user`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+    const token = await credential.user.getIdToken();
 
-      if (!syncRes.ok) {
-        throw new Error("SYNC_USER_FAILED");
-      }
+    // Sync user to PostgreSQL via webhook service
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-      useGlobalAuthenticationStore.getState().setToken(token);
-      router.push("/dashboard");
-    } catch (err: unknown) {
-      if (err instanceof FirebaseError) {
-        setError(
-          ERROR_MESSAGES[err.code] ?? "Registration failed — please try again",
-        );
-      } else {
-        setError("Registration failed — please try again");
-      }
-    } finally {
-      setIsLoading(false);
+    const syncRes = await fetch(
+      `${backendUrl}/api/auth/sync-user`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timeoutId);
+
+    if (!syncRes.ok) {
+      throw new Error("SYNC_USER_FAILED");
     }
-  };
+
+    useGlobalAuthenticationStore.getState().setToken(token);
+    router.push("/dashboard");
+  } catch (err: unknown) {
+    if (err instanceof FirebaseError) {
+      setError(
+        ERROR_MESSAGES[err.code] ?? "Registration failed — please try again",
+      );
+    } else if (err instanceof Error && err.name === "AbortError") {
+      setError("Registration timed out — please try again");
+    } else {
+      setError("Registration failed — please try again");
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="flex min-h-screen">
