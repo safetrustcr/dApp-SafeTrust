@@ -1,12 +1,17 @@
-CREATE TABLE users (
-    id TEXT PRIMARY KEY,  -- Firebase UID
+CREATE TABLE public.users (
+    id TEXT PRIMARY KEY,
+    firebase_uid TEXT NOT NULL,
     email TEXT NOT NULL,
+    first_name TEXT,
+    last_name TEXT,
+    phone_number TEXT,
+    country_code TEXT,
+    location TEXT,
     last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Add UNIQUE constraint to email
-ALTER TABLE users
+ALTER TABLE public.users
     ADD CONSTRAINT users_email_unique UNIQUE (email);
 
--- Add indices for common queries
-CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_email ON public.users(email);
+CREATE UNIQUE INDEX idx_users_firebase_uid ON public.users(firebase_uid);

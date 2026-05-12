@@ -1,0 +1,91 @@
+table:
+  name: user_wallets
+  schema: public
+object_relationships:
+  - name: user
+    using:
+      foreign_key_constraint_on: user_id
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+insert_permissions:
+  - role: tenant
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      columns:
+        - wallet_address
+        - chain_type
+        - is_primary
+      set:
+        user_id: X-Hasura-User-Id
+        created_at: "now()"
+  - role: landlord
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      columns:
+        - wallet_address
+        - chain_type
+        - is_primary
+      set:
+        user_id: X-Hasura-User-Id
+        created_at: "now()"
+update_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - is_primary
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: landlord
+    permission:
+      columns:
+        - is_primary
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: tenant
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: landlord
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
