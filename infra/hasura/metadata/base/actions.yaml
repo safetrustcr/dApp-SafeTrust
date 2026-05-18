@@ -20,8 +20,6 @@ actions:
       forward_client_headers: true
     permissions:
       - role: user
-        permission:
-          allow: true
   - name: open_dispute
     definition:
       kind: synchronous
@@ -32,8 +30,7 @@ actions:
       forward_client_headers: true
     permissions:
       - role: user
-        permission:
-          allow: true
+        
 
 custom_types:
   enums: []

@@ -150,17 +150,24 @@ EOL
                 -H "Content-Type: application/json" \
                 -d @"$temp_dir/track_table.json")
             
-            if [[ "$track_response" == *"error"* && "$track_response" != *"already tracked"* ]]; then
-                echo "Warning: Issue tracking table $table_name: $track_response"
-            elif [[ "$track_response" == *"already tracked"* ]]; then
-                echo "Table $table_name is already tracked"
-            else
-                echo "Successfully tracked table $table_name"
-            fi
+                if [[ "$track_response" == *"already tracked"* ]]; then
+                    echo "Table $table_name is already tracked" >&2
+                elif [[ "$track_response" == *"error"* ]]; then
+                    echo "❌ Error tracking table $table_name: $track_response" >&2
+                    TRACKING_FAILED=1
+                else
+                    echo "✅ Successfully tracked table $table_name" >&2
+                fi
+
         fi
     done
     
-    echo "✅ Metadata deployment for $tenant tenant completed"
+    if [ "${TRACKING_FAILED:-0}" -eq 1 ]; then
+        echo "❌ One or more tables failed to track — metadata may be incomplete" >&2
+        return 1
+    fi
+
+    echo "✅ Metadata deployment for $tenant tenant completed" >&2
     return 0
 }
 
@@ -169,32 +176,41 @@ deploy_tenant() {
     local tenant="$1"
     local hasura_endpoint="$2"
     local admin_secret="$3"
-    
-    # Create temporary directory
     local temp_dir
     temp_dir=$(mktemp -d)
-    
-    # Create metadata source and get tenant name
+    TEMP_DIR="$temp_dir"  # expose to cleanup trap
+
+    # Step 1 — register database source
     local tenant_name
-    tenant_name=$(create_metadata_source "$tenant" "$temp_dir" "$hasura_endpoint" "$admin_secret")
-    
-    # Check if source creation was successful
-    if [ $? -ne 0 ]; then
+    if ! tenant_name=$(create_metadata_source \
+            "$tenant" "$temp_dir" "$hasura_endpoint" "$admin_secret"); then
         rm -rf "$temp_dir"
         return 1
     fi
-    
-    # Process tables for the tenant
-    if ! process_metadata_tables "$tenant" "$tenant_name" "$temp_dir" "$hasura_endpoint" "$admin_secret"; then
+
+    # Step 2 — track tables
+    if ! process_metadata_tables \
+            "$tenant" "$tenant_name" "$temp_dir" \
+            "$hasura_endpoint" "$admin_secret"; then
         rm -rf "$temp_dir"
         return 1
     fi
-    
-    # Clean up
+
+    # Step 3 — apply full metadata (permissions, relationships, row-level filters)
+    echo "📋 Applying full metadata with permissions for $tenant..." >&2
+    if ! hasura metadata apply \
+            --endpoint "$hasura_endpoint" \
+            --admin-secret "$admin_secret" \
+            --metadata-dir "$BUILD_DIR/$tenant"; then
+        echo "❌ Metadata apply failed for $tenant" >&2
+        rm -rf "$temp_dir"
+        return 1
+    fi
+
+    echo "✅ Metadata deployment for $tenant tenant completed" >&2
     rm -rf "$temp_dir"
     return 0
 }
-
 
 
 # Main script execution
@@ -263,7 +279,13 @@ main() {
     fi
     
     echo "All tenant deployments have been completed!"
+
+
+
+
 }
 
 # Execute main function
 main "$@"
+
+

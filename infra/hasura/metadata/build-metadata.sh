@@ -4,12 +4,12 @@ set -e # Exit immediately if a command exits with a non-zero status
 BASE_DIR="$(pwd)/base"
 TENANTS_DIR="$(pwd)/tenants"
 BUILD_DIR="$(pwd)/build"
-YAML_MERGE_TOOL="yq" # Make sure yq is installed: https://github.com/mikefarah/yq
+YAML_MERGE_TOOL="yq" # Requires Mike Farah yq: https://github.com/mikefarah/yq
 
 
 if ! command -v "$YAML_MERGE_TOOL" &> /dev/null; then
     echo "Error: $YAML_MERGE_TOOL is required but not installed."
-    echo "Please install it with: pip install yq or brew install yq"
+    echo "Please install Mike Farah yq (for example: brew install yq)"
     exit 1
 fi
 
@@ -120,11 +120,9 @@ TENANT="$1"
 
 
 if [ ! -z "$TENANT" ]; then
-    build_tenant "$TENANT"
-    exit_code=$?
-    if [ $exit_code -ne 0 ]; then
-        exit $exit_code
-    fi
+   if ! build_tenant "$TENANT"; then
++        exit 1
++    fi
 else
    
     echo "Building metadata for all tenants..."
@@ -146,11 +144,10 @@ else
    
     for tenant_dir in $tenant_dirs; do
         tenant=$(basename "$tenant_dir")
-        build_tenant "$tenant"
-        exit_code=$?
-        if [ $exit_code -ne 0 ]; then
+
+        if ! build_tenant "$tenant"; then
             echo "Failed to build tenant: $tenant"
-            continue
+            exit 1
         fi
     done
 fi
