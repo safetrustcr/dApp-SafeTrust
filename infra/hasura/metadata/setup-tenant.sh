@@ -15,7 +15,7 @@ set -eo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Defaults
-ADMIN_SECRET="myadminsecretkey"
+ADMIN_SECRET="${HASURA_GRAPHQL_ADMIN_SECRET:-}"
 ENDPOINT="http://localhost:8080"
 TENANT=""
 
@@ -52,6 +52,12 @@ done
 if [[ -z "$TENANT" ]]; then
   echo "Usage: ./setup-tenant.sh <tenant_name> [--admin-secret SECRET] [--endpoint URL]"
   echo "Example: ./setup-tenant.sh safetrust --endpoint http://localhost:8080"
+  exit 1
+fi
+
+
+if [[ -z "$ADMIN_SECRET" ]]; then
+  echo "Error: admin secret is required (use --admin-secret or HASURA_GRAPHQL_ADMIN_SECRET)"
   exit 1
 fi
 

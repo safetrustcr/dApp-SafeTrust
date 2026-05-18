@@ -1,7 +1,7 @@
 CREATE TABLE public.bid_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    apartment_id UUID REFERENCES public.apartments(id) ON DELETE CASCADE,
-    tenant_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
+    apartment_id UUID NOT NULL REFERENCES public.apartments(id) ON DELETE CASCADE,
+    tenant_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     current_status TEXT NOT NULL DEFAULT 'PENDING',
     proposed_price DECIMAL(10,2) NOT NULL CHECK (proposed_price > 0),
     desired_move_in TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -48,7 +48,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger para registrar cambios de estado
+-- Trigger to record status changes
 CREATE TRIGGER record_bid_status
     AFTER INSERT OR UPDATE ON public.bid_requests
     FOR EACH ROW
@@ -84,7 +84,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger para prevenir múltiples ofertas activas
+
+CREATE UNIQUE INDEX ux_bid_requests_one_active_per_tenant
+ON public.bid_requests (tenant_id)
+WHERE deleted_at IS NULL
+  AND current_status IN ('PENDING', 'VIEWED', 'APPROVED');
+
+
+-- Trigger to prevent multiple active offers
 CREATE TRIGGER check_tenant_active_bids
     BEFORE INSERT OR UPDATE ON public.bid_requests
     FOR EACH ROW

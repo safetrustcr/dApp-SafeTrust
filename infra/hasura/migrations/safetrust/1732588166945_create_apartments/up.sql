@@ -8,7 +8,7 @@ $$ language 'plpgsql';
 -- Create apartments table
 CREATE TABLE public.apartments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    owner_id TEXT REFERENCES public.users(id) ON DELETE CASCADE,
+    owner_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT,
     price DECIMAL(10,2) NOT NULL CHECK (price > 0),
@@ -39,6 +39,9 @@ CREATE INDEX idx_apartments_availability
     ON public.apartments(is_available, available_from, available_until);
 CREATE INDEX idx_apartments_price 
     ON public.apartments(price);
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- Create update trigger for updated_at
 CREATE TRIGGER update_apartments_updated_at

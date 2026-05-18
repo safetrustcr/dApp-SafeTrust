@@ -104,12 +104,10 @@ build_tenant() {
             yaml_path=$(dirname "$relative_path")
             
            
-            $YAML_MERGE_TOOL eval ".\"$yaml_path\"" "$TENANTS_DIR/$tenant/tenant_overrides.yaml" > /dev/null 2>&1
-            if [ $? -eq 0 ]; then
-               
-                $YAML_MERGE_TOOL eval-all 'select(fileIndex == 0) * select(fileIndex == 1).'"\"$yaml_path\"" "$yaml_file" "$TENANTS_DIR/$tenant/tenant_overrides.yaml" > "$yaml_file.tmp"
-                mv "$yaml_file.tmp" "$yaml_file"
-            fi
+           if $YAML_MERGE_TOOL eval ".\"$yaml_path\"" "$TENANTS_DIR/$tenant/tenant_overrides.yaml" > /dev/null 2>&1; then
+                 $YAML_MERGE_TOOL eval-all 'select(fileIndex == 0) * select(fileIndex == 1).'"\"$yaml_path\"" "$yaml_file" "$TENANTS_DIR/$tenant/tenant_overrides.yaml" > "$yaml_file.tmp"
+                 mv "$yaml_file.tmp" "$yaml_file"
+           fi
         done
     fi
     

@@ -3,7 +3,7 @@ set -eo pipefail  # Exit on errors and pipe failures
 
 # Configuration
 BUILD_DIR="$(pwd)/build"
-HASURA_ENDPOINT="http://localhost:8082"  
+HASURA_ENDPOINT="http://localhost:8080"  
 HASURA_ADMIN_SECRET="myadminsecretkey"  
 
 # Clean up temp directories on exit

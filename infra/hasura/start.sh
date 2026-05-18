@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 HASURA_FOLDER=/app
 cd $HASURA_FOLDER || {
     echo "Hasura folder '$HASURA_FOLDER' not found"
@@ -13,11 +15,11 @@ socat TCP-LISTEN:9693,fork,reuseaddr,bind=console TCP:127.0.0.1:9693 &
 {
     # Skip migrations for safetrust since it will be created during tenant deployment
     echo "Skipping migrations for safetrust database as it will be created during tenant deployment"
-    
+
     # Apply only metadata changes
     echo "Applying metadata from metadata/base..."
     hasura metadata apply --metadata-dir metadata/base --skip-update-check
-    
+
     # Run console if specified
     if [[ -v HASURA_RUN_CONSOLE ]]; then
         echo "Starting console..."
