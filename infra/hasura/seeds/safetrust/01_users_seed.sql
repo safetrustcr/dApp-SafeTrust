@@ -1,4 +1,5 @@
-
+-- SafeTrust demo seed users
+-- id must be TEXT (Firebase UID format), not UUID
 
 INSERT INTO public.users (
     id,

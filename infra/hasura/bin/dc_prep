@@ -1,3 +1,50 @@
 #!/bin/bash
+set -e
 
-docker compose up -d graphql-engine
+echo "🚀 Starting SafeTrust backend..."
+
+echo "📦 Starting containers..."
+docker compose up -d
+
+echo "⏳ Waiting for Hasura to be healthy..."
+
+HASURA_ADMIN_SECRET="${HASURA_GRAPHQL_ADMIN_SECRET:?HASURA_GRAPHQL_ADMIN_SECRET is required}"
+
+max_attempts=90
+attempt=1
+until curl -sf http://localhost:8080/healthz > /dev/null; do
+  if [ "$attempt" -ge "$max_attempts" ]; then
+    echo "❌ Hasura health check timed out"
+    exit 1
+  fi
+  attempt=$((attempt + 1))
+  sleep 2
+done
+
+echo "🏗️ Deploying safetrust tenant metadata..."
+cd metadata
+./setup-tenant.sh safetrust \
+  --endpoint http://localhost:8080 \
+  --admin-secret "$HASURA_ADMIN_SECRET"
+cd ..
+
+echo "📂 Applying migrations..."
+hasura migrate apply \
+  --endpoint http://localhost:8080 \
+  --admin-secret "$HASURA_ADMIN_SECRET" \
+  --database-name safetrust
+
+echo "🌱 Applying seeds..."
+hasura seed apply \
+  --endpoint http://localhost:8080 \
+  --admin-secret "$HASURA_ADMIN_SECRET" \
+  --database-name safetrust
+
+echo ""
+echo "✅ SafeTrust backend ready"
+echo "   GraphQL:    http://localhost:8080/v1/graphql"
+echo "   PostgreSQL: localhost:5433"
+echo "   Webhook:    http://localhost:3000"
+echo ""
+echo "👉 To open Hasura console:"
+echo "   hasura console --endpoint http://localhost:8080 --admin-secret $HASURA_ADMIN_SECRET"

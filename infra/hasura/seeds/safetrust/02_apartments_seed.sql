@@ -1,37 +1,57 @@
--- MVP demo apartment listings
-INSERT INTO apartments (
-  id, name, description, address, location,
-  price_per_month, bedrooms, bathrooms, pet_friendly,
-  is_promoted, owner_id, created_at, updated_at
-) VALUES
-(
-  uuid_generate_v4(),
-  'La sabana sur',
-  'Beautiful apartment in the heart of San José with modern amenities and stunning views.',
-  '329 Calle santos, paseo colón, San José',
-  'San José',
-  4058.00, 2, 1, true, true,
-  'demo-owner-uid-002',
-  NOW(), NOW()
-),
-(
-  uuid_generate_v4(),
-  'Los yoses',
-  'Cozy apartment in the Los Yoses district, close to restaurants and parks.',
-  '329 Calle santos, paseo colón, San José',
-  'San José',
-  4000.00, 2, 1, true, false,
-  'demo-owner-uid-002',
-  NOW(), NOW()
-),
-(
-  uuid_generate_v4(),
-  'Escazú plaza',
-  'Modern studio near Multiplaza and Santa Ana.',
-  '45 Avenida central, Escazú',
-  'San José',
-  3500.00, 1, 1, false, false,
-  'demo-owner-uid-002',
-  NOW(), NOW()
+DELETE FROM public.apartments
+WHERE owner_id IN (
+    SELECT id FROM public.users
+    WHERE firebase_uid IN ('demo-tenant-uid-001', 'demo-owner-uid-002')
+);
+
+INSERT INTO public.apartments (
+    id,
+    owner_id,
+    name,
+    description,
+    price,
+    warranty_deposit,
+    address,
+    is_available,
+    available_from,
+    available_until
 )
-ON CONFLICT DO NOTHING;
+SELECT
+    '550e8400-e29b-41d4-a716-446655440001'::uuid,
+    u.id,
+    'Moderno Apartamento en San José Centro',
+    'Apartamento renovado con acabados de lujo, 2 habitaciones, 2 baños',
+    1200.00,
+    2400.00,
+    '{"street": "Avenida Central", "neighborhood": "Centro", "city": "San José", "country": "Costa Rica"}',
+    true,
+    NOW() - INTERVAL '2 months',
+    NOW() + INTERVAL '10 months'
+FROM public.users u WHERE u.firebase_uid = 'demo-owner-uid-002'
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.apartments (
+    id,
+    owner_id,
+    name,
+    description,
+    price,
+    warranty_deposit,
+    address,
+    is_available,
+    available_from,
+    available_until
+)
+SELECT
+    '550e8400-e29b-41d4-a716-446655440002'::uuid,
+    u.id,
+    'Suite Ejecutiva Sabana Norte',
+    'Suite perfecta para ejecutivos, amueblada, con gimnasio y piscina',
+    950.00,
+    1900.00,
+    '{"street": "Calle 42", "neighborhood": "Sabana Norte", "city": "San José", "country": "Costa Rica"}',
+    true,
+    NOW() - INTERVAL '1 month',
+    NOW() + INTERVAL '12 months'
+FROM public.users u WHERE u.firebase_uid = 'demo-owner-uid-002'
+ON CONFLICT (id) DO NOTHING;
