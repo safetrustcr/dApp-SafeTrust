@@ -77,52 +77,52 @@ copy_with_merge() {
 build_tenant() {
     local tenant="$1"
     echo "Building metadata for tenant: $tenant"
-    
-    
+
     if [ ! -d "$TENANTS_DIR/$tenant" ]; then
         echo "Error: Tenant directory $TENANTS_DIR/$tenant not found!"
         return 1
     fi
-    
 
     rm -rf "$BUILD_DIR/$tenant"
-    mkdir -p "$BUILD_DIR/$tenant"
+    mkdir -p "$BUILD_DIR/$tenant/metadata"   # ← wrap in metadata/
+
+    # Write config.yaml at project root
+    cat > "$BUILD_DIR/$tenant/config.yaml" << EOL
+version: 3
+endpoint: http://localhost:8080
+admin_secret: myadminsecretkey
+metadata_directory: metadata
+EOL
 
     echo "Copying base metadata..."
-    cp -r "$BASE_DIR"/* "$BUILD_DIR/$tenant/"
-    
+    cp -r "$BASE_DIR"/* "$BUILD_DIR/$tenant/metadata/"   # ← into metadata/
 
     echo "Applying tenant-specific metadata..."
-    copy_with_merge "$TENANTS_DIR/$tenant" "$BUILD_DIR/$tenant"
-    
+    copy_with_merge "$TENANTS_DIR/$tenant" "$BUILD_DIR/$tenant/metadata/"   # ← into metadata/
 
     if [ -f "$TENANTS_DIR/$tenant/tenant_overrides.yaml" ]; then
         echo "Applying tenant overrides..."
-      
-        find "$BUILD_DIR/$tenant" -name "*.yaml" -type f | while read -r yaml_file; do
-            relative_path="${yaml_file#$BUILD_DIR/$tenant/}"
+        find "$BUILD_DIR/$tenant/metadata" -name "*.yaml" -type f | while read -r yaml_file; do
+            relative_path="${yaml_file#$BUILD_DIR/$tenant/metadata/}"
             yaml_path=$(dirname "$relative_path")
-            
-           
-           if $YAML_MERGE_TOOL eval ".\"$yaml_path\"" "$TENANTS_DIR/$tenant/tenant_overrides.yaml" > /dev/null 2>&1; then
-                 $YAML_MERGE_TOOL eval-all 'select(fileIndex == 0) * select(fileIndex == 1).'"\"$yaml_path\"" "$yaml_file" "$TENANTS_DIR/$tenant/tenant_overrides.yaml" > "$yaml_file.tmp"
-                 mv "$yaml_file.tmp" "$yaml_file"
-           fi
+            if $YAML_MERGE_TOOL eval ".\"$yaml_path\"" "$TENANTS_DIR/$tenant/tenant_overrides.yaml" > /dev/null 2>&1; then
+                $YAML_MERGE_TOOL eval-all 'select(fileIndex == 0) * select(fileIndex == 1).'"\"$yaml_path\"" "$yaml_file" "$TENANTS_DIR/$tenant/tenant_overrides.yaml" > "$yaml_file.tmp"
+                mv "$yaml_file.tmp" "$yaml_file"
+            fi
         done
     fi
-    
+
     echo "Build complete for $tenant"
     return 0
 }
-
 
 TENANT="$1"
 
 
 if [ ! -z "$TENANT" ]; then
    if ! build_tenant "$TENANT"; then
-+        exit 1
-+    fi
+        exit 1
+   fi
 else
    
     echo "Building metadata for all tenants..."
