@@ -34,6 +34,11 @@ hasura migrate apply \
   --admin-secret "$HASURA_ADMIN_SECRET" \
   --database-name safetrust
 
+echo "📋 Reloading metadata after migrations..."
+hasura metadata reload \
+  --endpoint http://localhost:8080 \
+  --admin-secret "$HASURA_ADMIN_SECRET"
+
 echo "🌱 Applying seeds..."
 hasura seed apply \
   --endpoint http://localhost:8080 \
