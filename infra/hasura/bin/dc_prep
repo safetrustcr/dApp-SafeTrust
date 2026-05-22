@@ -8,7 +8,7 @@ docker compose up -d
 
 echo "⏳ Waiting for Hasura to be healthy..."
 
-HASURA_ADMIN_SECRET=myadminsecretkey
+HASURA_ADMIN_SECRET=="${HASURA_GRAPHQL_ADMIN_SECRET:?HASURA_GRAPHQL_ADMIN_SECRET is required}"
 
 max_attempts=90
 attempt=1

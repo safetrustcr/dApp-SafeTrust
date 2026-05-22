@@ -3,7 +3,7 @@ set -eo pipefail
 
 BUILD_DIR="$(pwd)/build"
 HASURA_ENDPOINT="http://localhost:8080"
-HASURA_ADMIN_SECRET="myadminsecretkey"
+HASURA_ADMIN_SECRET="${HASURA_GRAPHQL_ADMIN_SECRET:-myadminsecretkey}"
 
 cleanup() {
     if [[ -n "${TEMP_DIR:-}" && -d "$TEMP_DIR" ]]; then

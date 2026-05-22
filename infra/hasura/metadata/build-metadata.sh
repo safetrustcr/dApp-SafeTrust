@@ -83,14 +83,12 @@ build_tenant() {
         return 1
     fi
 
-    rm -rf "$BUILD_DIR/$tenant"
     mkdir -p "$BUILD_DIR/$tenant/metadata"   # ← wrap in metadata/
 
     # Write config.yaml at project root
     cat > "$BUILD_DIR/$tenant/config.yaml" << EOL
 version: 3
 endpoint: http://localhost:8080
-admin_secret: myadminsecretkey
 metadata_directory: metadata
 EOL
 
