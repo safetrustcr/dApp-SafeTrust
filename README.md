@@ -474,7 +474,7 @@ fix/<issue-number>-short-description
 | Repository | Purpose |
 |---|---|
 | [frontend-SafeTrust](https://github.com/safetrustcr/frontend-SafeTrust) | Full Next.js frontend (source for `apps/frontend` slices) |
-| [backend-SafeTrust](https://github.com/safetrustcr/backend-SafeTrust) | Full Hasura Graphql  backend (source for `metadata/migrations/seeds` slices) |
+| [backend-SafeTrust](https://github.com/safetrustcr/backend-SafeTrust) | Full Hasura GraphQL  backend (source for `metadata/migrations/seeds` slices) |
 | [landing-SafeTrust](https://github.com/safetrustcr/landing-SafeTrust) | Marketing landing page |
 
 ---
