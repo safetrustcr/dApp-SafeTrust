@@ -34,7 +34,7 @@ SELECT
     '660e8400-e29b-41d4-a716-446655440002'::uuid,
     '550e8400-e29b-41d4-a716-446655440002'::uuid,
     u.id,
-    'APPROVED',
+    'CANCELLED',
     900.00,
     NOW() + INTERVAL '2 months'
 FROM public.users u WHERE u.firebase_uid = 'demo-tenant-uid-001'
