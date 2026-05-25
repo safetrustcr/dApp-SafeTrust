@@ -76,7 +76,7 @@ build_tenant() {
     cat > "$BUILD_DIR/$tenant/config.yaml" << EOL
 version: 3
 endpoint: http://localhost:8080
-admin_secret: youradminsecretkey
+admin_secret: ${HASURA_ADMIN_SECRET}
 metadata_directory: metadata
 EOL
 
