@@ -9,7 +9,7 @@
     "codegen": "turbo run codegen"
   },
   "devDependencies": {
-    "turbo": "^2.4.4",
+    "turbo": "^2.9.14",
     "typescript": "^5.7.3"
   },
   "packageManager": "pnpm@9.15.4",
