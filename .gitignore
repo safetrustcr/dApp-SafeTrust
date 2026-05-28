@@ -9,6 +9,7 @@ node_modules/
 out/
 dist/
 build/
+infra/hasura/metadata/build/
 *.tsbuildinfo
 
 # Next.js (also covered in apps/web/.gitignore; listed here for clarity at repo root)
