@@ -1,7 +1,8 @@
+-- Safer: target only specific bid IDs
 DELETE FROM public.bid_requests
-WHERE tenant_id IN (
-    SELECT id FROM public.users
-    WHERE firebase_uid = 'demo-tenant-uid-001'
+WHERE id IN (
+    '660e8400-e29b-41d4-a716-446655440001',
+    '660e8400-e29b-41d4-a716-446655440002'
 );
 
 INSERT INTO public.bid_requests (
@@ -19,7 +20,7 @@ SELECT
     'PENDING',
     1150.00,
     NOW() + INTERVAL '1 month'
-FROM public.users u WHERE u.firebase_uid = 'demo-tenant-uid-001'
+FROM public.users u WHERE u.id = 'demo-tenant-uid-001'
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.bid_requests (
@@ -37,5 +38,5 @@ SELECT
     'CANCELLED',
     900.00,
     NOW() + INTERVAL '2 months'
-FROM public.users u WHERE u.firebase_uid = 'demo-tenant-uid-001'
+FROM public.users u WHERE u.id = 'demo-tenant-uid-001'
 ON CONFLICT (id) DO NOTHING;

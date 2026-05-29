@@ -1,7 +1,8 @@
+-- Safer delete targeting only specific IDs
 DELETE FROM public.apartments
-WHERE owner_id IN (
-    SELECT id FROM public.users
-    WHERE firebase_uid IN ('demo-tenant-uid-001', 'demo-owner-uid-002')
+WHERE id IN (
+    '550e8400-e29b-41d4-a716-446655440001',
+    '550e8400-e29b-41d4-a716-446655440002'
 );
 
 INSERT INTO public.apartments (
@@ -25,11 +26,11 @@ SELECT
     1200.00,
     2400.00,
     point(-84.0807, 9.9282),
-    '{"street": "Avenida Central", "neighborhood": "Centro", "city": "San José", "country": "Costa Rica"}',
+    '{"street": "Avenida Central", "neighborhood": "Centro", "city": "San José", "country": "Costa Rica"}'::jsonb,
     true,
     NOW() - INTERVAL '2 months',
     NOW() + INTERVAL '10 months'
-FROM public.users u WHERE u.firebase_uid = 'demo-owner-uid-002'
+FROM public.users u WHERE u.id = 'demo-owner-uid-002'
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.apartments (
@@ -53,9 +54,9 @@ SELECT
     950.00,
     1900.00,
     point(-84.0907, 9.9382),
-    '{"street": "Calle 42", "neighborhood": "Sabana Norte", "city": "San José", "country": "Costa Rica"}',
+    '{"street": "Calle 42", "neighborhood": "Sabana Norte", "city": "San José", "country": "Costa Rica"}'::jsonb,
     true,
     NOW() - INTERVAL '1 month',
     NOW() + INTERVAL '12 months'
-FROM public.users u WHERE u.firebase_uid = 'demo-owner-uid-002'
+FROM public.users u WHERE u.id = 'demo-owner-uid-002'
 ON CONFLICT (id) DO NOTHING;

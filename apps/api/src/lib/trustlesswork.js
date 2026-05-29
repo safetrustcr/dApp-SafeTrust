@@ -1,12 +1,9 @@
-const axios = require('axios');
+import axios from 'axios';
 
-const trustlessWork = axios.create({
-  baseURL: process.env.TRUSTLESS_WORK_API_URL,
-  timeout: 10000,
+export const trustlessWork = axios.create({
+  baseURL: process.env.TRUSTLESS_WORK_API_URL || 'https://dev.api.trustlesswork.com',
   headers: {
     'Content-Type': 'application/json',
-    'x-api-key': process.env.TRUSTLESS_WORK_API_KEY,
+    Authorization: `Bearer ${process.env.TRUSTLESS_WORK_API_KEY}`,
   },
 });
-
-module.exports = { trustlessWork };

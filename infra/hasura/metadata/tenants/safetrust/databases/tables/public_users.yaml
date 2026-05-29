@@ -12,22 +12,41 @@ array_relationships:
 select_permissions:
   - role: tenant
     permission:
-      columns: [id, firebase_uid, email, first_name, last_name,
-                phone_number, country_code, location, last_seen]
+      columns:
+        - id
+        - email
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
+        - last_seen
       filter:
         id:
           _eq: X-Hasura-User-Id
   - role: landlord
     permission:
-      columns: [id, firebase_uid, email, first_name, last_name,
-                phone_number, country_code, location, last_seen]
+      columns:
+        - id
+        - email
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
+        - last_seen
       filter:
         id:
           _eq: X-Hasura-User-Id
 update_permissions:
   - role: tenant
     permission:
-      columns: [first_name, last_name, phone_number, country_code, location]
+      columns:
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
       filter:
         id:
           _eq: X-Hasura-User-Id
@@ -36,7 +55,12 @@ update_permissions:
           _eq: X-Hasura-User-Id
   - role: landlord
     permission:
-      columns: [first_name, last_name, phone_number, country_code, location]
+      columns:
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
       filter:
         id:
           _eq: X-Hasura-User-Id
