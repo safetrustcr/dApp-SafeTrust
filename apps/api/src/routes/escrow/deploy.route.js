@@ -1,12 +1,11 @@
-const express = require('express');
-const { deployEscrowHandler } = require('./deploy.handler');
+import express from 'express';
+import { deployEscrowHandler } from './deploy.handler.js';
 
 const router = express.Router();
 
 /**
  * POST /api/escrow/deploy
- * Scaffolds the route for escrow deployment
  */
 router.post('/deploy', deployEscrowHandler);
 
-module.exports = router;
+export default router;

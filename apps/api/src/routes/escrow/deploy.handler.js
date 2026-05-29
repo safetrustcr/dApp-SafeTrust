@@ -1,10 +1,10 @@
-const { trustlessWork } = require('../../lib/trustlesswork');
+import { trustlessWork } from '../../lib/trustlesswork.js';
 
 /**
  * Scaffold escrow deploy handler
  * Receives escrow creation request, calls TrustlessWork, and returns unsigned XDR.
  */
-async function deployEscrowHandler(req, res) {
+export async function deployEscrowHandler(req, res) {
   const { apartmentId, tenantAddress, ownerAddress, amount, engagementId } = req.body;
 
   try {
@@ -30,7 +30,6 @@ async function deployEscrowHandler(req, res) {
 
     const { unsignedTransaction } = response.data;
 
-    // Log status 200 confirmation
     console.log(`[escrow/deploy] TrustlessWork 201 received — engagementId: ${engagementId}`);
 
     return res.status(200).json({
@@ -42,14 +41,13 @@ async function deployEscrowHandler(req, res) {
     const errorData = error.response?.data;
     const errorMessage = errorData?.message || error.message;
 
-    // TrustlessWork specific error mapping to 400
     const knownErrors = {
       'amount cannot be zero': 'Amount cannot be zero',
       'already initialized': 'Escrow already initialized (duplicate engagementId)',
       'fee cannot exceed 99%': 'Platform fee cannot exceed 99%',
       'without milestone': 'Escrow initialized without milestone',
       'more than 50 milestones': 'Cannot define more than 50 milestones',
-      'flags must be false': 'All flags (approved, disputed, released) must be false'
+      'flags must be false': 'All flags (approved, disputed, released) must be false',
     };
 
     for (const [key, descriptive] of Object.entries(knownErrors)) {
@@ -68,5 +66,3 @@ async function deployEscrowHandler(req, res) {
     });
   }
 }
-
-module.exports = { deployEscrowHandler };

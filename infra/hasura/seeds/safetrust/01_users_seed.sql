@@ -1,9 +1,5 @@
--- SafeTrust demo seed users
--- id must be TEXT (Firebase UID format), not UUID
-
 INSERT INTO public.users (
     id,
-    firebase_uid,
     email,
     first_name,
     last_name,
@@ -15,7 +11,6 @@ INSERT INTO public.users (
 VALUES
     (
         'demo-tenant-uid-001',
-        'demo-tenant-uid-001',
         'john_s@gmail.com',
         'John',
         'Smith',
@@ -25,7 +20,6 @@ VALUES
         NOW()
     ),
     (
-        'demo-owner-uid-002',
         'demo-owner-uid-002',
         'albertoCasas100@gmail.com',
         'Alberto',

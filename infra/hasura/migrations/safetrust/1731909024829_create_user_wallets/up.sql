@@ -7,5 +7,5 @@ CREATE TABLE public.user_wallets (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT unique_wallet_address UNIQUE (wallet_address),
-    CONSTRAINT valid_chain_type CHECK (chain_type IN ('ETH', 'STELLAR', 'BSC'))
+    CONSTRAINT valid_chain_type CHECK (chain_type IN ('STELLAR'))
 );
