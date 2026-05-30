@@ -1,6 +1,28 @@
-/* stylelint-disable-next-line */
 @tailwind base;
-/* stylelint-disable-next-line */
 @tailwind components;
-/* stylelint-disable-next-line */
 @tailwind utilities;
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: var(--ring);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+/* Multi-range slider support */
+input[type="range"]::-webkit-slider-thumb {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+input[type="range"]::-ms-thumb {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
