@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { TrustlessWorkProvider } from "@/providers/TrustlessWorkProvider";
+
+// @ts-ignore: allow side-effect import of global css
 import "./globals.css";
+
 import { ClientProviders } from "@/providers/ClientProviders";
+import { ThemeProvider } from "next-themes";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -11,13 +15,17 @@ export const metadata: Metadata = {
   description: "Decentralized P2P Escrow on Stellar Blockchain",
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <ClientProviders>
-          {children}
-        </ClientProviders>
+      <body className={inter.className}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <ClientProviders>
+            <TrustlessWorkProvider>
+              {children}
+            </TrustlessWorkProvider>
+          </ClientProviders>
+        </ThemeProvider>
       </body>
     </html>
   );
