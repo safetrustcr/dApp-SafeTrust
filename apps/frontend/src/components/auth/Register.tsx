@@ -89,12 +89,14 @@ export default function RegisterPage() {
     }
 
     useGlobalAuthenticationStore.getState().setToken(token);
-    router.push("/dashboard");
+    router.push("/login");
   } catch (err: unknown) {
     if (err instanceof FirebaseError) {
-      setError(
-        ERROR_MESSAGES[err.code] ?? "Registration failed — please try again",
-      );
+        console.log("🔴 Firebase error code:", err.code);
+        console.log("🔴 Firebase error message:", err.message);
+        setError(
+          ERROR_MESSAGES[err.code] ?? "Registration failed — please try again",
+    );
     } else if (err instanceof Error && err.name === "AbortError") {
       setError("Registration timed out — please try again");
     } else {
@@ -157,7 +159,7 @@ export default function RegisterPage() {
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
               <Select
-                value={location || undefined}
+                value={location}
                 onValueChange={(v) => { setLocation(v); clearError(); }}
               >
                 <SelectTrigger>

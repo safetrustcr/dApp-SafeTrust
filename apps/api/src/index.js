@@ -1,10 +1,10 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const escrowRoutes = require('./routes/escrow/deploy.route');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import authRouter from './routes/auth/sync-user.route.js';
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002;
 
 app.use(cors());
 app.use(express.json());
@@ -14,11 +14,12 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Register Escrow routes
-app.use('/api/escrow', escrowRoutes);
+// Auth routes
+app.use('/api/auth', authRouter);
 
-app.listen(port, () => {
-  console.log(`[api] Server running on http://localhost:${port}`);
+// TODO: wire escrow routes after trustlesswork.js ESM migration
+// app.use('/api/escrow', escrowRouter);
+
+app.listen(PORT, () => {
+  console.log(`[api] Server running on http://localhost:${PORT}`);
 });
-
-module.exports = app;
