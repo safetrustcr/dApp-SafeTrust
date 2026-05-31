@@ -19,6 +19,8 @@ import { useMultiWallet } from "./wallet/hooks/multi-wallet.hook";
 import { MainWalletSelectionModal } from "./wallet/components/MainWalletSelectionModal";
 import { WalletSelectionModal } from "./wallet/components/WalletSelectionModal";
 import { MetaMaskWalletModal } from "./wallet/components/MetaMaskWalletModal";
+import Cookies from "js-cookie";
+
 
 const ERROR_MESSAGES: Record<string, string> = {
   "auth/invalid-credential": "Invalid email or password",
@@ -63,6 +65,13 @@ export default function LoginPage() {
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password);
       const token = await credential.user.getIdToken();
+
+      // Store token in cookie for middleware authentication
+      Cookies.set("firebase-token", token, {
+        expires: 7,        // 7 days
+        secure: true,
+        sameSite: "strict",
+      });
 
       useGlobalAuthenticationStore.getState().setToken(token);
       router.push("/dashboard");
