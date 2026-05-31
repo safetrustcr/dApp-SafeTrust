@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Illustration from "@/components/auth/ui/Illustration";
+import Cookies from "js-cookie";
 
 const ERROR_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists",
@@ -81,6 +82,12 @@ export default function RegisterPage() {
         }),
       },
     );
+
+    Cookies.set("firebase-token", token, {
+      expires: 7,
+      secure: true,
+      sameSite: "strict",
+    });
 
     clearTimeout(timeoutId);
 
