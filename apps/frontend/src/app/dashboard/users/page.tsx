@@ -14,7 +14,7 @@ const STUB_USER = {
 export default function UsersPage() {
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">User Management</h1>
+      <h1 className="text-2xl font-semibold">My Profile</h1>
       <UserProfileCard user={STUB_USER} />
       <WalletAddressTable wallets={STUB_USER.wallets} />
     </div>
