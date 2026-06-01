@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+// import { Inter } from "next/font/google";
 import { TrustlessWorkProvider } from "@/providers/TrustlessWorkProvider";
 
 // @ts-ignore: allow side-effect import of global css
@@ -8,7 +8,7 @@ import "./globals.css";
 import { ClientProviders } from "@/providers/ClientProviders";
 import { ThemeProvider } from "next-themes";
 
-const inter = Inter({ subsets: ["latin"] });
+// const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "SafeTrust",
@@ -18,7 +18,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className="font-sans antialiased">
+
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <ClientProviders>
             <TrustlessWorkProvider>

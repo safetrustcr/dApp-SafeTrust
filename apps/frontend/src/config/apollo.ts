@@ -1,5 +1,5 @@
 import { auth } from "@/lib/firebase";
-import { setContext } from "@apollo/client";
+import { setContext } from "@apollo/client/link/context";
 
 const authLink = setContext(async (_, { headers }) => {
   const currentUser = auth.currentUser;
