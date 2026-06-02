@@ -111,7 +111,7 @@ export default function EscrowPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white shadow rounded-lg w-screen lg:w-full">
+      <div className="bg-white shadow rounded-lg w-full">
         <div className="scrollbar-thin w-full ">
           <Table>
             <TableHeader>
@@ -141,7 +141,7 @@ export default function EscrowPage() {
                 </TableRow>
               ) : (
                 filteredEscrows.map((escrow) => (
-                  <TableRow key={escrow.id} className="overflow-scroll">
+                  <TableRow key={escrow.id}>
                     <TableCell className="font-mono text-sm">
                       {escrow.id.slice(0, 8)}...
                     </TableCell>
