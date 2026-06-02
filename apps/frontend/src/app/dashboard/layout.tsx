@@ -61,15 +61,15 @@ const Layout = ({ children }: { children: ReactNode }) => {
     setIsSidebarOpen(false);
   }, [pathname]);
 
-  // Show loading state
-  if (isLoading) {
   const isGuestRoute = pathname === "/dashboard/guest";
 
   if (isGuestRoute) {
     return <>{children}</>;
   }
 
-  return (
+  // Show loading state
+  if (isLoading) {
+    return (
       <div className="flex h-screen items-center justify-center">
         {/* biome-ignore lint/style/useSelfClosingElements: <explanation> */}
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>

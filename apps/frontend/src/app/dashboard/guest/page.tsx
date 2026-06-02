@@ -14,9 +14,11 @@ const STUB_APARTMENTS = Array.from({ length: 6 }, (_, i) => ({
   name: "La sabana sur",
   address: "329 Calle santos, paseo colón, San José",
   price: 4058,
-  beds: 2,
+  beds: i === 2 ? 1 : i === 3 ? 3 : 2,
   baths: 1,
   petFriendly: true,
+  category: i % 3 === 0 ? "Family" : i % 3 === 1 ? "Students" : "Travelers",
+  location: i % 2 === 0 ? "San José" : "Heredia",
   isPromoted: i === 0 || i === 4,
   isFavorite: i === 2,
 }));
@@ -39,6 +41,13 @@ export default function GuestDashboardPage() {
         ? prev.filter((f) => f !== id)
         : [...prev, id]
     );
+
+  const filteredApartments = STUB_APARTMENTS.filter((apt) => {
+    if (categories.length > 0 && !categories.includes(apt.category)) return false;
+    if (locations.length > 0 && !locations.includes(apt.location)) return false;
+    if (bedrooms !== "all" && String(apt.beds) !== bedrooms) return false;
+    return true;
+  });
 
   return (
     <div className="flex min-h-screen bg-white">
@@ -127,7 +136,7 @@ export default function GuestDashboardPage() {
 
         {/* Apartment grid */}
         <div className="grid grid-cols-3 gap-4">
-          {STUB_APARTMENTS.map((apt) => (
+          {filteredApartments.map((apt) => (
             <ApartmentCard
               key={apt.id}
               {...apt}

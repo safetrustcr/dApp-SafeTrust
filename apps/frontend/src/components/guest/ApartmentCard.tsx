@@ -53,6 +53,8 @@ export function ApartmentCard({
               e.stopPropagation();
               onFavoriteToggle?.(id);
             }}
+            aria-label={`Toggle favorite for apartment ${id}`}
+            aria-pressed={isFavorite}
           >
             <Heart className={cn(
               "h-4 w-4 transition-colors",
