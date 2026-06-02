@@ -15,6 +15,7 @@ const PUBLIC_ROUTES = [
   "/dashboard/hotel/search",
   "/dashboard/hotel/escrow",
   "/dashboard/hotel/create-escrow",
+  "/dashboard/guest",
 ];
 
 // Routes that match patterns (for dynamic routes)
@@ -62,7 +63,13 @@ const Layout = ({ children }: { children: ReactNode }) => {
 
   // Show loading state
   if (isLoading) {
-    return (
+  const isGuestRoute = pathname === "/dashboard/guest";
+
+  if (isGuestRoute) {
+    return <>{children}</>;
+  }
+
+  return (
       <div className="flex h-screen items-center justify-center">
         {/* biome-ignore lint/style/useSelfClosingElements: <explanation> */}
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
