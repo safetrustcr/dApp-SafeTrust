@@ -9,7 +9,10 @@ type EscrowStatus =
   | "completed"
   | "disputed"
   | "resolved"
-  | "cancelled";
+  | "cancelled"
+  | "PENDING"
+  | "ACTIVE"
+  | "COMPLETED";
 
 const STATUS_STYLES: Record<EscrowStatus, string> = {
   pending_signature: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
@@ -19,6 +22,9 @@ const STATUS_STYLES: Record<EscrowStatus, string> = {
   disputed:          "bg-red-100    text-red-800    dark:bg-red-900    dark:text-red-300",
   resolved:          "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
   cancelled:         "bg-gray-100   text-gray-500   dark:bg-gray-800   dark:text-gray-400",
+  PENDING:           "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+  ACTIVE:            "bg-green-100  text-green-800  dark:bg-green-900  dark:text-green-300",
+  COMPLETED:         "bg-gray-100   text-gray-800   dark:bg-gray-700   dark:text-gray-300",
 };
 
 const STATUS_LABELS: Record<EscrowStatus, string> = {
@@ -29,6 +35,9 @@ const STATUS_LABELS: Record<EscrowStatus, string> = {
   disputed:          "Disputed",
   resolved:          "Resolved",
   cancelled:         "Cancelled",
+  PENDING:           "Pending",
+  ACTIVE:            "Active",
+  COMPLETED:         "Completed",
 };
 
 interface EscrowStatusBadgeProps {
