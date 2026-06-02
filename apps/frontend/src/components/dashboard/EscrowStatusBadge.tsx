@@ -41,7 +41,7 @@ export function EscrowStatusBadge({ status, className }: EscrowStatusBadgeProps)
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-        STATUS_STYLES[status] ?? "bg-gray-100 text-gray-800",
+        STATUS_STYLES[status] ?? "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
         className
       )}
     >
