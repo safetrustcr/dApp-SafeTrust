@@ -45,6 +45,11 @@ const Layout = ({ children }: { children: ReactNode }) => {
           localStorage.getItem("walletAddress") ||
           localStorage.getItem("address-wallet");
 
+        if (!isPublic && !address && !hasWalletInStorage) {
+          router.replace("/login");
+          return;
+        }
+
         setIsLoading(false);
       } catch (error) {
         console.error("Authentication error:", error);
