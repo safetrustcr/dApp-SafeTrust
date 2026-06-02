@@ -1,6 +1,6 @@
 "use client";
 
-import { EscrowStatusBadge } from "@/components/dashboard/EscrowStatusBadge";
+import { EscrowStatusBadge, type EscrowStatus } from "@/components/dashboard/EscrowStatusBadge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,6 +13,19 @@ import {
 import { PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+function normalizeEscrowStatus(status: string): EscrowStatus {
+  switch (status.toUpperCase()) {
+    case "PENDING":
+      return "pending_signature";
+    case "ACTIVE":
+      return "active";
+    case "COMPLETED":
+      return "completed";
+    default:
+      return status.toLowerCase() as EscrowStatus;
+  }
+}
 
 const STUB_ESCROWS = [
   {
@@ -154,7 +167,7 @@ export default function EscrowPage() {
                       {formatCurrency(escrow.amount)}
                     </TableCell>
                     <TableCell className="min-w-[120px]">
-                      <EscrowStatusBadge status={escrow.status} />
+                      <EscrowStatusBadge status={normalizeEscrowStatus(escrow.status)} />
                     </TableCell>
                     <TableCell className="text-right min-w-[100px]">
                       <Button
