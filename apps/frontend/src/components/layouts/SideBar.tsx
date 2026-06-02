@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Bell, Heart, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -35,9 +36,10 @@ export function SideBar({
         className,
       )}
     >
-      <div className="flex flex-col items-start gap-4 py-4 px-2 lg:px-4">
+      <div className="flex h-full flex-col items-start gap-4 py-4 px-2 lg:px-4">
         <Link
           href="/dashboard/escrow"
+          onClick={onClose}
           className={cn(
             "flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 w-full dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
             pathname === "/dashboard/escrow"
@@ -93,6 +95,7 @@ export function SideBar({
         </Link>
         <Link
           href="/dashboard/users"
+          onClick={onClose}
           className={cn(
             "flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
             pathname === "/dashboard/users" && "bg-accent font-medium dark:bg-gray-800 dark:text-white",
@@ -101,6 +104,9 @@ export function SideBar({
           <Users className="w-6 h-6 dark:text-gray-400" />
           <span>Users</span>
         </Link>
+        <div className="mt-auto w-full pt-4">
+          <LogoutButton />
+        </div>
       </div>
     </div>
   );
