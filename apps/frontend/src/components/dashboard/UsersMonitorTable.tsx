@@ -60,7 +60,7 @@ export function UsersMonitorTable({ users, offset }: UsersMonitorTableProps) {
                 : "—"}
             </TableCell>
             <TableCell>
-              <WalletAddressTable address={user.id} />
+              <WalletAddressTable />
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
               {user.location ?? "—"}

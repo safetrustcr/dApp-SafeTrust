@@ -22,8 +22,7 @@ export function UserProfileCard({
     [firstName?.[0], lastName?.[0]].filter(Boolean).join("").toUpperCase() ||
     email[0].toUpperCase();
 
-  const fullName =
-    [firstName, lastName].filter(Boolean).join(" ") || "—";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || "—";
 
   return (
     <div className={cn("flex items-center gap-3", className)}>
