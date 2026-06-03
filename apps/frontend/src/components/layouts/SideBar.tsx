@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "@/components/auth/LogoutButton";
-import { Bell, Heart, Shield, Users } from "lucide-react";
+import { Bell, Heart, LayoutDashboard, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -97,7 +97,7 @@ export function SideBar({
         </Link>
         <button
           onClick={() => router.push("/dashboard/guest")}
-          className="flex items-center gap-3 p-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors duration-200 w-full group relative"
+          className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white transition-colors duration-200 w-full group relative"
         >
           <LayoutDashboard className="w-6 h-6 shrink-0" />
           <span className="md:hidden lg:block">Guest view</span>
