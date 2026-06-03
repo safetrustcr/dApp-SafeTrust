@@ -74,7 +74,6 @@ export default function LoginPage() {
       });
 
       useGlobalAuthenticationStore.getState().setToken(token);
-      router.push("/dashboard");
     } catch (err: unknown) {
       if (err instanceof FirebaseError) {
         setError(ERROR_MESSAGES[err.code] ?? "Login failed — please try again");
