@@ -31,7 +31,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function LoginPage() {
-  const { address } = useGlobalAuthenticationStore();
+  const { address, token } = useGlobalAuthenticationStore();
   const {
     handleConnect,
     isMainModalOpen,
@@ -52,10 +52,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (address) {
+    if (address || token) {
       router.push("/dashboard");
     }
-  }, [address, router]);
+  }, [address, token, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
