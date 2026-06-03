@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Home, MapPin, DollarSign, Clock, Plus } from "lucide-react";
 
@@ -42,10 +42,13 @@ export function NewApartmentForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: wire to Hasura INSERT INTO public.apartments
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setIsLoading(false);
-    router.push("/dashboard/apartments");
+    try {
+      // TODO: wire to Hasura INSERT INTO public.apartments
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      router.push("/dashboard/apartments");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const leftFields: LeftField[] = [
@@ -194,19 +197,25 @@ export function NewApartmentForm() {
             <Label>Images</Label>
             <div className="grid grid-cols-3 gap-2">
               {/* Main (large) slot */}
-              <div className="col-span-2 h-44 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-orange-400 transition-colors">
+              <label
+                htmlFor="apt-img-main"
+                className="col-span-2 h-44 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-orange-400 transition-colors"
+              >
+                <input id="apt-img-main" type="file" accept="image/*" className="sr-only" />
                 <Plus className="h-6 w-6 text-gray-400" />
-              </div>
+              </label>
 
               {/* Three small slots */}
               <div className="flex flex-col gap-2">
                 {[1, 2, 3].map((i) => (
-                  <div
+                  <label
                     key={i}
+                    htmlFor={`apt-img-${i}`}
                     className="flex-1 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-orange-400 transition-colors"
                   >
+                    <input id={`apt-img-${i}`} type="file" accept="image/*" className="sr-only" />
                     <Plus className="h-4 w-4 text-gray-400" />
-                  </div>
+                  </label>
                 ))}
               </div>
             </div>
