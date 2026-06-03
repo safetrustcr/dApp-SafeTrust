@@ -15,26 +15,31 @@ interface HeaderProps {
 }
 
 export const Header = ({ onMenuClick }: HeaderProps) => {
+  const safeGetItem = (key: string): string | null => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  };
+
   const { address } = useGlobalAuthenticationStore();
-  const [activeAddress, setActiveAddress] = useState<string | null>(null);
+  const [fallbackAddress, setFallbackAddress] = useState<string | null>(null);
 
   useEffect(() => {
-    if (address) {
-      setActiveAddress(address);
-    } else {
-      const fallback =
-        localStorage.getItem("walletAddress") ||
-        localStorage.getItem("address-wallet");
-      setActiveAddress(fallback);
-    }
-  }, [address]);
+    const fallback = safeGetItem("walletAddress") || safeGetItem("address-wallet");
+    setFallbackAddress(fallback);
+  }, []);
 
-  // TODO: wire in Batch N — replace with real user name from Hasura
-  // once GET_CURRENT_USER query is wired
+  const activeAddress = address || fallbackAddress;
+
   const displayName = activeAddress
     ? `${activeAddress.slice(0, 4)}...${activeAddress.slice(-4)}`
     : "Account";
-  const initials = "ST"; // SafeTrust fallback
+
+  const initials = activeAddress
+    ? (activeAddress.startsWith("0x") ? activeAddress.slice(2, 4) : activeAddress.slice(0, 2)).toUpperCase() || "AC"
+    : "AC";
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm dark:border-b dark:border-gray-800 dark:bg-gray-900">
