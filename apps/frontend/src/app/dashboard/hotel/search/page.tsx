@@ -5,7 +5,6 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import DatePicker from "@/components/hotels/search/datepicker";
-import Link from "next/link";
 import { Heart, MapPin } from "lucide-react";
 
 export default function HotelSearch() {
@@ -60,9 +59,9 @@ export default function HotelSearch() {
         <Button>Search</Button>
       </div>
       <div className="flex justify-end">
-        <Link href={"#"} className="text-sky-600">
+        <span className="text-sky-600 opacity-50 cursor-not-allowed">
           View all
-        </Link>
+        </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-8">
         {searchData.map((data, idx) => (

@@ -9,7 +9,7 @@ export default function GuestDashboardPage() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-gray-900">
       <HotelHeader />
       <div className="flex items-center justify-end mb-4">
         <button
