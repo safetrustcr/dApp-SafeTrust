@@ -20,6 +20,7 @@ import { MainWalletSelectionModal } from "./wallet/components/MainWalletSelectio
 import { WalletSelectionModal } from "./wallet/components/WalletSelectionModal";
 import { MetaMaskWalletModal } from "./wallet/components/MetaMaskWalletModal";
 import Cookies from "js-cookie";
+import { toast } from "sonner";
 
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -74,10 +75,20 @@ export default function LoginPage() {
       });
 
       useGlobalAuthenticationStore.getState().setToken(token);
+      toast.success("Login successful!", {
+        description: "Redirecting to your dashboard...",
+      });
+      router.push("/dashboard");
     } catch (err: unknown) {
       if (err instanceof FirebaseError) {
+        toast.error(ERROR_MESSAGES[err.code] ?? "An unexpected error occurred. Please try again.", {
+          duration: 4000,
+        });
         setError(ERROR_MESSAGES[err.code] ?? "Login failed — please try again");
       } else {
+        toast.error("An unexpected error occurred. Please try again.", {
+          duration: 4000,
+        });
         setError("Login failed — please try again");
       }
     } finally {
