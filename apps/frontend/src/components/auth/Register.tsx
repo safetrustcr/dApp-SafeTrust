@@ -120,12 +120,21 @@ export default function RegisterPage() {
     if (err instanceof FirebaseError) {
         console.log("🔴 Firebase error code:", err.code);
         console.log("🔴 Firebase error message:", err.message);
+        toast.error(ERROR_MESSAGES[err.code] ?? "An unexpected error occurred. Please try again.", {
+          duration: 4000,
+        });
         setError(
           ERROR_MESSAGES[err.code] ?? "Registration failed — please try again",
     );
     } else if (err instanceof Error && err.name === "AbortError") {
+      toast.error("Registration timed out. Please try again.", {
+        duration: 4000,
+      });
       setError("Registration timed out — please try again");
     } else {
+      toast.error("An unexpected error occurred. Please try again.", {
+        duration: 4000,
+      });
       setError("Registration failed — please try again");
     }
   } finally {
