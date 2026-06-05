@@ -7,7 +7,6 @@ import { SideBar } from "@/components/layouts/SideBar";
 import { Header } from "@/components/layouts/Header";
 import type { ReactNode } from "react";
 
-// Define public routes that don't require authentication
 const PUBLIC_ROUTES = [
   "/dashboard/hotel",
   "/dashboard/hotel/payment",
@@ -18,7 +17,6 @@ const PUBLIC_ROUTES = [
   "/dashboard/guest",
 ];
 
-// Routes that match patterns (for dynamic routes)
 const PUBLIC_ROUTE_PATTERNS = [
   /^\/dashboard\/hotel\/booking\/.+\/escrow$/,
 ];
@@ -26,13 +24,17 @@ const PUBLIC_ROUTE_PATTERNS = [
 const Layout = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
+
+  // ── Watch both auth signals ──────────────────────────
   const address = useGlobalAuthenticationStore((state) => state.address);
+  const token = useGlobalAuthenticationStore((state) => state.token);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthError, setIsAuthError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuth = () => {
       try {
         const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname === route);
         const matchesPublicPattern = PUBLIC_ROUTE_PATTERNS.some((pattern) =>
@@ -40,13 +42,15 @@ const Layout = ({ children }: { children: ReactNode }) => {
         );
         const isPublic = isPublicRoute || matchesPublicPattern;
 
-        // Check for wallet in localStorage as fallback (for Trustless Work wallet)
         const hasWalletInStorage =
           localStorage.getItem("walletAddress") ||
           localStorage.getItem("address-wallet");
 
-        if (!isPublic && !address && !hasWalletInStorage) {
-          router.replace("/login");
+        // ── Check address (wallet) OR token (Firebase email/password) ──
+        const isAuthenticated = !!address || !!token || !!hasWalletInStorage;
+
+        if (!isPublic && !isAuthenticated) {
+          router.replace("/login?reason=unauthenticated");
           return;
         }
 
@@ -59,45 +63,35 @@ const Layout = ({ children }: { children: ReactNode }) => {
     };
 
     checkAuth();
-  }, [address, pathname, router]);
+  }, [address, token, pathname, router]);
 
-  // Close sidebar on route change on mobile
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [pathname]);
 
   const isGuestRoute = pathname === "/dashboard/guest";
+  if (isGuestRoute) return <>{children}</>;
 
-  if (isGuestRoute) {
-    return <>{children}</>;
-  }
-
-  // Show loading state
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        {/* biome-ignore lint/style/useSelfClosingElements: <explanation> */}
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
       </div>
     );
   }
 
-  // Show error state only for protected routes that failed authentication
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname === route);
   const matchesPublicPattern = PUBLIC_ROUTE_PATTERNS.some((pattern) =>
     pattern.test(pathname)
   );
   const isPublic = isPublicRoute || matchesPublicPattern;
 
-  if (isAuthError && !isPublic) {
-    return null;
-  }
+  if (isAuthError && !isPublic) return null;
 
   return (
     <div className="flex h-full bg-gray-100 min-h-screen dark:bg-gray-950">
       <Header onMenuClick={() => setIsSidebarOpen(true)} />
 
-      {/* Mobile Backdrop */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden"
@@ -105,7 +99,6 @@ const Layout = ({ children }: { children: ReactNode }) => {
         />
       )}
 
-      {/* Mobile Drawer */}
       {pathname !== "/dashboard/profile" && (
         <SideBar
           variant="drawer"
@@ -114,7 +107,6 @@ const Layout = ({ children }: { children: ReactNode }) => {
         />
       )}
 
-      {/* Desktop Permanent Sidebar */}
       {pathname !== "/dashboard/profile" && (
         <SideBar variant="permanent" notificationCount={1} />
       )}
@@ -127,6 +119,5 @@ const Layout = ({ children }: { children: ReactNode }) => {
     </div>
   );
 };
-
 
 export default Layout;
