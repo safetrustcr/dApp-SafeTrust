@@ -9,7 +9,6 @@ import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-
 // TODO: wire in Batch N — ThemeToggle component
 // TODO: wire in Batch N — getRoleBasedRedirect + getUserRole from role-utils
 // TODO: wire in Batch N — CacheStatus once Apollo is connected to backend
