@@ -15,6 +15,7 @@ const PUBLIC_ROUTES = [
   "/dashboard/hotel/search",
   "/dashboard/hotel/escrow",
   "/dashboard/hotel/create-escrow",
+  "/dashboard/guest",
 ];
 
 // Routes that match patterns (for dynamic routes)
@@ -44,6 +45,11 @@ const Layout = ({ children }: { children: ReactNode }) => {
           localStorage.getItem("walletAddress") ||
           localStorage.getItem("address-wallet");
 
+        if (!isPublic && !address && !hasWalletInStorage) {
+          router.replace("/login");
+          return;
+        }
+
         setIsLoading(false);
       } catch (error) {
         console.error("Authentication error:", error);
@@ -59,6 +65,12 @@ const Layout = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [pathname]);
+
+  const isGuestRoute = pathname === "/dashboard/guest";
+
+  if (isGuestRoute) {
+    return <>{children}</>;
+  }
 
   // Show loading state
   if (isLoading) {
