@@ -20,6 +20,21 @@ import {
 } from "@/components/ui/select";
 import Illustration from "@/components/auth/ui/Illustration";
 import Cookies from "js-cookie";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { toast } from "sonner";
+
+const COUNTRY_CODES = [
+  { code: "+506", country: "Costa Rica", flag: "🇨🇷" },
+  { code: "+1",   country: "United States", flag: "🇺🇸" },
+  { code: "+52",  country: "Mexico", flag: "🇲🇽" },
+  { code: "+34",  country: "Spain", flag: "🇪🇸" },
+  { code: "+44",  country: "United Kingdom", flag: "🇬🇧" },
+  { code: "+49",  country: "Germany", flag: "🇩🇪" },
+  { code: "+55",  country: "Brazil", flag: "🇧🇷" },
+  { code: "+57",  country: "Colombia", flag: "🇨🇴" },
+  { code: "+51",  country: "Peru", flag: "🇵🇪" },
+  { code: "+54",  country: "Argentina", flag: "🇦🇷" },
+];
 
 const ERROR_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists",
@@ -96,17 +111,30 @@ export default function RegisterPage() {
     }
 
     useGlobalAuthenticationStore.getState().setToken(token);
+    toast.success("Account created successfully!", {
+      description: "Please sign in with your new credentials.",
+      duration: 4000,
+    });
     router.push("/login");
   } catch (err: unknown) {
     if (err instanceof FirebaseError) {
         console.log("🔴 Firebase error code:", err.code);
         console.log("🔴 Firebase error message:", err.message);
+        toast.error(ERROR_MESSAGES[err.code] ?? "An unexpected error occurred. Please try again.", {
+          duration: 4000,
+        });
         setError(
           ERROR_MESSAGES[err.code] ?? "Registration failed — please try again",
     );
     } else if (err instanceof Error && err.name === "AbortError") {
+      toast.error("Registration timed out. Please try again.", {
+        duration: 4000,
+      });
       setError("Registration timed out — please try again");
     } else {
+      toast.error("An unexpected error occurred. Please try again.", {
+        duration: 4000,
+      });
       setError("Registration failed — please try again");
     }
   } finally {
@@ -118,12 +146,15 @@ export default function RegisterPage() {
     <div className="flex min-h-screen">
       <div className="flex w-full flex-col items-center justify-center px-4 md:w-1/2">
         <div className="w-full max-w-sm space-y-6">
-          <div className="flex items-center space-x-2">
-            <Image src="/img/logo.png" alt="SafeTrust" width={32} height={32} />
-            <h1 className="text-2xl font-bold">SafeTrust</h1>
+          <div className="flex items-center justify-between w-full mb-2">
+            <div className="flex items-center space-x-2">
+              <Image src="/img/logo.png" alt="SafeTrust" width={32} height={32} />
+              <h1 className="text-2xl font-bold">SafeTrust</h1>
+            </div>
+            <ThemeToggle />
           </div>
 
-          <form className="space-y-4" onSubmit={handleRegister}>
+          <form className="space-y-5 overflow-visible" onSubmit={handleRegister}>
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
               <Input
@@ -142,14 +173,15 @@ export default function RegisterPage() {
                   value={phoneCountryCode}
                   onValueChange={(v) => { setPhoneCountryCode(v); clearError(); }}
                 >
-                  <SelectTrigger className="w-[100px]">
+                  <SelectTrigger className="w-[120px]">
                     <SelectValue placeholder="Code" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="+506">+506</SelectItem>
-                    <SelectItem value="+1">+1</SelectItem>
-                    <SelectItem value="+52">+52</SelectItem>
-                    <SelectItem value="+34">+34</SelectItem>
+                  <SelectContent position="popper" sideOffset={4}>
+                    {COUNTRY_CODES.map(({ code, country, flag }) => (
+                      <SelectItem key={code} value={code}>
+                        {flag} {code} — {country}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Input
@@ -172,7 +204,7 @@ export default function RegisterPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select your location" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" sideOffset={4}>
                   <SelectItem value="cr">Costa Rica</SelectItem>
                   <SelectItem value="us">United States</SelectItem>
                   <SelectItem value="mx">Mexico</SelectItem>
@@ -200,6 +232,7 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="Enter your password"
                 required
+                minLength={6}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); clearError(); }}
               />

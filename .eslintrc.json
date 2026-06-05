@@ -1,0 +1,19 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals"],
+  "settings": {
+    "next": {
+      "rootDir": "apps/frontend/"
+    }
+  },
+  "rules": {
+    "@next/next/no-html-link-for-pages": "off"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "dist/",
+    "apps/frontend/.next/",
+    "packages/graphql/src/generated/"
+  ]
+}

@@ -26,6 +26,8 @@ export function SearchHeader() {
       </div>
       <input
         type="text"
+        id="search-input"
+        aria-label="Search by city or province"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="City, province..."

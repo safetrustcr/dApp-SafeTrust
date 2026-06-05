@@ -2,7 +2,7 @@ import { NewApartmentForm } from '@/components/dashboard/apartments/NewApartment
 
 export default function NewApartmentPage() {
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8 lg:p-10">
+    <div className="rounded-2xl bg-card p-6 shadow-sm md:p-8 lg:p-10">
       <NewApartmentForm />
     </div>
   );
