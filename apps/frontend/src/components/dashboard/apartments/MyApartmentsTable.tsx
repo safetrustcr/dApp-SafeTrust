@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import Link from "next/link";
 import { Home } from "lucide-react";
@@ -120,6 +122,8 @@ export function MyApartmentsTable() {
         </span>
         <div className="flex items-center gap-2">
           <button
+            aria-label="Previous page"
+            title="Previous page"
             disabled={page === 0}
             onClick={() => setPage((p) => p - 1)}
             className="text-sm px-2 disabled:opacity-40"
@@ -128,6 +132,8 @@ export function MyApartmentsTable() {
           </button>
           <span className="text-sm text-gray-500">Page {page + 1}</span>
           <button
+            aria-label="Next page"
+            title="Next page"
             disabled={(page + 1) * ITEMS_PER_PAGE >= total}
             onClick={() => setPage((p) => p + 1)}
             className="text-sm px-2 disabled:opacity-40"
