@@ -7,14 +7,8 @@ import { useMultiWallet } from "@/components/auth/wallet/hooks/multi-wallet.hook
 import { Button } from "@/components/ui/button";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { Wallet } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-// TODO: wire in Batch N — ThemeToggle component
-// TODO: wire in Batch N — getRoleBasedRedirect + getUserRole from role-utils
-// TODO: wire in Batch N — CacheStatus once Apollo is connected to backend
 
-const DashboardPage = () => {
-  const router = useRouter();
+export function EscrowDashboard() {
   const {
     disconnectWallet,
     handleConnect,
@@ -32,13 +26,6 @@ const DashboardPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="text-xl font-semibold">Dashboard</div>
-        <p className="text-sm text-muted-foreground">
-          Welcome to SafeTrust — your escrow management hub.
-        </p>
-      </div>
-
       <div className="rounded-md border p-4 bg-muted text-foreground">
         {address ? (
           <div className="flex flex-col gap-2">
@@ -59,17 +46,14 @@ const DashboardPage = () => {
         )}
       </div>
 
-      {/* TODO: wire in Batch N — Quick Actions */}
       <div className="rounded-md border p-4 text-sm text-muted-foreground">
         Quick Actions — coming soon
       </div>
 
-      {/* TODO: wire in Batch N — Escrow Overview */}
       <div className="rounded-md border p-4 text-sm text-muted-foreground">
         Escrow Overview — coming soon
       </div>
 
-      {/* TODO: wire in Batch N — Recent Escrow Transactions */}
       <div className="rounded-md border p-4 text-sm text-muted-foreground">
         Recent Escrow Transactions — coming soon
       </div>
@@ -91,6 +75,4 @@ const DashboardPage = () => {
       />
     </div>
   );
-};
-
-export default DashboardPage;
+}
