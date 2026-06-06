@@ -1,51 +1,42 @@
-"use client";
+import React from "react";
+import { Badge } from "@/components/ui/badge";
 
-import { cn } from "@/lib/utils";
-
-export type EscrowStatus =
-  | "pending_signature"
-  | "funded"
-  | "active"
-  | "completed"
-  | "disputed"
-  | "resolved"
-  | "cancelled";
-
-const STATUS_STYLES: Record<EscrowStatus, string> = {
-  pending_signature: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-  funded:            "bg-blue-100   text-blue-800   dark:bg-blue-900   dark:text-blue-300",
-  active:            "bg-green-100  text-green-800  dark:bg-green-900  dark:text-green-300",
-  completed:         "bg-gray-100   text-gray-800   dark:bg-gray-700   dark:text-gray-300",
-  disputed:          "bg-red-100    text-red-800    dark:bg-red-900    dark:text-red-300",
-  resolved:          "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
-  cancelled:         "bg-gray-100   text-gray-500   dark:bg-gray-800   dark:text-gray-400",
-};
-
-const STATUS_LABELS: Record<EscrowStatus, string> = {
-  pending_signature: "Pending",
-  funded:            "Funded",
-  active:            "Active",
-  completed: "Completed",
-  disputed:          "Disputed",
-  resolved:          "Resolved",
-  cancelled:         "Cancelled",
-};
+type EscrowStatus = "PENDING" | "ACTIVE" | "COMPLETED" | "DISPUTED" | "RESOLVED" | "CANCELLED";
 
 interface EscrowStatusBadgeProps {
-  status: EscrowStatus;
-  className?: string;
+  status: EscrowStatus | string;
 }
 
-export function EscrowStatusBadge({ status, className }: EscrowStatusBadgeProps) {
+export function EscrowStatusBadge({ status }: EscrowStatusBadgeProps) {
+  const normalizedStatus = status.toUpperCase() as EscrowStatus;
+
+  let colorClasses = "bg-amber-50 dark:bg-amber-950/20 text-amber-700 border-amber-200 dark:border-amber-900";
+  
+  switch (normalizedStatus) {
+    case "ACTIVE":
+      colorClasses = "bg-blue-50 dark:bg-blue-950/20 text-blue-700 border-blue-200 dark:border-blue-900";
+      break;
+    case "COMPLETED":
+      colorClasses = "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 border-emerald-200 dark:border-emerald-900";
+      break;
+    case "DISPUTED":
+      colorClasses = "bg-rose-50 dark:bg-rose-950/20 text-rose-700 border-rose-200 dark:border-rose-900";
+      break;
+    case "RESOLVED":
+      colorClasses = "bg-teal-50 dark:bg-teal-950/20 text-teal-700 border-teal-200 dark:border-teal-900";
+      break;
+    case "CANCELLED":
+      colorClasses = "bg-slate-50 dark:bg-slate-950/20 text-slate-700 border-slate-200 dark:border-slate-900";
+      break;
+    case "PENDING":
+    default:
+      colorClasses = "bg-amber-50 dark:bg-amber-950/20 text-amber-700 border-amber-200 dark:border-amber-900";
+      break;
+  }
+
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-        STATUS_STYLES[status] ?? "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
-        className
-      )}
-    >
-      {STATUS_LABELS[status] ?? status}
-    </span>
+    <Badge variant="outline" className={`font-semibold capitalize px-2 py-0.5 text-xs ${colorClasses}`}>
+      {status.toLowerCase()}
+    </Badge>
   );
 }

@@ -1,78 +1,24 @@
-"use client";
-
-import { MainWalletSelectionModal } from "@/components/auth/wallet/components/MainWalletSelectionModal";
-import { MetaMaskWalletModal } from "@/components/auth/wallet/components/MetaMaskWalletModal";
-import { WalletSelectionModal } from "@/components/auth/wallet/components/WalletSelectionModal";
-import { useMultiWallet } from "@/components/auth/wallet/hooks/multi-wallet.hook";
-import { Button } from "@/components/ui/button";
-import { useGlobalAuthenticationStore } from "@/core/store/data";
-import { Wallet } from "lucide-react";
+import React from "react";
+import { EscrowOverviewCard } from "./EscrowOverviewCard";
+import EscrowPage from "@/app/dashboard/escrow/page";
 
 export function EscrowDashboard() {
-  const {
-    disconnectWallet,
-    handleConnect,
-    isMainModalOpen,
-    isStellarModalOpen,
-    isMetaMaskModalOpen,
-    closeMainModal,
-    closeStellarModal,
-    closeMetaMaskModal,
-    handleWalletTypeSelected,
-    handleStellarWalletSelected,
-    handleMetaMaskSelected,
-  } = useMultiWallet();
-  const { address } = useGlobalAuthenticationStore();
-
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="rounded-md border p-4 bg-muted text-foreground">
-        {address ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-semibold">Connected Wallet:</p>
-            <p className="font-mono text-sm break-all">{address}</p>
-            <Button variant="outline" size="sm" onClick={disconnectWallet} className="w-fit">
-              Disconnect
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">No wallet connected</p>
-            <Button onClick={handleConnect} className="w-fit">
-              <Wallet className="mr-2 h-4 w-4" />
-              Connect Wallet
-            </Button>
-          </div>
-        )}
+    <div className="space-y-8 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white">Escrow Control Panel</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Decentralised smart contract control center powered by Trustless Work API.
+        </p>
       </div>
 
-      <div className="rounded-md border p-4 text-sm text-muted-foreground">
-        Quick Actions — coming soon
-      </div>
+      {/* Stats cards overview */}
+      <EscrowOverviewCard />
 
-      <div className="rounded-md border p-4 text-sm text-muted-foreground">
-        Escrow Overview — coming soon
+      {/* Main List Table */}
+      <div className="border-t border-slate-100 dark:border-slate-800/80 pt-6">
+        <EscrowPage />
       </div>
-
-      <div className="rounded-md border p-4 text-sm text-muted-foreground">
-        Recent Escrow Transactions — coming soon
-      </div>
-
-      <MainWalletSelectionModal
-        isOpen={isMainModalOpen}
-        onClose={closeMainModal}
-        onWalletTypeSelected={handleWalletTypeSelected}
-      />
-      <WalletSelectionModal
-        isOpen={isStellarModalOpen}
-        onClose={closeStellarModal}
-        onWalletSelected={handleStellarWalletSelected}
-      />
-      <MetaMaskWalletModal
-        isOpen={isMetaMaskModalOpen}
-        onClose={closeMetaMaskModal}
-        onWalletConnected={handleMetaMaskSelected}
-      />
     </div>
   );
 }
