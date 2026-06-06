@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import Illustration from "@/components/auth/ui/Illustration";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { FirebaseError } from "firebase/app";
 import { auth } from "@/lib/firebase";
@@ -19,8 +19,7 @@ import { useMultiWallet } from "./wallet/hooks/multi-wallet.hook";
 import { MainWalletSelectionModal } from "./wallet/components/MainWalletSelectionModal";
 import { WalletSelectionModal } from "./wallet/components/WalletSelectionModal";
 import { MetaMaskWalletModal } from "./wallet/components/MetaMaskWalletModal";
-import Cookies from "js-cookie";
-
+import { toast } from "sonner";
 
 const ERROR_MESSAGES: Record<string, string> = {
   "auth/invalid-credential": "Invalid email or password",
@@ -31,7 +30,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function LoginPage() {
-  const { address } = useGlobalAuthenticationStore();
+  const { address, token } = useGlobalAuthenticationStore();
   const {
     handleConnect,
     isMainModalOpen,
@@ -44,7 +43,9 @@ export default function LoginPage() {
     handleStellarWalletSelected,
     handleMetaMaskSelected,
   } = useMultiWallet();
+
   const router = useRouter();
+  const pathname = usePathname();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,10 +53,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (address) {
+    if ((address || token) && pathname === "/login") {
       router.push("/dashboard");
     }
-  }, [address, router]);
+  }, [address, token, router, pathname]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,21 +65,26 @@ export default function LoginPage() {
 
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password);
-      const token = await credential.user.getIdToken();
+      const idToken = await credential.user.getIdToken();
 
-      // Store token in cookie for middleware authentication
-      Cookies.set("firebase-token", token, {
-        expires: 7,        // 7 days
-        secure: true,
-        sameSite: "strict",
+      // setToken handles cookie sync internally via data.ts
+      useGlobalAuthenticationStore.getState().setToken(idToken);
+
+      toast.success("Login successful!", {
+        description: "Redirecting to your dashboard...",
       });
-
-      useGlobalAuthenticationStore.getState().setToken(token);
       router.push("/dashboard");
     } catch (err: unknown) {
       if (err instanceof FirebaseError) {
+        toast.error(
+          ERROR_MESSAGES[err.code] ?? "An unexpected error occurred. Please try again.",
+          { duration: 4000 }
+        );
         setError(ERROR_MESSAGES[err.code] ?? "Login failed — please try again");
       } else {
+        toast.error("An unexpected error occurred. Please try again.", {
+          duration: 4000,
+        });
         setError("Login failed — please try again");
       }
     } finally {
@@ -149,12 +155,14 @@ export default function LoginPage() {
             )}
           </form>
 
-          <div className="relative">
+          <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <Separator />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">or</span>
+              <span className="bg-white dark:bg-[#0a0a0a] px-2 text-muted-foreground dark:text-gray-400">
+                or
+              </span>
             </div>
           </div>
 

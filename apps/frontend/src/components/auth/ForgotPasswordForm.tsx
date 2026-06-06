@@ -63,7 +63,7 @@ export default function ForgotPasswordForm() {
 
         <h1 className="text-2xl font-bold">Forgot password?</h1>
         <p className="text-gray-500 text-sm">
-          No worries, we'll send you a temporary password
+          No worries, we&apos;ll send you a temporary password
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">

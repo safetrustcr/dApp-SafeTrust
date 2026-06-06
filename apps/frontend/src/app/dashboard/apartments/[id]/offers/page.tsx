@@ -68,7 +68,7 @@ export default function InterestedPeoplePage() {
 
   // Handle invalid apartment ID
   useEffect(() => {
-    if (!apartmentId || isNaN(apartmentId)) {
+    if (isNaN(apartmentId) || apartmentId < 1) {
       router.push("/dashboard/apartments");
     }
   }, [apartmentId, router]);
