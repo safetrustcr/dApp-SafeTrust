@@ -15,6 +15,7 @@ const PUBLIC_ROUTES = [
   "/dashboard/hotel/escrow",
   "/dashboard/hotel/create-escrow",
   "/dashboard/guest",
+  "/dashboard/guest/suggestions",
 ];
 
 const PUBLIC_ROUTE_PATTERNS = [

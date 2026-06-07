@@ -53,9 +53,9 @@ export default function SuggestionsPage() {
   };
 
   return (
-    <div className="min-h-full bg-white text-gray-950">
-      <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
-        <aside className="space-y-8 rounded-lg border border-gray-200 bg-white p-5 lg:min-h-[calc(100vh-10rem)]">
+    <div className="min-h-full bg-background text-foreground">
+     <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
+      <aside className="space-y-8 rounded-lg border border-gray-200 bg-card p-5 lg:min-h-[calc(100vh-10rem)]">
           <CategoryFilter selected={categories} onChange={setCategories} />
           <PriceRangeFilter minPrice={3200} maxPrice={206000} />
           <LocationFilter selected={locations} onChange={setLocations} />

@@ -36,7 +36,6 @@ export function UsersMonitorTable({ users, offset }: UsersMonitorTableProps) {
           <TableHead>Name</TableHead>
           <TableHead>Phone</TableHead>
           <TableHead>Wallet</TableHead>
-          <TableHead>Location</TableHead>
           <TableHead>Last Seen</TableHead>
         </TableRow>
       </TableHeader>
@@ -51,7 +50,6 @@ export function UsersMonitorTable({ users, offset }: UsersMonitorTableProps) {
                 firstName={user.first_name}
                 lastName={user.last_name}
                 email={user.email}
-                location={user.location}
               />
             </TableCell>
             <TableCell className="text-sm">
@@ -61,9 +59,6 @@ export function UsersMonitorTable({ users, offset }: UsersMonitorTableProps) {
             </TableCell>
             <TableCell>
               <WalletAddressTable />
-            </TableCell>
-            <TableCell className="text-sm text-muted-foreground">
-              {user.location ?? "—"}
             </TableCell>
             <TableCell className="text-xs text-muted-foreground">
               {user.last_seen

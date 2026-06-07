@@ -12,7 +12,7 @@ const SUGGESTIONS = Array.from({ length: 5 }, (_, index) => ({
 
 export default function GuestDashboard() {
   return (
-    <div className="grid gap-8 bg-white text-gray-950 xl:grid-cols-[18rem_1fr]">
+    <div className="grid gap-8 bg-background text-foreground xl:grid-cols-[18rem_1fr]">
       <aside className="space-y-5">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold">Suggestions</h1>

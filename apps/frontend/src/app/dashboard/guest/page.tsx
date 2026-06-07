@@ -1,7 +1,6 @@
 "use client";
 
 import GuestDashboard from "@/components/dashboard/guest/GuestDashboard";
-import { HotelHeader } from "@/components/hotel";
 import { LayoutDashboard } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -9,8 +8,7 @@ export default function GuestDashboardPage() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      <HotelHeader />
+    <div className="min-h-screen bg-background">
       <div className="flex items-center justify-end mb-4">
         <button
           onClick={() => router.push("/dashboard")}
