@@ -2,12 +2,14 @@ const { syncUser } = require('../services/user.service');
 
 async function syncUserHandler(req, res) {
     const { uid, email } = req.user;
-    const { phone_number, country_code, location } = req.body;
+    const { first_name, last_name, phone_number, country_code, location } = req.body;
 
     try {
         const user = await syncUser({
             uid,
             email,
+            first_name: first_name || null,
+            last_name: last_name || null,
             phone_number,
             country_code,
             location,
