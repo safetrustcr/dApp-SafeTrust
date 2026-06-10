@@ -25,6 +25,14 @@ export const GET_USERS = gql`
       country_code
       location
       last_seen
+      user_wallets(
+        where: { is_primary: { _eq: true } }
+        limit: 1
+      ) {
+        wallet_address
+        chain_type
+        is_primary
+      }
     }
     users_aggregate {
       aggregate {

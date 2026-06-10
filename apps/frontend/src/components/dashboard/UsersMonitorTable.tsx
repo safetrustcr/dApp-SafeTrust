@@ -20,6 +20,11 @@ interface User {
   country_code?: string | null;
   location?: string | null;
   last_seen?: string | null;
+  user_wallets?: Array<{
+    wallet_address: string;
+    chain_type: string;
+    is_primary: boolean;
+  }> | null;
 }
 
 interface UsersMonitorTableProps {
@@ -58,7 +63,9 @@ export function UsersMonitorTable({ users, offset }: UsersMonitorTableProps) {
                 : "—"}
             </TableCell>
             <TableCell>
-              <WalletAddressTable />
+              <WalletAddressTable
+                address={user.user_wallets?.[0]?.wallet_address ?? null}
+              />
             </TableCell>
             <TableCell className="text-xs text-muted-foreground">
               {user.last_seen
