@@ -1,4 +1,3 @@
-// apps/web/src/graphql/queries/user-queries.ts
 import { gql } from "@apollo/client";
 
 export const GET_USER = gql`
@@ -16,7 +15,7 @@ export const GET_USERS = gql`
     users(
       limit: $limit
       offset: $offset
-      order_by: { created_at: desc }
+      order_by: { last_seen: desc }
     ) {
       id
       email

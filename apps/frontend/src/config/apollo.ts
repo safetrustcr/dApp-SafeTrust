@@ -22,8 +22,11 @@ const authLink = setContext(async (_, { headers }) => {
 
 const httpLink = new HttpLink({
   uri: process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL ?? "http://localhost:8080/v1/graphql",
+  headers: {
+    // TODO: wire in Batch N — replace with JWT role claim for production
+    "x-hasura-admin-secret": process.env.NEXT_PUBLIC_HASURA_ADMIN_SECRET ?? "myadminsecretkey",
+  },
 });
-
 export const apolloClient = new ApolloClient({
   link: from([authLink as unknown as ApolloLink, httpLink]),
   cache: new InMemoryCache(),

@@ -30,6 +30,13 @@ CREATE TABLE public.apartments (
         CHECK (available_until IS NULL OR available_from < available_until)
 );
 
+-- Alter table query: add image_urls array to apartments table
+ALTER TABLE public.apartments
+  ADD COLUMN IF NOT EXISTS image_urls TEXT[] DEFAULT '{}';
+ 
+COMMENT ON COLUMN public.apartments.image_urls
+  IS 'Array of image URL strings for the apartment listing';
+
 -- Create spatial index
 CREATE INDEX idx_apartments_coordinates 
     ON public.apartments USING GIST (coordinates);
