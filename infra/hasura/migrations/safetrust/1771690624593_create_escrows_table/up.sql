@@ -24,7 +24,14 @@ CREATE TABLE IF NOT EXISTS public.escrows (
     CONSTRAINT unique_engagement UNIQUE (engagement_id)
 );
 
+
+-- Add apartment_id FK to escrows
+ALTER TABLE public.escrows
+  ADD COLUMN IF NOT EXISTS apartment_id UUID
+  REFERENCES public.apartments(id) ON DELETE SET NULL;
+
 -- Indexes
+CREATE INDEX IF NOT EXISTS idx_escrows_apartment_id ON public.escrows(apartment_id);
 CREATE INDEX IF NOT EXISTS idx_escrows_contract_id      ON public.escrows (contract_id);
 CREATE INDEX IF NOT EXISTS idx_escrows_property_id      ON public.escrows (property_id);
 CREATE INDEX IF NOT EXISTS idx_escrows_sender_address   ON public.escrows (sender_address);
@@ -47,6 +54,7 @@ CREATE TRIGGER escrows_set_updated_at
     FOR EACH ROW EXECUTE FUNCTION public.set_escrows_updated_at();
 
 -- Comments
+COMMENT ON COLUMN public.escrows.apartment_id IS 'FK to apartments — the property this escrow covers';
 COMMENT ON TABLE  public.escrows IS 'Single-release escrow contracts for security deposits';
 COMMENT ON COLUMN public.escrows.contract_id    IS 'On-chain Stellar contract address';
 COMMENT ON COLUMN public.escrows.engagement_id  IS 'Unique identifier sent to TrustlessWork API';

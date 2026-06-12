@@ -51,10 +51,6 @@ const ownerAddress = (() => {
 })();
 
 
-  // Temporary debug — remove after confirming
-  console.log("🔑 ownerAddress:", ownerAddress);
-  console.log("🔑 token:", token ? token.substring(0, 20) + "..." : null);
-
   // ── Form state ──────────────────────────────────────────────────────────────
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");

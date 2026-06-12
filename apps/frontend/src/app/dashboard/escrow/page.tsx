@@ -1,121 +1,77 @@
 "use client";
 
+import { useQuery } from "@apollo/client";
 import { EscrowStatusBadge, type EscrowStatus } from "@/components/dashboard/EscrowStatusBadge";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell,
+  TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, Home, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { GET_ESCROWS } from "@/graphql/queries/escrow-queries";
 
-function normalizeEscrowStatus(status: string): EscrowStatus {
-  switch (status.toUpperCase()) {
-    case "PENDING":
-      return "pending_signature";
-    case "ACTIVE":
-      return "active";
-    case "COMPLETED":
-      return "completed";
-    default:
-      return status.toLowerCase() as EscrowStatus;
-  }
+const FILTER_TABS = ["All", "Pending", "Active", "Completed", "Disputed"] as const;
+
+const ITEMS_PER_PAGE = 10;
+
+function normalizeStatus(status: string): EscrowStatus {
+  const map: Record<string, EscrowStatus> = {
+    pending_signature: "pending_signature",
+    deploying: "pending_signature",
+    funded: "funded",
+    active: "active",
+    completed: "completed",
+    disputed: "disputed",
+    resolved: "resolved",
+    cancelled: "cancelled",
+  };
+  return map[status.toLowerCase()] ?? "pending_signature";
 }
-
-const STUB_ESCROWS = [
-  {
-    id: "abc-123",
-    property: "La sabana apartment",
-    amount: 4000,
-    status: "PENDING" as const,
-    createdAt: "2025-01-20",
-  },
-  {
-    id: "def-456",
-    property: "Casa verde downtown",
-    amount: 2500,
-    status: "ACTIVE" as const,
-    createdAt: "2025-01-15",
-  },
-  {
-    id: "ghi-789",
-    property: "Playa escazú suite",
-    amount: 6000,
-    status: "COMPLETED" as const,
-    createdAt: "2025-01-10",
-  },
-];
-
-const FILTER_TABS = [
-  "All",
-  "Pending",
-  "Active",
-  "Completed",
-  "Disputed",
-] as const;
 
 export default function EscrowPage() {
   const router = useRouter();
-  const [activeFilter, setActiveFilter] =
-    useState<(typeof FILTER_TABS)[number]>("All");
+  const [activeFilter, setActiveFilter] = useState<(typeof FILTER_TABS)[number]>("All");
+  const [page, setPage] = useState(0);
 
-  const handleViewEscrow = (id: string) => {
-    router.push(`/dashboard/escrow/${id}`);
-  };
+  const offset = page * ITEMS_PER_PAGE;
 
-  const handleNewEscrow = () => {
-    // TODO: Navigate to new escrow creation page
-    console.log("Navigate to new escrow creation");
-  };
+  const { data, loading, error } = useQuery(GET_ESCROWS, {
+    variables: { limit: ITEMS_PER_PAGE, offset },
+  });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
-  };
+  const allEscrows = data?.escrows ?? [];
+  const total = data?.escrows_aggregate?.aggregate?.count ?? 0;
 
-  const filteredEscrows = STUB_ESCROWS.filter((escrow) => {
+  const filtered = allEscrows.filter((e: { status: string }) => {
     if (activeFilter === "All") return true;
-    return escrow.status.toUpperCase() === activeFilter.toUpperCase();
+    return e.status.toLowerCase().includes(activeFilter.toLowerCase());
   });
 
   return (
     <div className="space-y-6 w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          My Escrows
-        </h1>
-        <Button
-          onClick={handleNewEscrow}
-          className="flex items-center gap-2 sm:w-auto w-fit"
-        >
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground">My Escrows</h1>
+        <Button className="flex items-center gap-2 w-fit">
           <PlusIcon className="h-4 w-4" />
           New Escrow
         </Button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="border-b border-gray-200 overflow-hidden">
-        <nav className="-mb-px space-x-3  lg:space-x-8 w-full flex gap-2 overflow-hidden whitespace-nowrap items-start">
+      {/* Filter tabs */}
+      <div className="border-b border-border">
+        <nav className="-mb-px flex gap-1 overflow-x-auto">
           {FILTER_TABS.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveFilter(tab)}
-              className={`
-                py-2 px-1 border-b-2 lg:text-sm text-xs font-medium transition-colors whitespace-nowrap
-                ${
-                  activeFilter === tab
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }
-              `}
+              onClick={() => { setActiveFilter(tab); setPage(0); }}
+              className={`py-2 px-3 border-b-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                activeFilter === tab
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300"
+              }`}
             >
               {tab}
             </button>
@@ -123,58 +79,103 @@ export default function EscrowPage() {
         </nav>
       </div>
 
+      {/* States */}
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-destructive text-center py-8">
+          Failed to load escrows — {error.message}
+        </p>
+      )}
+
       {/* Table */}
-      <div className="bg-white shadow rounded-lg w-full">
-        <div className="scrollbar-thin w-full ">
+      {!loading && !error && (
+        <div className="rounded-lg border border-border overflow-hidden bg-card">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px] min-w-[100px]">ID</TableHead>
-                <TableHead className="min-w-[200px]">Property</TableHead>
-                <TableHead className="w-[120px] min-w-[120px]">
-                  Amount
-                </TableHead>
-                <TableHead className="w-[120px] min-w-[120px]">
-                  Status
-                </TableHead>
-                <TableHead className="w-[100px] min-w-[100px] text-right">
-                  Actions
-                </TableHead>
+              <TableRow className="bg-muted/50">
+                <TableHead className="w-28">ID</TableHead>
+                <TableHead>Property</TableHead>
+                <TableHead className="w-32">Amount</TableHead>
+                <TableHead className="w-36">Status</TableHead>
+                <TableHead className="w-28">Created</TableHead>
+                <TableHead className="w-20 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEscrows.length === 0 ? (
+              {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="h-24 text-center text-gray-500"
-                  >
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     No escrows found
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEscrows.map((escrow) => (
-                  <TableRow key={escrow.id}>
-                    <TableCell className="font-mono text-sm">
-                      {escrow.id.slice(0, 8)}...
+                filtered.map((escrow: {
+                  id: string;
+                  contract_id: string;
+                  amount: number;
+                  status: string;
+                  created_at: string;
+                  apartment?: {
+                    id: string;
+                    name: string;
+                    image_urls?: string[] | null;
+                    address?: { city?: string; neighborhood?: string };
+                  } | null;
+                }) => (
+                  <TableRow key={escrow.id} className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {escrow.contract_id?.slice(0, 10) ?? escrow.id.slice(0, 8)}...
                     </TableCell>
-                    <TableCell className="font-medium min-w-[200px]">
-                      <div className="truncate" title={escrow.property}>
-                        {escrow.property}
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {/* Apartment thumbnail */}
+                        <div className="w-9 h-9 rounded-md overflow-hidden bg-muted shrink-0 border border-border">
+                          {escrow.apartment?.image_urls?.[0] ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={escrow.apartment.image_urls[0]}
+                              alt={escrow.apartment.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Home className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">
+                            {escrow.apartment?.name ?? "Unknown property"}
+                          </p>
+                          {escrow.apartment?.address && (
+                            <p className="text-xs text-muted-foreground">
+                              {[escrow.apartment.address.neighborhood, escrow.apartment.address.city]
+                                .filter(Boolean).join(", ")}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium min-w-[120px]">
-                      {formatCurrency(escrow.amount)}
+                    <TableCell className="font-semibold text-emerald-600">
+                      ${Number(escrow.amount).toLocaleString()}
                     </TableCell>
-                    <TableCell className="min-w-[120px]">
-                      <EscrowStatusBadge status={normalizeEscrowStatus(escrow.status)} />
+                    <TableCell>
+                      <EscrowStatusBadge status={normalizeStatus(escrow.status)} />
                     </TableCell>
-                    <TableCell className="text-right min-w-[100px]">
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(escrow.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleViewEscrow(escrow.id)}
-                        className="whitespace-nowrap"
+                        onClick={() => router.push(`/dashboard/escrow/${escrow.id}`)}
                       >
                         View
                       </Button>
@@ -184,39 +185,21 @@ export default function EscrowPage() {
               )}
             </TableBody>
           </Table>
-        </div>
 
-        {/* Pagination */}
-        <div className="px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="text-sm text-gray-700">
-            Showing <span className="font-medium">1</span> to{" "}
-            <span className="font-medium">{filteredEscrows.length}</span> of{" "}
-            <span className="font-medium">{filteredEscrows.length}</span>{" "}
-            results
-          </div>
-          <div className="flex items-center space-x-1">
-            <Button variant="outline" size="sm" disabled>
-              ←
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-blue-50 text-blue-600 border-blue-200"
-            >
-              1
-            </Button>
-            <Button variant="outline" size="sm" disabled>
-              2
-            </Button>
-            <Button variant="outline" size="sm" disabled>
-              3
-            </Button>
-            <Button variant="outline" size="sm" disabled>
-              →
-            </Button>
+          {/* Pagination */}
+          <div className="px-4 py-3 border-t border-border flex items-center justify-between text-sm text-muted-foreground">
+            <p>Showing {filtered.length} of {total}</p>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" disabled={page === 0}
+                onClick={() => setPage(p => p - 1)}>←</Button>
+              <span className="px-2">Page {page + 1}</span>
+              <Button variant="outline" size="sm"
+                disabled={(page + 1) * ITEMS_PER_PAGE >= total}
+                onClick={() => setPage(p => p + 1)}>→</Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
