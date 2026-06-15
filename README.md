@@ -17,6 +17,8 @@
 
 > **dApp-SafeTrust** is the MVP integration monorepo — it wires `apps/frontend` (Next.js 14) and `apps/api` (Node.js + Express) together through a Hasura GraphQL middleware and a PostgreSQL database. One command starts everything.
 
+(powered by the Stellar network via [TrustlessWork API Docs](https://docs.trustlesswork.com) )
+
 <br/>
 
 [🚀 Quick Start](#-quick-start) · [🏗️ Architecture](#️-architecture) · [📁 Structure](#-project-structure) · [🧩 Apps & Packages](#-apps--packages) · [🛠️ Development](#️-development) · [⚠️ Known State](#️-known-state-for-contributors) · [🤝 Contributing](#-contributing)
