@@ -15,6 +15,8 @@
 
 import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
 import { ProcessStepper } from '@/components/escrow/ProcessStepper';
+import { Home } from 'lucide-react';
+import Image from 'next/image';
 import type { CSSProperties } from 'react';
 
 type StubStatus = 'paid' | 'blocked' | 'released';
@@ -85,7 +87,34 @@ const styles = {
     padding: '0.6rem 1rem',
     fontWeight: 700,
   } satisfies CSSProperties,
+  productCell: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+  } satisfies CSSProperties,
+  productThumbnail: {
+    width: '2.5rem',
+    height: '2.5rem',
+    borderRadius: '0.5rem',
+    objectFit: 'cover',
+    flexShrink: 0,
+  } satisfies CSSProperties,
+  productThumbnailFallback: {
+    width: '2.5rem',
+    height: '2.5rem',
+    borderRadius: '0.5rem',
+    backgroundColor: '#fff7ed',
+    color: '#f97316',
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+  } satisfies CSSProperties,
 } as const;
+
+const PAID_INVOICE_APARTMENT = {
+  name: 'La sabana apartment',
+  image_urls: ['/img/hotel/hotel1.jpg'],
+};
 
 function getStubView(status: string | undefined): ViewConfig {
   switch (status) {
@@ -104,6 +133,35 @@ function InfoPair({ label, value }: { label: string; value: string }) {
     <div>
       <p style={{ margin: 0, color: '#6b7280', fontSize: '0.85rem' }}>{label}</p>
       <p style={{ margin: '0.35rem 0 0', fontWeight: 600 }}>{value}</p>
+    </div>
+  );
+}
+
+function ApartmentProductCell({
+  name,
+  imageUrls,
+}: {
+  name: string;
+  imageUrls?: string[] | null;
+}) {
+  const imageUrl = imageUrls?.[0];
+
+  return (
+    <div style={styles.productCell}>
+      {imageUrl ? (
+        <Image
+          src={imageUrl}
+          alt={`${name} thumbnail`}
+          width={40}
+          height={40}
+          style={styles.productThumbnail}
+        />
+      ) : (
+        <span aria-label="Apartment image unavailable" style={styles.productThumbnailFallback}>
+          <Home size={18} aria-hidden="true" />
+        </span>
+      )}
+      <span>{name}</span>
     </div>
   );
 }
@@ -129,7 +187,12 @@ function PaidStubView() {
           </thead>
           <tbody>
             <tr>
-              <td style={{ padding: '0.9rem', borderTop: '1px solid #fed7aa' }}>La sabana apartment</td>
+              <td style={{ padding: '0.9rem', borderTop: '1px solid #fed7aa' }}>
+                <ApartmentProductCell
+                  name={PAID_INVOICE_APARTMENT.name}
+                  imageUrls={PAID_INVOICE_APARTMENT.image_urls}
+                />
+              </td>
               <td style={{ padding: '0.9rem', textAlign: 'right', borderTop: '1px solid #fed7aa' }}>
                 $4,000
               </td>
