@@ -1,143 +1,130 @@
-import { EscrowPayFlow } from '@/components/escrow/EscrowPayFlow';
-import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
-import { ProcessStepper } from '@/components/escrow/ProcessStepper';
-import type { CSSProperties } from 'react';
+"use client";
 
-const STUB_APARTMENT = {
-  id: 'la-sabana',
-  name: 'La sabana',
-  address: '329 Calle santos, paseo colon, San Jose',
-  price: 4000,
-  owner: {
-    walletAddress: 'GDUMR3GDOAWAJXFYB7BLMCQQX4FGXJQ3NGPBHPBWKWJRG4ZL2RKIUJL',
-  },
-};
+import { useQuery } from "@apollo/client";
+import { ApartmentPropertyCard } from "@/components/escrow/ApartmentPropertyCard";
+import { EscrowPayFlow } from "@/components/escrow/EscrowPayFlow";
+import { InvoiceHeader } from "@/components/escrow/InvoiceHeader";
+import { ProcessStepper } from "@/components/escrow/ProcessStepper";
+import { GET_APARTMENT_BY_ID } from "@/graphql/queries/apartment-queries";
+import type { CSSProperties } from "react";
 
 const styles = {
   page: {
-    maxWidth: '72rem',
-    margin: '0 auto',
-    padding: '2rem 1.5rem 3rem',
-    color: '#111827',
+    maxWidth: "72rem",
+    margin: "0 auto",
+    padding: "2rem 1.5rem 3rem",
+    color: "#111827",
   } satisfies CSSProperties,
   grid: {
-    gap: '1.5rem',
-    marginTop: '1.5rem',
-    alignItems: 'start',
+    gap: "1.5rem",
+    marginTop: "1.5rem",
+    alignItems: "start",
   } satisfies CSSProperties,
   panel: {
-    border: '1px solid #fed7aa',
-    borderRadius: '1rem',
-    backgroundColor: '#ffffff',
-    padding: '1.5rem',
+    border: "1px solid #fed7aa",
+    borderRadius: "1rem",
+    backgroundColor: "#ffffff",
+    padding: "1.5rem",
   } satisfies CSSProperties,
-  headingRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '1rem',
-    flexWrap: 'wrap',
-  } satisfies CSSProperties,
-  payButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-  } satisfies CSSProperties,
-  imageGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-    gap: '0.5rem',
-  } satisfies CSSProperties,
-  imagePlaceholder: {
-    height: '5rem',
-    borderRadius: '0.75rem',
-    backgroundColor: '#fed7aa',
-  } satisfies CSSProperties,
-  detailsRow: {
-    display: 'flex',
-    gap: '1rem',
-    flexWrap: 'wrap',
-    fontSize: '0.95rem',
-  } satisfies CSSProperties,
-  mutedText: {
-    margin: 0,
-    color: '#6b7280',
-    fontSize: '0.9rem',
+  sidebar: {
+    display: "grid",
+    gap: "1rem",
   } satisfies CSSProperties,
   label: {
-    display: 'block',
-    marginBottom: '0.5rem',
+    display: "block",
+    marginBottom: "0.5rem",
     fontWeight: 600,
   } satisfies CSSProperties,
   input: {
-    width: '100%',
-    border: '1px solid #d1d5db',
-    borderRadius: '0.75rem',
-    padding: '0.75rem',
-    font: 'inherit',
-    resize: 'vertical',
-    minHeight: '6rem',
+    width: "100%",
+    border: "1px solid #d1d5db",
+    borderRadius: "0.75rem",
+    padding: "0.75rem",
+    font: "inherit",
+    resize: "vertical",
+    minHeight: "6rem",
   } satisfies CSSProperties,
-  sidebar: {
-    display: 'grid',
-    gap: '1rem',
+  mutedText: {
+    margin: 0,
+    color: "#6b7280",
+    fontSize: "0.9rem",
   } satisfies CSSProperties,
 } as const;
+
+type ApartmentData = {
+  id: string;
+  name: string;
+  description?: string | null;
+  image_urls?: string[] | null;
+  address?: {
+    street?: string;
+    neighborhood?: string;
+    city?: string;
+  } | null;
+  price: number;
+  owner_id: string;
+};
 
 export default function EscrowCreatePage({
   params,
 }: {
   params: { id: string };
 }) {
+  const { data, loading, error } = useQuery<{ apartments_by_pk: ApartmentData | null }>(
+    GET_APARTMENT_BY_ID,
+    { variables: { id: params.id } }
+  );
+
+  const apartment = data?.apartments_by_pk;
+
   return (
     <div style={styles.page}>
       <InvoiceHeader invoiceNumber="INV4257-09-012" status="pending" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3" style={styles.grid}>
-        <div className="lg:col-span-2" style={{ ...styles.panel, display: 'grid', gap: '1rem' }}>
-          <div style={styles.headingRow}>
-            <div>
-              <p style={{ margin: 0, fontSize: '0.8rem', letterSpacing: '0.08em', color: '#9ca3af' }}>
-                HOTEL {params.id}
-              </p>
-              <h2 style={{ marginTop: '0.35rem', marginBottom: 0, fontSize: '1.5rem' }}>{STUB_APARTMENT.name}</h2>
-            </div>
-            <div style={styles.payButton}>
-              <EscrowPayFlow
-                apartmentId={params.id}
-                apartmentName={STUB_APARTMENT.name}
-                ownerAddress={STUB_APARTMENT.owner.walletAddress}
-                amount={STUB_APARTMENT.price}
-              />
-            </div>
-          </div>
+        <div className="lg:col-span-2" style={{ ...styles.panel, display: "grid", gap: "1rem" }}>
+          {loading && (
+            <p style={styles.mutedText}>Loading property details…</p>
+          )}
 
-          <div style={styles.imageGrid}>
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} style={styles.imagePlaceholder} />
-            ))}
-          </div>
-
-          <p style={styles.mutedText}>Address: {STUB_APARTMENT.address}</p>
-          <div style={styles.detailsRow}>
-            <span>2 bd</span>
-            <span>pet friendly</span>
-            <span>1 ba</span>
-          </div>
-
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: '0.35rem', fontSize: '1rem' }}>Property details</h3>
-            <p style={styles.mutedText}>
-              Beautiful apartment in the heart of San Jose.
+          {error && (
+            <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem" }}>
+              Failed to load property details.
             </p>
-          </div>
+          )}
 
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: '0.35rem', fontSize: '1rem' }}>Owner contact</h3>
-            <p style={{ margin: 0, fontSize: '0.95rem' }}>Phone: +1 555-0100</p>
-            <p style={{ margin: '0.35rem 0 0', fontSize: '0.95rem' }}>Email: owner@example.com</p>
-          </div>
+          {apartment && (
+            <ApartmentPropertyCard
+              name={apartment.name}
+              imageUrls={apartment.image_urls}
+              address={apartment.address}
+              description={apartment.description}
+              paySlot={
+                <EscrowPayFlow
+                  apartmentId={params.id}
+                  apartmentName={apartment.name}
+                  // TODO: replace with owner's Stellar wallet from users_wallets once wired
+                  ownerAddress={apartment.owner_id}
+                  amount={apartment.price}
+                />
+              }
+            />
+          )}
 
+          {!loading && !error && !apartment && (
+            <p style={styles.mutedText}>Property not found.</p>
+          )}
+
+          {apartment && (
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: "0.35rem", fontSize: "1rem" }}>
+                Owner contact
+              </h3>
+              <p style={{ margin: 0, fontSize: "0.95rem" }}>
+                Wallet: {apartment.owner_id}
+              </p>
+            </div>
+          )}
         </div>
 
         <div style={styles.sidebar}>
@@ -148,7 +135,7 @@ export default function EscrowCreatePage({
             <textarea
               id="escrow-notes"
               style={styles.input}
-              placeholder="Add notes..."
+              placeholder="Add notes…"
             />
           </div>
           <ProcessStepper currentStep={1} />
