@@ -85,7 +85,7 @@ export function ApartmentPropertyCard({
   imageUrls,
   address,
   description,
-  petFriendly = true,
+  petFriendly = false,
   // TODO: wire bedrooms/bathrooms after migration
   bedrooms,
   bathrooms,
@@ -110,7 +110,9 @@ export function ApartmentPropertyCard({
             alt={`${name} photo ${i + 1}`}
             style={styles.img}
             onError={(e) => {
-              (e.target as HTMLImageElement).src = FALLBACK_IMAGE;
+              const img = e.target as HTMLImageElement;
+              img.onerror = null;
+              img.src = FALLBACK_IMAGE;
             }}
           />
         ))}

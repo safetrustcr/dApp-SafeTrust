@@ -105,7 +105,10 @@ export const CREATE_APARTMENT = gql`
 
 export const GET_APARTMENT_BY_ID = gql`
   query GetApartmentById($id: uuid!) {
-    apartments_by_pk(id: $id) {
+    apartments(
+      where: { id: { _eq: $id }, deleted_at: { _is_null: true } }
+      limit: 1
+    ) {
       id
       name
       description

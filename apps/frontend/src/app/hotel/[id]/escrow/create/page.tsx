@@ -51,6 +51,8 @@ const styles = {
   } satisfies CSSProperties,
 } as const;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type ApartmentData = {
   id: string;
   name: string;
@@ -70,12 +72,14 @@ export default function EscrowCreatePage({
 }: {
   params: { id: string };
 }) {
-  const { data, loading, error } = useQuery<{ apartments_by_pk: ApartmentData | null }>(
+  const isValidId = UUID_RE.test(params.id);
+
+  const { data, loading, error } = useQuery<{ apartments: ApartmentData[] }>(
     GET_APARTMENT_BY_ID,
-    { variables: { id: params.id } }
+    { variables: { id: params.id }, skip: !isValidId }
   );
 
-  const apartment = data?.apartments_by_pk;
+  const apartment = data?.apartments[0] ?? null;
 
   return (
     <div style={styles.page}>
@@ -111,7 +115,7 @@ export default function EscrowCreatePage({
             />
           )}
 
-          {!loading && !error && !apartment && (
+          {(!isValidId || (!loading && !error && !apartment)) && (
             <p style={styles.mutedText}>Property not found.</p>
           )}
 
