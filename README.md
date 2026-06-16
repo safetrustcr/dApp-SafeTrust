@@ -208,7 +208,7 @@ Writes typed Apollo hooks to `packages/graphql/generated/index.ts`. Not required
 
 ---
 
-## TrustlessWork Escrow Integration
+## TrustlessWork Escrow Integration (Not step to do, just API information)
 
 SafeTrust deploys escrow contracts via the [TrustlessWork API](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/initialize-escrow). The escrow flow is two steps:
 
