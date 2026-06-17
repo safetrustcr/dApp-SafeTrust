@@ -1,0 +1,7 @@
+table:
+  name: apartments
+  schema: public
+object_relationships:
+  - name: owner
+    using:
+      foreign_key_constraint_on: owner_id

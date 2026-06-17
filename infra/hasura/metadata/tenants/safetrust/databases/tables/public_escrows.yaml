@@ -1,0 +1,7 @@
+table:
+  name: escrows
+  schema: public
+object_relationships:
+  - name: apartment
+    using:
+      foreign_key_constraint_on: apartment_id
