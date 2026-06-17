@@ -209,59 +209,63 @@ Writes typed Apollo hooks to `packages/graphql/generated/index.ts`. Not required
 
 ---
 
-## TrustlessWork Escrow Integration 
+## TrustlessWork Escrow Integration
 > ⚠️ **Not an implementation step** — this section describes the TrustlessWork API for reference only.
 
-SafeTrust deploys escrow contracts via the [TrustlessWork API](https://docs.trustlesswork.com/trustless-work).
+SafeTrust deploys and funds escrow contracts via the [TrustlessWork API](https://docs.trustlesswork.com/trustless-work). All calls require an `x-api-key` header and return an **unsigned XDR transaction** that must be signed by Freighter before being broadcast to Stellar.
 
 ### Core flow
 
 ```
-POST /escrow/deploy          → returns unsignedTransaction (XDR)
-Freighter signs the XDR
-POST /helper/send-transaction → broadcasts to Stellar network
+Step 1 — POST /deployer/single-release   → returns unsignedTransaction (XDR)
+           Freighter signs the XDR
+           POST /helper/send-transaction  → broadcasts to Stellar (escrow deployed)
+
+Step 2 — POST /escrow/single-release/fund-escrow → returns unsignedTransaction (XDR)
+           Freighter signs the XDR
+           POST /helper/send-transaction  → broadcasts to Stellar (escrow funded)
 ```
 
-### 1 — Deploy escrow (`POST /escrow/deploy`)
+---
 
-Returns an **unsigned XDR transaction**. Requires an `x-api-key` header.
+**Use example:**
 
 ```typescript
-const response = await http.post("/escrow/deploy", {
-  engagementId: "unique-id",           // your escrow identifier
+const http = axios.create({
+  baseURL: "https://dev.api.trustlesswork.com",
+  headers: { "Content-Type": "application/json", "x-api-key": YOUR_API_KEY },
+});
+
+const { address } = await kit.getAddress();
+
+const response = await http.post("/deployer/single-release", {
+  signer: address,
+  engagementId: "safetrust-rental-001",
   title: "Rental deposit — Apt 4B",
   description: "Security deposit for rental agreement",
-  issuer: walletAddress,               // Freighter wallet (signer)
-  approver: tenantAddress,             // requests the service
-  serviceProvider: ownerAddress,       // receives funds on release
-  platformAddress: safetrustFeeAddress,
-  platformFee: "1",                    // % SafeTrust retains (string)
-  receiverMemo: 0,
-  releaseSigner: ownerAddress,         // triggers fund release
-  disputeResolver: resolverAddress,
-  amount: "500",                       // USDC amount as string
+  roles: [
+    { approver: tenantAddress },
+    { serviceProvider: ownerAddress },
+    { plataformAddress: safetrustFeeAddress },
+    { releaseSigner: ownerAddress },
+    { disputeResolver: resolverAddress },
+    { receiver: ownerAddress },
+  ],
+  amount: 500,
+  platformFee: 1,
+  milestones: [{ description: "Check-out completed", status: "pending", approved: false }],
+  trustline: [{ address: usdcIssuerAddress, symbol: "USDC" }],
 });
 
 const { unsignedTransaction } = response.data;
-```
 
-### 2 — Sign and broadcast (`POST /helper/send-transaction`)
-
-```typescript
-// Sign with Freighter
 const { signedTxXdr } = await signTransaction(unsignedTransaction, {
-  address: walletAddress,
+  address,
   networkPassphrase: WalletNetwork.TESTNET,
-});
-
-// Broadcast to Stellar
-await http.post("/helper/send-transaction", {
-  signedXdr: signedTxXdr,
 });
 ```
 
 Full API reference: [docs.trustlesswork.com](https://docs.trustlesswork.com)
-
 
 ---
 
