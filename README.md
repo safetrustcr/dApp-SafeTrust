@@ -214,7 +214,7 @@ Writes typed Apollo hooks to `packages/graphql/generated/index.ts`. Not required
 
 SafeTrust deploys escrow contracts via the [TrustlessWork API](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/initialize-escrow). The escrow flow is two steps:
 
-### Step 1 — Initialize escrow (`POST /deployer/single-release`)
+### 1 — Initialize escrow (`POST /deployer/single-release`)
 
 Returns an **unsigned XDR transaction**. Requires an `x-api-key` header.
 
@@ -241,7 +241,7 @@ const response = await http.post("/deployer/single-release", {
 const { unsignedTransaction } = response.data;
 ```
 
-### Step 2 — Sign and broadcast (`POST /helper/send-transaction`)
+### 2 — Sign and broadcast (`POST /helper/send-transaction`)
 
 ```typescript
 // Sign with Freighter
