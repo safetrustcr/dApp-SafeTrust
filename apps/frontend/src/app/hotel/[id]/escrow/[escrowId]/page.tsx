@@ -14,6 +14,7 @@
 // Real-time: RealTimeEscrowStatus (Hasura subscription) drives automatic transitions
 
 import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
+import { PdfExportButton } from '@/components/escrow/PdfExportButton';
 import { ProcessStepper } from '@/components/escrow/ProcessStepper';
 import type { CSSProperties } from 'react';
 
@@ -156,6 +157,23 @@ function BlockedStubView() {
         <InfoPair label="Amount blocked" value="$4,000" />
       </div>
 
+      <div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            marginBottom: '0.75rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <h3 style={{ margin: 0 }}>Escrow Description</h3>
+          <PdfExportButton />
+        </div>
+        <textarea style={styles.input} placeholder="Description..." />
+      </div>
+
       <div
         style={{
           display: 'grid',
@@ -201,9 +219,7 @@ function ReleasedStubView() {
           }}
         >
           <h3 style={{ margin: 0 }}>Escrow Justification</h3>
-          <button type="button" disabled style={{ ...styles.secondaryButton, opacity: 0.5 }}>
-            PDF
-          </button>
+          <PdfExportButton />
         </div>
         <textarea style={styles.input} placeholder="Justification..." />
       </div>
