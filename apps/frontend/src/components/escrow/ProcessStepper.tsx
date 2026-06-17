@@ -3,6 +3,8 @@
 
 import type { CSSProperties } from 'react';
 
+import type { EscrowDetailStatus } from '@/components/escrow/EscrowDetailLayout';
+
 const STEPS = [
   { step: 1, title: 'Create escrow' },
   { step: 2, title: 'Payment batch' },
@@ -10,7 +12,25 @@ const STEPS = [
   { step: 4, title: 'Deposit released' },
 ] as const;
 
-export function ProcessStepper({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
+function statusToStep(status: EscrowDetailStatus): 1 | 2 | 3 | 4 {
+  switch (status) {
+    case 'pending':
+      return 1;
+    case 'paid':
+      return 2;
+    case 'blocked':
+      return 3;
+    case 'released':
+      return 4;
+  }
+}
+
+type ProcessStepperProps =
+  | { currentStep: 1 | 2 | 3 | 4; status?: never }
+  | { status: EscrowDetailStatus; currentStep?: never };
+
+export function ProcessStepper({ currentStep, status }: ProcessStepperProps) {
+  const activeStep = currentStep ?? statusToStep(status ?? 'pending');
   return (
     <div
       style={{
@@ -23,8 +43,8 @@ export function ProcessStepper({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) 
       <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1rem' }}>Process</h3>
       <div style={{ display: 'grid', gap: '0.9rem' }}>
         {STEPS.map(({ step, title }) => {
-          const isActive = step === currentStep;
-          const isComplete = step < currentStep;
+          const isActive = step === activeStep;
+          const isComplete = step < activeStep;
           const markerStyle: CSSProperties = isActive
             ? { backgroundColor: '#22c55e', color: '#ffffff', border: '1px solid #22c55e' }
             : isComplete

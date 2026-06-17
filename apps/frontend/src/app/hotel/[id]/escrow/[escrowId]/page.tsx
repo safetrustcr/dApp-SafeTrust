@@ -13,15 +13,13 @@
 //
 // Real-time: RealTimeEscrowStatus (Hasura subscription) drives automatic transitions
 
-import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
-import { ProcessStepper } from '@/components/escrow/ProcessStepper';
+import { EscrowDetailLayout } from '@/components/escrow/EscrowDetailLayout';
 import type { CSSProperties } from 'react';
 
 type StubStatus = 'paid' | 'blocked' | 'released';
 
 type ViewConfig = {
   label: StubStatus;
-  step: 2 | 3 | 4;
   title: string;
 };
 
@@ -31,12 +29,6 @@ const styles = {
     margin: '0 auto',
     padding: '2rem 1.5rem 3rem',
     color: '#111827',
-  } satisfies CSSProperties,
-  grid: {
-    display: 'grid',
-    gap: '1.5rem',
-    marginTop: '1.5rem',
-    alignItems: 'start',
   } satisfies CSSProperties,
   panel: {
     border: '1px solid #fed7aa',
@@ -90,12 +82,12 @@ const styles = {
 function getStubView(status: string | undefined): ViewConfig {
   switch (status) {
     case 'blocked':
-      return { label: 'blocked', step: 3, title: 'Payment batch - Escrow Status' };
+      return { label: 'blocked', title: 'Payment batch - Escrow Status' };
     case 'released':
-      return { label: 'released', step: 4, title: 'Deposit / Escrow Released' };
+      return { label: 'released', title: 'Deposit / Escrow Released' };
     case 'paid':
     default:
-      return { label: 'paid', step: 2, title: 'Payment batch January 2025' };
+      return { label: 'paid', title: 'Payment batch January 2025' };
   }
 }
 
@@ -247,13 +239,11 @@ export default function EscrowDetailPage({
 
   return (
     <div style={styles.page}>
-      <InvoiceHeader
+      <EscrowDetailLayout
         invoiceNumber="INV4257-09-012"
         status={view.label}
         paidAt={`${params.escrowId} · 25 Jan 2025`}
-      />
-
-      <div style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 2fr) minmax(18rem, 1fr)' }}>
+      >
         <div style={styles.panel}>
           <p
             style={{
@@ -274,15 +264,7 @@ export default function EscrowDetailPage({
           {view.label === 'blocked' && <BlockedStubView />}
           {view.label === 'released' && <ReleasedStubView />}
         </div>
-
-        <div style={{ display: 'grid', gap: '1rem' }}>
-          <div style={styles.panel}>
-            <h3 style={{ marginTop: 0 }}>Notes</h3>
-            <textarea style={styles.input} placeholder="Notes..." />
-          </div>
-          <ProcessStepper currentStep={view.step} />
-        </div>
-      </div>
+      </EscrowDetailLayout>
 
       <p style={{ marginTop: '1rem', color: '#6b7280', fontSize: '0.85rem' }}>
         Dev: append ?status=paid|blocked|released
