@@ -214,17 +214,17 @@ pnpm --filter @safetrust/web run codegen
 
 SafeTrust deploys and funds escrow contracts via the [TrustlessWork API](https://docs.trustlesswork.com/trustless-work). All calls require an `x-api-key` header and return an **unsigned XDR transaction** that must be signed by Freighter before being broadcast to Stellar.
 
-### Core flow
+### EaaS flow
 
 ```
-Step 1 — POST /deployer/single-release   → returns unsignedTransaction (XDR)
+POST /deployer/single-release   → returns unsignedTransaction (XDR)
            Freighter signs the XDR
            POST /helper/send-transaction  → broadcasts to Stellar (escrow deployed)
 ```
 - [trustlesswork-initialize-escrow](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/initialize-escrow)
 
 ```
-Step 2 — POST /escrow/single-release/fund-escrow → returns unsignedTransaction (XDR)
+POST /escrow/single-release/fund-escrow → returns unsignedTransaction (XDR)
            Freighter signs the XDR
            POST /helper/send-transaction  → broadcasts to Stellar (escrow funded)
 ```
