@@ -11,7 +11,7 @@
 [![Hasura](https://img.shields.io/badge/Hasura-GraphQL-1EB4D4?logo=hasura)](https://hasura.io)
 [![Stellar](https://img.shields.io/badge/Stellar-Blockchain-7B2BF9?logo=stellar)](https://stellar.org)
 [![💧 Drips Wave](https://img.shields.io/badge/💧_Drips-Wave-7B2BF9)](https://www.drips.network/wave)
-[![🦊 GrantFox](https://img.shields.io/badge/🦊_GrantFox-Grants-FF6B00)](https://grantfox.xyz/)
+[![🦊 GrantFox](https://img.shields.io/badge/🦊_GrantFox-grantfox-FF6B00)](https://grantfox.xyz/)
 </div>
 
 ---
