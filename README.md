@@ -228,43 +228,6 @@ Step 2 — POST /escrow/single-release/fund-escrow → returns unsignedTransacti
 
 ---
 
-**Use example:**
-
-```typescript
-const http = axios.create({
-  baseURL: "https://dev.api.trustlesswork.com",
-  headers: { "Content-Type": "application/json", "x-api-key": YOUR_API_KEY },
-});
-
-const { address } = await kit.getAddress();
-
-const response = await http.post("/deployer/single-release", {
-  signer: address,
-  engagementId: "safetrust-rental-001",
-  title: "Rental deposit — Apt 4B",
-  description: "Security deposit for rental agreement",
-  roles: [
-    { approver: tenantAddress },
-    { serviceProvider: ownerAddress },
-    { plataformAddress: safetrustFeeAddress },
-    { releaseSigner: ownerAddress },
-    { disputeResolver: resolverAddress },
-    { receiver: ownerAddress },
-  ],
-  amount: 500,
-  platformFee: 1,
-  milestones: [{ description: "Check-out completed", status: "pending", approved: false }],
-  trustline: [{ address: usdcIssuerAddress, symbol: "USDC" }],
-});
-
-const { unsignedTransaction } = response.data;
-
-const { signedTxXdr } = await signTransaction(unsignedTransaction, {
-  address,
-  networkPassphrase: WalletNetwork.TESTNET,
-});
-```
-
 Full API reference: [docs.trustlesswork.com](https://docs.trustlesswork.com)
 
 ---
