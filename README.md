@@ -218,14 +218,14 @@ SafeTrust deploys and funds escrow contracts via the [TrustlessWork API](https:/
 
 ```
 POST /deployer/single-release   → returns unsignedTransaction (XDR)
-           Freighter signs the XDR
+           Wallet signs the XDR
            POST /helper/send-transaction  → broadcasts to Stellar (escrow deployed)
 ```
 - [trustlesswork-initialize-escrow](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/initialize-escrow)
 
 ```
 POST /escrow/single-release/fund-escrow → returns unsignedTransaction (XDR)
-           Freighter signs the XDR
+           Wallet signs the XDR
            POST /helper/send-transaction  → broadcasts to Stellar (escrow funded)
 ```
 - [trustlesswork-fund-escrow](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/fund-escrow)
