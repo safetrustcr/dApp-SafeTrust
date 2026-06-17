@@ -210,32 +210,36 @@ Writes typed Apollo hooks to `packages/graphql/generated/index.ts`. Not required
 ---
 
 ## TrustlessWork Escrow Integration 
-> ⚠️**Not an implementation step** — this section describes the TrustlessWork API for reference only.
+> ⚠️ **Not an implementation step** — this section describes the TrustlessWork API for reference only.
 
-SafeTrust deploys escrow contracts via the [TrustlessWork API](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/initialize-escrow). 
+SafeTrust deploys escrow contracts via the [TrustlessWork API](https://docs.trustlesswork.com/trustless-work).
 
-### 1 — Initialize escrow (`POST /deployer/single-release`)
+### Core flow
+
+```
+POST /escrow/deploy          → returns unsignedTransaction (XDR)
+Freighter signs the XDR
+POST /helper/send-transaction → broadcasts to Stellar network
+```
+
+### 1 — Deploy escrow (`POST /escrow/deploy`)
 
 Returns an **unsigned XDR transaction**. Requires an `x-api-key` header.
 
 ```typescript
-const response = await http.post("/deployer/single-release", {
-  signer: walletAddress,           // Freighter wallet address
-  engagementId: "unique-id",       // your escrow identifier
+const response = await http.post("/escrow/deploy", {
+  engagementId: "unique-id",           // your escrow identifier
   title: "Rental deposit — Apt 4B",
   description: "Security deposit for rental agreement",
-  roles: {
-    approver: tenantAddress,        // requests the service
-    serviceProvider: ownerAddress,  // receives funds on release
-    platformAddress: safetrustFeeAddress,
-    releaseSigner: ownerAddress,    // triggers fund release
-    disputeResolver: resolverAddress,
-    receiver: ownerAddress,
-  },
-  amount: 500,
-  platformFee: 1,                  // % SafeTrust retains on completion
-  milestones: [{ description: "Check-out completed", status: "pending", approved: false }],
-  trustline: [{ address: usdcIssuer, symbol: "USDC" }],
+  issuer: walletAddress,               // Freighter wallet (signer)
+  approver: tenantAddress,             // requests the service
+  serviceProvider: ownerAddress,       // receives funds on release
+  platformAddress: safetrustFeeAddress,
+  platformFee: "1",                    // % SafeTrust retains (string)
+  receiverMemo: 0,
+  releaseSigner: ownerAddress,         // triggers fund release
+  disputeResolver: resolverAddress,
+  amount: "500",                       // USDC amount as string
 });
 
 const { unsignedTransaction } = response.data;
@@ -251,12 +255,13 @@ const { signedTxXdr } = await signTransaction(unsignedTransaction, {
 });
 
 // Broadcast to Stellar
-const result = await http.post("/helper/send-transaction", {
+await http.post("/helper/send-transaction", {
   signedXdr: signedTxXdr,
 });
 ```
 
 Full API reference: [docs.trustlesswork.com](https://docs.trustlesswork.com)
+
 
 ---
 
