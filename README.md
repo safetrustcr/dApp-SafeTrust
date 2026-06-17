@@ -13,7 +13,7 @@
 [![💧 Drips Wave](https://img.shields.io/badge/💧_Drips-Wave-7B2BF9)](https://www.drips.network/wave)
 [![🦊 GrantFox](https://img.shields.io/badge/🦊_GrantFox-GrantFox-FF6B00)](https://grantfox.xyz/)
 [![🔥 Firebase](https://img.shields.io/badge/🔥_Firebase-Firebase-FFCA28)](https://firebase.google.com/)
-[![🔐 TrustlessWork](https://img.shields.io/badge/🔐_TrustlessWork-Escrow_API-00C2A8)](https://docs.trustlesswork.com/trustless-work)
+[![🔐 TrustlessWork](https://img.shields.io/badge/🔐_TrustlessWork-EaaS-00C2A8)](https://docs.trustlesswork.com/trustless-work)
 </div>
 
 ---
@@ -209,7 +209,7 @@ Writes typed Apollo hooks to `packages/graphql/generated/index.ts`. Not required
 
 ---
 
-## TrustlessWork Escrow Integration
+## TrustlessWork Escrow Integration - EaaS
 > ⚠️ **Not an implementation step** — this section describes the TrustlessWork API for reference only.
 
 SafeTrust deploys and funds escrow contracts via the [TrustlessWork API](https://docs.trustlesswork.com/trustless-work). All calls require an `x-api-key` header and return an **unsigned XDR transaction** that must be signed by Freighter before being broadcast to Stellar.
