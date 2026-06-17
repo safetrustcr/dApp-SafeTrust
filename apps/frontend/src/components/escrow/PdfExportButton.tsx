@@ -19,17 +19,20 @@ const pdfButtonStyle: CSSProperties = {
 };
 
 export function PdfExportButton({ label = 'PDF' }: { label?: string }) {
+  // Wrap in span so the browser's native title tooltip fires on hover.
+  // Chrome/Safari suppress pointer events (and tooltips) on disabled buttons.
   return (
-    <button
-      type="button"
-      disabled
-      aria-disabled="true"
-      aria-label="Export to PDF (coming soon)"
-      title="PDF export coming soon"
-      style={pdfButtonStyle}
-    >
-      <FileText size={16} aria-hidden="true" />
-      {label}
-    </button>
+    <span title="PDF export coming soon" style={{ display: 'inline-block' }}>
+      <button
+        type="button"
+        disabled
+        aria-disabled="true"
+        aria-label="Export to PDF (coming soon)"
+        style={pdfButtonStyle}
+      >
+        <FileText size={16} aria-hidden="true" />
+        {label}
+      </button>
+    </span>
   );
 }
