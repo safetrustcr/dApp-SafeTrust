@@ -205,7 +205,7 @@ Requires Hasura to be running:
 pnpm --filter @safetrust/web run codegen
 ```
 
-Writes typed Apollo hooks to `packages/graphql/generated/index.ts`. Not required for auth flow, but needed for escrow queries.
+- Writes typed Apollo hooks to `packages/graphql/generated/index.ts`. Not required for auth flow, but needed for escrow queries.
 
 ---
 
@@ -220,11 +220,15 @@ SafeTrust deploys and funds escrow contracts via the [TrustlessWork API](https:/
 Step 1 — POST /deployer/single-release   → returns unsignedTransaction (XDR)
            Freighter signs the XDR
            POST /helper/send-transaction  → broadcasts to Stellar (escrow deployed)
+```
+- [trustlesswork-initialize-escrow](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/initialize-escrow)
 
+```
 Step 2 — POST /escrow/single-release/fund-escrow → returns unsignedTransaction (XDR)
            Freighter signs the XDR
            POST /helper/send-transaction  → broadcasts to Stellar (escrow funded)
 ```
+- [trustlesswork-fund-escrow](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/fund-escrow)
 
 ---
 
