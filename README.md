@@ -12,6 +12,8 @@
 [![Stellar](https://img.shields.io/badge/Stellar-Blockchain-7B2BF9?logo=stellar)](https://stellar.org)
 [![💧 Drips Wave](https://img.shields.io/badge/💧_Drips-Wave-7B2BF9)](https://www.drips.network/wave)
 [![🦊 GrantFox](https://img.shields.io/badge/🦊_GrantFox-GrantFox-FF6B00)](https://grantfox.xyz/)
+[![🔥 Firebase](https://img.shields.io/badge/🔥_Firebase-Firebase-FFCA28)](https://firebase.google.com/)
+[![🔐 TrustlessWork](https://img.shields.io/badge/🔐_TrustlessWork-Escrow_API-00C2A8)](https://docs.trustlesswork.com/trustless-work)
 </div>
 
 ---
