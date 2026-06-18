@@ -31,7 +31,9 @@ select_permissions:
               - user_id:
                   _eq: X-Hasura-User-Id
               - wallet_address:
-                  _eq: sender_address
+                  _ceq:
+                    - "$"
+                    - sender_address
   - role: landlord
     permission:
       columns:
@@ -58,7 +60,9 @@ select_permissions:
                   - user_id:
                       _eq: X-Hasura-User-Id
                   - wallet_address:
-                      _eq: receiver_address
+                      _ceq:
+                        - "$"
+                        - receiver_address
           - _exists:
               _table:
                 name: apartments
@@ -66,6 +70,8 @@ select_permissions:
               _where:
                 _and:
                   - id:
-                      _eq: apartment_id
+                      _ceq:
+                        - "$"
+                        - apartment_id
                   - owner_id:
                       _eq: X-Hasura-User-Id
