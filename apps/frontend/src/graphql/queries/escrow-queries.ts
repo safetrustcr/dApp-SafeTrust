@@ -65,3 +65,39 @@ export const GET_ESCROW_BY_ID = gql`
     }
   }
 `;
+
+export const GET_ESCROW_BLOCKED_VIEW = gql`
+  query GetEscrowBlockedView($id: uuid!, $senderAddress: String!) {
+    escrows_by_pk(id: $id) {
+      id
+      contract_id
+      engagement_id
+      amount
+      status
+      created_at
+      sender_address
+      receiver_address
+      apartment {
+        id
+        name
+        owner {
+          id
+          first_name
+          last_name
+          email
+        }
+      }
+    }
+    users(
+      where: {
+        user_wallets: { wallet_address: { _eq: $senderAddress } }
+      }
+      limit: 1
+    ) {
+      id
+      first_name
+      last_name
+      email
+    }
+  }
+`;
