@@ -1,13 +1,13 @@
 "use client";
 
 const LOCATIONS = [
-  "San José",
-  "Heredia",
-  "Alajuela",
-  "Cartago",
-  "Puntarenas",
-  "Guanacaste",
-  "Limón",
+  { value: "San Jose", label: "San José" },
+  { value: "Heredia", label: "Heredia" },
+  { value: "Alajuela", label: "Alajuela" },
+  { value: "Cartago", label: "Cartago" },
+  { value: "Puntarenas", label: "Puntarenas" },
+  { value: "Guanacaste", label: "Guanacaste" },
+  { value: "Limon", label: "Limón" },
 ];
 
 interface LocationFilterProps {
@@ -29,18 +29,18 @@ export function LocationFilter({
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold text-gray-700">Location</h3>
-      {LOCATIONS.map((loc) => (
+      {LOCATIONS.map(({ value, label }) => (
         <label
-          key={loc}
+          key={value}
           className="flex cursor-pointer items-center gap-2"
         >
           <input
             type="checkbox"
-            checked={selected.includes(loc)}
-            onChange={() => toggle(loc)}
+            checked={selected.includes(value)}
+            onChange={() => toggle(value)}
             className="rounded border-gray-300 accent-orange-500"
           />
-          <span className="text-sm text-gray-600">{loc}</span>
+          <span className="text-sm text-gray-600">{label}</span>
         </label>
       ))}
     </div>
