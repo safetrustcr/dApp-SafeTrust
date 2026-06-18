@@ -5,3 +5,67 @@ object_relationships:
   - name: apartment
     using:
       foreign_key_constraint_on: apartment_id
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - contract_id
+        - engagement_id
+        - property_id
+        - apartment_id
+        - sender_address
+        - receiver_address
+        - amount
+        - status
+        - unsigned_xdr
+        - created_at
+        - updated_at
+      filter:
+        _exists:
+          _table:
+            name: user_wallets
+            schema: public
+          _where:
+            _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - wallet_address:
+                  _eq: sender_address
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - contract_id
+        - engagement_id
+        - property_id
+        - apartment_id
+        - sender_address
+        - receiver_address
+        - amount
+        - status
+        - unsigned_xdr
+        - created_at
+        - updated_at
+      filter:
+        _or:
+          - _exists:
+              _table:
+                name: user_wallets
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - wallet_address:
+                      _eq: receiver_address
+          - _exists:
+              _table:
+                name: apartments
+                schema: public
+              _where:
+                _and:
+                  - id:
+                      _eq: apartment_id
+                  - owner_id:
+                      _eq: X-Hasura-User-Id
