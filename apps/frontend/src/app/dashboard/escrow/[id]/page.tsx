@@ -17,8 +17,9 @@ const styles = {
   } satisfies CSSProperties,
 } as const;
 
-function normalizeStatus(status: string | undefined): EscrowDetailStatus {
-  switch (status?.toLowerCase()) {
+function normalizeStatus(status: string | string[] | undefined): EscrowDetailStatus {
+  const normalizedStatus = (Array.isArray(status) ? status[0] : status)?.trim().toLowerCase();
+  switch (normalizedStatus) {
     case 'funded':
     case 'paid':
       return 'paid';
@@ -41,7 +42,7 @@ export default function DashboardEscrowDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { status?: string };
+  searchParams?: { status?: string | string[] };
 }) {
   const status = normalizeStatus(searchParams?.status);
 
@@ -50,7 +51,7 @@ export default function DashboardEscrowDetailPage({
       <EscrowDetailLayout
         invoiceNumber={`INV-${params.id.slice(0, 8).toUpperCase()}`}
         status={status}
-        paidAt={`Escrow ${params.id.slice(0, 8)}`}
+        paidAt={status === 'pending' ? undefined : `Escrow ${params.id.slice(0, 8)}`}
       >
         <div style={styles.panel}>
           <p
