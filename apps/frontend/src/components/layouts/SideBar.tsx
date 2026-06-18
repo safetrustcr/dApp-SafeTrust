@@ -69,7 +69,7 @@ export function SideBar({
           </span>
         </Link>
         <Link
-          href="/notifications"
+          href="/dashboard/notifications"
           onClick={onClose}
           className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full relative group dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
         >
@@ -86,7 +86,7 @@ export function SideBar({
           </span>
         </Link>
         <Link
-          href="/favorites"
+          href="/dashboard/favorites"
           onClick={onClose}
           className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full group relative dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
         >
