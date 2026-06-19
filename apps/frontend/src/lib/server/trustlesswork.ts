@@ -33,8 +33,8 @@ export async function trustlessWorkRequest<T>(
   path: string,
   options: TrustlessWorkRequestOptions = {},
 ): Promise<T> {
-  const apiKey = process.env.TRUSTLESS_WORK_API_KEY ?? process.env.NEXT_PUBLIC_TRUSTLESS_WORK_API_KEY;
-
+  //const apiKey = process.env.TRUSTLESS_WORK_API_KEY ?? process.env.NEXT_PUBLIC_TRUSTLESS_WORK_API_KEY;
+  const apiKey = process.env.TRUSTLESS_WORK_API_KEY
   if (!apiKey) {
     throw new TrustlessWorkRequestError(
       "TrustlessWork API key is not configured. Set TRUSTLESS_WORK_API_KEY to enable real escrow deployment.",
@@ -63,6 +63,14 @@ export async function trustlessWorkRequest<T>(
       undefined,
       payload,
     );
+  }
+
+  if (payload === null) {
+      throw new TrustlessWorkRequestError(
+          `TrustlessWork request to ${path} returned invalid JSON.`,
+          500,
+          ["Response body is not valid JSON."],
+        );
   }
 
   return payload as T;
