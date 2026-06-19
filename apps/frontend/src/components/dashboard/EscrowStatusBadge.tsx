@@ -12,10 +12,10 @@ export type EscrowStatus =
   | "cancelled";
 
 const STATUS_STYLES: Record<EscrowStatus, string> = {
-  pending_signature: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-  funded:            "bg-blue-100   text-blue-800   dark:bg-blue-900   dark:text-blue-300",
-  active:            "bg-green-100  text-green-800  dark:bg-green-900  dark:text-green-300",
-  completed:         "bg-gray-100   text-gray-800   dark:bg-gray-700   dark:text-gray-300",
+  pending_signature: "bg-red-100 text-red-600",
+  funded:            "bg-blue-100 text-blue-700",
+  active:            "bg-green-100 text-green-700",
+  completed:         "bg-emerald-100 text-emerald-700",
   disputed:          "bg-red-100    text-red-800    dark:bg-red-900    dark:text-red-300",
   resolved:          "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
   cancelled:         "bg-gray-100   text-gray-500   dark:bg-gray-800   dark:text-gray-400",
@@ -23,9 +23,9 @@ const STATUS_STYLES: Record<EscrowStatus, string> = {
 
 const STATUS_LABELS: Record<EscrowStatus, string> = {
   pending_signature: "Pending",
-  funded:            "Funded",
-  active:            "Active",
-  completed: "Completed",
+  funded:            "Deposit blocked",
+  active:            "Paid",
+  completed:         "Deposit released",
   disputed:          "Disputed",
   resolved:          "Resolved",
   cancelled:         "Cancelled",
