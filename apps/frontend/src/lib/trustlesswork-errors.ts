@@ -45,5 +45,5 @@ export function getErrorMessages(input: ErrorLike, fallback: string): string[] {
     return [obj.error];
   }
 
-  return [fallback];
+  return [safeFallback];
 }
