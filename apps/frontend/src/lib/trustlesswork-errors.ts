@@ -12,16 +12,18 @@ type ErrorLike =
   | undefined;
 
 export function getErrorMessages(input: ErrorLike, fallback: string): string[] {
+  const safeFallback = fallback.trim() || 'Something went wrong.';
+
   if (!input) {
-    return [fallback];
+    return [safeFallback];
   }
 
   if (typeof input === 'string') {
-    return input.trim() ? [input] : [fallback];
+    return input.trim() ? [input] : [safeFallback];
   }
 
   if (input instanceof Error) {
-    return [input.message || fallback];
+    return [input.message || safeFallback];
   }
 
   const obj = input as Record<string, unknown>;
