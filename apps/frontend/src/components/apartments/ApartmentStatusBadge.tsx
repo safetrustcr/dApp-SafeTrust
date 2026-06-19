@@ -98,4 +98,31 @@ export interface ApartmentStatusBadgeProps {
  * - The component is memoised to minimise unnecessary re‑renders.
  *
  * @example
- *
+ *   <ApartmentStatusBadge status="inhabited" />
+ */
+export const ApartmentStatusBadge = memo(function ApartmentStatusBadge({
+  status,
+  className,
+}: ApartmentStatusBadgeProps) {
+  const safeStatus = isValidApartmentStatus(status) ? status : DEFAULT_STATUS;
+  
+  if (safeStatus !== status) {
+    logger.warn(`Invalid apartment status provided: "${status}". Falling back to default.`);
+  }
+
+  const { bg, text } = STATUS_STYLES[safeStatus];
+  const label = STATUS_LABELS[safeStatus];
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+        bg,
+        text,
+        className
+      )}
+    >
+      {label}
+    </span>
+  );
+});

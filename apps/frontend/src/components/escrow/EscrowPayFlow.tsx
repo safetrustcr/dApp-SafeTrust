@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 
 import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
+import { truncateStellarAddress } from '@/lib/utils';
 
 type EscrowPayFlowProps = {
   apartmentId: string;
@@ -185,7 +186,7 @@ export function EscrowPayFlow({
               Unsigned XDR is ready for engagement <strong>{deployState.engagementId}</strong>.
             </p>
             <p style={{ margin: 0, fontSize: '0.85rem', color: '#9ca3af' }}>
-              Contract ID: {deployState.contractId}
+              Contract ID: <span title={deployState.contractId}>{truncateStellarAddress(deployState.contractId)}</span>
             </p>
           </div>
         )}

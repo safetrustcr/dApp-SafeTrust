@@ -6,7 +6,8 @@ import { ProcessStepper } from '@/components/escrow/ProcessStepper';
 import { useQuery } from '@apollo/client';
 import { GET_ESCROW_BY_ANY_ID } from '@/graphql/queries/escrow-queries';
 import type { EscrowStatus } from '@/components/dashboard/EscrowStatusBadge';
-import type { CSSProperties } from 'react';
+import { truncateStellarAddress } from '@/lib/utils';
+import type { CSSProperties, ReactNode } from 'react';
 
 type ViewConfig = {
   label: 'paid' | 'blocked' | 'released';
@@ -102,7 +103,7 @@ function formatDate(dateString?: string) {
   });
 }
 
-function InfoPair({ label, value }: { label: string; value: string }) {
+function InfoPair({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <p style={{ margin: 0, color: '#6b7280', fontSize: '0.85rem' }}>{label}</p>
@@ -189,7 +190,7 @@ function BlockedStubView() {
           <h3 style={{ marginTop: 0 }}>Tenant Information</h3>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             <InfoPair label="Tenant name" value="John Smith" />
-            <InfoPair label="Wallet Address" value="MJE...XN32" />
+            <InfoPair label="Wallet Address" value={<span title="MJE1234567890ABCDEF1234567890ABCDEFXN32">{truncateStellarAddress("MJE1234567890ABCDEF1234567890ABCDEFXN32")}</span>} />
             <InfoPair label="Email" value="John_s@gmail.com" />
           </div>
         </div>
@@ -197,7 +198,7 @@ function BlockedStubView() {
           <h3 style={{ marginTop: 0 }}>Owner Information</h3>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             <InfoPair label="Owner name" value="Alberto Casas" />
-            <InfoPair label="Wallet Address" value="MJE...XN32" />
+            <InfoPair label="Wallet Address" value={<span title="MJE1234567890ABCDEF1234567890ABCDEFXN32">{truncateStellarAddress("MJE1234567890ABCDEF1234567890ABCDEFXN32")}</span>} />
             <InfoPair label="Email" value="albertoCasas100@gmail.com" />
           </div>
         </div>
@@ -231,7 +232,7 @@ function ReleasedStubView() {
           <h3 style={{ marginTop: 0 }}>Beneficiary Information</h3>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             <InfoPair label="Name" value="John Smith" />
-            <InfoPair label="Wallet" value="MJE...XN32" />
+            <InfoPair label="Wallet" value={<span title="MJE1234567890ABCDEF1234567890ABCDEFXN32">{truncateStellarAddress("MJE1234567890ABCDEF1234567890ABCDEFXN32")}</span>} />
             <InfoPair label="Released date" value="20 January 2025" />
             <InfoPair label="Deposit" value="$4,000" />
           </div>
