@@ -1,9 +1,19 @@
-const HASURA_URL = process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL ?? 'http://localhost:8080/v1/graphql';
-const HASURA_ADMIN_SECRET = process.env.NEXT_PUBLIC_HASURA_ADMIN_SECRET ?? '';
+import 'server-only';
+
+const HASURA_URL =
+  process.env.HASURA_GRAPHQL_URL ??
+  process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL ??
+  'http://localhost:8080/v1/graphql';
+const HASURA_ADMIN_SECRET = process.env.HASURA_ADMIN_SECRET;
+
+if (!HASURA_ADMIN_SECRET) {
+  throw new Error('Missing required env var: HASURA_ADMIN_SECRET');
+}
 
 async function hasuraRequest<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const response = await fetch(HASURA_URL, {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
       'x-hasura-admin-secret': HASURA_ADMIN_SECRET,
@@ -11,13 +21,23 @@ async function hasuraRequest<T>(query: string, variables: Record<string, unknown
     body: JSON.stringify({ query, variables }),
   });
 
-  const json = (await response.json()) as { data?: T; errors?: { message: string }[] };
+  const text = await response.text();
+  const json = (text ? JSON.parse(text) : {}) as { data?: T; errors?: { message: string }[] };
+
+  if (!response.ok) {
+    const msg = json.errors?.map((e) => e.message).join(', ') ?? `Hasura request failed (${response.status})`;
+    throw new Error(msg);
+  }
 
   if (json.errors?.length) {
     throw new Error(json.errors.map((e) => e.message).join(', '));
   }
 
-  return json.data as T;
+  if (!json.data) {
+    throw new Error('Hasura response missing data');
+  }
+
+  return json.data;
 }
 
 type InsertEscrowInput = {

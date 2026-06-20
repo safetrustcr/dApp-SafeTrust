@@ -92,8 +92,8 @@ export function EscrowPayFlow({
         },
         body: JSON.stringify({
           apartmentId,
-          tenantAddress: address,
-          ownerAddress,
+          senderAddress: address,
+          receiverAddress: ownerAddress,
           amount,
         }),
       });
@@ -122,7 +122,7 @@ export function EscrowPayFlow({
 
     try {
       const signedXdr = await signXDR(deployState.unsignedXDR);
-      const response = await fetch('/helper/send-transaction', {
+      const response = await fetch('/api/escrow/send-transaction', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -154,15 +154,8 @@ export function EscrowPayFlow({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={deployState ? handleSignAndSend : handleDeploy}
-        disabled={!isWalletConnected || deploying || signing}
-        style={{
-          ...flowStyles.button,
-          opacity: !isWalletConnected || deploying || signing ? 0.7 : 1,
-          cursor: !isWalletConnected ? 'not-allowed' : deploying || signing ? 'wait' : 'pointer',
-        }}
+      <span
+        style={{ display: 'inline-block', cursor: !isWalletConnected ? 'not-allowed' : undefined }}
         title={
           !isWalletConnected
             ? 'Connect wallet to pay'
@@ -171,8 +164,20 @@ export function EscrowPayFlow({
               : `Deploy escrow for ${apartmentName}`
         }
       >
-        {payButtonLabel}
-      </button>
+        <button
+          type="button"
+          onClick={deployState ? handleSignAndSend : handleDeploy}
+          disabled={!isWalletConnected || deploying || signing}
+          style={{
+            ...flowStyles.button,
+            opacity: !isWalletConnected || deploying || signing ? 0.7 : 1,
+            cursor: deploying || signing ? 'wait' : !isWalletConnected ? 'not-allowed' : 'pointer',
+            pointerEvents: !isWalletConnected ? 'none' : undefined,
+          }}
+        >
+          {payButtonLabel}
+        </button>
+      </span>
 
       <div style={flowStyles.panel}>
         <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Wallet signing</h3>

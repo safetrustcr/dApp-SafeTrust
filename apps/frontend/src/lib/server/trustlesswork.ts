@@ -1,14 +1,9 @@
-// Minimal server-side client for the TrustlessWork API.
-//
-// STATUS: stubbed for local/UI development. NEXT_PUBLIC_TRUSTLESS_WORK_API_KEY
-// is not set in most local environments yet (see TrustlessWorkProvider's
-// console warning on boot), so real requests would 401 anyway. This client
-// still makes a real HTTP call when the key IS configured; when it's not,
-// it throws a TrustlessWorkRequestError with a clear message instead of
-// silently faking a successful deploy.
+const BASE_URL = process.env.TRUSTLESS_WORK_API_URL;
+const API_KEY = process.env.TRUSTLESS_WORK_API_KEY;
 
-const TRUSTLESS_WORK_BASE_URL =
-  process.env.TRUSTLESS_WORK_API_URL ?? "https://api.trustlesswork.com";
+if (!BASE_URL || !API_KEY) {
+  throw new Error('Missing TRUSTLESS_WORK_API_URL or TRUSTLESS_WORK_API_KEY');
+}
 
 export class TrustlessWorkRequestError extends Error {
   statusCode: number;
@@ -17,7 +12,7 @@ export class TrustlessWorkRequestError extends Error {
 
   constructor(message: string, statusCode: number, messages?: string[], payload?: unknown) {
     super(message);
-    this.name = "TrustlessWorkRequestError";
+    this.name = 'TrustlessWorkRequestError';
     this.statusCode = statusCode;
     this.messages = messages;
     this.payload = payload;
@@ -25,7 +20,7 @@ export class TrustlessWorkRequestError extends Error {
 }
 
 type TrustlessWorkRequestOptions = {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
 };
 
@@ -33,45 +28,34 @@ export async function trustlessWorkRequest<T>(
   path: string,
   options: TrustlessWorkRequestOptions = {},
 ): Promise<T> {
-  //const apiKey = process.env.TRUSTLESS_WORK_API_KEY ?? process.env.NEXT_PUBLIC_TRUSTLESS_WORK_API_KEY;
-  const apiKey = process.env.TRUSTLESS_WORK_API_KEY
-  if (!apiKey) {
-    throw new TrustlessWorkRequestError(
-      "TrustlessWork API key is not configured. Set TRUSTLESS_WORK_API_KEY to enable real escrow deployment.",
-      401,
-      ["TrustlessWork API key is not configured."],
-    );
-  }
-
-  const response = await fetch(`${TRUSTLESS_WORK_BASE_URL}${path}`, {
-    method: options.method ?? "POST",
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: options.method ?? 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'x-api-key': API_KEY,
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
+  const raw = await response.text();
+  let data: T & Record<string, unknown>;
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
     throw new TrustlessWorkRequestError(
-      payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
-        ? payload.message
-        : `TrustlessWork request to ${path} failed with status ${response.status}.`,
+      `TrustlessWork request to ${path} returned non-JSON response (status ${response.status}).`,
       response.status,
-      undefined,
-      payload,
+      ['Response body is not valid JSON.'],
     );
   }
 
-  if (payload === null) {
-      throw new TrustlessWorkRequestError(
-          `TrustlessWork request to ${path} returned invalid JSON.`,
-          500,
-          ["Response body is not valid JSON."],
-        );
+  if (!response.ok) {
+    const messages = [
+      typeof data?.message === 'string' ? data.message : `TrustlessWork request to ${path} failed with status ${response.status}.`,
+    ];
+    throw new TrustlessWorkRequestError(messages[0], response.status, messages, data);
   }
 
-  return payload as T;
+  return data;
 }
