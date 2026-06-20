@@ -5,8 +5,8 @@ import { TrustlessWorkRequestError, trustlessWorkRequest } from '@/lib/server/tr
 
 type DeployRequestBody = {
   apartmentId?: string;
-  tenantAddress?: string;
-  ownerAddress?: string;
+  senderAddress?: string;
+  receiverAddress?: string;
   amount?: number;
 };
 
@@ -20,9 +20,9 @@ type InitializeSingleReleaseEscrowResponse = {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as DeployRequestBody;
-    const { apartmentId, tenantAddress, ownerAddress, amount } = body;
+    const { apartmentId, senderAddress, receiverAddress, amount } = body;
 
-    if (!apartmentId || !tenantAddress || !ownerAddress) {
+    if (!apartmentId || !senderAddress || !receiverAddress) {
       return NextResponse.json(
         { error: 'Missing required escrow deployment fields.' },
         { status: 400 },
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     const engagementId = crypto.randomUUID();
 
-    const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS ?? ownerAddress;
+    const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS ?? receiverAddress;
     const trustlineAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS;
 
     if (!trustlineAddress) {
@@ -49,19 +49,19 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = {
-      signer: tenantAddress,
+      signer: senderAddress,
       engagementId,
       title: `Security deposit for apartment ${apartmentId}`,
       description: `Security deposit escrow for apartment ${apartmentId}`,
       amount,
       platformFee: 0,
       roles: {
-        approver: tenantAddress,
-        serviceProvider: ownerAddress,
+        approver: senderAddress,
+        serviceProvider: receiverAddress,
         platformAddress,
         releaseSigner: platformAddress,
         disputeResolver: platformAddress,
-        receiver: ownerAddress,
+        receiver: receiverAddress,
       },
       trustline: {
         symbol: 'USDC',
