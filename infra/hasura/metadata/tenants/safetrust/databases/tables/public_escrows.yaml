@@ -5,3 +5,50 @@ object_relationships:
   - name: apartment
     using:
       foreign_key_constraint_on: apartment_id
+select_permissions:
+  - role: tenant
+    permission:
+      # Tenants see escrows where they are the sender (their Stellar wallet).
+      # Requires X-Hasura-User-Wallet JWT claim (added in Batch N with the JWT migration).
+      # unsigned_xdr is included — the tenant must have it to sign the transaction.
+      # tenant_id is excluded — internal multitenancy discriminator, not user-facing.
+      columns:
+        - id
+        - contract_id
+        - engagement_id
+        - property_id
+        - sender_address
+        - receiver_address
+        - amount
+        - status
+        - unsigned_xdr
+        - apartment_id
+        - created_at
+        - updated_at
+      filter:
+        sender_address:
+          _eq: X-Hasura-User-Wallet
+  - role: landlord
+    permission:
+      # Landlords see escrows for apartments they own, resolved via the apartment
+      # object relationship (apartment.owner_id = X-Hasura-User-Id).
+      # Escrows without an apartment_id are not visible — all SafeTrust escrows
+      # must reference an apartment.
+      # unsigned_xdr is excluded — it is the tenant's signing artifact only.
+      # tenant_id is excluded — internal multitenancy discriminator, not user-facing.
+      columns:
+        - id
+        - contract_id
+        - engagement_id
+        - property_id
+        - sender_address
+        - receiver_address
+        - amount
+        - status
+        - apartment_id
+        - created_at
+        - updated_at
+      filter:
+        apartment:
+          owner_id:
+            _eq: X-Hasura-User-Id
