@@ -1,6 +1,7 @@
 "use client";
 
 import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
+import { PaidInvoiceView } from '@/components/escrow/PaidInvoiceView';
 import { PdfExportButton } from '@/components/escrow/PdfExportButton';
 import { ProcessStepper } from '@/components/escrow/ProcessStepper';
 import { useQuery } from '@apollo/client';
@@ -16,6 +17,10 @@ type ViewConfig = {
 };
 
 const styles = {
+  pageBg: {
+    backgroundColor: '#f3f4f6',
+    minHeight: '100vh',
+  } satisfies CSSProperties,
   page: {
     maxWidth: '72rem',
     margin: '0 auto',
@@ -25,14 +30,14 @@ const styles = {
   grid: {
     display: 'grid',
     gap: '1.5rem',
-    marginTop: '1.5rem',
+    marginTop: '0.5rem',
     alignItems: 'start',
   } satisfies CSSProperties,
   panel: {
-    border: '1px solid #fed7aa',
+    border: '1px solid #e5e7eb',
     borderRadius: '1rem',
     backgroundColor: '#ffffff',
-    padding: '1.5rem',
+    padding: '1.75rem',
   } satisfies CSSProperties,
   splitGrid: {
     display: 'grid',
@@ -82,7 +87,7 @@ function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
     case 'pending_signature':
       return { label: 'paid', step: 1, title: 'Invoice Pending Signature' };
     case 'active':
-      return { label: 'paid', step: 2, title: 'Payment batch January 2025' };
+      return { label: 'paid', step: 2, title: '' };
     case 'funded':
       return { label: 'blocked', step: 3, title: 'Payment batch - Escrow Status' };
     case 'completed':
@@ -96,7 +101,7 @@ function formatDate(dateString?: string) {
   if (!dateString) return '';
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return dateString;
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -112,45 +117,22 @@ function InfoPair({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function PaidStubView() {
-  return (
-    <div style={{ display: 'grid', gap: '1.5rem' }}>
-      <div style={styles.splitGrid}>
-        <InfoPair label="Billed to" value="John_s@gmail.com" />
-        <InfoPair label="Invoice Number" value="INV4257-09-012" />
-        <InfoPair label="Billing details" value="John Smith" />
-        <InfoPair label="Currency" value="IDR - Dollar" />
-      </div>
-
-      <div style={{ border: '1px solid #fed7aa', borderRadius: '1rem', overflow: 'hidden' }}>
-        <table style={styles.table}>
-          <thead style={{ backgroundColor: '#fff7ed' }}>
-            <tr>
-              <th style={{ textAlign: 'left', padding: '0.9rem' }}>PRODUCT</th>
-              <th style={{ textAlign: 'right', padding: '0.9rem' }}>PRICE / MONTH</th>
-              <th style={{ textAlign: 'right', padding: '0.9rem' }}>DEPOSIT</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={{ padding: '0.9rem', borderTop: '1px solid #fed7aa' }}>La sabana apartment</td>
-              <td style={{ padding: '0.9rem', textAlign: 'right', borderTop: '1px solid #fed7aa' }}>
-                $4,000
-              </td>
-              <td style={{ padding: '0.9rem', textAlign: 'right', borderTop: '1px solid #fed7aa' }}>
-                $4,000
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div style={{ fontSize: '0.95rem' }}>
-        <strong>Total: $8,000</strong>
-      </div>
-    </div>
-  );
-}
+const MOCK_PAID_ESCROW = {
+  id: 'mock-id',
+  engagement_id: 'INV4257-09-012',
+  contract_id: 'mock-contract',
+  amount: 4000,
+  created_at: '2025-01-20T12:00:00Z',
+  sender_address: 'GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGHIJKLMNOPQR',
+  apartment: {
+    id: 'mock-apartment',
+    name: 'La sabana apartment',
+    image_urls: ['/img/room1.png'],
+    price: 4000,
+    warranty_deposit: 4000,
+    available_until: '2025-01-30T12:00:00Z',
+  },
+};
 
 function BlockedStubView() {
   return (
@@ -306,55 +288,50 @@ export default function EscrowDetailPage({
   // If loading and we have no cached data, display a nice loading state
   if (loading && !escrow) {
     return (
-      <div style={styles.page}>
-        <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
-          Loading escrow details...
+      <div style={styles.pageBg}>
+        <div style={styles.page}>
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+            Loading escrow details...
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
-      <InvoiceHeader
-        invoiceNumber={invoiceNumber}
-        status={status}
-        paidAt={paidAt}
-      />
+    <div style={styles.pageBg}>
+      <div style={styles.page}>
+        <InvoiceHeader
+          invoiceNumber={invoiceNumber}
+          status={status}
+          paidAt={paidAt}
+        />
 
-      <div style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 2fr) minmax(18rem, 1fr)' }}>
-        <div style={styles.panel}>
-          <p
-            style={{
-              marginTop: 0,
-              marginBottom: '0.5rem',
-              fontSize: '0.8rem',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: '#9ca3af',
-            }}
-          >
-            Hotel {params.id}
-          </p>
-          <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.5rem' }}>{view.title}</h2>
-
-          {view.label === 'paid' && <PaidStubView />}
-          {view.label === 'blocked' && <BlockedStubView />}
-          {view.label === 'released' && <ReleasedStubView />}
-        </div>
-
-        <div style={{ display: 'grid', gap: '1rem' }}>
+        <div style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 2fr) minmax(18rem, 1fr)' }}>
           <div style={styles.panel}>
-            <h3 style={{ marginTop: 0 }}>Notes</h3>
-            <textarea style={styles.input} placeholder="Notes..." />
-          </div>
-          <ProcessStepper currentStep={view.step} />
-        </div>
-      </div>
+            {view.title && (
+              <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.5rem' }}>{view.title}</h2>
+            )}
 
-      <p style={{ marginTop: '1rem', color: '#6b7280', fontSize: '0.85rem' }}>
-        Dev: append ?status=paid|blocked|released
-      </p>
+            {view.label === 'paid' && (
+              <PaidInvoiceView escrow={escrow ?? MOCK_PAID_ESCROW} />
+            )}
+            {view.label === 'blocked' && <BlockedStubView />}
+            {view.label === 'released' && <ReleasedStubView />}
+          </div>
+
+          <div style={styles.panel}>
+            <h3 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '1.125rem', fontWeight: 700 }}>Notes</h3>
+            <textarea style={styles.input} placeholder="Notes..." />
+            <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '1.5rem 0' }} />
+            <ProcessStepper currentStep={view.step} />
+          </div>
+        </div>
+
+        <p style={{ marginTop: '1rem', color: '#6b7280', fontSize: '0.85rem' }}>
+          Dev: append ?status=paid|blocked|released
+        </p>
+      </div>
     </div>
   );
 }
