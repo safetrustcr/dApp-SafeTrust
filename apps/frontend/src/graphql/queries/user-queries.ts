@@ -41,3 +41,19 @@ export const GET_USERS = gql`
     }
   }
 `;
+
+export const GET_USER_BY_WALLET_ADDRESS = gql`
+  query GetUserByWalletAddress($wallet_address: String!) {
+    users(
+      where: {
+        user_wallets: { wallet_address: { _eq: $wallet_address } }
+      }
+      limit: 1
+    ) {
+      id
+      email
+      first_name
+      last_name
+    }
+  }
+`;
