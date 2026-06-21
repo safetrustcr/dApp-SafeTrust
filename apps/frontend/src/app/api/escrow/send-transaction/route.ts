@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { TrustlessWorkRequestError, trustlessWorkRequest } from '@/lib/server/trustlesswork';
+import { updateEscrowStatus } from '@/lib/server/hasura';
 
 type SendTransactionRequestBody = {
   signedXdr?: string;
@@ -37,6 +38,8 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       body: { signedXdr, contractId, engagementId, propertyId, senderAddress, receiverAddress, amount },
     });
+
+    await updateEscrowStatus(engagementId, 'funded');
 
     return NextResponse.json(result);
   } catch (error) {

@@ -38,8 +38,15 @@ export async function POST(request: NextRequest) {
 
     const engagementId = crypto.randomUUID();
 
-    const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS ?? receiverAddress;
+    const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS;
     const trustlineAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS;
+
+    if (!platformAddress) {
+      return NextResponse.json(
+        { error: 'Missing NEXT_PUBLIC_PLATFORM_ADDRESS for escrow role configuration.' },
+        { status: 500 },
+      );
+    }
 
     if (!trustlineAddress) {
       return NextResponse.json(
