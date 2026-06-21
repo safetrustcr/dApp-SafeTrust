@@ -36,10 +36,13 @@ export async function POST(request: NextRequest) {
 
     const result = await trustlessWorkRequest<SendTransactionResult>('/helper/send-transaction', {
       method: 'POST',
-      body: { signedXdr, contractId, engagementId, propertyId, senderAddress, receiverAddress, amount },
+      body: { signedXdr },
     });
 
-    await updateEscrowStatus(engagementId, 'funded');
+    const updateResult = await updateEscrowStatus(engagementId, 'funded');
+    if (updateResult.update_escrows.affected_rows === 0) {
+      console.warn(`No escrow record found to update for engagementId: ${engagementId}`);
+    }
 
     return NextResponse.json(result);
   } catch (error) {
