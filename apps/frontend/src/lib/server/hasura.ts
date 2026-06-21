@@ -10,13 +10,15 @@ if (!HASURA_ADMIN_SECRET) {
   throw new Error('Missing required env var: HASURA_ADMIN_SECRET');
 }
 
+const _HASURA_ADMIN_SECRET: string = HASURA_ADMIN_SECRET;
+
 async function hasuraRequest<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const response = await fetch(HASURA_URL, {
     method: 'POST',
     signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
-      'x-hasura-admin-secret': HASURA_ADMIN_SECRET,
+      'x-hasura-admin-secret': _HASURA_ADMIN_SECRET,
     },
     body: JSON.stringify({ query, variables }),
   });

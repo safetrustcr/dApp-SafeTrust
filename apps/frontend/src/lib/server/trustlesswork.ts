@@ -5,6 +5,9 @@ if (!BASE_URL || !API_KEY) {
   throw new Error('Missing TRUSTLESS_WORK_API_URL or TRUSTLESS_WORK_API_KEY');
 }
 
+const _BASE_URL: string = BASE_URL;
+const _API_KEY: string = API_KEY;
+
 export class TrustlessWorkRequestError extends Error {
   statusCode: number;
   messages?: string[];
@@ -28,12 +31,12 @@ export async function trustlessWorkRequest<T>(
   path: string,
   options: TrustlessWorkRequestOptions = {},
 ): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${_BASE_URL}${path}`, {
     method: options.method ?? 'POST',
     signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': API_KEY,
+      'x-api-key': _API_KEY,
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
