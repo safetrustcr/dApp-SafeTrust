@@ -41,7 +41,10 @@ export async function POST(request: NextRequest) {
 
     const updateResult = await updateEscrowStatus(engagementId, 'funded');
     if (updateResult.update_escrows.affected_rows === 0) {
-      console.warn(`No escrow record found to update for engagementId: ${engagementId}`);
+      return NextResponse.json(
+        { error: `No escrow record found for engagementId: ${engagementId}` },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json(result);
