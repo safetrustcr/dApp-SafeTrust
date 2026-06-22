@@ -199,7 +199,7 @@ function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
     case 'pending_signature':
       return { label: 'paid', step: 1, title: 'Invoice Pending Signature' };
     case 'active':
-      return { label: 'paid', step: 2, title: 'Payment batch January 2025' };
+      return { label: 'paid', step: 2, title: '' };
     case 'funded':
       return { label: 'blocked', step: 3, title: 'Payment batch - Escrow Status' };
     case 'completed':
@@ -213,7 +213,7 @@ function formatDate(dateString?: string) {
   if (!dateString) return '';
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return dateString;
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
