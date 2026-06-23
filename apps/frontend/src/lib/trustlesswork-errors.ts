@@ -1,49 +1,49 @@
-// Normalizes errors/payloads coming back from the TrustlessWork API (and thrown
-// Errors) into a non-empty list of human-readable messages.
+// Normalizes errors from TrustlessWork API responses, fetch() failures, and
+// caught exceptions into a flat string array suitable for rendering in the UI.
 //
-// Call sites expect `string[]` and use `messages[0]` as the primary error, so a
-// fallback is always returned when nothing usable can be extracted.
+// Consumers pass either:
+//   - a parsed JSON payload (e.g. { error, message, messages }) returned from
+//     our own API routes (/api/escrow/deploy, /helper/send-transaction), or
+//   - a caught `unknown` error from a try/catch block.
 
-type ErrorLike =
-  | string
-  | Error
-  | { messages?: unknown; message?: unknown; error?: unknown }
-  | null
-  | undefined;
+type ErrorLikePayload = {
+  error?: unknown;
+  message?: unknown;
+  messages?: unknown;
+};
 
-export function getErrorMessages(input: ErrorLike, fallback: string): string[] {
-  const safeFallback = fallback.trim() || 'Something went wrong.';
+function isErrorLikePayload(value: unknown): value is ErrorLikePayload {
+  return typeof value === "object" && value !== null;
+}
 
-  if (!input) {
-    return [safeFallback];
+export function getErrorMessages(source: unknown, fallback: string): string[] {
+  if (Array.isArray(source)) {
+    const messages = source.filter((item): item is string => typeof item === "string");
+    return messages.length > 0 ? messages : [fallback];
   }
 
-  if (typeof input === 'string') {
-    return input.trim() ? [input] : [safeFallback];
-  }
+  if (isErrorLikePayload(source)) {
+    if (Array.isArray(source.messages) && source.messages.length > 0) {
+      const messages = source.messages.filter((item): item is string => typeof item === "string");
+      if (messages.length > 0) return messages;
+    }
 
-  if (input instanceof Error) {
-    return [input.message || safeFallback];
-  }
+    if (typeof source.error === "string" && source.error.trim()) {
+      return [source.error];
+    }
 
-  const obj = input as Record<string, unknown>;
-
-  if (Array.isArray(obj.messages)) {
-    const messages = obj.messages.filter(
-      (m): m is string => typeof m === 'string' && m.trim().length > 0,
-    );
-    if (messages.length > 0) {
-      return messages;
+    if (typeof source.message === "string" && source.message.trim()) {
+      return [source.message];
     }
   }
 
-  if (typeof obj.message === 'string' && obj.message.trim()) {
-    return [obj.message];
+  if (source instanceof Error && source.message) {
+    return [source.message];
   }
 
-  if (typeof obj.error === 'string' && obj.error.trim()) {
-    return [obj.error];
+  if (typeof source === "string" && source.trim()) {
+    return [source];
   }
 
-  return [safeFallback];
+  return [fallback];
 }
