@@ -511,8 +511,6 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function ReleasedView({ escrow }: { escrow: any }) {
-  const [claimsText, setClaimsText] = useState('');
-
   const isMock = !escrow;
 
   const justification = isMock
@@ -526,7 +524,7 @@ function ReleasedView({ escrow }: { escrow: any }) {
 
   const beneficiaryWallet = isMock
     ? "MJE...XN32"
-    : (escrow.sender_address || "N/A");
+    : (escrow.sender_address ? truncateStellarAddress(escrow.sender_address) : "N/A");
 
   const releasedDate = isMock
     ? "20 January 2025"
@@ -543,7 +541,7 @@ function ReleasedView({ escrow }: { escrow: any }) {
   const phone = isMock
     ? "+506 64895321"
     : (tenantUser?.phone_number
-      ? `${tenantUser.country_code ? `+${tenantUser.country_code} ` : ''}${tenantUser.phone_number}`
+      ? `${tenantUser.country_code ? `+${tenantUser.country_code.replace(/^\+/, '')} ` : ''}${tenantUser.phone_number}`
       : "N/A");
 
   return (
@@ -597,47 +595,44 @@ function ReleasedView({ escrow }: { escrow: any }) {
             id="escrow-claims-input"
             style={{ ...styles.input, minHeight: '6.7rem' }}
             placeholder="Lorem Ipsum is simply dummy text of the printing and typesetting industry..."
-            value={claimsText}
-            onChange={(e) => setClaimsText(e.target.value)}
+            value=""
+            readOnly
           />
           <div style={{ ...styles.buttonRow, justifyContent: 'flex-end', marginTop: '0.85rem' }}>
             <button
               id="escrow-claims-clean-btn"
               type="button"
+              disabled
               style={{
                 border: 'none',
-                backgroundColor: '#202124',
-                color: '#ffffff',
+                backgroundColor: '#d1d5db',
+                color: '#9ca3af',
                 borderRadius: '0.35rem',
                 padding: '0.45rem 1.15rem',
                 fontWeight: 800,
                 fontSize: '0.78rem',
-                cursor: 'pointer',
+                cursor: 'not-allowed',
                 transition: 'all 0.2s',
+                opacity: 0.6,
               }}
-              onClick={() => setClaimsText('')}
             >
               Clean
             </button>
             <button
               id="escrow-claims-send-btn"
               type="button"
+              disabled
               style={{
                 border: 'none',
-                backgroundColor: '#ff6400',
-                color: '#ffffff',
+                backgroundColor: '#d1d5db',
+                color: '#9ca3af',
                 borderRadius: '0.35rem',
                 padding: '0.45rem 1.15rem',
                 fontWeight: 800,
                 fontSize: '0.78rem',
-                cursor: 'pointer',
+                cursor: 'not-allowed',
                 transition: 'all 0.2s',
-              }}
-              onClick={() => {
-                if (claimsText) {
-                  alert(`Claim submitted: "${claimsText}"`);
-                  setClaimsText('');
-                }
+                opacity: 0.6,
               }}
             >
               Send
@@ -701,6 +696,19 @@ export default function EscrowDetailPage({
         <div style={styles.page}>
           <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
             Loading escrow details...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !escrow) {
+    return (
+      <div style={styles.pageWrapper}>
+        <div style={styles.page}>
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626', backgroundColor: '#fee2e2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
+            <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>Error Loading Escrow</h2>
+            <p style={{ margin: 0, fontSize: '0.9rem' }}>{error.message || 'Failed to load escrow details. Please try again later.'}</p>
           </div>
         </div>
       </div>
