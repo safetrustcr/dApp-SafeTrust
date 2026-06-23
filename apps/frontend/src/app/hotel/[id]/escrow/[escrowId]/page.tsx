@@ -1,5 +1,6 @@
 "use client";
 
+import { EscrowDetailLayout } from '@/components/escrow/EscrowDetailLayout';
 import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
 import { PaidInvoiceView } from '@/components/escrow/PaidInvoiceView';
 import { PdfExportButton } from '@/components/escrow/PdfExportButton';
@@ -20,8 +21,7 @@ type InvoiceEscrow = {
 };
 
 type ViewConfig = {
-  label: 'paid' | 'blocked' | 'released';
-  step: 1 | 2 | 3 | 4;
+  label: StubStatus;
   title: string;
 };
 
@@ -42,12 +42,6 @@ const styles = {
     margin: '0 auto',
     padding: '2rem 1.5rem 3rem',
     color: '#111827',
-  } satisfies CSSProperties,
-  grid: {
-    display: 'grid',
-    gap: '1.5rem',
-    marginTop: '0.5rem',
-    alignItems: 'start',
   } satisfies CSSProperties,
   panel: {
     border: '1px solid #e5e7eb',
@@ -123,16 +117,13 @@ const styles = {
 
 function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
   switch (status) {
-    case 'pending_signature':
-      return { label: 'paid', step: 1, title: 'Invoice Pending Signature' };
-    case 'active':
-      return { label: 'paid', step: 2, title: '' };
-    case 'funded':
-      return { label: 'blocked', step: 3, title: 'Payment batch - Escrow Status' };
-    case 'completed':
-      return { label: 'released', step: 4, title: 'Deposit / Escrow Released' };
+    case 'blocked':
+      return { label: 'blocked', title: 'Payment batch - Escrow Status' };
+    case 'released':
+      return { label: 'released', title: 'Deposit / Escrow Released' };
+    case 'paid':
     default:
-      return { label: 'paid', step: 1, title: 'Payment batch' };
+      return { label: 'paid', title: 'Payment batch January 2025' };
   }
 }
 
@@ -330,87 +321,34 @@ export default function EscrowDetailPage({
 }) {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.escrowId);
 
-  const { data, loading, error } = useQuery(GET_ESCROW_BY_ANY_ID, {
-    variables: {
-      id: isUuid ? params.escrowId : null,
-      engagement_id: params.escrowId,
-      contract_id: params.escrowId,
-    },
-    pollInterval: 2000,
-  });
-
-  const escrow = data?.escrows?.[0];
-
-  // Determine page content dynamically from Hasura or fallback to developer status query param
-  let status: EscrowStatus;
-  let invoiceNumber: string;
-  let paidAt: string;
-
-  if (escrow) {
-    status = escrow.status as EscrowStatus;
-    const rawId = escrow.engagement_id || escrow.contract_id || escrow.id || '';
-    invoiceNumber = `INV-${rawId.slice(0, 12)}`;
-    paidAt = formatDate(escrow.updated_at || escrow.created_at);
-  } else {
-    // Fallback stub status for styling and manual development verification
-    const devStatus = searchParams?.status;
-    if (devStatus === 'blocked') {
-      status = 'funded';
-    } else if (devStatus === 'released') {
-      status = 'completed';
-    } else if (devStatus === 'paid') {
-      status = 'active';
-    } else {
-      status = 'pending_signature';
-    }
-    invoiceNumber = 'INV4257-09-012';
-    paidAt = '25 Jan 2025';
-  }
-
-  const view = getEscrowViewConfig(status);
-
-  // If loading and we have no cached data, display a nice loading state
-  if (loading && !escrow) {
-    return (
-      <div style={styles.pageBg}>
-        <div style={styles.page}>
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
-            Loading escrow details...
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={styles.pageBg}>
-      <div style={styles.page}>
-        <InvoiceHeader
-          invoiceNumber={invoiceNumber}
-          status={status}
-          paidAt={paidAt}
-        />
+    <div style={styles.page}>
+      <EscrowDetailLayout
+        invoiceNumber="INV4257-09-012"
+        status={view.label}
+        paidAt={`${params.escrowId} · 25 Jan 2025`}
+      >
+        <div style={styles.panel}>
+          <p
+            style={{
+              marginTop: 0,
+              marginBottom: '0.5rem',
+              fontSize: '0.8rem',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#9ca3af',
+            }}
+          >
+            Hotel {params.id}
+          </p>
+          <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.5rem' }}>{view.title}</h2>
 
-        <div style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 2fr) minmax(18rem, 1fr)' }}>
-          <div style={styles.panel}>
-            {view.title && (
-              <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.5rem' }}>{view.title}</h2>
-            )}
-
-            {view.label === 'paid' && (
-              <PaidInvoiceView escrow={escrow ?? MOCK_PAID_ESCROW} />
-            )}
-            {view.label === 'blocked' && <BlockedStubView />}
-            {view.label === 'released' && <ReleasedStubView />}
-          </div>
-
-          <div style={styles.panel}>
-            <h3 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '1.125rem', fontWeight: 700 }}>Notes</h3>
-            <textarea style={styles.input} placeholder="Notes..." />
-            <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '1.5rem 0' }} />
-            <ProcessStepper currentStep={view.step} />
-          </div>
+          {/* TODO: swap placeholder sections for real escrow views once frontend-SafeTrust is merged */}
+          {view.label === 'paid' && <PaidStubView />}
+          {view.label === 'blocked' && <BlockedStubView />}
+          {view.label === 'released' && <ReleasedStubView />}
         </div>
+      </EscrowDetailLayout>
 
         <p style={{ marginTop: '1rem', color: '#6b7280', fontSize: '0.85rem' }}>
           Dev: append ?status=paid|blocked|released
