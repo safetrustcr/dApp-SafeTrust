@@ -242,14 +242,14 @@ export default function GuestDashboard() {
                           </span>
                         </div>
                       </div>
-
                       <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
-                        <button
-                          type="button"
-                          className="rounded-lg bg-orange-500 px-10 py-3 text-sm font-bold text-white hover:bg-orange-600 transition-colors shadow-sm"
-                        >
-                          BOOK
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/hotel/${featured.id}/escrow/create`)}
+                            className="rounded-lg bg-orange-500 px-10 py-3 text-sm font-bold text-white hover:bg-orange-600 transition-colors shadow-sm"
+                          >
+                            BOOK
+                          </button>
                         <p className="text-xl font-bold text-emerald-600">
                           ${featured.price.toLocaleString()}.00{" "}
                           <span className="text-xs font-normal text-gray-400">Per month</span>

@@ -1,106 +1,48 @@
-// TODO: replace with real component once merged in frontend-SafeTrust
-// Source: frontend-SafeTrust/src/components/escrow/InvoiceHeader.tsx
+import { EscrowStatusBadge, type EscrowStatus } from '@/components/dashboard/EscrowStatusBadge';
 
-import type { CSSProperties } from 'react';
-
-type InvoiceStatus = 'pending' | 'paid' | 'blocked' | 'released';
-
-const STATUS_STYLES: Record<InvoiceStatus, { label: string; style: CSSProperties }> = {
-  pending: {
-    label: 'Pending',
-    style: {
-      backgroundColor: '#fce7f3',
-      color: '#9d174d',
-      border: '1px solid #f9a8d4',
-    },
-  },
-  paid: {
-    label: 'Paid',
-    style: {
-      backgroundColor: '#dcfce7',
-      color: '#166534',
-      border: '1px solid #86efac',
-    },
-  },
-  blocked: {
-    label: 'Deposit blocked',
-    style: {
-      backgroundColor: '#dbeafe',
-      color: '#1d4ed8',
-      border: '1px solid #93c5fd',
-    },
-  },
-  released: {
-    label: 'Deposit released',
-    style: {
-      backgroundColor: '#ecfccb',
-      color: '#3f6212',
-      border: '1px solid #bef264',
-    },
-  },
-};
+type LegacyInvoiceStatus = 'pending' | 'paid' | 'blocked' | 'released';
 
 export function InvoiceHeader({
   invoiceNumber,
   paidAt,
-  status,
+  status: inputStatus,
 }: {
   invoiceNumber: string;
   paidAt?: string;
-  status: InvoiceStatus;
+  status: EscrowStatus | LegacyInvoiceStatus;
 }) {
-  const badge = STATUS_STYLES[status];
+  const status = (() => {
+    switch (inputStatus) {
+      case 'pending':
+        return 'pending_signature';
+      case 'paid':
+        return 'active';
+      case 'blocked':
+        return 'funded';
+      case 'released':
+        return 'completed';
+      default:
+        return inputStatus as EscrowStatus;
+    }
+  })();
 
   return (
     <div
       style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '1rem',
-        padding: '1.25rem 1.5rem',
-        borderRadius: '1rem',
-        border: '1px solid #fed7aa',
-        backgroundColor: '#ffffff',
+        padding: '0 0 1.25rem',
       }}
     >
-      <div>
-        <p
-          style={{
-            margin: 0,
-            fontSize: '0.8rem',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: '#9ca3af',
-          }}
-        >
-          Invoice number
-        </p>
-        <h1 style={{ margin: '0.35rem 0 0', fontSize: '1.75rem' }}>{invoiceNumber}</h1>
-      </div>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <span
-          style={{
-            ...badge.style,
-            display: 'inline-flex',
-            alignItems: 'center',
-            borderRadius: '999px',
-            padding: '0.35rem 0.75rem',
-            fontSize: '0.875rem',
-            fontWeight: 700,
-          }}
-        >
-          {badge.label}
-        </span>
-        {paidAt && (
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>Updated</p>
-            <p style={{ margin: '0.25rem 0 0', fontWeight: 600 }}>{paidAt}</p>
-          </div>
-        )}
+        <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>
+          {invoiceNumber}
+        </h1>
+        <EscrowStatusBadge status={status} className="px-4 py-1 text-sm font-bold" />
       </div>
+      {status !== 'pending_signature' && paidAt && (
+        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
+          Paid at {paidAt}
+        </p>
+      )}
     </div>
   );
 }

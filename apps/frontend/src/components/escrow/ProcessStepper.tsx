@@ -1,7 +1,11 @@
-// TODO: replace with real component once merged in frontend-SafeTrust
-// Source: frontend-SafeTrust/src/components/escrow/ProcessStepper.tsx
-
 import type { CSSProperties } from 'react';
+import { Home, CreditCard, Lock, Users, type LucideIcon } from 'lucide-react';
+
+type Step = {
+  step: 1 | 2 | 3 | 4;
+  icon: LucideIcon;
+  description: string;
+};
 
 import type { EscrowDetailStatus } from '@/components/escrow/EscrowDetailLayout';
 
@@ -52,36 +56,46 @@ export function ProcessStepper({ currentStep, status }: ProcessStepperProps) {
               : { backgroundColor: '#ffffff', color: '#9ca3af', border: '1px solid #d1d5db' };
 
           return (
-            <div key={step} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div
-                style={{
-                  ...markerStyle,
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: '999px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  flexShrink: 0,
-                }}
-              >
-                {step}
-              </div>
-              <div>
-                <p
+            <div key={step} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', position: 'relative' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div
                   style={{
-                    margin: 0,
-                    fontWeight: isActive ? 700 : 600,
-                    color: isActive ? '#111827' : '#374151',
+                    ...markerStyle,
+                    width: '2.25rem',
+                    height: '2.25rem',
+                    borderRadius: '9999px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
-                  {title}
-                </p>
-                <p style={{ margin: '0.2rem 0 0', color: '#9ca3af', fontSize: '0.8rem' }}>
-                  {isActive ? 'Current step' : isComplete ? 'Completed' : 'Pending'}
-                </p>
+                  <Icon size={18} />
+                </div>
+                {!isLast && (
+                  <div
+                    style={{
+                      width: '1px',
+                      flex: 1,
+                      minHeight: '1.25rem',
+                      backgroundColor: '#e5e7eb',
+                      marginTop: '0.25rem',
+                    }}
+                  />
+                )}
               </div>
+              <p
+                style={{
+                  margin: 0,
+                  paddingTop: '0.5rem',
+                  paddingBottom: isLast ? 0 : '1rem',
+                  color: '#6b7280',
+                  fontSize: '0.85rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                {description}
+              </p>
             </div>
           );
         })}
