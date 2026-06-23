@@ -103,6 +103,23 @@ export const CREATE_APARTMENT = gql`
   }
 `;
 
+export const GET_APARTMENT_BY_ID = gql`
+  query GetApartmentById($id: uuid!) {
+    apartments(
+      where: { id: { _eq: $id }, deleted_at: { _is_null: true } }
+      limit: 1
+    ) {
+      id
+      name
+      description
+      image_urls
+      address
+      price
+      owner_id
+    }
+  }
+`;
+
 export const DELETE_APARTMENT = gql`
   mutation SoftDeleteApartment($id: uuid!, $deleted_at: timestamptz!) {
     update_apartments_by_pk(

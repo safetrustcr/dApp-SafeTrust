@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, truncateStellarAddress } from "@/lib/utils";
 
 interface WalletAddressTableProps {
   address?: string | null;
@@ -15,7 +15,7 @@ export function WalletAddressTable({
     return <span className="text-xs text-muted-foreground italic">No wallet</span>;
   }
 
-  const truncated = address.slice(0, 4) + "..." + address.slice(-4);
+  const truncated = truncateStellarAddress(address, 4, 4);
 
   return (
     <span
