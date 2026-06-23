@@ -66,15 +66,11 @@ export function EscrowPayFlow({
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [deployState, setDeployState] = useState<DeployResponse | null>(null);
 
+  const isWalletConnected = Boolean(address);
+
   const payButtonLabel = useMemo(() => {
-    if (deploying) {
-      return 'Deploying escrow...';
-    }
-
-    if (signing) {
-      return 'Awaiting wallet signature...';
-    }
-
+    if (deploying) return 'Deploying escrow...';
+    if (signing) return 'Awaiting wallet signature...';
     return 'PAY';
   }, [deploying, signing]);
 
@@ -96,8 +92,8 @@ export function EscrowPayFlow({
         },
         body: JSON.stringify({
           apartmentId,
-          tenantAddress: address,
-          ownerAddress,
+          senderAddress: address,
+          receiverAddress: ownerAddress,
           amount,
         }),
       });
@@ -126,7 +122,7 @@ export function EscrowPayFlow({
 
     try {
       const signedXdr = await signXDR(deployState.unsignedXDR);
-      const response = await fetch('/helper/send-transaction', {
+      const response = await fetch('/api/escrow/send-transaction', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -148,7 +144,6 @@ export function EscrowPayFlow({
         return;
       }
 
-      console.log(`[PAY success] Escrow deployed on Stellar\n  engagement_id: ${payload.engagementId}\n  transaction_hash: ${payload.transactionHash ?? 'unknown'}\n  status: ${payload.status}\n  amount: ${amount} USDC`);
       router.push(`/hotel/${apartmentId}/escrow/${payload.engagementId}`);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to complete escrow signing.'));
@@ -159,19 +154,30 @@ export function EscrowPayFlow({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={deployState ? handleSignAndSend : handleDeploy}
-        disabled={deploying || signing}
-        style={{
-          ...flowStyles.button,
-          opacity: deploying || signing ? 0.7 : 1,
-          cursor: deploying || signing ? 'wait' : 'pointer',
-        }}
-        title={deployState ? 'Sign and submit escrow transaction' : `Deploy escrow for ${apartmentName}`}
+      <span
+        style={{ display: 'inline-block', cursor: !isWalletConnected ? 'not-allowed' : undefined }}
+        title={
+          !isWalletConnected
+            ? 'Connect wallet to pay'
+            : deployState
+              ? 'Sign and submit escrow transaction'
+              : `Deploy escrow for ${apartmentName}`
+        }
       >
-        {payButtonLabel}
-      </button>
+        <button
+          type="button"
+          onClick={deployState ? handleSignAndSend : handleDeploy}
+          disabled={!isWalletConnected || deploying || signing}
+          style={{
+            ...flowStyles.button,
+            opacity: !isWalletConnected || deploying || signing ? 0.7 : 1,
+            cursor: deploying || signing ? 'wait' : !isWalletConnected ? 'not-allowed' : 'pointer',
+            pointerEvents: !isWalletConnected ? 'none' : undefined,
+          }}
+        >
+          {payButtonLabel}
+        </button>
+      </span>
 
       <div style={flowStyles.panel}>
         <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Wallet signing</h3>
