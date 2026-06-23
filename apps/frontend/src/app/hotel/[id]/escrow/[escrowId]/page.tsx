@@ -10,10 +10,26 @@ import type { EscrowStatus } from '@/components/dashboard/EscrowStatusBadge';
 import { truncateStellarAddress } from '@/lib/utils';
 import type { CSSProperties, ReactNode } from 'react';
 
+type InvoiceApartment = {
+  name: string;
+  image_urls?: string[] | null;
+};
+
+type InvoiceEscrow = {
+  apartment: InvoiceApartment;
+};
+
 type ViewConfig = {
   label: 'paid' | 'blocked' | 'released';
   step: 1 | 2 | 3 | 4;
   title: string;
+};
+
+const STUB_INVOICE_ESCROW: InvoiceEscrow = {
+  apartment: {
+    name: 'La sabana apartment',
+    image_urls: [],
+  },
 };
 
 const styles = {
@@ -80,6 +96,29 @@ const styles = {
     padding: '0.6rem 1rem',
     fontWeight: 700,
   } satisfies CSSProperties,
+  productCell: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+  } satisfies CSSProperties,
+  productThumbnail: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '0.5rem',
+    objectFit: 'cover',
+    flexShrink: 0,
+  } satisfies CSSProperties,
+  productThumbnailFallback: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '0.5rem',
+    backgroundColor: '#fff7ed',
+    color: '#f97316',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  } satisfies CSSProperties,
 } as const;
 
 function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
@@ -117,22 +156,67 @@ function InfoPair({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-const MOCK_PAID_ESCROW = {
-  id: 'mock-id',
-  engagement_id: 'INV4257-09-012',
-  contract_id: 'mock-contract',
-  amount: 4000,
-  created_at: '2025-01-20T12:00:00Z',
-  sender_address: 'GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGHIJKLMNOPQR',
-  apartment: {
-    id: 'mock-apartment',
-    name: 'La sabana apartment',
-    image_urls: ['/img/room1.png'],
-    price: 4000,
-    warranty_deposit: 4000,
-    available_until: '2025-01-30T12:00:00Z',
-  },
-};
+function ProductCell({ apartment }: { apartment: InvoiceApartment }) {
+  const imageUrl = apartment.image_urls?.[0];
+
+  return (
+    <div style={styles.productCell}>
+      {imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl} alt={apartment.name} style={styles.productThumbnail} />
+      ) : (
+        <span aria-hidden="true" style={styles.productThumbnailFallback}>
+          <Home size={20} strokeWidth={2} />
+        </span>
+      )}
+      <span>{apartment.name}</span>
+    </div>
+  );
+}
+
+function PaidStubView() {
+  const escrow = STUB_INVOICE_ESCROW;
+
+  return (
+    <div style={{ display: 'grid', gap: '1.5rem' }}>
+      <div style={styles.splitGrid}>
+        <InfoPair label="Billed to" value="John_s@gmail.com" />
+        <InfoPair label="Invoice Number" value="INV4257-09-012" />
+        <InfoPair label="Billing details" value="John Smith" />
+        <InfoPair label="Currency" value="IDR - Dollar" />
+      </div>
+
+      <div style={{ border: '1px solid #fed7aa', borderRadius: '1rem', overflow: 'hidden' }}>
+        <table style={styles.table}>
+          <thead style={{ backgroundColor: '#fff7ed' }}>
+            <tr>
+              <th style={{ textAlign: 'left', padding: '0.9rem' }}>PRODUCT</th>
+              <th style={{ textAlign: 'right', padding: '0.9rem' }}>PRICE / MONTH</th>
+              <th style={{ textAlign: 'right', padding: '0.9rem' }}>DEPOSIT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ padding: '0.9rem', borderTop: '1px solid #fed7aa' }}>
+                <ProductCell apartment={escrow.apartment} />
+              </td>
+              <td style={{ padding: '0.9rem', textAlign: 'right', borderTop: '1px solid #fed7aa' }}>
+                $4,000
+              </td>
+              <td style={{ padding: '0.9rem', textAlign: 'right', borderTop: '1px solid #fed7aa' }}>
+                $4,000
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ fontSize: '0.95rem' }}>
+        <strong>Total: $8,000</strong>
+      </div>
+    </div>
+  );
+}
 
 function BlockedStubView() {
   return (
