@@ -17,9 +17,11 @@ function isErrorLikePayload(value: unknown): value is ErrorLikePayload {
 }
 
 export function getErrorMessages(source: unknown, fallback: string): string[] {
+  const safeFallback = fallback.trim() || "Something went wrong.";
+
   if (Array.isArray(source)) {
     const messages = source.filter((item): item is string => typeof item === "string");
-    return messages.length > 0 ? messages : [fallback];
+    return messages.length > 0 ? messages : [safeFallback];
   }
 
   if (isErrorLikePayload(source)) {
@@ -45,5 +47,5 @@ export function getErrorMessages(source: unknown, fallback: string): string[] {
     return [source];
   }
 
-  return [fallback];
+  return [safeFallback];
 }
