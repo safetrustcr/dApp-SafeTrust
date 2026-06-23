@@ -16,35 +16,44 @@ function isErrorLikePayload(value: unknown): value is ErrorLikePayload {
   return typeof value === "object" && value !== null;
 }
 
+// Keeps only non-empty strings and returns them trimmed, so blank-looking
+// messages never reach the UI.
+function toMessages(values: unknown[]): string[] {
+  return values
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
 export function getErrorMessages(source: unknown, fallback: string): string[] {
   const safeFallback = fallback.trim() || "Something went wrong.";
 
   if (Array.isArray(source)) {
-    const messages = source.filter((item): item is string => typeof item === "string");
+    const messages = toMessages(source);
     return messages.length > 0 ? messages : [safeFallback];
   }
 
   if (isErrorLikePayload(source)) {
-    if (Array.isArray(source.messages) && source.messages.length > 0) {
-      const messages = source.messages.filter((item): item is string => typeof item === "string");
+    if (Array.isArray(source.messages)) {
+      const messages = toMessages(source.messages);
       if (messages.length > 0) return messages;
     }
 
     if (typeof source.error === "string" && source.error.trim()) {
-      return [source.error];
+      return [source.error.trim()];
     }
 
     if (typeof source.message === "string" && source.message.trim()) {
-      return [source.message];
+      return [source.message.trim()];
     }
   }
 
-  if (source instanceof Error && source.message) {
-    return [source.message];
+  if (source instanceof Error && source.message.trim()) {
+    return [source.message.trim()];
   }
 
   if (typeof source === "string" && source.trim()) {
-    return [source];
+    return [source.trim()];
   }
 
   return [safeFallback];
