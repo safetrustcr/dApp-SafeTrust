@@ -1,5 +1,8 @@
 "use client";
 
+import { EscrowDetailLayout } from '@/components/escrow/EscrowDetailLayout';
+import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
+import { PaidInvoiceView } from '@/components/escrow/PaidInvoiceView';
 import { PdfExportButton } from '@/components/escrow/PdfExportButton';
 import { useQuery } from '@apollo/client';
 import { GET_ESCROW_BY_ANY_ID } from '@/graphql/queries/escrow-queries';
@@ -29,8 +32,7 @@ type InvoiceEscrow = {
 };
 
 type ViewConfig = {
-  label: 'paid' | 'blocked' | 'released';
-  step: 1 | 2 | 3 | 4;
+  label: StubStatus;
   title: string;
 };
 
@@ -235,16 +237,13 @@ const PROCESS_STEPS = [
 
 function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
   switch (status) {
-    case 'pending_signature':
-      return { label: 'paid', step: 1, title: 'Invoice Pending Signature' };
-    case 'active':
-      return { label: 'paid', step: 2, title: '' };
-    case 'funded':
-      return { label: 'blocked', step: 3, title: 'Payment batch - Escrow Status' };
-    case 'completed':
-      return { label: 'released', step: 4, title: 'Deposit / Escrow Released' };
+    case 'blocked':
+      return { label: 'blocked', title: 'Payment batch - Escrow Status' };
+    case 'released':
+      return { label: 'released', title: 'Deposit / Escrow Released' };
+    case 'paid':
     default:
-      return { label: 'paid', step: 1, title: 'Payment batch' };
+      return { label: 'paid', title: 'Payment batch January 2025' };
   }
 }
 

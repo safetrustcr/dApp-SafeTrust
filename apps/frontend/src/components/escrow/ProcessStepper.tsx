@@ -7,47 +7,53 @@ type Step = {
   description: string;
 };
 
-const STEPS: Step[] = [
-  {
-    step: 1,
-    icon: Home,
-    description:
-      'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-  },
-  {
-    step: 2,
-    icon: CreditCard,
-    description:
-      'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-  },
-  {
-    step: 3,
-    icon: Lock,
-    description:
-      'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-  },
-  {
-    step: 4,
-    icon: Users,
-    description:
-      'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-  },
-];
+import type { EscrowDetailStatus } from '@/components/escrow/EscrowDetailLayout';
 
-export function ProcessStepper({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
+const STEPS = [
+  { step: 1, title: 'Create escrow' },
+  { step: 2, title: 'Payment batch' },
+  { step: 3, title: 'Deposit blocked' },
+  { step: 4, title: 'Deposit released' },
+] as const;
+
+function statusToStep(status: EscrowDetailStatus): 1 | 2 | 3 | 4 {
+  switch (status) {
+    case 'pending':
+      return 1;
+    case 'paid':
+      return 2;
+    case 'blocked':
+      return 3;
+    case 'released':
+      return 4;
+  }
+}
+
+type ProcessStepperProps =
+  | { currentStep: 1 | 2 | 3 | 4; status?: never }
+  | { status: EscrowDetailStatus; currentStep?: never };
+
+export function ProcessStepper({ currentStep, status }: ProcessStepperProps) {
+  const activeStep = currentStep ?? statusToStep(status ?? 'pending');
   return (
-    <div>
-      <h3 style={{ margin: '0 0 1rem', fontSize: '1.125rem', fontWeight: 700, color: '#111827' }}>
-        Process
-      </h3>
-      <div style={{ position: 'relative', display: 'grid', gap: '1rem' }}>
-        {STEPS.map(({ step, icon: Icon, description }, idx) => {
-          const isActiveOrComplete = step <= currentStep;
-          const markerStyle: CSSProperties = isActiveOrComplete
-            ? { backgroundColor: '#22c55e', color: '#ffffff' }
-            : { backgroundColor: '#e5e7eb', color: '#9ca3af' };
-
-          const isLast = idx === STEPS.length - 1;
+    <div
+      style={{
+        border: '1px solid #fed7aa',
+        borderRadius: '1rem',
+        backgroundColor: '#ffffff',
+        padding: '1.25rem',
+      }}
+    >
+      <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1rem' }}>Process</h3>
+      <div style={{ display: 'grid', gap: '0.9rem' }}>
+        {STEPS.map(({ step, title }) => {
+          const isActive = step === activeStep;
+          const isComplete = step < activeStep;
+          const markerStyle: CSSProperties = isActive
+            ? { backgroundColor: '#22c55e', color: '#ffffff', border: '1px solid #22c55e' }
+            : isComplete
+              ? { backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac' }
+              : { backgroundColor: '#ffffff', color: '#9ca3af', border: '1px solid #d1d5db' };
 
           return (
             <div key={step} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', position: 'relative' }}>
