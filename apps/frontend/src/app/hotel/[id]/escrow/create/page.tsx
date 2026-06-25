@@ -1,3 +1,6 @@
+import { EscrowPayFlow } from '@/components/escrow/EscrowPayFlow';
+import { EscrowDetailLayout } from '@/components/escrow/EscrowDetailLayout';
+import type { CSSProperties } from 'react';
 "use client";
 
 import { useQuery } from "@apollo/client";
@@ -83,6 +86,30 @@ export default function EscrowCreatePage({
 
   return (
     <div style={styles.page}>
+      <EscrowDetailLayout invoiceNumber="INV4257-09-012" status="pending">
+        <div style={{ ...styles.panel, display: 'grid', gap: '1rem' }}>
+          <div style={styles.headingRow}>
+            <div>
+              <p style={{ margin: 0, fontSize: '0.8rem', letterSpacing: '0.08em', color: '#9ca3af' }}>
+                HOTEL {params.id}
+              </p>
+              <h2 style={{ marginTop: '0.35rem', marginBottom: 0, fontSize: '1.5rem' }}>{STUB_APARTMENT.name}</h2>
+            </div>
+            <div style={styles.payButton}>
+              <EscrowPayFlow
+                apartmentId={params.id}
+                apartmentName={STUB_APARTMENT.name}
+                ownerAddress={STUB_APARTMENT.owner.walletAddress}
+                amount={STUB_APARTMENT.price}
+              />
+            </div>
+          </div>
+
+          <div style={styles.imageGrid}>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} style={styles.imagePlaceholder} />
+            ))}
+          </div>
       <InvoiceHeader invoiceNumber="INV4257-09-012" status="pending" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3" style={styles.grid}>
@@ -97,6 +124,11 @@ export default function EscrowCreatePage({
             </p>
           )}
 
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: '0.35rem', fontSize: '1rem' }}>Owner contact</h3>
+            <p style={{ margin: 0, fontSize: '0.95rem' }}>Phone: +1 555-0100</p>
+            <p style={{ margin: '0.35rem 0 0', fontSize: '0.95rem' }}>Email: owner@example.com</p>
+          </div>
           {apartment && (
             <ApartmentPropertyCard
               name={apartment.name}
@@ -144,7 +176,7 @@ export default function EscrowCreatePage({
           </div>
           <ProcessStepper currentStep={1} />
         </div>
-      </div>
+      </EscrowDetailLayout>
     </div>
   );
 }

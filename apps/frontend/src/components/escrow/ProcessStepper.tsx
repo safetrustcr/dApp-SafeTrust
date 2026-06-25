@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { Banknote, Check, FileLock2, HandCoins, Home } from 'lucide-react';
+import type { EscrowDetailStatus } from '@/components/escrow/EscrowDetailLayout';
 
 const STEPS = [
   {
@@ -30,7 +31,25 @@ const STEPS = [
 
 const MARKER_SIZE = '2.25rem';
 
-export function ProcessStepper({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
+function statusToStep(status: EscrowDetailStatus): 1 | 2 | 3 | 4 {
+  switch (status) {
+    case 'pending':
+      return 1;
+    case 'paid':
+      return 2;
+    case 'blocked':
+      return 3;
+    case 'released':
+      return 4;
+  }
+}
+
+type ProcessStepperProps =
+  | { currentStep: 1 | 2 | 3 | 4; status?: never }
+  | { status: EscrowDetailStatus; currentStep?: never };
+
+export function ProcessStepper({ currentStep, status }: ProcessStepperProps) {
+  const activeStep = currentStep ?? statusToStep(status ?? 'pending');
   return (
     <div
       style={{
@@ -53,8 +72,8 @@ export function ProcessStepper({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) 
       <h3 style={{ marginTop: 0, marginBottom: '1.25rem', fontSize: '1rem' }}>Process</h3>
       <div style={{ display: 'grid', gap: '0.25rem' }}>
         {STEPS.map(({ step, title, description, Icon }, index) => {
-          const isActive = step === currentStep;
-          const isComplete = step < currentStep;
+          const isActive = step === activeStep;
+          const isComplete = step < activeStep;
           const isLast = index === STEPS.length - 1;
 
           const markerStyle: CSSProperties = isActive
