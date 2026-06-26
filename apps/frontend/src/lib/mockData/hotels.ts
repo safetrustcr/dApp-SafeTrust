@@ -154,8 +154,8 @@ export const BEDROOM_FILTERS = [
   { label: '3 bedrooms', value: '3' },
 ] as const;
 
-export function getHotelById(id: string) {
-  return STUB_HOTELS.find((hotel) => hotel.id === id) ?? STUB_HOTELS[0];
+export function getHotelById(id: string): HotelListing | undefined {
+  return STUB_HOTELS.find((hotel) => hotel.id === id);
 }
 
 export function getSuggestedHotels(activeId: string) {

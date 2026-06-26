@@ -27,10 +27,16 @@ export default function SuggestionsList({
   }, [apartments]);
 
   const handleLike = (id: string) => {
-    setLikedById((currentLikes) => ({
-      ...currentLikes,
-      [id]: !currentLikes[id],
-    }));
+    setLikedById((currentLikes) => {
+      const apartment = apartments.find((item) => item.id === id);
+      const current =
+        currentLikes[id] ?? apartment?.favorite ?? false;
+
+      return {
+        ...currentLikes,
+        [id]: !current,
+      };
+    });
   };
 
   return (

@@ -126,7 +126,8 @@ export default function FilterSidebar({
             onChange={(event) =>
               onMinPriceChange(Math.min(Number(event.target.value), maxPrice))
             }
-            className="absolute inset-x-0 top-0 h-full w-full appearance-none bg-transparent opacity-0 cursor-pointer"
+            style={{ width: `${rightPercent}%` }}
+            className="absolute left-0 top-0 z-[3] h-full appearance-none bg-transparent opacity-0 cursor-pointer"
           />
           <input
             type="range"
@@ -137,7 +138,8 @@ export default function FilterSidebar({
             onChange={(event) =>
               onMaxPriceChange(Math.max(Number(event.target.value), minPrice))
             }
-            className="absolute inset-x-0 top-0 h-full w-full appearance-none bg-transparent opacity-0 cursor-pointer"
+            style={{ left: `${leftPercent}%`, width: `${100 - leftPercent}%` }}
+            className="absolute top-0 z-[4] h-full appearance-none bg-transparent opacity-0 cursor-pointer"
           />
         </div>
       </section>

@@ -1,3 +1,10 @@
+export type BookingStatus =
+  | 'pending'
+  | 'checked_in'
+  | 'checked_out'
+  | 'completed'
+  | 'cancelled';
+
 export interface Booking {
   id: string;
   guestName: string;
@@ -5,7 +12,7 @@ export interface Booking {
   checkInDate: string;
   checkOutDate: string;
   roomNumber?: string;
-  status: 'pending' | 'checked_in' | 'checked_out' | 'completed' | 'cancelled';
+  status: BookingStatus;
 }
 
 export interface CheckInData {
@@ -39,7 +46,7 @@ export interface MilestoneApprovalData {
 export interface MilestoneStatusData {
   contractId: string;
   milestoneId: string;
-  newStatus: string;
+  newStatus: BookingStatus;
   bookingId: string;
   timestamp: string;
 }

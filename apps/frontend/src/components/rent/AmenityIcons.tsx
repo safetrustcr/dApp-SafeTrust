@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { HotelAmenitySummary } from '@/@types/hotel';
 import { FaBath, FaBed, FaPaw } from 'react-icons/fa';
 
@@ -12,7 +13,7 @@ function AmenityPill({
   label,
   compact = false,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   compact?: boolean;
 }) {

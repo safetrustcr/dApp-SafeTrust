@@ -9,7 +9,15 @@ import {
   FaSearch,
 } from 'react-icons/fa';
 
-export default function HotelHeader() {
+export interface HotelHeaderProps {
+  userName?: string;
+  hasUnreadNotifications?: boolean;
+}
+
+export default function HotelHeader({
+  userName,
+  hasUnreadNotifications = false,
+}: HotelHeaderProps = {}) {
   return (
     <header className="border-b border-[#e8e1da] bg-white">
       <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-5 py-5 lg:px-7">
@@ -38,11 +46,15 @@ export default function HotelHeader() {
         <div className="ml-auto flex items-center gap-5">
           <div className="relative">
             <FaBell className="h-4 w-4 text-[#1f1f1f]" />
-            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#ff6a00]" />
+            {hasUnreadNotifications ? (
+              <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-[#ff6a00]" />
+            ) : null}
           </div>
-          <span className="hidden text-sm font-semibold text-[#1f1f1f] lg:block">
-            Randall Valenciano
-          </span>
+          {userName ? (
+            <span className="hidden text-sm font-semibold text-[#1f1f1f] lg:block">
+              {userName}
+            </span>
+          ) : null}
           <div className="grid h-10 w-10 place-items-center rounded-full border border-[#d9d9d9] bg-[#f6f6f6]">
             <FaRegUserCircle className="h-5 w-5 text-[#1f1f1f]" />
           </div>

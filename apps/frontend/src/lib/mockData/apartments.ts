@@ -1,3 +1,12 @@
+/**
+ * Hasura/dashboard apartment shape. The /rent listing UI uses {@link HotelListing}
+ * from `@/@types/hotel` via `STUB_HOTELS`; map between these at the data layer
+ * when Hasura wiring lands.
+ */
+import type { HotelListing } from '@/@types/hotel';
+
+export type { HotelListing };
+
 export interface Apartment {
   id: string;
   name: string;

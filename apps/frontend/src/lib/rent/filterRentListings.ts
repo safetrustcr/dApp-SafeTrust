@@ -1,17 +1,24 @@
-import type { HotelListing } from '@/@types/hotel';
+import type {
+  HotelCategory,
+  HotelListing,
+  HotelLocation,
+} from '@/@types/hotel';
 
 export type SortOption = 'relevance' | 'price-low' | 'price-high';
 
 export interface RentListingFilters {
-  selectedCategories: string[];
-  selectedLocations: string[];
+  selectedCategories: HotelCategory[];
+  selectedLocations: HotelLocation[];
   selectedBedrooms: string;
   sortOption: SortOption;
   minPrice: number;
   maxPrice: number;
 }
 
-export function toggleFilterValue(values: string[], value: string): string[] {
+export function toggleFilterValue<T extends string>(
+  values: T[],
+  value: T,
+): T[] {
   return values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value];

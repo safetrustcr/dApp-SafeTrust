@@ -15,7 +15,7 @@ export interface HotelListing extends HotelAmenitySummary {
   address: string;
   price: number;
   promoted: boolean;
-  images: string[];
+  images: [string, ...string[]];
   category: 'Family' | 'Students' | 'Travelers';
   location:
     | 'San José'
@@ -29,3 +29,6 @@ export interface HotelListing extends HotelAmenitySummary {
   description: string;
   favorite?: boolean;
 }
+
+export type HotelCategory = HotelListing['category'];
+export type HotelLocation = HotelListing['location'];

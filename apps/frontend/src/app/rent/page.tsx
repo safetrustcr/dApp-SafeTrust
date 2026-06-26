@@ -1,6 +1,6 @@
 'use client';
 
-import type { HotelListing } from '@/@types/hotel';
+import type { HotelCategory, HotelListing, HotelLocation } from '@/@types/hotel';
 import {
   ApartmentGrid,
   BedroomTabs,
@@ -20,11 +20,11 @@ import { BsSortDownAlt } from 'react-icons/bs';
 
 export default function RentListingPage() {
   const router = useRouter();
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([
+  const [selectedCategories, setSelectedCategories] = useState<HotelCategory[]>([
     'Family',
     'Students',
   ]);
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([
+  const [selectedLocations, setSelectedLocations] = useState<HotelLocation[]>([
     'San José',
     'Heredia',
   ]);
@@ -57,6 +57,12 @@ export default function RentListingPage() {
     router.push(`/hotel/${apartment.id}`);
   };
 
+  const locationLabel =
+    selectedLocations.length > 0
+      ? `Costa Rica, ${selectedLocations.join(', ')}`
+      : 'Costa Rica';
+  const unitCount = filteredApartments.length;
+
   return (
     <div className="min-h-screen bg-white text-[#1c1c1c]">
       <HotelHeader />
@@ -82,9 +88,11 @@ export default function RentListingPage() {
             <div>
               <h1 className="text-[24px] leading-tight text-[#1d1d1d] sm:text-[30px]">
                 Available for rent in{' '}
-                <span className="font-semibold">Costa Rica, San José</span>
+                <span className="font-semibold">{locationLabel}</span>
               </h1>
-              <p className="mt-3 text-sm text-[#515151]">204 units available</p>
+              <p className="mt-3 text-sm text-[#515151]">
+                {unitCount} {unitCount === 1 ? 'unit' : 'units'} available
+              </p>
             </div>
 
             <div className="flex items-center gap-2 text-sm text-[#202020]">
