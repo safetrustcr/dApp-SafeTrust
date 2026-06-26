@@ -43,6 +43,17 @@ export const GET_ESCROW_BY_ID = gql`
       updated_at
       sender_address
       receiver_address
+      resolution_notes
+      tenant_wallet {
+        user {
+          id
+          first_name
+          last_name
+          email
+          phone_number
+          country_code
+        }
+      }
       apartment {
         id
         name
@@ -89,6 +100,17 @@ export const GET_ESCROW_BY_ANY_ID = gql`
       updated_at
       sender_address
       receiver_address
+      resolution_notes
+      tenant_wallet {
+        user {
+          id
+          first_name
+          last_name
+          email
+          phone_number
+          country_code
+        }
+      }
       apartment {
         id
         name
