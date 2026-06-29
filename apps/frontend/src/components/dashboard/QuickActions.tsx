@@ -35,19 +35,19 @@ export function QuickActions({ userRole }: QuickActionsProps) {
     {
       title: 'Add Property',
       icon: Plus,
-      onClick: () => router.push('/hotel/properties/add'),
+      onClick: () => router.push('/apartment/properties/add'),
       description: 'List a new property',
     },
     {
       title: 'Manage Bookings',
       icon: FileText,
-      onClick: () => router.push('/hotel/bookings'),
+      onClick: () => router.push('/apartment/bookings'),
       description: 'View and manage bookings',
     },
     {
       title: 'Hotel Settings',
       icon: Settings,
-      onClick: () => router.push('/hotel/settings'),
+      onClick: () => router.push('/apartment/settings'),
       description: 'Update property details',
     },
   ];

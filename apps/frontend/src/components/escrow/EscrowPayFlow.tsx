@@ -144,7 +144,7 @@ export function EscrowPayFlow({
         return;
       }
 
-      router.push(`/hotel/${apartmentId}/escrow/${payload.engagementId}`);
+      router.push(`/apartment/${apartmentId}/escrow/${payload.engagementId}`);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to complete escrow signing.'));
     } finally {
