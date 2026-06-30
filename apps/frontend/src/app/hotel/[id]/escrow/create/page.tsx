@@ -1,6 +1,3 @@
-import { EscrowPayFlow } from '@/components/escrow/EscrowPayFlow';
-import { EscrowDetailLayout } from '@/components/escrow/EscrowDetailLayout';
-import type { CSSProperties } from 'react';
 "use client";
 
 import { useQuery } from "@apollo/client";
@@ -19,9 +16,15 @@ const styles = {
     color: "#111827",
   } satisfies CSSProperties,
   grid: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr)",
     gap: "1.5rem",
     marginTop: "1.5rem",
     alignItems: "start",
+  } satisfies CSSProperties,
+  mainColumn: {
+    display: "grid",
+    gap: "1rem",
   } satisfies CSSProperties,
   panel: {
     border: "1px solid #fed7aa",
@@ -54,7 +57,11 @@ const styles = {
   } satisfies CSSProperties,
 } as const;
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const desktopGridClassName = "grid grid-cols-1 lg:grid-cols-3";
+const mainColumnClassName = "lg:col-span-2";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type ApartmentData = {
   id: string;
@@ -79,81 +86,62 @@ export default function EscrowCreatePage({
 
   const { data, loading, error } = useQuery<{ apartments: ApartmentData[] }>(
     GET_APARTMENT_BY_ID,
-    { variables: { id: params.id }, skip: !isValidId }
+    {
+      variables: { id: params.id },
+      skip: !isValidId,
+    },
   );
 
   const apartment = data?.apartments[0] ?? null;
 
   return (
     <div style={styles.page}>
-      <EscrowDetailLayout invoiceNumber="INV4257-09-012" status="pending">
-        <div style={{ ...styles.panel, display: 'grid', gap: '1rem' }}>
-          <div style={styles.headingRow}>
-            <div>
-              <p style={{ margin: 0, fontSize: '0.8rem', letterSpacing: '0.08em', color: '#9ca3af' }}>
-                HOTEL {params.id}
-              </p>
-              <h2 style={{ marginTop: '0.35rem', marginBottom: 0, fontSize: '1.5rem' }}>{STUB_APARTMENT.name}</h2>
-            </div>
-            <div style={styles.payButton}>
-              <EscrowPayFlow
-                apartmentId={params.id}
-                apartmentName={STUB_APARTMENT.name}
-                ownerAddress={STUB_APARTMENT.owner.walletAddress}
-                amount={STUB_APARTMENT.price}
-              />
-            </div>
-          </div>
-
-          <div style={styles.imageGrid}>
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} style={styles.imagePlaceholder} />
-            ))}
-          </div>
       <InvoiceHeader invoiceNumber="INV4257-09-012" status="pending" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3" style={styles.grid}>
-        <div className="lg:col-span-2" style={{ ...styles.panel, display: "grid", gap: "1rem" }}>
-          {loading && (
-            <p style={styles.mutedText}>Loading property details…</p>
-          )}
+      <div className={desktopGridClassName} style={styles.grid}>
+        <div className={mainColumnClassName} style={styles.mainColumn}>
+          <div style={styles.panel}>
+            {loading && (
+              <p style={styles.mutedText}>Loading property details…</p>
+            )}
 
-          {error && (
-            <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem" }}>
-              Failed to load property details.
-            </p>
-          )}
+            {error && (
+              <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.9rem" }}>
+                Failed to load property details.
+              </p>
+            )}
 
-          <div>
-            <h3 style={{ marginTop: 0, marginBottom: '0.35rem', fontSize: '1rem' }}>Owner contact</h3>
-            <p style={{ margin: 0, fontSize: '0.95rem' }}>Phone: +1 555-0100</p>
-            <p style={{ margin: '0.35rem 0 0', fontSize: '0.95rem' }}>Email: owner@example.com</p>
+            {apartment && (
+              <ApartmentPropertyCard
+                name={apartment.name}
+                imageUrls={apartment.image_urls}
+                address={apartment.address}
+                description={apartment.description}
+                paySlot={
+                  <EscrowPayFlow
+                    apartmentId={params.id}
+                    apartmentName={apartment.name}
+                    ownerAddress={apartment.owner_id}
+                    amount={apartment.price}
+                  />
+                }
+              />
+            )}
+
+            {(!isValidId || (!loading && !error && !apartment)) && (
+              <p style={styles.mutedText}>Property not found.</p>
+            )}
           </div>
-          {apartment && (
-            <ApartmentPropertyCard
-              name={apartment.name}
-              imageUrls={apartment.image_urls}
-              address={apartment.address}
-              description={apartment.description}
-              paySlot={
-                <EscrowPayFlow
-                  apartmentId={params.id}
-                  apartmentName={apartment.name}
-                  // TODO: replace with owner's Stellar wallet from users_wallets once wired
-                  ownerAddress={apartment.owner_id}
-                  amount={apartment.price}
-                />
-              }
-            />
-          )}
-
-          {(!isValidId || (!loading && !error && !apartment)) && (
-            <p style={styles.mutedText}>Property not found.</p>
-          )}
 
           {apartment && (
-            <div>
-              <h3 style={{ marginTop: 0, marginBottom: "0.35rem", fontSize: "1rem" }}>
+            <div style={styles.panel}>
+              <h3
+                style={{
+                  marginTop: 0,
+                  marginBottom: "0.35rem",
+                  fontSize: "1rem",
+                }}
+              >
                 Owner contact
               </h3>
               <p style={{ margin: 0, fontSize: "0.95rem" }}>
@@ -176,7 +164,7 @@ export default function EscrowCreatePage({
           </div>
           <ProcessStepper currentStep={1} />
         </div>
-      </EscrowDetailLayout>
+      </div>
     </div>
   );
 }
