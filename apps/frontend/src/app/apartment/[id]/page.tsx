@@ -9,23 +9,10 @@
 //   Apollo query: GET_APARTMENT_BY_ID -> public.apartments (Hasura)
 
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 
-const STUB_APARTMENT = {
-  name: "La sabana sur",
-  address: "329 Calle santos, paseo colón, San José",
-  price: 4058,
-  bedrooms: 2,
-  bathrooms: 1,
-  petFriendly: true,
-  owner: {
-    name: "Alberto Casas",
-    email: "albertoCasas100@gmail.com",
-    phone: "+506 64852179",
-  },
-  description:
-    "Beautiful apartment in the heart of San José with modern amenities and stunning views.",
-};
+import { getStubApartmentById } from "@/lib/stub-apartments";
 
 const styles = {
   page: {
@@ -102,6 +89,11 @@ export default function ApartmentDetailPage({
 }: {
   params: { id: string };
 }) {
+  const apartment = getStubApartmentById(params.id);
+  if (!apartment) {
+    notFound();
+  }
+
   return (
     <div style={styles.page}>
       <aside
@@ -167,13 +159,13 @@ export default function ApartmentDetailPage({
         <div style={styles.header}>
           <div>
             <h1 style={{ margin: 0, fontSize: "2rem", fontWeight: 700 }}>
-              {STUB_APARTMENT.name}
+              {apartment.name}
             </h1>
 
             <p
               style={{ marginTop: "0.5rem", color: "#ea580c", fontWeight: 600 }}
             >
-              ${STUB_APARTMENT.price.toLocaleString()}.00 Per month
+              ${apartment.price.toLocaleString()}.00 Per month
             </p>
           </div>
 
@@ -188,20 +180,20 @@ export default function ApartmentDetailPage({
         <div
           style={{ ...styles.metaRow, color: "#57534e", fontSize: "0.95rem" }}
         >
-          <span>📍 {STUB_APARTMENT.address}</span>
+          <span>📍 {apartment.address}</span>
         </div>
 
         <div style={{ ...styles.metaRow, fontSize: "0.95rem" }}>
-          <span>🛏 {STUB_APARTMENT.bedrooms} bd</span>
+          <span>🛏 {apartment.bedrooms} bd</span>
           <span>
-            🐾 {STUB_APARTMENT.petFriendly ? "pet friendly" : "no pets"}
+            🐾 {apartment.petFriendly ? "pet friendly" : "no pets"}
           </span>
-          <span>🚿 {STUB_APARTMENT.bathrooms} ba</span>
+          <span>🚿 {apartment.bathrooms} ba</span>
         </div>
 
         <div style={{ marginBottom: "1rem" }}>
           <p style={{ marginBottom: "0.25rem", fontWeight: 600 }}>
-            Owner: {STUB_APARTMENT.owner.name}
+            Owner: {apartment.owner.name}
           </p>
         </div>
 
@@ -211,7 +203,7 @@ export default function ApartmentDetailPage({
           </h2>
 
           <p style={{ color: "#57534e", lineHeight: 1.6 }}>
-            {STUB_APARTMENT.description}
+            {apartment.description}
           </p>
         </div>
       </main>

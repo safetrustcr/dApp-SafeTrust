@@ -11,35 +11,7 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 
-const STUB_APARTMENTS = [
-  {
-    id: '1',
-    name: 'La sabana sur',
-    address: '329 Calle santos, San Jose',
-    price: 4058,
-    bedrooms: 2,
-    bathrooms: 1,
-    petFriendly: true,
-  },
-  {
-    id: '2',
-    name: 'Los yoses',
-    address: '329 Calle santos, San Jose',
-    price: 4000,
-    bedrooms: 2,
-    bathrooms: 1,
-    petFriendly: true,
-  },
-  {
-    id: '3',
-    name: 'Escazú plaza',
-    address: '45 Avenida central, Escazú',
-    price: 3500,
-    bedrooms: 1,
-    bathrooms: 1,
-    petFriendly: false,
-  },
-] as const;
+import { STUB_APARTMENTS } from '@/lib/stub-apartments';
 
 const styles = {
   page: {
@@ -101,7 +73,7 @@ const styles = {
   } satisfies CSSProperties,
 } as const;
 
-export default function HotelListingPage() {
+export default function ApartmentListingPage() {
   return (
     <div style={styles.page}>
       {/* TODO: replace with <FilterSidebar /> */}

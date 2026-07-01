@@ -116,6 +116,14 @@ export const GET_APARTMENT_BY_ID = gql`
       address
       price
       owner_id
+      owner {
+        user_wallets(
+          where: { is_primary: { _eq: true }, chain_type: { _eq: "STELLAR" } }
+          limit: 1
+        ) {
+          wallet_address
+        }
+      }
     }
   }
 `;

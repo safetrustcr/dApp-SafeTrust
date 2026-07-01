@@ -31,9 +31,47 @@ type InvoiceEscrow = {
   apartment: InvoiceApartment;
 };
 
+type EscrowViewLabel = 'paid' | 'blocked' | 'released';
+
 type ViewConfig = {
-  label: StubStatus;
+  label: EscrowViewLabel;
   title: string;
+  step: number;
+};
+
+type EscrowRecord = {
+  id?: string;
+  contract_id?: string | null;
+  engagement_id?: string | null;
+  amount?: number | null;
+  status?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  sender_address?: string | null;
+  receiver_address?: string | null;
+  resolution_notes?: string | null;
+  tenant_wallet?: {
+    user?: {
+      first_name?: string | null;
+      last_name?: string | null;
+      email?: string | null;
+      phone_number?: string | null;
+      country_code?: string | null;
+    } | null;
+  } | null;
+  apartment?: {
+    name?: string | null;
+    image_urls?: string[] | null;
+    description?: string | null;
+    price?: number | null;
+    owner?: {
+      first_name?: string | null;
+      last_name?: string | null;
+      email?: string | null;
+      phone_number?: string | null;
+      country_code?: string | null;
+    } | null;
+  } | null;
 };
 
 const STUB_INVOICE_ESCROW: InvoiceEscrow = {
@@ -237,13 +275,27 @@ const PROCESS_STEPS = [
 
 function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
   switch (status) {
-    case 'blocked':
-      return { label: 'blocked', title: 'Payment batch - Escrow Status' };
-    case 'released':
-      return { label: 'released', title: 'Deposit / Escrow Released' };
-    case 'paid':
+    case 'funded':
+      return {
+        label: 'blocked',
+        title: 'Payment batch - Escrow Status',
+        step: 3,
+      };
+    case 'completed':
+    case 'resolved':
+      return {
+        label: 'released',
+        title: 'Deposit / Escrow Released',
+        step: 4,
+      };
+    case 'active':
+    case 'pending_signature':
     default:
-      return { label: 'paid', title: 'Payment batch January 2025' };
+      return {
+        label: 'paid',
+        title: 'Payment batch January 2025',
+        step: 2,
+      };
   }
 }
 
@@ -402,15 +454,25 @@ function ProductCell({ apartment }: { apartment: InvoiceApartment }) {
   );
 }
 
-function PaidStubView() {
-  const escrow = STUB_INVOICE_ESCROW;
+function PaidStubView({ escrow }: { escrow?: EscrowRecord | null }) {
+  const apartment = escrow?.apartment ?? STUB_INVOICE_ESCROW.apartment;
+  const invoiceNumber = escrow?.engagement_id
+    ? `INV-${escrow.engagement_id.slice(0, 12)}`
+    : 'INV4257-09-012';
+  const tenantEmail = escrow?.tenant_wallet?.user?.email ?? 'John_s@gmail.com';
+  const tenantName = escrow?.tenant_wallet?.user
+    ? `${escrow.tenant_wallet.user.first_name ?? ''} ${escrow.tenant_wallet.user.last_name ?? ''}`.trim()
+    : 'John Smith';
+  const monthlyPrice = escrow?.apartment?.price ?? 4000;
+  const depositAmount = escrow?.amount ?? monthlyPrice;
+
   return (
     <div style={{ display: 'grid', gap: '1.5rem' }}>
       <div style={styles.splitGrid}>
-        <InfoPair label="Billed to" value="John_s@gmail.com" />
-        <InfoPair label="Invoice Number" value="INV4257-09-012" />
-        <InfoPair label="Billing details" value="John Smith" />
-        <InfoPair label="Currency" value="IDR - Dollar" />
+        <InfoPair label="Billed to" value={tenantEmail} />
+        <InfoPair label="Invoice Number" value={invoiceNumber} />
+        <InfoPair label="Billing details" value={tenantName || 'Tenant'} />
+        <InfoPair label="Currency" value="USD - Dollar" />
       </div>
 
       <div style={{ border: '1px solid #fed7aa', borderRadius: '1rem', overflow: 'hidden' }}>
@@ -425,13 +487,13 @@ function PaidStubView() {
           <tbody>
             <tr>
               <td style={{ padding: '0.9rem', borderTop: '1px solid #fed7aa' }}>
-                <ProductCell apartment={escrow.apartment} />
+                <ProductCell apartment={apartment} />
               </td>
               <td style={{ padding: '0.9rem', textAlign: 'right', borderTop: '1px solid #fed7aa' }}>
-                $4,000
+                ${monthlyPrice.toLocaleString()}
               </td>
               <td style={{ padding: '0.9rem', textAlign: 'right', borderTop: '1px solid #fed7aa' }}>
-                $4,000
+                ${depositAmount.toLocaleString()}
               </td>
             </tr>
           </tbody>
@@ -439,18 +501,27 @@ function PaidStubView() {
       </div>
 
       <div style={{ fontSize: '0.95rem' }}>
-        <strong>Total: $8,000</strong>
+        <strong>Total: ${(monthlyPrice + depositAmount).toLocaleString()}</strong>
       </div>
     </div>
   );
 }
 
-function BlockedStubView() {
+function BlockedStubView({ escrow }: { escrow?: EscrowRecord | null }) {
+  const createdAt = escrow?.created_at
+    ? formatDate(escrow.created_at)
+    : '25 January 2025';
+  const blockedAmount = escrow?.amount
+    ? `$${escrow.amount.toLocaleString()}`
+    : '$4,000';
+  const tenantUser = escrow?.tenant_wallet?.user;
+  const ownerUser = escrow?.apartment?.owner;
+
   return (
     <div style={{ display: 'grid', gap: '1.5rem' }}>
       <div style={styles.splitGrid}>
-        <InfoPair label="Creation date" value="25 January 2025" />
-        <InfoPair label="Amount blocked" value="$4,000" />
+        <InfoPair label="Creation date" value={createdAt} />
+        <InfoPair label="Amount blocked" value={blockedAmount} />
       </div>
 
       <div>
@@ -482,17 +553,33 @@ function BlockedStubView() {
         <div>
           <h3 style={{ marginTop: 0 }}>Tenant Information</h3>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
-            <InfoPair label="Tenant name" value="John Smith" />
-            <InfoPair label="Wallet Address" value={<span title="MJE1234567890ABCDEF1234567890ABCDEFXN32">{truncateStellarAddress("MJE1234567890ABCDEF1234567890ABCDEFXN32")}</span>} />
-            <InfoPair label="Email" value="John_s@gmail.com" />
+            <InfoPair label="Tenant name" value={
+              tenantUser
+                ? `${tenantUser.first_name ?? ''} ${tenantUser.last_name ?? ''}`.trim() || 'Tenant'
+                : 'John Smith'
+            } />
+            <InfoPair label="Wallet Address" value={
+              <span title={escrow?.sender_address ?? undefined}>
+                {truncateStellarAddress(escrow?.sender_address ?? 'MJE1234567890ABCDEF1234567890ABCDEFXN32')}
+              </span>
+            } />
+            <InfoPair label="Email" value={tenantUser?.email ?? 'John_s@gmail.com'} />
           </div>
         </div>
         <div>
           <h3 style={{ marginTop: 0 }}>Owner Information</h3>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
-            <InfoPair label="Owner name" value="Alberto Casas" />
-            <InfoPair label="Wallet Address" value={<span title="MJE1234567890ABCDEF1234567890ABCDEFXN32">{truncateStellarAddress("MJE1234567890ABCDEF1234567890ABCDEFXN32")}</span>} />
-            <InfoPair label="Email" value="albertoCasas100@gmail.com" />
+            <InfoPair label="Owner name" value={
+              ownerUser
+                ? `${ownerUser.first_name ?? ''} ${ownerUser.last_name ?? ''}`.trim() || 'Owner'
+                : 'Alberto Casas'
+            } />
+            <InfoPair label="Wallet Address" value={
+              <span title={escrow?.receiver_address ?? undefined}>
+                {truncateStellarAddress(escrow?.receiver_address ?? 'MJE1234567890ABCDEF1234567890ABCDEFXN32')}
+              </span>
+            } />
+            <InfoPair label="Email" value={ownerUser?.email ?? 'albertoCasas100@gmail.com'} />
           </div>
         </div>
       </div>
@@ -509,21 +596,21 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function ReleasedView({ escrow }: { escrow: any }) {
+function ReleasedView({ escrow }: { escrow?: EscrowRecord | null }) {
   const isMock = !escrow;
 
   const justification = isMock
     ? "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book"
     : (escrow.resolution_notes || escrow.apartment?.description || "Deposit released.");
 
-  const tenantUser = escrow?.tenant_wallet?.user;
+  const ownerUser = escrow?.apartment?.owner;
   const beneficiaryName = isMock
-    ? "John Smith"
-    : (tenantUser ? `${tenantUser.first_name || ''} ${tenantUser.last_name || ''}`.trim() : "Tenant");
+    ? "Alberto Casas"
+    : (ownerUser ? `${ownerUser.first_name || ''} ${ownerUser.last_name || ''}`.trim() : "Owner");
 
   const beneficiaryWallet = isMock
     ? "MJE...XN32"
-    : (escrow.sender_address ? truncateStellarAddress(escrow.sender_address) : "N/A");
+    : (escrow.receiver_address ? truncateStellarAddress(escrow.receiver_address) : "N/A");
 
   const releasedDate = isMock
     ? "20 January 2025"
@@ -534,13 +621,13 @@ function ReleasedView({ escrow }: { escrow: any }) {
     : (escrow.amount ? `$${escrow.amount.toLocaleString()}` : "$0");
 
   const email = isMock
-    ? "John_s@gmail.com"
-    : (tenantUser?.email || "N/A");
+    ? "albertoCasas100@gmail.com"
+    : (ownerUser?.email || "N/A");
 
   const phone = isMock
     ? "+506 64895321"
-    : (tenantUser?.phone_number
-      ? `${tenantUser.country_code ? `+${tenantUser.country_code.replace(/^\+/, '')} ` : ''}${tenantUser.phone_number}`
+    : (ownerUser?.phone_number
+      ? `${ownerUser.country_code ? `+${ownerUser.country_code.replace(/^\+/, '')} ` : ''}${ownerUser.phone_number}`
       : "N/A");
 
   return (
@@ -775,8 +862,8 @@ export default function EscrowDetailPage({
 
             <hr style={styles.divider} />
 
-            {view.label === 'paid' && <PaidStubView />}
-            {view.label === 'blocked' && <BlockedStubView />}
+            {view.label === 'paid' && <PaidStubView escrow={escrow} />}
+            {view.label === 'blocked' && <BlockedStubView escrow={escrow} />}
             {view.label === 'released' && <ReleasedView escrow={escrow} />}
           </div>
 
