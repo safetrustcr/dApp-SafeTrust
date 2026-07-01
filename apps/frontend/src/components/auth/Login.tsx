@@ -54,7 +54,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if ((address || token) && pathname === "/login") {
-      router.push("/dashboard");
+      router.push("/dashboard/escrow-dashboard");
     }
   }, [address, token, router, pathname]);
 
@@ -73,7 +73,7 @@ export default function LoginPage() {
       toast.success("Login successful!", {
         description: "Redirecting to your dashboard...",
       });
-      router.push("/dashboard");
+      router.push("/dashboard/escrow-dashboard");
     } catch (err: unknown) {
       if (err instanceof FirebaseError) {
         toast.error(
