@@ -749,6 +749,8 @@ export default function EscrowDetailPage({
   });
 
   const escrow = data?.escrows?.[0];
+  const apartmentMismatch =
+    escrow?.apartment?.id != null && escrow.apartment.id !== params.id;
 
   let status: EscrowStatus;
   let invoiceNumber: string;
@@ -782,6 +784,19 @@ export default function EscrowDetailPage({
         <div style={styles.page}>
           <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
             Loading escrow details...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (apartmentMismatch) {
+    return (
+      <div style={styles.pageWrapper}>
+        <div style={styles.page}>
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626', backgroundColor: '#fee2e2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
+            <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>Escrow Not Found</h2>
+            <p style={{ margin: 0, fontSize: '0.9rem' }}>This escrow does not belong to the selected apartment.</p>
           </div>
         </div>
       </div>

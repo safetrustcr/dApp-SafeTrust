@@ -15,7 +15,7 @@ export function QuickActions({ userRole }: QuickActionsProps) {
       title: 'New Booking',
       icon: Plus,
       onClick: () => router.push('/book'),
-      description: 'Start a new hotel booking',
+      description: 'Start a new apartment booking',
     },
     {
       title: 'My Profile',
