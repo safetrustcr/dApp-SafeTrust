@@ -6,7 +6,7 @@ import { LogoutButton } from "@/components/auth/LogoutButton";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 // Add to imports at the top:
-import { Bell, Heart, Home, LayoutDashboard, PlusSquare, Shield, Users } from "lucide-react";
+import { Bell, Building2, Heart, Home, LayoutDashboard, PlusSquare, Shield, Users } from "lucide-react";
 
 interface SideBarProps {
   className?: string;
@@ -66,6 +66,21 @@ export function SideBar({
           <span className="md:hidden lg:block">Escrow Dashboard</span>
           <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
             Escrow Dashboard
+          </span>
+        </Link>
+        <Link
+          href="/rent"
+          onClick={onClose}
+          className={cn(
+            "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full group relative dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
+            pathname === "/rent" &&
+              "bg-accent font-medium dark:bg-gray-800 dark:text-white",
+          )}
+        >
+          <Building2 className="w-6 h-6 shrink-0 dark:text-gray-400" />
+          <span className="md:hidden lg:block">Rent</span>
+          <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
+            Rent
           </span>
         </Link>
         <Link
