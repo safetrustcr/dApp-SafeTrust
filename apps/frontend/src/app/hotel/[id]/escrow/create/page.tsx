@@ -17,7 +17,6 @@ const styles = {
   } satisfies CSSProperties,
   grid: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr)",
     gap: "1.5rem",
     marginTop: "1.5rem",
     alignItems: "start",
@@ -74,7 +73,11 @@ type ApartmentData = {
     city?: string;
   } | null;
   price: number;
-  owner_id: string;
+  owner: {
+    user_wallets: {
+      wallet_address: string;
+    }[];
+  };
 };
 
 export default function EscrowCreatePage({
@@ -93,6 +96,7 @@ export default function EscrowCreatePage({
   );
 
   const apartment = data?.apartments[0] ?? null;
+  const ownerWallet = apartment?.owner.user_wallets[0]?.wallet_address ?? "";
 
   return (
     <div style={styles.page}>
@@ -121,7 +125,7 @@ export default function EscrowCreatePage({
                   <EscrowPayFlow
                     apartmentId={params.id}
                     apartmentName={apartment.name}
-                    ownerAddress={apartment.owner_id}
+                    ownerAddress={ownerWallet}
                     amount={apartment.price}
                   />
                 }
@@ -145,7 +149,7 @@ export default function EscrowCreatePage({
                 Owner contact
               </h3>
               <p style={{ margin: 0, fontSize: "0.95rem" }}>
-                Wallet: {apartment.owner_id}
+                Wallet: {ownerWallet}
               </p>
             </div>
           )}
