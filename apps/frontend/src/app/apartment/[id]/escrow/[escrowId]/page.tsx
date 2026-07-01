@@ -60,6 +60,7 @@ type EscrowRecord = {
     } | null;
   } | null;
   apartment?: {
+    id?: string | null;
     name?: string | null;
     image_urls?: string[] | null;
     description?: string | null;

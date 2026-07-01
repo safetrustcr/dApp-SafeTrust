@@ -11,7 +11,11 @@ export default function EscrowDetailLayout({ children }: { children: ReactNode }
     html.classList.remove("dark");
     html.classList.add("light");
     return () => {
-      html.className = classNameSnapshot;
+      const stillOnForcedLight =
+        html.classList.contains("light") && !html.classList.contains("dark");
+      if (stillOnForcedLight) {
+        html.className = classNameSnapshot;
+      }
     };
   }, []);
 

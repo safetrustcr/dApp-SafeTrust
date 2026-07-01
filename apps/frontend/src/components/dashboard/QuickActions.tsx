@@ -1,4 +1,4 @@
-import { Plus, Hotel, User, Settings, CreditCard, FileText, HelpCircle } from 'lucide-react';
+import { Plus, User, Settings, CreditCard, FileText, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
