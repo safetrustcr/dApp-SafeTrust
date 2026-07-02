@@ -1,4 +1,4 @@
-import { Plus, Hotel, User, Settings, CreditCard, FileText, HelpCircle } from 'lucide-react';
+import { Plus, User, Settings, CreditCard, FileText, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
@@ -15,7 +15,7 @@ export function QuickActions({ userRole }: QuickActionsProps) {
       title: 'New Booking',
       icon: Plus,
       onClick: () => router.push('/book'),
-      description: 'Start a new hotel booking',
+      description: 'Start a new apartment booking',
     },
     {
       title: 'My Profile',
@@ -35,19 +35,19 @@ export function QuickActions({ userRole }: QuickActionsProps) {
     {
       title: 'Add Property',
       icon: Plus,
-      onClick: () => router.push('/hotel/properties/add'),
+      onClick: () => router.push('/dashboard/apartments/new'),
       description: 'List a new property',
     },
     {
       title: 'Manage Bookings',
       icon: FileText,
-      onClick: () => router.push('/hotel/bookings'),
+      onClick: () => router.push('/dashboard/escrow'),
       description: 'View and manage bookings',
     },
     {
-      title: 'Hotel Settings',
+      title: 'Apartment Settings',
       icon: Settings,
-      onClick: () => router.push('/hotel/settings'),
+      onClick: () => router.push('/dashboard/apartments'),
       description: 'Update property details',
     },
   ];
