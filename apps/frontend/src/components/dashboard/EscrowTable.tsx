@@ -55,7 +55,7 @@ export function EscrowTable({ escrows, userRole }: EscrowTableProps) {
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency === 'XLM' ? 'USD' : currency,
+      currency: (currency === 'XLM' || currency === 'USDC') ? 'USD' : currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 6,
     }).format(amount);
