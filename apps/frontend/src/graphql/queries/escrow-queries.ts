@@ -134,3 +134,48 @@ export const GET_ESCROW_BY_ANY_ID = gql`
   }
 `;
 
+export const GET_ESCROW_DASHBOARD_STATS = gql`
+  query GetEscrowDashboardStats($tenant_id: String!) {
+    total: trustlessWorkEscrows_aggregate(
+      where: { tenantId: { _eq: $tenant_id } }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    active: trustlessWorkEscrows_aggregate(
+      where: {
+        tenantId: { _eq: $tenant_id }
+        status: { _in: ["funded", "active", "milestone_approved"] }
+      }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    completed: trustlessWorkEscrows_aggregate(
+      where: {
+        tenantId: { _eq: $tenant_id }
+        status: { _eq: "completed" }
+      }
+    ) {
+      aggregate {
+        count
+      }
+    }
+    total_value: trustlessWorkEscrows_aggregate(
+      where: {
+        tenantId: { _eq: $tenant_id }
+        status: { _nin: ["cancelled", "resolved"] }
+      }
+    ) {
+      aggregate {
+        sum {
+          amount
+        }
+      }
+    }
+  }
+`;
+
+
