@@ -94,6 +94,42 @@ pnpm install          # always run from repo root
 
 > ⚠️ Never run `pnpm install` from inside a subdirectory — `workspace:*` deps only resolve from the root.
 
+### 2. Set up environment variables
+
+```bash
+cp apps/frontend/.env.example apps/frontend/.env.local
+```
+
+Open `apps/frontend/.env.local` and fill in every value. The table below summarises what is required and where each value comes from.
+
+| Variable | Required | Source |
+|---|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | ✅ | Firebase Console → Project Settings → Your apps |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | ✅ | same |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | ✅ | same |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | ✅ | same |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | ✅ | same |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | ✅ | same |
+| `NEXT_PUBLIC_HASURA_GRAPHQL_URL` | ✅ | `http://localhost:8080/v1/graphql` (default) |
+| `NEXT_PUBLIC_HASURA_WS_URL` | ✅ | `ws://localhost:8080/v1/graphql` (default) |
+| `HASURA_ADMIN_SECRET` | ✅ | Must match `HASURA_GRAPHQL_ADMIN_SECRET` in `infra/hasura/.env` |
+| `NEXT_PUBLIC_BACKEND_URL` | ✅ | `http://localhost:3002` (default) |
+| `TRUSTLESS_WORK_API_KEY` | ✅ | See below — **crashes the server if missing** |
+| `TRUSTLESS_WORK_API_URL` | ✅ | `https://dev.api.trustlesswork.com` (testnet default) |
+| `NEXT_PUBLIC_PLATFORM_ADDRESS` | ✅ | Your SafeTrust Stellar wallet address |
+| `NEXT_PUBLIC_USDC_ADDRESS` | ✅ | Pre-filled in `.env.example` — do not change for testnet |
+
+> ⚠️ `TRUSTLESS_WORK_API_KEY`, `TRUSTLESS_WORK_API_URL`, and `HASURA_ADMIN_SECRET` are read at module load time. If any of them is missing, Next.js will crash immediately on `pnpm run dev`.
+
+#### Getting a TrustlessWork API key
+
+1. Go to [dapp.trustlesswork.com](https://dapp.trustlesswork.com) and connect your **Freighter wallet**.
+2. Under **Settings → Profile**, fill in the use-case field (required before you can request a key).
+3. Under **Settings → API Keys**, click **Request API Key** and select **Testnet**.
+4. Copy the key immediately — it is shown only once.
+
+Full guide: [docs.trustlesswork.com → Request API Key](https://docs.trustlesswork.com/trustless-work/introduction/developer-resources/request-api-key)
+
 ---
 
 ## Firebase Setup
@@ -109,22 +145,13 @@ SafeTrust uses Firebase for user authentication. You need a Firebase project bef
 
 ### Frontend environment — `apps/frontend/.env.local`
 
+Copy from the template and fill in your values:
+
 ```bash
-# From Firebase Console → Project Settings → General → Your apps
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
-NEXT_PUBLIC_FIREBASE_APP_ID=
-
-# Hasura GraphQL endpoint
-NEXT_PUBLIC_HASURA_GRAPHQL_URL=http://localhost:8080/v1/graphql
-NEXT_PUBLIC_HASURA_WS_URL=ws://localhost:8080/v1/graphql
-
-# Backend webhook (auth sync)
-NEXT_PUBLIC_BACKEND_URL=http://localhost:3000
+cp apps/frontend/.env.example apps/frontend/.env.local
 ```
+
+See [Step 2: Set up environment variables](#2-set-up-environment-variables) in the Quick Start section for the full variable reference and instructions for each value.
 
 ---
 
