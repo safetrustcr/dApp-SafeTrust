@@ -25,36 +25,52 @@ const ACTION_ENDPOINT: Record<ActionKind, string> = {
 };
 
 const flowStyles = {
-  button: {
-    border: '1px solid #f97316',
-    backgroundColor: '#f97316',
-    color: '#ffffff',
-    fontWeight: 700,
-    padding: '0.6rem 1.5rem',
-    borderRadius: '0.75rem',
-  },
   panel: {
-    border: '1px solid #fed7aa',
-    borderRadius: '1rem',
-    backgroundColor: '#ffffff',
-    padding: '1rem',
     display: 'grid',
-    gap: '0.5rem',
+    gap: '0.6rem',
+  },
+  title: {
+    margin: 0,
+    fontSize: '1.1rem',
+    fontWeight: 900,
+    color: '#202124',
+  },
+  description: {
+    margin: 0,
+    color: '#6f7275',
+    fontSize: '0.82rem',
+    lineHeight: 1.4,
+  },
+  button: {
+    alignSelf: 'start',
+    border: 'none',
+    backgroundColor: '#111827',
+    color: '#ffffff',
+    fontWeight: 800,
+    fontSize: '0.82rem',
+    padding: '0.6rem 1.4rem',
+    borderRadius: '0.35rem',
+  },
+  label: {
+    fontSize: '0.82rem',
+    color: '#6f7275',
   },
   input: {
     display: 'block',
     width: '100%',
-    marginTop: '0.25rem',
+    marginTop: '0.3rem',
     border: '1px solid #d8d8d8',
     borderRadius: '0.35rem',
-    padding: '0.5rem 0.6rem',
+    padding: '0.55rem 0.7rem',
     font: 'inherit',
+    fontSize: '0.85rem',
+    color: '#5f6368',
   },
   errorList: {
     margin: 0,
-    paddingLeft: '1.25rem',
+    paddingLeft: '1.1rem',
     color: '#b91c1c',
-    fontSize: '0.9rem',
+    fontSize: '0.8rem',
   },
 } as const satisfies Record<string, CSSProperties>;
 
@@ -89,13 +105,13 @@ function ActionPanel({
 
   return (
     <div style={flowStyles.panel}>
-      <h3 style={{ margin: 0 }}>{title}</h3>
-      <p style={{ margin: 0, color: '#6b7280', fontSize: '0.85rem' }}>{description}</p>
+      <h3 style={flowStyles.title}>{title}</h3>
+      <p style={flowStyles.description}>{description}</p>
       <button
         type="button"
         onClick={ready ? onSign : onPrepare}
         disabled={busy}
-        style={{ ...flowStyles.button, opacity: busy ? 0.7 : 1, cursor: busy ? 'wait' : 'pointer', justifySelf: 'start' }}
+        style={{ ...flowStyles.button, opacity: busy ? 0.7 : 1, cursor: busy ? 'wait' : 'pointer' }}
       >
         {label}
       </button>
@@ -238,11 +254,11 @@ export function EscrowLifecycleActions({
 
     content = (
       <div style={flowStyles.panel}>
-        <h3 style={{ margin: 0 }}>Resolve Dispute</h3>
-        <p style={{ margin: 0, color: '#6b7280', fontSize: '0.85rem' }}>
+        <h3 style={flowStyles.title}>Resolve Dispute</h3>
+        <p style={flowStyles.description}>
           Split the deposit between the tenant (approver) and the owner (receiver).
         </p>
-        <label style={{ fontSize: '0.85rem', color: '#374151' }}>
+        <label style={flowStyles.label}>
           Approver funds
           <input
             type="number"
@@ -252,7 +268,7 @@ export function EscrowLifecycleActions({
             style={flowStyles.input}
           />
         </label>
-        <label style={{ fontSize: '0.85rem', color: '#374151' }}>
+        <label style={flowStyles.label}>
           Receiver funds
           <input
             type="number"
@@ -266,7 +282,7 @@ export function EscrowLifecycleActions({
           type="button"
           onClick={ready ? handleSignAndSend : handleResolveDispute}
           disabled={busy}
-          style={{ ...flowStyles.button, opacity: busy ? 0.7 : 1, cursor: busy ? 'wait' : 'pointer', justifySelf: 'start' }}
+          style={{ ...flowStyles.button, opacity: busy ? 0.7 : 1, cursor: busy ? 'wait' : 'pointer' }}
         >
           {label}
         </button>
@@ -279,15 +295,18 @@ export function EscrowLifecycleActions({
   }
 
   return (
-    <div style={{ display: 'grid', gap: '0.75rem' }}>
-      {content}
-      {errorMessages.length > 0 && (
-        <ul style={flowStyles.errorList}>
-          {errorMessages.map((message, index) => (
-            <li key={index}>{message}</li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <>
+      <div style={{ display: 'grid', gap: '0.6rem' }}>
+        {content}
+        {errorMessages.length > 0 && (
+          <ul style={flowStyles.errorList}>
+            {errorMessages.map((message, index) => (
+              <li key={index}>{message}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <hr style={{ border: 'none', borderTop: '1px solid #c5c5c5', margin: 0 }} />
+    </>
   );
 }
