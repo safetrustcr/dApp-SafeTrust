@@ -16,9 +16,10 @@ type EscrowLifecycleActionsProps = {
 
 type PrepareResponse = { unsignedXDR: string; message?: string };
 
-type ActionKind = 'milestone-status' | 'release-funds' | 'resolve-dispute';
+type ActionKind = 'fund' | 'milestone-status' | 'release-funds' | 'resolve-dispute';
 
 const ACTION_ENDPOINT: Record<ActionKind, string> = {
+  fund: '/api/escrow/fund',
   'milestone-status': '/api/escrow/milestone-status',
   'release-funds': '/api/escrow/release-funds',
   'resolve-dispute': '/api/escrow/resolve-dispute',
@@ -137,6 +138,7 @@ export function EscrowLifecycleActions({
   const [receiverFunds, setReceiverFunds] = useState(amount);
 
   const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS;
+  const isTenant = Boolean(address) && address === senderAddress;
   const isOwner = Boolean(address) && address === receiverAddress;
   const isPlatform = Boolean(address) && Boolean(platformAddress) && address === platformAddress;
   const busy = preparing || signing;
@@ -198,6 +200,8 @@ export function EscrowLifecycleActions({
     }
   };
 
+  const handleFundEscrow = () => prepare('fund', { contractId, signer: senderAddress, amount });
+
   const handleMarkMilestoneComplete = () =>
     prepare('milestone-status', {
       contractId,
@@ -209,12 +213,31 @@ export function EscrowLifecycleActions({
 
   const handleReleaseFunds = () => prepare('release-funds', { contractId, releaseSigner: platformAddress });
 
-  const handleResolveDispute = () =>
+  const handleResolveDispute = () => {
+    if (approverFunds + receiverFunds !== amount) {
+      setErrorMessages([`Approver funds + receiver funds must equal the escrow amount (${amount}).`]);
+      return;
+    }
     prepare('resolve-dispute', { contractId, approverFunds, receiverFunds, releaseSigner: platformAddress });
+  };
 
   let content: ReactNode = null;
 
-  if (status === 'funded' && isOwner) {
+  if (status === 'pending_signature' && isTenant) {
+    content = (
+      <ActionPanel
+        title="Fund Escrow"
+        description="Send the deposit into the escrow contract."
+        busy={busy}
+        preparing={preparing}
+        signing={signing}
+        ready={pendingAction === 'fund' && Boolean(unsignedXDR)}
+        onPrepare={handleFundEscrow}
+        onSign={handleSignAndSend}
+        idleLabel="Fund Escrow"
+      />
+    );
+  } else if (status === 'funded' && isOwner) {
     content = (
       <ActionPanel
         title="Mark Milestone Complete"
@@ -264,7 +287,11 @@ export function EscrowLifecycleActions({
             type="number"
             min={0}
             value={approverFunds}
-            onChange={(event) => setApproverFunds(Number(event.target.value))}
+            onChange={(event) => {
+              setApproverFunds(Number(event.target.value));
+              setUnsignedXDR(null);
+              setPendingAction(null);
+            }}
             style={flowStyles.input}
           />
         </label>
@@ -274,7 +301,11 @@ export function EscrowLifecycleActions({
             type="number"
             min={0}
             value={receiverFunds}
-            onChange={(event) => setReceiverFunds(Number(event.target.value))}
+            onChange={(event) => {
+              setReceiverFunds(Number(event.target.value));
+              setUnsignedXDR(null);
+              setPendingAction(null);
+            }}
             style={flowStyles.input}
           />
         </label>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { TrustlessWorkRequestError, trustlessWorkRequest } from '@/lib/server/trustlesswork';
+import { getEscrowAmountByContractId } from '@/lib/server/hasura';
 
 type ResolveDisputeRequestBody = {
   contractId?: string;
@@ -38,6 +39,23 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: 'Invalid approverFunds/receiverFunds: must be non-negative numbers.' },
+        { status: 400 },
+      );
+    }
+
+    const escrowAmount = await getEscrowAmountByContractId(contractId);
+    if (escrowAmount === null) {
+      return NextResponse.json(
+        { error: `No escrow record found for contractId: ${contractId}` },
+        { status: 404 },
+      );
+    }
+
+    if (approverFunds + receiverFunds !== escrowAmount) {
+      return NextResponse.json(
+        {
+          error: `approverFunds + receiverFunds (${approverFunds + receiverFunds}) must equal the escrow amount (${escrowAmount}).`,
+        },
         { status: 400 },
       );
     }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { TrustlessWorkRequestError, trustlessWorkRequest } from '@/lib/server/trustlesswork';
-import { updateEscrowStatus } from '@/lib/server/hasura';
+import { getEscrowStatusByEngagementId, updateEscrowStatus } from '@/lib/server/hasura';
 
 type EscrowAction = 'initialize' | 'fund' | 'milestone-status' | 'release-funds' | 'resolve-dispute';
 
@@ -33,6 +33,14 @@ const ACTION_STATUS: Record<EscrowAction, string> = {
   'resolve-dispute': 'resolved',
 };
 
+const ACTION_FROM_STATUS: Record<EscrowAction, string> = {
+  initialize: 'pending_signature',
+  fund: 'pending_signature',
+  'milestone-status': 'funded',
+  'release-funds': 'active',
+  'resolve-dispute': 'disputed',
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SendTransactionRequestBody;
@@ -55,6 +63,21 @@ export async function POST(request: NextRequest) {
 
     if (!(action in ACTION_STATUS)) {
       return NextResponse.json({ error: `Unsupported action: ${action}.` }, { status: 400 });
+    }
+
+    const currentStatus = await getEscrowStatusByEngagementId(engagementId);
+    if (currentStatus === null) {
+      return NextResponse.json(
+        { error: `No escrow record found for engagementId: ${engagementId}` },
+        { status: 404 },
+      );
+    }
+
+    if (currentStatus !== ACTION_FROM_STATUS[action]) {
+      return NextResponse.json(
+        { error: `Escrow is in status '${currentStatus}', which does not allow the '${action}' action.` },
+        { status: 409 },
+      );
     }
 
     const result = await trustlessWorkRequest<SendTransactionResult>('/helper/send-transaction', {
