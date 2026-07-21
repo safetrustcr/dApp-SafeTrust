@@ -1,6 +1,7 @@
 "use client";
 
 import { EscrowDetailLayout } from '@/components/escrow/EscrowDetailLayout';
+import { EscrowLifecycleActions } from '@/components/escrow/EscrowLifecycleActions';
 import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
 import { PaidInvoiceView } from '@/components/escrow/PaidInvoiceView';
 import { PdfExportButton } from '@/components/escrow/PdfExportButton';
@@ -884,6 +885,17 @@ export default function EscrowDetailPage({
           </div>
 
           <div style={styles.rightPanel}>
+            {escrow?.contract_id && escrow.engagement_id && (
+              <EscrowLifecycleActions
+                contractId={escrow.contract_id}
+                engagementId={escrow.engagement_id}
+                amount={escrow.amount ?? 0}
+                status={status}
+                senderAddress={escrow.sender_address}
+                receiverAddress={escrow.receiver_address}
+              />
+            )}
+
             <div>
               <h3 style={{ marginTop: 0, marginBottom: '1.15rem', fontSize: '1.1rem', fontWeight: 900 }}>Notes</h3>
               <textarea
