@@ -65,16 +65,24 @@ export function RoleEscrowDashboardPage() {
     updatedAt: e.updated_at ?? e.created_at,
   }));
 
+  // NOTE: Data Source Reconciliation
+  // - GET_ESCROWS (from public.escrows): Retrieves the detailed list of user-relevant escrow records
+  //   for the table, recent activity, and notifications.
+  // - GET_ESCROW_DASHBOARD_STATS (from public.trustless_work_escrows): Retrieves the tenant-wide aggregate
+  //   statistics. This is required because public.escrows only tracks security deposits, while
+  //   trustless_work_escrows contains the authoritative full value and status breakdown.
+  // Both sources are required and distinct; counts/totals differ because GET_ESCROWS is user-scoped.
   const notifications = generateMockNotifications(escrows);
 
   const dashboardStats = statsData ? {
     total: statsData.total?.aggregate?.count ?? 0,
     active: statsData.active?.aggregate?.count ?? 0,
     completed: statsData.completed?.aggregate?.count ?? 0,
-    totalValue: statsData.total_value?.aggregate?.sum?.amount ?? 0,
+    totalValue: Number(statsData.total_value?.aggregate?.sum?.amount ?? 0),
   } : null;
 
-  const errorMsg = escrowsError ? escrowsError.message : statsError ? statsError.message : null;
+  const errorMsg = escrowsError ? escrowsError.message : null;
+  const statsErrorMsg = statsError ? statsError.message : null;
 
   return (
     <RoleEscrowDashboard
@@ -83,6 +91,7 @@ export function RoleEscrowDashboardPage() {
       notifications={notifications}
       isLoading={escrowsLoading && !escrowsData}
       error={errorMsg}
+      statsError={statsErrorMsg}
       onRefresh={handleRefresh}
       dashboardStats={dashboardStats}
       isLoadingStats={statsLoading}

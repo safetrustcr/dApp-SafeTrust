@@ -85,6 +85,7 @@ interface RoleEscrowDashboardProps {
   notifications?: NotificationData[];
   isLoading?: boolean;
   error?: string | null;
+  statsError?: string | null;
   onRefresh?: () => void;
   dashboardStats?: EscrowDashboardStats | null;
   isLoadingStats?: boolean;
@@ -96,6 +97,7 @@ export function RoleEscrowDashboard({
   notifications: initialNotifications = [],
   isLoading = false,
   error = null,
+  statsError = null,
   onRefresh,
   dashboardStats = null,
   isLoadingStats = false,
@@ -198,6 +200,7 @@ export function RoleEscrowDashboard({
             onToggleAnalytics={() => setShowAnalytics((prev) => !prev)}
             stats={dashboardStats}
             isLoadingStats={isLoadingStats}
+            statsError={statsError}
           />
         </div>
 
