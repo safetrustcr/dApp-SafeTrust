@@ -24,6 +24,7 @@ interface DashboardHeaderProps {
   onToggleAnalytics?: () => void;
   stats?: EscrowDashboardStats | null;
   isLoadingStats?: boolean;
+  statsError?: string | null;
 }
 
 export function DashboardHeader({
@@ -34,6 +35,7 @@ export function DashboardHeader({
   onToggleAnalytics,
   stats = null,
   isLoadingStats = false,
+  statsError = null,
 }: DashboardHeaderProps) {
   const unreadCount = notifications.filter(n => !n.read).length;
   
@@ -73,7 +75,7 @@ export function DashboardHeader({
               )}
             </div>
             <p className="hidden sm:block text-sm text-muted-foreground">
-              Welcome back! You're logged in as {roleLabels[userRole]}
+              Welcome back! You&apos;re logged in as {roleLabels[userRole]}
             </p>
           </div>
 
@@ -153,7 +155,11 @@ export function DashboardHeader({
 
       {/* Stats and Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {isLoadingStats ? (
+        {statsError ? (
+          <div className="col-span-full bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 p-4 rounded-xl border border-red-100 dark:border-red-900/50 text-sm flex items-center justify-between">
+            <span>Failed to load escrow overview statistics. Click refresh to try again.</span>
+          </div>
+        ) : isLoadingStats ? (
           <>
             {/* Skeleton 1 */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700 animate-pulse">
