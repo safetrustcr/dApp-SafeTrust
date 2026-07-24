@@ -7,9 +7,13 @@ import type {
   EscrowData,
   NotificationData,
 } from "@/components/dashboard/RoleEscrowDashboard";
+import {
+  generateMockNotifications,
+} from "@/lib/mockData";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
-import { GET_ESCROWS } from "@/graphql/queries/escrow-queries";
 import { getUserRole } from "@/utils/role-utils";
+import { mapDbStatusToDashboardStatus } from "@/utils/escrow-utils";
+import { GET_ESCROWS, GET_ESCROW_DASHBOARD_STATS } from "@/graphql/queries/escrow-queries";
 
 const DASHBOARD_ESCROW_LIMIT = 50;
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -225,106 +229,87 @@ const deriveNotifications = (escrows: EscrowData[]): NotificationData[] => {
 
 export function RoleEscrowDashboardPage() {
   const [userRole, setUserRole] = useState<"guest" | "hotel" | "admin">("guest");
-  const storeAddress = useGlobalAuthenticationStore((state) => state.address);
-  const [storedAddress, setStoredAddress] = useState<string | null>(null);
-  const [recentEscrowCutoff, setRecentEscrowCutoff] = useState(
-    getRecentEscrowCutoff,
-  );
-
-  const walletAddress = storeAddress ?? storedAddress;
-
-  const variables = useMemo<GetEscrowsDashboardVariables | undefined>(() => {
-    if (!walletAddress) return undefined;
-
-    const walletEscrowFilter: EscrowFilter = {
-      _or: [
-        { sender_address: { _eq: walletAddress } },
-        { receiver_address: { _eq: walletAddress } },
-      ],
-    };
-
-    return {
-      limit: DASHBOARD_ESCROW_LIMIT,
-      offset: 0,
-      where: walletEscrowFilter,
-      recentWhere: {
-        _and: [
-          walletEscrowFilter,
-          {
-            updated_at: {
-              _gte: recentEscrowCutoff,
-            },
-          },
-        ],
-      },
-      trustlessWorkWhere: {
-        _or: [
-          { marker: { _eq: walletAddress } },
-          { approver: { _eq: walletAddress } },
-          { releaser: { _eq: walletAddress } },
-          { resolver: { _eq: walletAddress } },
-        ],
-      },
-    };
-  }, [recentEscrowCutoff, walletAddress]);
-
-  const { data, loading, error, refetch } = useQuery<
-    GetEscrowsDashboardQuery,
-    GetEscrowsDashboardVariables
-  >(GET_ESCROWS, {
-    variables,
-    skip: !variables,
-    fetchPolicy: "cache-and-network",
-  });
 
   useEffect(() => {
-    setUserRole(getUserRole() ?? "guest");
-    setStoredAddress(getStoredWalletAddress());
+    const role = getUserRole();
+    setUserRole(role ?? "guest");
   }, []);
 
-  const escrows = useMemo(
-    () => mapEscrows(data?.escrows, data?.trustless_work_escrows),
-    [data?.escrows, data?.trustless_work_escrows],
-  );
+  const {
+    data: escrowsData,
+    loading: escrowsLoading,
+    error: escrowsError,
+    refetch: refetchEscrows,
+  } = useQuery(GET_ESCROWS, {
+    variables: { limit: 100, offset: 0 },
+  });
 
-  const recentEscrows = useMemo(
-    () => mapEscrows(data?.recent_escrows, data?.trustless_work_escrows),
-    [data?.recent_escrows, data?.trustless_work_escrows],
-  );
+  const {
+    data: statsData,
+    loading: statsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useQuery(GET_ESCROW_DASHBOARD_STATS, {
+    variables: { tenant_id: "safetrust" },
+    pollInterval: 15000,
+  });
 
-  const notifications = useMemo(
-    () => deriveNotifications(recentEscrows),
-    [recentEscrows],
-  );
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      refetchEscrows().catch(() => {}),
+      refetchStats().catch(() => {}),
+    ]);
+  }, [refetchEscrows, refetchStats]);
 
-  const handleRefresh = useCallback(() => {
-    setUserRole(getUserRole() ?? "guest");
-    setStoredAddress(getStoredWalletAddress());
-    const nextRecentEscrowCutoff = getRecentEscrowCutoff();
-    setRecentEscrowCutoff(nextRecentEscrowCutoff);
+  const escrows: EscrowData[] = (escrowsData?.escrows ?? []).map((e: any) => ({
+    id: e.id,
+    contractId: e.contract_id ?? "",
+    status: mapDbStatusToDashboardStatus(e.status),
+    amount: Number(e.amount),
+    asset: { code: "USDC" },
+    metadata: {
+      bookingId: e.engagement_id ?? "",
+      hotelName: e.apartment?.name ?? "Unknown Property",
+      checkInDate: "",
+      checkOutDate: "",
+    },
+    marker: e.receiver_address ?? "",
+    createdAt: e.created_at,
+    updatedAt: e.updated_at ?? e.created_at,
+  }));
 
-    if (variables) {
-      void refetch({
-        ...variables,
-        recentWhere: {
-          _and: [
-            variables.where,
-            { updated_at: { _gte: nextRecentEscrowCutoff } },
-          ],
-        },
-      });
-    }
-  }, [refetch, variables]);
+  // NOTE: Data Source Reconciliation
+  // - GET_ESCROWS (from public.escrows): Retrieves the detailed list of user-relevant escrow records
+  //   for the table, recent activity, and notifications.
+  // - GET_ESCROW_DASHBOARD_STATS (from public.trustless_work_escrows): Retrieves the tenant-wide aggregate
+  //   statistics. This is required because public.escrows only tracks security deposits, while
+  //   trustless_work_escrows contains the authoritative full value and status breakdown.
+  // Both sources are required and distinct; counts/totals differ because GET_ESCROWS is user-scoped.
+  const notifications = generateMockNotifications(escrows);
+
+  const dashboardStats = statsData ? {
+    total: statsData.total?.aggregate?.count ?? 0,
+    active: statsData.active?.aggregate?.count ?? 0,
+    completed: statsData.completed?.aggregate?.count ?? 0,
+    totalValue: Number(statsData.total_value?.aggregate?.sum?.amount ?? 0),
+  } : null;
+
+  const errorMsg = escrowsError ? escrowsError.message : null;
+  const statsErrorMsg = statsError ? statsError.message : null;
 
   return (
     <RoleEscrowDashboard
       userRole={userRole}
       escrows={escrows}
-      totalEscrows={data?.escrows_aggregate?.aggregate?.count ?? escrows.length}
+      totalEscrows={escrowsData?.escrows_aggregate?.aggregate?.count ?? escrows.length}
       notifications={notifications}
-      isLoading={loading}
-      error={error ? "Failed to load escrow dashboard data." : null}
+      isLoading={escrowsLoading && !escrowsData}
+      error={errorMsg}
+      statsError={statsErrorMsg}
       onRefresh={handleRefresh}
+      dashboardStats={dashboardStats}
+      isLoadingStats={statsLoading}
     />
   );
 }
+

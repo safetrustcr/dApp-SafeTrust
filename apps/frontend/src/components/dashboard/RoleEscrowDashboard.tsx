@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DashboardHeader } from "./DashboardHeader";
+import { DashboardHeader, type EscrowDashboardStats } from "./DashboardHeader";
 import { EscrowsByStatus } from "./EscrowsByStatus";
 import { RecentActivity } from "./RecentActivity";
 import { QuickActions } from "./QuickActions";
@@ -94,7 +94,10 @@ interface RoleEscrowDashboardProps {
   notifications?: NotificationData[];
   isLoading?: boolean;
   error?: string | null;
+  statsError?: string | null;
   onRefresh?: () => void;
+  dashboardStats?: EscrowDashboardStats | null;
+  isLoadingStats?: boolean;
 }
 
 export function RoleEscrowDashboard({
@@ -104,7 +107,10 @@ export function RoleEscrowDashboard({
   notifications: initialNotifications = EMPTY_NOTIFICATIONS,
   isLoading = false,
   error = null,
+  statsError = null,
   onRefresh,
+  dashboardStats = null,
+  isLoadingStats = false,
 }: RoleEscrowDashboardProps) {
   const [notifications, setNotifications] =
     useState<NotificationData[]>(initialNotifications);
@@ -221,137 +227,12 @@ export function RoleEscrowDashboard({
             notifications={notifications}
             showAnalytics={showAnalytics}
             onToggleAnalytics={() => setShowAnalytics((prev) => !prev)}
+            stats={dashboardStats}
+            isLoadingStats={isLoadingStats}
+            statsError={statsError}
           />
         </div>
 
-        {/* Stats and Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Escrows
-                </p>
-                <p className="text-2xl font-bold mt-1 dark:text-white">
-                  {totalEscrows ?? escrows.length}
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30">
-                <svg
-                  className="w-6 h-6 text-blue-600 dark:text-blue-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Active
-                </p>
-                <p className="text-2xl font-bold mt-1 text-green-600 dark:text-green-400">
-                  {
-                    escrows.filter(
-                      (e) =>
-                        e.status === "pending" ||
-                        e.status === "check_in_approved" ||
-                        e.status === "check_out_approved",
-                    ).length
-                  }
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/30">
-                <svg
-                  className="w-6 h-6 text-green-600 dark:text-green-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Completed
-                </p>
-                <p className="text-2xl font-bold mt-1 text-purple-600 dark:text-purple-400">
-                  {escrows.filter((e) => e.status === "completed").length}
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/30">
-                <svg
-                  className="w-6 h-6 text-purple-600 dark:text-purple-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Value
-                </p>
-                <p className="text-2xl font-bold mt-1 dark:text-white">
-                  $
-                  {escrows
-                    .reduce((sum, e) => sum + e.amount, 0)
-                    .toLocaleString()}
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/30">
-                <svg
-                  className="w-6 h-6 text-amber-600 dark:text-amber-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Analytics Panel (toggled from the header) */}
         {showAnalytics && (
