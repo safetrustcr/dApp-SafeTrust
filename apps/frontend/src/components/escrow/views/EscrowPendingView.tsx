@@ -36,7 +36,7 @@ export function EscrowPendingView({ escrow }: { escrow: EscrowDetail }) {
             <EscrowPayFlow
               apartmentId={apartment.id}
               apartmentName={apartment.name}
-              ownerAddress={ownerAddress}
+              ownerWalletAddress={ownerAddress}
               amount={escrow.amount}
             />
           }

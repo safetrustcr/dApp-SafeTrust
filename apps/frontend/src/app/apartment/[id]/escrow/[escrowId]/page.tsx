@@ -1,29 +1,28 @@
 "use client";
 
-import { EscrowDetailLayout } from '@/components/escrow/EscrowDetailLayout';
-import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
-import { PaidInvoiceView } from '@/components/escrow/PaidInvoiceView';
 import { PdfExportButton } from '@/components/escrow/PdfExportButton';
 import { useQuery } from '@apollo/client';
 import { GET_ESCROW_BY_ANY_ID } from '@/graphql/queries/escrow-queries';
 import type { EscrowStatus } from '@/components/dashboard/EscrowStatusBadge';
 import { truncateStellarAddress } from '@/lib/utils';
-import { useState, type CSSProperties, ReactNode } from 'react';
+import { getErrorMessages } from '@/lib/trustlesswork-errors';
+import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
+import { useState, useCallback, type CSSProperties, ReactNode } from 'react';
 import Image from 'next/image';
 import {
   Bell,
   ChevronDown,
-  CircleDollarSign,
   FileCheck2,
   Home,
   Search,
   ShieldCheck,
   User,
   WalletCards,
+  Loader2,
 } from 'lucide-react';
 
 type InvoiceApartment = {
-  name: string;
+  name: string | null;
   image_urls?: string[] | null;
 };
 
@@ -36,7 +35,7 @@ type EscrowViewLabel = 'paid' | 'blocked' | 'released';
 type ViewConfig = {
   label: EscrowViewLabel;
   title: string;
-  step: number;
+  step: 1 | 2 | 3 | 4;
 };
 
 type EscrowRecord = {
@@ -66,11 +65,13 @@ type EscrowRecord = {
     description?: string | null;
     price?: number | null;
     owner?: {
+      id?: string | null;
       first_name?: string | null;
       last_name?: string | null;
       email?: string | null;
       phone_number?: string | null;
       country_code?: string | null;
+      user_wallets?: Array<{ wallet_address: string }> | null;
     } | null;
   } | null;
 };
@@ -228,9 +229,11 @@ const styles = {
 } as const;
 
 const STATUS_LABELS: Record<EscrowStatus, string> = {
+  created: 'Escrow created',
   pending_signature: 'Deposit pending',
   active: 'Deposit paid',
   funded: 'Deposit blocked',
+  milestone_approved: 'Milestone approved',
   completed: 'Deposit released',
   disputed: 'Deposit disputed',
   resolved: 'Deposit resolved',
@@ -238,9 +241,11 @@ const STATUS_LABELS: Record<EscrowStatus, string> = {
 };
 
 const STATUS_COLORS: Record<EscrowStatus, { backgroundColor: string; color: string }> = {
+  created: { backgroundColor: '#fef3c7', color: '#92400e' },
   pending_signature: { backgroundColor: '#ffe2e2', color: '#b91c1c' },
   active: { backgroundColor: '#dcfce7', color: '#166534' },
   funded: { backgroundColor: '#dbeafe', color: '#1d4ed8' },
+  milestone_approved: { backgroundColor: '#e0e7ff', color: '#3730a3' },
   completed: { backgroundColor: '#def35b', color: '#577004' },
   disputed: { backgroundColor: '#fee2e2', color: '#991b1b' },
   resolved: { backgroundColor: '#ede9fe', color: '#6d28d9' },
@@ -276,10 +281,24 @@ const PROCESS_STEPS = [
 
 function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
   switch (status) {
+    case 'created':
+    case 'pending_signature':
+      return {
+        label: 'paid',
+        title: 'Payment batch - Awaiting Funding',
+        step: 1,
+      };
     case 'funded':
       return {
         label: 'blocked',
         title: 'Payment batch - Escrow Status',
+        step: 3,
+      };
+    case 'active':
+    case 'milestone_approved':
+      return {
+        label: 'blocked',
+        title: 'Payment batch - Milestone Status',
         step: 3,
       };
     case 'completed':
@@ -289,18 +308,22 @@ function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
         title: 'Deposit / Escrow Released',
         step: 4,
       };
-    case 'active':
-    case 'pending_signature':
-    default:
+    case 'disputed':
+      return {
+        label: 'blocked',
+        title: 'Payment batch - Disputed',
+        step: 3,
+      };
+    case 'cancelled':
       return {
         label: 'paid',
-        title: 'Payment batch January 2025',
+        title: 'Payment batch - Cancelled',
         step: 2,
       };
   }
 }
 
-function formatDate(dateString?: string) {
+function formatDate(dateString?: string | null) {
   if (!dateString) return '';
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return dateString;
@@ -444,7 +467,7 @@ function ProductCell({ apartment }: { apartment: InvoiceApartment }) {
     <div style={styles.productCell}>
       {imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt={apartment.name} style={styles.productThumbnail} />
+        <img src={imageUrl} alt={apartment.name ?? 'Apartment'} style={styles.productThumbnail} />
       ) : (
         <span aria-hidden="true" style={styles.productThumbnailFallback}>
           <Home size={20} strokeWidth={2} />
@@ -456,7 +479,9 @@ function ProductCell({ apartment }: { apartment: InvoiceApartment }) {
 }
 
 function PaidStubView({ escrow }: { escrow?: EscrowRecord | null }) {
-  const apartment = escrow?.apartment ?? STUB_INVOICE_ESCROW.apartment;
+  const apartment: InvoiceApartment = escrow?.apartment
+    ? { name: escrow.apartment.name ?? 'Apartment', image_urls: escrow.apartment.image_urls }
+    : STUB_INVOICE_ESCROW.apartment;
   const invoiceNumber = escrow?.engagement_id
     ? `INV-${escrow.engagement_id.slice(0, 12)}`
     : 'INV4257-09-012';
@@ -731,6 +756,68 @@ function ReleasedView({ escrow }: { escrow?: EscrowRecord | null }) {
   );
 }
 
+type EscrowAction = 'fund' | 'milestone' | 'release';
+
+function EscrowActionButton({
+  action,
+  status,
+  isLoading,
+  loadingMessage,
+  onClick,
+}: {
+  action: EscrowAction;
+  status: EscrowStatus;
+  isLoading: boolean;
+  loadingMessage: string;
+  onClick: () => void;
+}) {
+  const buttonConfig: Record<EscrowAction, { label: string; color: string; hoverColor: string }> = {
+    fund: { label: 'Fund Escrow', color: '#f97316', hoverColor: '#ea580c' },
+    milestone: { label: 'Mark Completed', color: '#22c55e', hoverColor: '#16a34a' },
+    release: { label: 'Release Funds', color: '#6366f1', hoverColor: '#4f46e5' },
+  };
+
+  const config = buttonConfig[action];
+
+  return (
+    <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
+      <p style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', color: '#374151' }}>
+        {action === 'fund' && 'Deposit funds into the escrow contract to secure the transaction.'}
+        {action === 'milestone' && 'Mark the milestone as completed to proceed with fund release.'}
+        {action === 'release' && 'Release the escrowed funds to the service provider.'}
+      </p>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={isLoading}
+        style={{
+          border: 'none',
+          backgroundColor: isLoading ? '#9ca3af' : config.color,
+          color: '#ffffff',
+          borderRadius: '0.5rem',
+          padding: '0.75rem 1.5rem',
+          fontWeight: 700,
+          fontSize: '0.9rem',
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          transition: 'all 0.2s',
+        }}
+      >
+        {isLoading ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            {loadingMessage}
+          </>
+        ) : (
+          config.label
+        )}
+      </button>
+    </div>
+  );
+}
+
 export default function EscrowDetailPage({
   params,
   searchParams,
@@ -738,6 +825,11 @@ export default function EscrowDetailPage({
   params: { id: string; escrowId: string };
   searchParams: { status?: string };
 }) {
+  const { address, signXDR } = useWallet();
+  const [actionLoading, setActionLoading] = useState<EscrowAction | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [errorMessages, setErrorMessages] = useState<string[]>([]);
+
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.escrowId);
 
   const { data, loading, error } = useQuery(GET_ESCROW_BY_ANY_ID, {
@@ -778,6 +870,205 @@ export default function EscrowDetailPage({
   }
 
   const view = getEscrowViewConfig(status);
+
+  const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS || '';
+
+  const ownerWalletAddress = escrow?.apartment?.owner?.user_wallets?.[0]?.wallet_address || '';
+
+  const isApprover = address && escrow?.sender_address && address.toLowerCase() === escrow.sender_address.toLowerCase();
+  const isMarker = address && escrow?.receiver_address && address.toLowerCase() === escrow.receiver_address.toLowerCase();
+  const isReleaseSigner = address && platformAddress && address.toLowerCase() === platformAddress.toLowerCase();
+
+  const canFund = status === 'created' || status === 'pending_signature';
+  const canMarkMilestone = status === 'funded';
+  const canRelease = status === 'milestone_approved';
+
+  const showFundButton = canFund && isApprover;
+  const showMilestoneButton = canMarkMilestone && isMarker;
+  const showReleaseButton = canRelease && isReleaseSigner;
+
+  const handleFundEscrow = useCallback(async () => {
+    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.amount || !escrow.receiver_address) {
+      setErrorMessages(['Missing required escrow data for funding.']);
+      return;
+    }
+
+    setActionLoading('fund');
+    setLoadingMessage('Building fund transaction...');
+    setErrorMessages([]);
+
+    try {
+      const response = await fetch('/api/escrow/fund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId: escrow.contract_id,
+          signer: address,
+          amount: escrow.amount,
+          engagementId: escrow.engagement_id,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        setErrorMessages(getErrorMessages(payload, 'Failed to build fund transaction.'));
+        return;
+      }
+
+      setLoadingMessage('Awaiting wallet signature...');
+      const signedXdr = await signXDR(payload.unsignedXdr);
+
+      setLoadingMessage('Submitting transaction...');
+      const submitResponse = await fetch('/api/escrow/send-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signedXdr,
+          contractId: escrow.contract_id,
+          engagementId: escrow.engagement_id,
+          senderAddress: address,
+          receiverAddress: escrow.receiver_address,
+          amount: escrow.amount,
+          status: 'funded',
+        }),
+      });
+
+      const submitPayload = await submitResponse.json();
+      if (!submitResponse.ok) {
+        setErrorMessages(getErrorMessages(submitPayload, 'Failed to submit fund transaction.'));
+        return;
+      }
+
+      setErrorMessages([]);
+    } catch (err) {
+      setErrorMessages(getErrorMessages(err, 'Failed to complete fund flow.'));
+    } finally {
+      setActionLoading(null);
+      setLoadingMessage('');
+    }
+  }, [escrow, address, signXDR]);
+
+  const handleMarkCompleted = useCallback(async () => {
+    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address) {
+      setErrorMessages(['Missing required escrow data for milestone update.']);
+      return;
+    }
+
+    setActionLoading('milestone');
+    setLoadingMessage('Building milestone transaction...');
+    setErrorMessages([]);
+
+    try {
+      const response = await fetch('/api/escrow/milestone-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId: escrow.contract_id,
+          serviceProvider: address,
+          engagementId: escrow.engagement_id,
+          milestoneIndex: 0,
+          newStatus: 'completed',
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        setErrorMessages(getErrorMessages(payload, 'Failed to build milestone transaction.'));
+        return;
+      }
+
+      setLoadingMessage('Awaiting wallet signature...');
+      const signedXdr = await signXDR(payload.unsignedXdr);
+
+      setLoadingMessage('Submitting transaction...');
+      const submitResponse = await fetch('/api/escrow/send-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signedXdr,
+          contractId: escrow.contract_id,
+          engagementId: escrow.engagement_id,
+          senderAddress: escrow.sender_address,
+          receiverAddress: address,
+          amount: escrow.amount,
+          status: 'milestone_approved',
+        }),
+      });
+
+      const submitPayload = await submitResponse.json();
+      if (!submitResponse.ok) {
+        setErrorMessages(getErrorMessages(submitPayload, 'Failed to submit milestone transaction.'));
+        return;
+      }
+
+      setErrorMessages([]);
+    } catch (err) {
+      setErrorMessages(getErrorMessages(err, 'Failed to complete milestone flow.'));
+    } finally {
+      setActionLoading(null);
+      setLoadingMessage('');
+    }
+  }, [escrow, address, signXDR]);
+
+  const handleReleaseFunds = useCallback(async () => {
+    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
+      setErrorMessages(['Missing required escrow data for release.']);
+      return;
+    }
+
+    setActionLoading('release');
+    setLoadingMessage('Building release transaction...');
+    setErrorMessages([]);
+
+    try {
+      const response = await fetch('/api/escrow/release', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId: escrow.contract_id,
+          releaseSigner: address,
+          engagementId: escrow.engagement_id,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        setErrorMessages(getErrorMessages(payload, 'Failed to build release transaction.'));
+        return;
+      }
+
+      setLoadingMessage('Awaiting wallet signature...');
+      const signedXdr = await signXDR(payload.unsignedXdr);
+
+      setLoadingMessage('Submitting transaction...');
+      const submitResponse = await fetch('/api/escrow/send-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signedXdr,
+          contractId: escrow.contract_id,
+          engagementId: escrow.engagement_id,
+          senderAddress: escrow.sender_address,
+          receiverAddress: escrow.receiver_address,
+          amount: escrow.amount,
+          status: 'completed',
+        }),
+      });
+
+      const submitPayload = await submitResponse.json();
+      if (!submitResponse.ok) {
+        setErrorMessages(getErrorMessages(submitPayload, 'Failed to submit release transaction.'));
+        return;
+      }
+
+      setErrorMessages([]);
+    } catch (err) {
+      setErrorMessages(getErrorMessages(err, 'Failed to complete release flow.'));
+    } finally {
+      setActionLoading(null);
+      setLoadingMessage('');
+    }
+  }, [escrow, address, signXDR]);
 
   if (loading && !escrow) {
     return (
@@ -854,6 +1145,13 @@ export default function EscrowDetailPage({
             padding: 1.5rem 1rem 2.5rem !important;
           }
         }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
       `}</style>
       <div className="responsive-page" style={styles.page}>
         <div>
@@ -870,6 +1168,16 @@ export default function EscrowDetailPage({
           )}
         </div>
 
+        {errorMessages.length > 0 && (
+          <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee2e2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
+            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#b91c1c', fontSize: '0.9rem' }}>
+              {errorMessages.map((msg, i) => (
+                <li key={i}>{msg}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="responsive-grid" style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 2.05fr) minmax(18rem, 1fr)' }}>
           <div style={styles.leftPanel}>
             <h2 style={{ marginTop: 0, marginBottom: '0.9rem', fontSize: '1.55rem', fontWeight: 900 }}>
@@ -881,6 +1189,44 @@ export default function EscrowDetailPage({
             {view.label === 'paid' && <PaidStubView escrow={escrow} />}
             {view.label === 'blocked' && <BlockedStubView escrow={escrow} />}
             {view.label === 'released' && <ReleasedView escrow={escrow} />}
+
+            {showFundButton && (
+              <EscrowActionButton
+                action="fund"
+                status={status}
+                isLoading={actionLoading === 'fund'}
+                loadingMessage={loadingMessage}
+                onClick={handleFundEscrow}
+              />
+            )}
+
+            {showMilestoneButton && (
+              <EscrowActionButton
+                action="milestone"
+                status={status}
+                isLoading={actionLoading === 'milestone'}
+                loadingMessage={loadingMessage}
+                onClick={handleMarkCompleted}
+              />
+            )}
+
+            {showReleaseButton && (
+              <EscrowActionButton
+                action="release"
+                status={status}
+                isLoading={actionLoading === 'release'}
+                loadingMessage={loadingMessage}
+                onClick={handleReleaseFunds}
+              />
+            )}
+
+            {!address && (canFund || canMarkMilestone || canRelease) && (
+              <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: '0.5rem', border: '1px solid #fcd34d' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#92400e' }}>
+                  Connect your Stellar wallet to perform this action.
+                </p>
+              </div>
+            )}
           </div>
 
           <div style={styles.rightPanel}>

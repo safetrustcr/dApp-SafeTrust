@@ -2,10 +2,17 @@
 import { gql } from "@apollo/client";
 
 export const GET_ESCROWS = gql`
-  query GetEscrows($limit: Int!, $offset: Int!) {
+  query GetEscrows(
+    $limit: Int!
+    $offset: Int!
+    $where: escrows_bool_exp = {}
+    $recentWhere: escrows_bool_exp = {}
+    $trustlessWorkWhere: trustless_work_escrows_bool_exp = {}
+  ) {
     escrows(
       limit: $limit
       offset: $offset
+      where: $where
       order_by: { created_at: desc }
     ) {
       id
@@ -14,6 +21,7 @@ export const GET_ESCROWS = gql`
       amount
       status
       created_at
+      updated_at
       sender_address
       receiver_address
       apartment {
@@ -21,12 +29,51 @@ export const GET_ESCROWS = gql`
         name
         address
         image_urls
+        available_from
+        available_until
       }
     }
-    escrows_aggregate {
+    escrows_aggregate(where: $where) {
       aggregate {
         count
       }
+    }
+    recent_escrows: escrows(
+      where: $recentWhere
+      order_by: { updated_at: desc }
+    ) {
+      id
+      contract_id
+      engagement_id
+      amount
+      status
+      created_at
+      updated_at
+      sender_address
+      receiver_address
+      apartment {
+        id
+        name
+        address
+        image_urls
+        available_from
+        available_until
+      }
+    }
+    trustless_work_escrows(
+      where: $trustlessWorkWhere
+      order_by: { updated_at: desc }
+    ) {
+      id
+      contract_id
+      status
+      asset_issuer
+      marker
+      booking_id
+      check_in_date
+      check_out_date
+      created_at
+      updated_at
     }
   }
 `;
@@ -128,6 +175,9 @@ export const GET_ESCROW_BY_ANY_ID = gql`
           email
           phone_number
           country_code
+          user_wallets(where: { is_primary: { _eq: true } }, limit: 1) {
+            wallet_address
+          }
         }
       }
     }
