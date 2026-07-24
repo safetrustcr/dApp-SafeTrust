@@ -7,7 +7,7 @@ export const GET_ESCROWS = gql`
     $offset: Int!
     $where: escrows_bool_exp = {}
     $recentWhere: escrows_bool_exp = {}
-    $trustlessWorkWhere: trustless_work_escrows_bool_exp = {}
+    $trustlessWorkWhere: trustlessWorkEscrows_bool_exp = {}
   ) {
     escrows(
       limit: $limit
@@ -60,20 +60,20 @@ export const GET_ESCROWS = gql`
         available_until
       }
     }
-    trustless_work_escrows(
+    trustlessWorkEscrows: trustlessWorkEscrows(
       where: $trustlessWorkWhere
-      order_by: { updated_at: desc }
+      order_by: { updatedAt: desc }
     ) {
       id
-      contract_id
+      contract_id: contractId
       status
-      asset_issuer
+      asset_issuer: assetIssuer
       marker
-      booking_id
-      check_in_date
-      check_out_date
-      created_at
-      updated_at
+      booking_id: bookingId
+      check_in_date: checkInDate
+      check_out_date: checkOutDate
+      created_at: createdAt
+      updated_at: updatedAt
     }
   }
 `;

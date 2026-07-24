@@ -301,7 +301,7 @@ export function RoleEscrowDashboardPage() {
     <RoleEscrowDashboard
       userRole={userRole}
       escrows={escrows}
-      totalEscrows={data?.escrows_aggregate?.aggregate?.count ?? escrows.length}
+      totalEscrows={escrowsData?.escrows_aggregate?.aggregate?.count ?? escrows.length}
       notifications={notifications}
       isLoading={escrowsLoading && !escrowsData}
       error={errorMsg}
