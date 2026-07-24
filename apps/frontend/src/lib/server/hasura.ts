@@ -111,3 +111,20 @@ export async function updateEscrowStatus(
     { engagement_id: engagementId, status },
   );
 }
+
+export async function updateEscrowStatusByContractId(
+  contractId: string,
+  status: string,
+): Promise<UpdateEscrowStatusResult> {
+  return hasuraRequest<UpdateEscrowStatusResult>(
+    `mutation UpdateEscrowStatusByContractId($contract_id: String!, $status: String!) {
+      update_escrows(
+        where: { contract_id: { _eq: $contract_id } }
+        _set: { status: $status }
+      ) {
+        affected_rows
+      }
+    }`,
+    { contract_id: contractId, status },
+  );
+}
