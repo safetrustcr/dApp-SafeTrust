@@ -6,25 +6,25 @@ import { getEscrowAmountByContractId } from '@/lib/server/hasura';
 
 type ResolveDisputeRequestBody = {
   contractId?: string;
+  releaseSigner?: string;
+  engagementId?: string;
   approverFunds?: number;
   receiverFunds?: number;
-  releaseSigner?: string;
 };
 
 type ResolveDisputeResponse = {
-  status: 'SUCCESS' | 'FAILED';
-  unsignedTransaction?: string;
-  message: string;
+  unsignedXdr: string;
+  txHash: string;
 };
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ResolveDisputeRequestBody;
-    const { contractId, approverFunds, receiverFunds, releaseSigner } = body;
+    const { contractId, releaseSigner, engagementId, approverFunds, receiverFunds } = body;
 
-    if (!contractId || !releaseSigner) {
+    if (!contractId || !releaseSigner || !engagementId) {
       return NextResponse.json(
-        { error: 'Missing required fields: contractId, releaseSigner.' },
+        { error: 'Missing required fields: contractId, releaseSigner, engagementId.' },
         { status: 400 },
       );
     }
@@ -61,24 +61,19 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await trustlessWorkRequest<ResolveDisputeResponse>(
-      '/escrow/single-release/resolve-dispute',
+      '/escrow/single-release/v2/resolve-dispute',
       {
         method: 'POST',
         body: { contractId, approverFunds, receiverFunds, releaseSigner },
       },
     );
 
-    if (result.status !== 'SUCCESS' || !result.unsignedTransaction) {
-      return NextResponse.json(
-        { error: result.message ?? 'TrustlessWork resolve-dispute failed.', payload: result },
-        { status: 502 },
-      );
-    }
-
     return NextResponse.json({
-      status: result.status,
-      unsignedXDR: result.unsignedTransaction,
-      message: result.message,
+      unsignedXdr: result.unsignedXdr,
+      txHash: result.txHash,
+      contractId,
+      engagementId,
+      status: 'resolved',
     });
   } catch (error) {
     if (error instanceof TrustlessWorkRequestError) {
@@ -88,8 +83,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const messages = getErrorMessages(error, 'Failed to build resolve-dispute transaction.');
     return NextResponse.json(
-      { error: getErrorMessages(error, 'Failed to resolve dispute.') },
+      { error: messages[0], messages },
       { status: 500 },
     );
   }

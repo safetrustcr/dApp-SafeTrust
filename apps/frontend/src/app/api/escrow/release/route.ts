@@ -2,44 +2,35 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { TrustlessWorkRequestError, trustlessWorkRequest } from '@/lib/server/trustlesswork';
-import { updateEscrowStatus } from '@/lib/server/hasura';
 
-type FundRequestBody = {
+type ReleaseRequestBody = {
   contractId?: string;
-  signer?: string;
-  amount?: number;
+  releaseSigner?: string;
   engagementId?: string;
 };
 
-type FundEscrowResponse = {
+type ReleaseFundsResponse = {
   unsignedXdr: string;
   txHash: string;
 };
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as FundRequestBody;
-    const { contractId, signer, amount, engagementId } = body;
+    const body = (await request.json()) as ReleaseRequestBody;
+    const { contractId, releaseSigner, engagementId } = body;
 
-    if (!contractId || !signer || typeof amount !== 'number' || !engagementId) {
+    if (!contractId || !releaseSigner || !engagementId) {
       return NextResponse.json(
-        { error: 'Missing required fields: contractId, signer, amount, engagementId.' },
+        { error: 'Missing required fields: contractId, releaseSigner, engagementId.' },
         { status: 400 },
       );
     }
 
-    if (amount <= 0 || !Number.isFinite(amount)) {
-      return NextResponse.json(
-        { error: 'Invalid amount: must be a positive number.' },
-        { status: 400 },
-      );
-    }
-
-    const result = await trustlessWorkRequest<FundEscrowResponse>(
-      '/escrow/single-release/v2/fund',
+    const result = await trustlessWorkRequest<ReleaseFundsResponse>(
+      '/escrow/single-release/v2/release-funds',
       {
         method: 'POST',
-        body: { contractId, signer, amount },
+        body: { contractId, releaseSigner },
       },
     );
 
@@ -48,6 +39,7 @@ export async function POST(request: NextRequest) {
       txHash: result.txHash,
       contractId,
       engagementId,
+      status: 'completed',
     });
   } catch (error) {
     if (error instanceof TrustlessWorkRequestError) {
@@ -57,7 +49,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const messages = getErrorMessages(error, 'Failed to build fund transaction.');
+    const messages = getErrorMessages(error, 'Failed to build release transaction.');
     return NextResponse.json(
       { error: messages[0], messages },
       { status: 500 },

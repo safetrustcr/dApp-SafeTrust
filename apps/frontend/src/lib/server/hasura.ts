@@ -12,7 +12,7 @@ if (!HASURA_ADMIN_SECRET) {
 
 const _HASURA_ADMIN_SECRET: string = HASURA_ADMIN_SECRET;
 
-async function hasuraRequest<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+export async function hasuraRequest<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const response = await fetch(HASURA_URL, {
     method: 'POST',
     signal: AbortSignal.timeout(15_000),
@@ -91,22 +91,6 @@ export async function insertEscrowRecord(input: InsertEscrowInput): Promise<Inse
   );
 }
 
-type EscrowStatusLookupResult = {
-  escrows: { status: string }[];
-};
-
-export async function getEscrowStatusByEngagementId(engagementId: string): Promise<string | null> {
-  const data = await hasuraRequest<EscrowStatusLookupResult>(
-    `query GetEscrowStatus($engagement_id: String!) {
-      escrows(where: { engagement_id: { _eq: $engagement_id } }, limit: 1) {
-        status
-      }
-    }`,
-    { engagement_id: engagementId },
-  );
-  return data.escrows[0]?.status ?? null;
-}
-
 type EscrowAmountLookupResult = {
   escrows: { amount: number }[];
 };
@@ -141,5 +125,22 @@ export async function updateEscrowStatus(
       }
     }`,
     { engagement_id: engagementId, status },
+  );
+}
+
+export async function updateEscrowStatusByContractId(
+  contractId: string,
+  status: string,
+): Promise<UpdateEscrowStatusResult> {
+  return hasuraRequest<UpdateEscrowStatusResult>(
+    `mutation UpdateEscrowStatusByContractId($contract_id: String!, $status: String!) {
+      update_escrows(
+        where: { contract_id: { _eq: $contract_id } }
+        _set: { status: $status }
+      ) {
+        affected_rows
+      }
+    }`,
+    { contract_id: contractId, status },
   );
 }

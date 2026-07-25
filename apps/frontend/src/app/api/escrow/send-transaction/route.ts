@@ -2,19 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { TrustlessWorkRequestError, trustlessWorkRequest } from '@/lib/server/trustlesswork';
-import { getEscrowStatusByEngagementId, updateEscrowStatus } from '@/lib/server/hasura';
-
-type EscrowAction = 'initialize' | 'fund' | 'milestone-status' | 'release-funds' | 'resolve-dispute';
+import { updateEscrowStatus } from '@/lib/server/hasura';
 
 type SendTransactionRequestBody = {
   signedXdr?: string;
-  action?: EscrowAction;
   contractId?: string;
   engagementId?: string;
   propertyId?: string;
   senderAddress?: string;
   receiverAddress?: string;
   amount?: number;
+  status?: string;
 };
 
 type SendTransactionResult = {
@@ -25,58 +23,24 @@ type SendTransactionResult = {
   transactionHash: string | null;
 };
 
-const ACTION_STATUS: Record<EscrowAction, string> = {
-  initialize: 'funded',
-  fund: 'funded',
-  'milestone-status': 'active',
-  'release-funds': 'completed',
-  'resolve-dispute': 'resolved',
-};
-
-const ACTION_FROM_STATUS: Record<EscrowAction, string> = {
-  initialize: 'pending_signature',
-  fund: 'pending_signature',
-  'milestone-status': 'funded',
-  'release-funds': 'active',
-  'resolve-dispute': 'disputed',
-};
-
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SendTransactionRequestBody;
-    const { signedXdr, contractId, engagementId, propertyId, senderAddress, receiverAddress, amount } = body;
-    const action = body.action ?? 'initialize';
+    const { signedXdr, contractId, engagementId, propertyId, senderAddress, receiverAddress, amount, status } = body;
 
-    if (!signedXdr || !contractId || !engagementId) {
+    if (!signedXdr || !contractId || !engagementId || !senderAddress || !receiverAddress) {
       return NextResponse.json(
-        { error: 'Missing required fields: signedXdr, contractId, engagementId.' },
+        { error: 'Missing required fields: signedXdr, contractId, engagementId, senderAddress, receiverAddress.' },
         { status: 400 },
       );
     }
 
-    if (action === 'initialize' && (!senderAddress || !receiverAddress)) {
+    const allowedStatuses = ['funded', 'milestone_approved', 'completed', 'resolved'];
+    const resolvedStatus = status ?? 'funded';
+    if (!allowedStatuses.includes(resolvedStatus)) {
       return NextResponse.json(
-        { error: 'Missing required fields: senderAddress, receiverAddress.' },
+        { error: `Invalid status: must be one of ${allowedStatuses.join(', ')}.` },
         { status: 400 },
-      );
-    }
-
-    if (!(action in ACTION_STATUS)) {
-      return NextResponse.json({ error: `Unsupported action: ${action}.` }, { status: 400 });
-    }
-
-    const currentStatus = await getEscrowStatusByEngagementId(engagementId);
-    if (currentStatus === null) {
-      return NextResponse.json(
-        { error: `No escrow record found for engagementId: ${engagementId}` },
-        { status: 404 },
-      );
-    }
-
-    if (currentStatus !== ACTION_FROM_STATUS[action]) {
-      return NextResponse.json(
-        { error: `Escrow is in status '${currentStatus}', which does not allow the '${action}' action.` },
-        { status: 409 },
       );
     }
 
@@ -85,7 +49,14 @@ export async function POST(request: NextRequest) {
       body: { signedXdr },
     });
 
-    const updateResult = await updateEscrowStatus(engagementId, ACTION_STATUS[action]);
+    if (result.contractId !== contractId || result.engagementId !== engagementId) {
+      return NextResponse.json(
+        { error: 'Transaction result does not match the requested contract and engagement.' },
+        { status: 409 },
+      );
+    }
+
+    const updateResult = await updateEscrowStatus(engagementId, resolvedStatus);
     if (updateResult.update_escrows.affected_rows === 0) {
       return NextResponse.json(
         { error: `No escrow record found for engagementId: ${engagementId}` },
@@ -102,8 +73,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const messages = getErrorMessages(error, 'Failed to send transaction.');
     return NextResponse.json(
-      { error: getErrorMessages(error, 'Failed to send transaction.') },
+      { error: messages[0], messages },
       { status: 500 },
     );
   }

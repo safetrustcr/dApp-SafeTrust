@@ -3,33 +3,43 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { TrustlessWorkRequestError, trustlessWorkRequest } from '@/lib/server/trustlesswork';
 
-type ChangeMilestoneStatusRequestBody = {
+type MilestoneStatusRequestBody = {
   contractId?: string;
-  milestoneIndex?: number;
-  newEvidence?: string;
-  newStatus?: string;
   serviceProvider?: string;
+  engagementId?: string;
+  milestoneIndex?: number;
+  newStatus?: string;
+  newEvidence?: string;
 };
 
 type ChangeMilestoneStatusResponse = {
-  status: 'SUCCESS' | 'FAILED';
-  unsignedTransaction?: string;
-  message: string;
+  unsignedXdr: string;
+  txHash: string;
 };
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as ChangeMilestoneStatusRequestBody;
-    const { contractId, milestoneIndex, newEvidence, newStatus, serviceProvider } = body;
+    const body = (await request.json()) as MilestoneStatusRequestBody;
+    const { contractId, serviceProvider, engagementId, milestoneIndex, newStatus, newEvidence } = body;
 
-    if (!contractId || !serviceProvider || !newStatus) {
+    if (!contractId || !serviceProvider || !engagementId) {
       return NextResponse.json(
-        { error: 'Missing required fields: contractId, serviceProvider, newStatus.' },
+        { error: 'Missing required fields: contractId, serviceProvider, engagementId.' },
         { status: 400 },
       );
     }
 
-    if (typeof milestoneIndex !== 'number' || !Number.isInteger(milestoneIndex) || milestoneIndex < 0) {
+    const validStatuses = ['completed'];
+    const resolvedStatus = newStatus ?? 'completed';
+    if (!validStatuses.includes(resolvedStatus)) {
+      return NextResponse.json(
+        { error: `Invalid newStatus: must be one of ${validStatuses.join(', ')}.` },
+        { status: 400 },
+      );
+    }
+
+    const resolvedIndex = milestoneIndex ?? 0;
+    if (!Number.isInteger(resolvedIndex) || resolvedIndex < 0) {
       return NextResponse.json(
         { error: 'Invalid milestoneIndex: must be a non-negative integer.' },
         { status: 400 },
@@ -37,30 +47,29 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await trustlessWorkRequest<ChangeMilestoneStatusResponse>(
-      '/escrow/single-release/change-milestone-status',
+      '/escrow/single-release/v2/change-milestone-status',
       {
         method: 'POST',
         body: {
           contractId,
-          milestoneIndex,
-          newEvidence: newEvidence ?? '',
-          newStatus,
           serviceProvider,
+          updates: [
+            {
+              index: resolvedIndex,
+              newStatus: resolvedStatus,
+              ...(newEvidence ? { newEvidence } : {}),
+            },
+          ],
         },
       },
     );
 
-    if (result.status !== 'SUCCESS' || !result.unsignedTransaction) {
-      return NextResponse.json(
-        { error: result.message ?? 'TrustlessWork change-milestone-status failed.', payload: result },
-        { status: 502 },
-      );
-    }
-
     return NextResponse.json({
-      status: result.status,
-      unsignedXDR: result.unsignedTransaction,
-      message: result.message,
+      unsignedXdr: result.unsignedXdr,
+      txHash: result.txHash,
+      contractId,
+      engagementId,
+      status: 'milestone_approved',
     });
   } catch (error) {
     if (error instanceof TrustlessWorkRequestError) {
@@ -70,8 +79,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const messages = getErrorMessages(error, 'Failed to build milestone status transaction.');
     return NextResponse.json(
-      { error: getErrorMessages(error, 'Failed to update milestone status.') },
+      { error: messages[0], messages },
       { status: 500 },
     );
   }
