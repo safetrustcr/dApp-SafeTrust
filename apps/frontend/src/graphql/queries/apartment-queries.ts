@@ -138,3 +138,26 @@ export const DELETE_APARTMENT = gql`
     }
   }
 `;
+
+export const GET_APARTMENT_OWNER = gql`
+  query GetApartmentOwner($id: uuid!) {
+    apartments(
+      where: { id: { _eq: $id }, deleted_at: { _is_null: true } }
+      limit: 1
+    ) {
+      owner {
+        first_name
+        last_name
+        email
+        phone_number
+        country_code
+        user_wallets(
+          where: { is_primary: { _eq: true }, chain_type: { _eq: "STELLAR" } }
+          limit: 1
+        ) {
+          wallet_address
+        }
+      }
+    }
+  }
+`;
