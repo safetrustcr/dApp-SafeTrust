@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const allowedStatuses = ['funded', 'milestone_approved', 'completed'];
+    const allowedStatuses = ['funded', 'milestone_approved', 'completed', 'resolved'];
     const resolvedStatus = status ?? 'funded';
     if (!allowedStatuses.includes(resolvedStatus)) {
       return NextResponse.json(

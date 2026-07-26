@@ -756,7 +756,7 @@ function ReleasedView({ escrow }: { escrow?: EscrowRecord | null }) {
   );
 }
 
-type EscrowAction = 'fund' | 'milestone' | 'release';
+type EscrowAction = 'fund' | 'milestone' | 'release' | 'resolve';
 
 function EscrowActionButton({
   action,
@@ -764,17 +764,20 @@ function EscrowActionButton({
   isLoading,
   loadingMessage,
   onClick,
+  children,
 }: {
   action: EscrowAction;
   status: EscrowStatus;
   isLoading: boolean;
   loadingMessage: string;
   onClick: () => void;
+  children?: ReactNode;
 }) {
   const buttonConfig: Record<EscrowAction, { label: string; color: string; hoverColor: string }> = {
     fund: { label: 'Fund Escrow', color: '#f97316', hoverColor: '#ea580c' },
     milestone: { label: 'Mark Completed', color: '#22c55e', hoverColor: '#16a34a' },
     release: { label: 'Release Funds', color: '#6366f1', hoverColor: '#4f46e5' },
+    resolve: { label: 'Resolve Dispute', color: '#dc2626', hoverColor: '#b91c1c' },
   };
 
   const config = buttonConfig[action];
@@ -785,7 +788,9 @@ function EscrowActionButton({
         {action === 'fund' && 'Deposit funds into the escrow contract to secure the transaction.'}
         {action === 'milestone' && 'Mark the milestone as completed to proceed with fund release.'}
         {action === 'release' && 'Release the escrowed funds to the service provider.'}
+        {action === 'resolve' && 'Split the deposit between the tenant (approver) and the owner (receiver) to close the dispute.'}
       </p>
+      {children}
       <button
         type="button"
         onClick={onClick}
@@ -829,6 +834,8 @@ export default function EscrowDetailPage({
   const [actionLoading, setActionLoading] = useState<EscrowAction | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
+  const [approverFunds, setApproverFunds] = useState(0);
+  const [receiverFunds, setReceiverFunds] = useState(0);
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.escrowId);
 
@@ -878,14 +885,17 @@ export default function EscrowDetailPage({
   const isApprover = address && escrow?.sender_address && address.toLowerCase() === escrow.sender_address.toLowerCase();
   const isMarker = address && escrow?.receiver_address && address.toLowerCase() === escrow.receiver_address.toLowerCase();
   const isReleaseSigner = address && platformAddress && address.toLowerCase() === platformAddress.toLowerCase();
+  const isResolver = isReleaseSigner;
 
   const canFund = status === 'created' || status === 'pending_signature';
   const canMarkMilestone = status === 'funded';
   const canRelease = status === 'milestone_approved';
+  const canResolve = status === 'disputed';
 
   const showFundButton = canFund && isApprover;
   const showMilestoneButton = canMarkMilestone && isMarker;
   const showReleaseButton = canRelease && isReleaseSigner;
+  const showResolveButton = canResolve && isResolver;
 
   const handleFundEscrow = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.amount || !escrow.receiver_address) {
@@ -1070,6 +1080,73 @@ export default function EscrowDetailPage({
     }
   }, [escrow, address, signXDR]);
 
+  const handleResolveDispute = useCallback(async () => {
+    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
+      setErrorMessages(['Missing required escrow data for dispute resolution.']);
+      return;
+    }
+
+    if (approverFunds + receiverFunds !== escrow.amount) {
+      setErrorMessages([`Approver funds + receiver funds must equal the escrow amount (${escrow.amount}).`]);
+      return;
+    }
+
+    setActionLoading('resolve');
+    setLoadingMessage('Building resolution transaction...');
+    setErrorMessages([]);
+
+    try {
+      const response = await fetch('/api/escrow/resolve-dispute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId: escrow.contract_id,
+          releaseSigner: address,
+          engagementId: escrow.engagement_id,
+          approverFunds,
+          receiverFunds,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        setErrorMessages(getErrorMessages(payload, 'Failed to build resolve-dispute transaction.'));
+        return;
+      }
+
+      setLoadingMessage('Awaiting wallet signature...');
+      const signedXdr = await signXDR(payload.unsignedXdr);
+
+      setLoadingMessage('Submitting transaction...');
+      const submitResponse = await fetch('/api/escrow/send-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signedXdr,
+          contractId: escrow.contract_id,
+          engagementId: escrow.engagement_id,
+          senderAddress: escrow.sender_address,
+          receiverAddress: escrow.receiver_address,
+          amount: escrow.amount,
+          status: 'resolved',
+        }),
+      });
+
+      const submitPayload = await submitResponse.json();
+      if (!submitResponse.ok) {
+        setErrorMessages(getErrorMessages(submitPayload, 'Failed to submit resolution transaction.'));
+        return;
+      }
+
+      setErrorMessages([]);
+    } catch (err) {
+      setErrorMessages(getErrorMessages(err, 'Failed to complete dispute resolution flow.'));
+    } finally {
+      setActionLoading(null);
+      setLoadingMessage('');
+    }
+  }, [escrow, address, signXDR, approverFunds, receiverFunds]);
+
   if (loading && !escrow) {
     return (
       <div style={styles.pageWrapper}>
@@ -1220,7 +1297,40 @@ export default function EscrowDetailPage({
               />
             )}
 
-            {!address && (canFund || canMarkMilestone || canRelease) && (
+            {showResolveButton && (
+              <EscrowActionButton
+                action="resolve"
+                status={status}
+                isLoading={actionLoading === 'resolve'}
+                loadingMessage={loadingMessage}
+                onClick={handleResolveDispute}
+              >
+                <div style={{ display: 'grid', gap: '0.6rem', marginBottom: '0.9rem' }}>
+                  <label style={{ fontSize: '0.82rem', color: '#374151' }}>
+                    Approver funds
+                    <input
+                      type="number"
+                      min={0}
+                      value={approverFunds}
+                      onChange={(event) => setApproverFunds(Number(event.target.value))}
+                      style={{ ...styles.input, minHeight: 'auto', marginTop: '0.3rem' }}
+                    />
+                  </label>
+                  <label style={{ fontSize: '0.82rem', color: '#374151' }}>
+                    Receiver funds
+                    <input
+                      type="number"
+                      min={0}
+                      value={receiverFunds}
+                      onChange={(event) => setReceiverFunds(Number(event.target.value))}
+                      style={{ ...styles.input, minHeight: 'auto', marginTop: '0.3rem' }}
+                    />
+                  </label>
+                </div>
+              </EscrowActionButton>
+            )}
+
+            {!address && (canFund || canMarkMilestone || canRelease || canResolve) && (
               <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: '0.5rem', border: '1px solid #fcd34d' }}>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#92400e' }}>
                   Connect your Stellar wallet to perform this action.
