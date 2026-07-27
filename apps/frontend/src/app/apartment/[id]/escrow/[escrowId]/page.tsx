@@ -8,6 +8,7 @@ import { truncateStellarAddress } from '@/lib/utils';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
 import { useState, useCallback, type CSSProperties, ReactNode } from 'react';
+import { useEscrowAction } from '@/hooks/use-escrow-action';
 import Image from 'next/image';
 import {
   Bell,
@@ -38,6 +39,13 @@ type ViewConfig = {
   label: EscrowViewLabel;
   title: string;
   step: 1 | 2 | 3 | 4;
+};
+
+type TrustlessWorkEscrowRecord = {
+  approver?: string | null;
+  marker?: string | null;
+  releaser?: string | null;
+  resolver?: string | null;
 };
 
 type EscrowRecord = {
@@ -615,6 +623,18 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function ErrorAlert({ messages }: { messages: string[] }) {
+  return (
+    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee2e2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
+      <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#b91c1c', fontSize: '0.9rem' }}>
+        {messages.map((msg, i) => (
+          <li key={i}>{msg}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function DisputedView({ escrow }: { escrow?: EscrowRecord | null }) {
   const createdAt = escrow?.created_at
     ? formatDate(escrow.created_at)
@@ -912,6 +932,7 @@ export default function EscrowDetailPage({
   searchParams: { status?: string };
 }) {
   const { address, signXDR } = useWallet();
+  const { execute, actioning, phase, actionError } = useEscrowAction();
   const [actionLoading, setActionLoading] = useState<EscrowAction | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
@@ -929,7 +950,8 @@ export default function EscrowDetailPage({
     pollInterval: 2000,
   });
 
-  const escrow = data?.escrows?.[0];
+  const escrow = data?.escrows?.[0] as EscrowRecord | undefined;
+  const trustlessWorkEscrow = data?.trustlessWorkEscrows?.[0] as TrustlessWorkEscrowRecord | undefined;
   const apartmentMismatch =
     escrow?.apartment?.id != null && escrow.apartment.id !== params.id;
 
@@ -967,10 +989,22 @@ export default function EscrowDetailPage({
 
   const ownerWalletAddress = escrow?.apartment?.owner?.user_wallets?.[0]?.wallet_address || '';
 
-  const isApprover = address && escrow?.sender_address && address.toLowerCase() === escrow.sender_address.toLowerCase();
-  const isMarker = address && escrow?.receiver_address && address.toLowerCase() === escrow.receiver_address.toLowerCase();
-  const isReleaseSigner = address && platformAddress && address.toLowerCase() === platformAddress.toLowerCase();
-  const isResolver = isReleaseSigner;
+  const matches = (candidate?: string | null) =>
+    Boolean(address && candidate && address.toLowerCase() === candidate.toLowerCase());
+
+  // Authoritative Trustless Work role wins; legacy address is only a fallback.
+  const isApprover = trustlessWorkEscrow?.approver
+    ? matches(trustlessWorkEscrow.approver)
+    : matches(escrow?.sender_address);
+  const isMarker = trustlessWorkEscrow?.marker
+    ? matches(trustlessWorkEscrow.marker)
+    : matches(escrow?.receiver_address);
+  const isReleaseSigner = trustlessWorkEscrow?.releaser
+    ? matches(trustlessWorkEscrow.releaser)
+    : matches(platformAddress);
+  const isResolver = trustlessWorkEscrow?.resolver
+    ? matches(trustlessWorkEscrow.resolver)
+    : isReleaseSigner;
 
   const canFund = status === 'created' || status === 'pending_signature';
   const canMarkMilestone = status === 'funded';
@@ -982,128 +1016,66 @@ export default function EscrowDetailPage({
   const showReleaseButton = canRelease && isReleaseSigner;
   const showResolveButton = canResolve && isResolver;
 
+  const phaseMessage = phase === 'building'
+    ? 'Building transaction...'
+    : phase === 'signing'
+      ? 'Awaiting wallet signature...'
+      : phase === 'submitting'
+        ? 'Submitting transaction...'
+        : 'Processing...';
+
   const handleFundEscrow = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.amount || !escrow.receiver_address) {
       setErrorMessages(['Missing required escrow data for funding.']);
       return;
     }
 
-    setActionLoading('fund');
-    setLoadingMessage('Building fund transaction...');
     setErrorMessages([]);
-
-    try {
-      const response = await fetch('/api/escrow/fund', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractId: escrow.contract_id,
-          signer: address,
-          amount: escrow.amount,
-          engagementId: escrow.engagement_id,
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        setErrorMessages(getErrorMessages(payload, 'Failed to build fund transaction.'));
-        return;
-      }
-
-      setLoadingMessage('Awaiting wallet signature...');
-      const signedXdr = await signXDR(payload.unsignedXdr);
-
-      setLoadingMessage('Submitting transaction...');
-      const submitResponse = await fetch('/api/escrow/send-transaction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signedXdr,
-          contractId: escrow.contract_id,
-          engagementId: escrow.engagement_id,
-          senderAddress: address,
-          receiverAddress: escrow.receiver_address,
-          amount: escrow.amount,
-          status: 'funded',
-        }),
-      });
-
-      const submitPayload = await submitResponse.json();
-      if (!submitResponse.ok) {
-        setErrorMessages(getErrorMessages(submitPayload, 'Failed to submit fund transaction.'));
-        return;
-      }
-
-      setErrorMessages([]);
-    } catch (err) {
-      setErrorMessages(getErrorMessages(err, 'Failed to complete fund flow.'));
-    } finally {
-      setActionLoading(null);
-      setLoadingMessage('');
-    }
-  }, [escrow, address, signXDR]);
+    await execute({
+      apiRoute: '/api/escrow/fund',
+      apiBody: {
+        contractId: escrow.contract_id,
+        signer: address,
+        amount: escrow.amount,
+        engagementId: escrow.engagement_id,
+      },
+      sendTransactionBody: {
+        contractId: escrow.contract_id,
+        engagementId: escrow.engagement_id,
+        senderAddress: address,
+        receiverAddress: escrow.receiver_address,
+        amount: escrow.amount,
+        status: 'funded',
+      },
+    });
+  }, [escrow, address, execute]);
 
   const handleMarkCompleted = useCallback(async () => {
-    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address) {
+    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
       setErrorMessages(['Missing required escrow data for milestone update.']);
       return;
     }
 
-    setActionLoading('milestone');
-    setLoadingMessage('Building milestone transaction...');
     setErrorMessages([]);
-
-    try {
-      const response = await fetch('/api/escrow/milestone-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractId: escrow.contract_id,
-          serviceProvider: address,
-          engagementId: escrow.engagement_id,
-          milestoneIndex: 0,
-          newStatus: 'completed',
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        setErrorMessages(getErrorMessages(payload, 'Failed to build milestone transaction.'));
-        return;
-      }
-
-      setLoadingMessage('Awaiting wallet signature...');
-      const signedXdr = await signXDR(payload.unsignedXdr);
-
-      setLoadingMessage('Submitting transaction...');
-      const submitResponse = await fetch('/api/escrow/send-transaction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signedXdr,
-          contractId: escrow.contract_id,
-          engagementId: escrow.engagement_id,
-          senderAddress: escrow.sender_address,
-          receiverAddress: address,
-          amount: escrow.amount,
-          status: 'milestone_approved',
-        }),
-      });
-
-      const submitPayload = await submitResponse.json();
-      if (!submitResponse.ok) {
-        setErrorMessages(getErrorMessages(submitPayload, 'Failed to submit milestone transaction.'));
-        return;
-      }
-
-      setErrorMessages([]);
-    } catch (err) {
-      setErrorMessages(getErrorMessages(err, 'Failed to complete milestone flow.'));
-    } finally {
-      setActionLoading(null);
-      setLoadingMessage('');
-    }
-  }, [escrow, address, signXDR]);
+    await execute({
+      apiRoute: '/api/escrow/milestone-status',
+      apiBody: {
+        contractId: escrow.contract_id,
+        serviceProvider: address,
+        engagementId: escrow.engagement_id,
+        milestoneIndex: 0,
+        newStatus: 'completed',
+      },
+      sendTransactionBody: {
+        contractId: escrow.contract_id,
+        engagementId: escrow.engagement_id,
+        senderAddress: escrow.sender_address,
+        receiverAddress: escrow.receiver_address,
+        amount: escrow.amount,
+        status: 'milestone_approved',
+      },
+    });
+  }, [escrow, address, execute]);
 
   const handleReleaseFunds = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
@@ -1111,59 +1083,24 @@ export default function EscrowDetailPage({
       return;
     }
 
-    setActionLoading('release');
-    setLoadingMessage('Building release transaction...');
     setErrorMessages([]);
-
-    try {
-      const response = await fetch('/api/escrow/release', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractId: escrow.contract_id,
-          releaseSigner: address,
-          engagementId: escrow.engagement_id,
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        setErrorMessages(getErrorMessages(payload, 'Failed to build release transaction.'));
-        return;
-      }
-
-      setLoadingMessage('Awaiting wallet signature...');
-      const signedXdr = await signXDR(payload.unsignedXdr);
-
-      setLoadingMessage('Submitting transaction...');
-      const submitResponse = await fetch('/api/escrow/send-transaction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signedXdr,
-          contractId: escrow.contract_id,
-          engagementId: escrow.engagement_id,
-          senderAddress: escrow.sender_address,
-          receiverAddress: escrow.receiver_address,
-          amount: escrow.amount,
-          status: 'completed',
-        }),
-      });
-
-      const submitPayload = await submitResponse.json();
-      if (!submitResponse.ok) {
-        setErrorMessages(getErrorMessages(submitPayload, 'Failed to submit release transaction.'));
-        return;
-      }
-
-      setErrorMessages([]);
-    } catch (err) {
-      setErrorMessages(getErrorMessages(err, 'Failed to complete release flow.'));
-    } finally {
-      setActionLoading(null);
-      setLoadingMessage('');
-    }
-  }, [escrow, address, signXDR]);
+    await execute({
+      apiRoute: '/api/escrow/release',
+      apiBody: {
+        contractId: escrow.contract_id,
+        releaseSigner: address,
+        engagementId: escrow.engagement_id,
+      },
+      sendTransactionBody: {
+        contractId: escrow.contract_id,
+        engagementId: escrow.engagement_id,
+        senderAddress: escrow.sender_address,
+        receiverAddress: escrow.receiver_address,
+        amount: escrow.amount,
+        status: 'completed',
+      },
+    });
+  }, [escrow, address, execute]);
 
   const handleResolveDispute = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
@@ -1330,15 +1267,9 @@ export default function EscrowDetailPage({
           )}
         </div>
 
-        {errorMessages.length > 0 && (
-          <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee2e2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
-            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#b91c1c', fontSize: '0.9rem' }}>
-              {errorMessages.map((msg, i) => (
-                <li key={i}>{msg}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {errorMessages.length > 0 && <ErrorAlert messages={errorMessages} />}
+
+        {actionError && actionError.length > 0 && <ErrorAlert messages={actionError} />}
 
         <div className="responsive-grid" style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 2.05fr) minmax(18rem, 1fr)' }}>
           <div style={styles.leftPanel}>
@@ -1358,8 +1289,8 @@ export default function EscrowDetailPage({
               <EscrowActionButton
                 action="fund"
                 status={status}
-                isLoading={actionLoading === 'fund'}
-                loadingMessage={loadingMessage}
+                isLoading={actioning}
+                loadingMessage={phaseMessage}
                 onClick={handleFundEscrow}
               />
             )}
@@ -1368,8 +1299,8 @@ export default function EscrowDetailPage({
               <EscrowActionButton
                 action="milestone"
                 status={status}
-                isLoading={actionLoading === 'milestone'}
-                loadingMessage={loadingMessage}
+                isLoading={actioning}
+                loadingMessage={phaseMessage}
                 onClick={handleMarkCompleted}
               />
             )}
@@ -1378,8 +1309,8 @@ export default function EscrowDetailPage({
               <EscrowActionButton
                 action="release"
                 status={status}
-                isLoading={actionLoading === 'release'}
-                loadingMessage={loadingMessage}
+                isLoading={actioning}
+                loadingMessage={phaseMessage}
                 onClick={handleReleaseFunds}
               />
             )}

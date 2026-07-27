@@ -181,6 +181,15 @@ export const GET_ESCROW_BY_ANY_ID = gql`
         }
       }
     }
+    trustlessWorkEscrows: trustlessWorkEscrows(
+      where: { contractId: { _eq: $contract_id } }
+      limit: 1
+    ) {
+      approver
+      marker
+      releaser
+      resolver
+    }
   }
 `;
 
