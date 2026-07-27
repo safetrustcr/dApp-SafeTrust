@@ -20,13 +20,19 @@ import {
   WalletCards,
   Loader2,
 } from 'lucide-react';
+import { EscrowPendingView } from '@/components/escrow/views/EscrowPendingView';
+import { EscrowStatusView } from '@/components/escrow/views/EscrowStatusView';
 
 type InvoiceApartment = {
   name: string | null;
   image_urls?: string[] | null;
 };
 
-type EscrowViewLabel = 'paid' | 'blocked' | 'released';
+type InvoiceEscrow = {
+  apartment: InvoiceApartment;
+};
+
+type EscrowViewLabel = 'pending' | 'paid' | 'blocked' | 'released' | 'disputed';
 
 type ViewConfig = {
   label: EscrowViewLabel;
@@ -273,21 +279,16 @@ function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
     case 'created':
     case 'pending_signature':
       return {
-        label: 'paid',
-        title: 'Payment batch - Awaiting Funding',
+        label: 'pending',
+        title: 'Escrow Deployed — Awaiting Deposit',
         step: 1,
       };
     case 'funded':
-      return {
-        label: 'blocked',
-        title: 'Payment batch - Escrow Status',
-        step: 3,
-      };
     case 'active':
     case 'milestone_approved':
       return {
         label: 'blocked',
-        title: 'Payment batch - Milestone Status',
+        title: 'Payment batch - Escrow Status',
         step: 3,
       };
     case 'completed':
@@ -299,14 +300,14 @@ function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
       };
     case 'disputed':
       return {
-        label: 'blocked',
-        title: 'Payment batch - Disputed',
+        label: 'disputed',
+        title: 'Escrow Disputed',
         step: 3,
       };
-    case 'cancelled':
+    default:
       return {
-        label: 'paid',
-        title: 'Payment batch - Cancelled',
+        label: 'blocked',
+        title: 'Payment batch - Escrow Status',
         step: 2,
       };
   }
@@ -614,12 +615,100 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function DisputedView({ escrow }: { escrow?: EscrowRecord | null }) {
+  const createdAt = escrow?.created_at
+    ? formatDate(escrow.created_at)
+    : '25 January 2025';
+  const deposit = escrow?.amount
+    ? `$${escrow.amount.toLocaleString()}`
+    : '$4,000';
+  const tenantUser = escrow?.tenant_wallet?.user;
+  const ownerUser = escrow?.apartment?.owner;
+
+  return (
+    <div style={{ display: 'grid', gap: '1.5rem' }}>
+      <div style={styles.splitGrid}>
+        <InfoPair label="Creation date" value={createdAt} />
+        <InfoPair label="Amount blocked" value={deposit} />
+      </div>
+
+      <div>
+        <h3 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '1rem' }}>
+          Escrow Description
+        </h3>
+        <textarea style={styles.input} placeholder="Description..." />
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gap: '1.5rem',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(16rem, 1fr))',
+          borderTop: '1px solid #e5e7eb',
+          paddingTop: '1.5rem',
+        }}
+      >
+        <div>
+          <h3 style={{ marginTop: 0 }}>Tenant Information</h3>
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <InfoPair
+              label="Tenant name"
+              value={
+                tenantUser
+                  ? `${tenantUser.first_name ?? ''} ${tenantUser.last_name ?? ''}`.trim() ||
+                    'Tenant'
+                  : 'John Smith'
+              }
+            />
+            <InfoPair
+              label="Wallet Address"
+              value={
+                <span title={escrow?.sender_address ?? undefined}>
+                  {truncateStellarAddress(
+                    escrow?.sender_address ?? 'MJE1234567890ABCDEF1234567890ABCDEFXN32',
+                  )}
+                </span>
+              }
+            />
+            <InfoPair label="Email" value={tenantUser?.email ?? 'John_s@gmail.com'} />
+          </div>
+        </div>
+        <div>
+          <h3 style={{ marginTop: 0 }}>Owner Information</h3>
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <InfoPair
+              label="Owner name"
+              value={
+                ownerUser
+                  ? `${ownerUser.first_name ?? ''} ${ownerUser.last_name ?? ''}`.trim() ||
+                    'Owner'
+                  : 'Alberto Casas'
+              }
+            />
+            <InfoPair
+              label="Wallet Address"
+              value={
+                <span title={escrow?.receiver_address ?? undefined}>
+                  {truncateStellarAddress(
+                    escrow?.receiver_address ?? 'MJE1234567890ABCDEF1234567890ABCDEFXN32',
+                  )}
+                </span>
+              }
+            />
+            <InfoPair label="Email" value={ownerUser?.email ?? 'albertoCasas100@gmail.com'} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReleasedView({ escrow }: { escrow?: EscrowRecord | null }) {
   const isMock = !escrow;
 
   const justification = isMock
-    ? "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book"
-    : (escrow.resolution_notes || escrow.apartment?.description || "Deposit released.");
+    ? "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book."
+    : (escrow.resolution_notes || escrow.apartment?.description || 'Deposit released.');
 
   const ownerUser = escrow?.apartment?.owner;
   const beneficiaryName = isMock
@@ -855,10 +944,14 @@ export default function EscrowDetailPage({
     paidAt = formatDate(escrow.updated_at || escrow.created_at);
   } else {
     const devStatus = searchParams?.status;
-    if (devStatus === 'blocked') {
+    if (devStatus === 'created') {
+      status = 'created';
+    } else if (devStatus === 'funded') {
       status = 'funded';
-    } else if (devStatus === 'released') {
+    } else if (devStatus === 'completed' || devStatus === 'released') {
       status = 'completed';
+    } else if (devStatus === 'blocked') {
+      status = 'funded';
     } else if (devStatus === 'paid') {
       status = 'active';
     } else {
@@ -1255,8 +1348,10 @@ export default function EscrowDetailPage({
 
             <hr style={styles.divider} />
 
+            {view.label === 'pending' && <EscrowPendingView escrow={escrow} />}
             {view.label === 'paid' && <PaidStubView escrow={escrow} />}
             {view.label === 'blocked' && <BlockedStubView escrow={escrow} />}
+            {view.label === 'disputed' && <DisputedView escrow={escrow} />}
             {view.label === 'released' && <ReleasedView escrow={escrow} />}
 
             {showFundButton && (
