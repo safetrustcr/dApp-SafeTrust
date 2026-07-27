@@ -14,19 +14,19 @@ export function QuickActions({ userRole }: QuickActionsProps) {
     {
       title: 'New Booking',
       icon: Plus,
-      onClick: () => router.push('/book'),
+      onClick: () => router.push('/dashboard/guest'),
       description: 'Start a new apartment booking',
     },
     {
       title: 'My Profile',
       icon: User,
-      onClick: () => router.push('/profile'),
+      onClick: () => router.push('/dashboard/profile'),
       description: 'Update your profile',
     },
     {
       title: 'Payment Methods',
       icon: CreditCard,
-      onClick: () => router.push('/payment-methods'),
+      onClick: () => router.push('/dashboard/favorites'),
       description: 'Manage payment options',
     },
   ];
@@ -56,19 +56,19 @@ export function QuickActions({ userRole }: QuickActionsProps) {
     {
       title: 'Manage Escrows',
       icon: FileText,
-      onClick: () => router.push('/admin/escrows'),
+      onClick: () => router.push('/dashboard/escrow'),
       description: 'View all escrow transactions',
     },
     {
       title: 'User Management',
       icon: User,
-      onClick: () => router.push('/admin/users'),
+      onClick: () => router.push('/dashboard/users'),
       description: 'Manage platform users',
     },
     {
       title: 'System Settings',
       icon: Settings,
-      onClick: () => router.push('/admin/settings'),
+      onClick: () => router.push('/rent'),
       description: 'Configure platform settings',
     },
   ];
@@ -82,7 +82,7 @@ export function QuickActions({ userRole }: QuickActionsProps) {
   const helpAction = {
     title: 'Get Help',
     icon: HelpCircle,
-    onClick: () => router.push('/support'),
+    onClick: () => router.push('/dashboard/notifications'),
     description: 'Contact support or view help docs',
   };
 
