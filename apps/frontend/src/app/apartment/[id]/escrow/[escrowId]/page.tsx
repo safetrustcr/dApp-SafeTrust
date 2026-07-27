@@ -78,13 +78,6 @@ type EscrowRecord = {
   } | null;
 };
 
-const STUB_INVOICE_ESCROW: InvoiceEscrow = {
-  apartment: {
-    name: 'La sabana apartment',
-    image_urls: [],
-  },
-};
-
 const styles = {
   pageWrapper: {
     backgroundColor: '#eeeeee',
@@ -478,17 +471,20 @@ function ProductCell({ apartment }: { apartment: InvoiceApartment }) {
 function PaidStubView({ escrow }: { escrow?: EscrowRecord | null }) {
   const apartment: InvoiceApartment = escrow?.apartment
     ? { name: escrow.apartment.name ?? 'Apartment', image_urls: escrow.apartment.image_urls }
-    : STUB_INVOICE_ESCROW.apartment;
+    : { name: '—', image_urls: [] };
   const invoiceNumber = escrow?.engagement_id
     ? `INV-${escrow.engagement_id.slice(0, 12)}`
-    : 'INV4257-09-012';
-  const tenantEmail = escrow?.tenant_wallet?.user?.email ?? 'John_s@gmail.com';
+    : '—';
+  const tenantEmail = escrow?.tenant_wallet?.user?.email ?? '—';
   const tenantName = escrow?.tenant_wallet?.user
-    ? `${escrow.tenant_wallet.user.first_name ?? ''} ${escrow.tenant_wallet.user.last_name ?? ''}`.trim()
-    : 'John Smith';
-  const monthlyPrice = escrow?.apartment?.price ?? 4000;
-  const depositAmount = escrow?.amount ?? monthlyPrice;
+    ? `${escrow.tenant_wallet.user.first_name ?? ''} ${escrow.tenant_wallet.user.last_name ?? ''}`.trim() || '—'
+    : '—';
 
+  const formattedMonthlyPrice = escrow?.apartment?.price != null ? `$${escrow.apartment.price.toLocaleString()}` : '—';
+  const formattedDeposit = escrow?.amount != null ? `$${escrow.amount.toLocaleString()}` : '—';
+  const formattedTotal = (escrow?.apartment?.price != null && escrow?.amount != null)
+    ? `$${(escrow.apartment.price + escrow.amount).toLocaleString()}`
+    : '—';
   return (
     <div style={{ display: 'grid', gap: '1.5rem' }}>
       <div style={styles.splitGrid}>
@@ -513,10 +509,10 @@ function PaidStubView({ escrow }: { escrow?: EscrowRecord | null }) {
                 <ProductCell apartment={apartment} />
               </td>
               <td style={{ padding: '0.9rem', textAlign: 'right', borderTop: '1px solid #fed7aa' }}>
-                ${monthlyPrice.toLocaleString()}
+                {formattedMonthlyPrice}
               </td>
               <td style={{ padding: '0.9rem', textAlign: 'right', borderTop: '1px solid #fed7aa' }}>
-                ${depositAmount.toLocaleString()}
+                {formattedDeposit}
               </td>
             </tr>
           </tbody>
@@ -524,7 +520,7 @@ function PaidStubView({ escrow }: { escrow?: EscrowRecord | null }) {
       </div>
 
       <div style={{ fontSize: '0.95rem' }}>
-        <strong>Total: ${(monthlyPrice + depositAmount).toLocaleString()}</strong>
+        <strong>Total: {formattedTotal}</strong>
       </div>
     </div>
   );
@@ -533,10 +529,10 @@ function PaidStubView({ escrow }: { escrow?: EscrowRecord | null }) {
 function BlockedStubView({ escrow }: { escrow?: EscrowRecord | null }) {
   const createdAt = escrow?.created_at
     ? formatDate(escrow.created_at)
-    : '25 January 2025';
+    : '—';
   const blockedAmount = escrow?.amount
     ? `$${escrow.amount.toLocaleString()}`
-    : '$4,000';
+    : '—';
   const tenantUser = escrow?.tenant_wallet?.user;
   const ownerUser = escrow?.apartment?.owner;
 
@@ -578,15 +574,15 @@ function BlockedStubView({ escrow }: { escrow?: EscrowRecord | null }) {
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             <InfoPair label="Tenant name" value={
               tenantUser
-                ? `${tenantUser.first_name ?? ''} ${tenantUser.last_name ?? ''}`.trim() || 'Tenant'
-                : 'John Smith'
+                ? `${tenantUser.first_name ?? ''} ${tenantUser.last_name ?? ''}`.trim() || '—'
+                : '—'
             } />
             <InfoPair label="Wallet Address" value={
-              <span title={escrow?.sender_address ?? undefined}>
-                {truncateStellarAddress(escrow?.sender_address ?? 'MJE1234567890ABCDEF1234567890ABCDEFXN32')}
-              </span>
+              escrow?.sender_address
+                ? <span title={escrow.sender_address}>{truncateStellarAddress(escrow.sender_address)}</span>
+                : '—'
             } />
-            <InfoPair label="Email" value={tenantUser?.email ?? 'John_s@gmail.com'} />
+            <InfoPair label="Email" value={tenantUser?.email ?? '—'} />
           </div>
         </div>
         <div>
@@ -594,15 +590,15 @@ function BlockedStubView({ escrow }: { escrow?: EscrowRecord | null }) {
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             <InfoPair label="Owner name" value={
               ownerUser
-                ? `${ownerUser.first_name ?? ''} ${ownerUser.last_name ?? ''}`.trim() || 'Owner'
-                : 'Alberto Casas'
+                ? `${ownerUser.first_name ?? ''} ${ownerUser.last_name ?? ''}`.trim() || '—'
+                : '—'
             } />
             <InfoPair label="Wallet Address" value={
-              <span title={escrow?.receiver_address ?? undefined}>
-                {truncateStellarAddress(escrow?.receiver_address ?? 'MJE1234567890ABCDEF1234567890ABCDEFXN32')}
-              </span>
+              escrow?.receiver_address
+                ? <span title={escrow.receiver_address}>{truncateStellarAddress(escrow.receiver_address)}</span>
+                : '—'
             } />
-            <InfoPair label="Email" value={ownerUser?.email ?? 'albertoCasas100@gmail.com'} />
+            <InfoPair label="Email" value={ownerUser?.email ?? '—'} />
           </div>
         </div>
       </div>
@@ -1436,7 +1432,7 @@ export default function EscrowDetailPage({
               <textarea
                 id="escrow-notes-input"
                 style={{ ...styles.input, minHeight: '6.9rem' }}
-                placeholder="Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s..."
+                placeholder="Add notes..."
               />
             </div>
 
