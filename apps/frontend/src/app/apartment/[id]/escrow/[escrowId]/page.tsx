@@ -59,7 +59,6 @@ type EscrowRecord = {
   sender_address?: string | null;
   receiver_address?: string | null;
   resolution_notes?: string | null;
-  trustlessWorkEscrow?: TrustlessWorkEscrowRecord | null;
   tenant_wallet?: {
     user?: {
       first_name?: string | null;
@@ -624,6 +623,18 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function ErrorAlert({ messages }: { messages: string[] }) {
+  return (
+    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee2e2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
+      <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#b91c1c', fontSize: '0.9rem' }}>
+        {messages.map((msg, i) => (
+          <li key={i}>{msg}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function DisputedView({ escrow }: { escrow?: EscrowRecord | null }) {
   const createdAt = escrow?.created_at
     ? formatDate(escrow.created_at)
@@ -921,7 +932,7 @@ export default function EscrowDetailPage({
   searchParams: { status?: string };
 }) {
   const { address, signXDR } = useWallet();
-  const { execute, actioning, actionError } = useEscrowAction();
+  const { execute, actioning, phase, actionError } = useEscrowAction();
   const [actionLoading, setActionLoading] = useState<EscrowAction | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
@@ -978,22 +989,22 @@ export default function EscrowDetailPage({
 
   const ownerWalletAddress = escrow?.apartment?.owner?.user_wallets?.[0]?.wallet_address || '';
 
-  const isApprover = address && (
-    (trustlessWorkEscrow?.approver && address.toLowerCase() === trustlessWorkEscrow.approver.toLowerCase()) ||
-    (escrow?.sender_address && address.toLowerCase() === escrow.sender_address.toLowerCase())
-  );
-  const isMarker = address && (
-    (trustlessWorkEscrow?.marker && address.toLowerCase() === trustlessWorkEscrow.marker.toLowerCase()) ||
-    (escrow?.receiver_address && address.toLowerCase() === escrow.receiver_address.toLowerCase())
-  );
-  const isReleaseSigner = address && (
-    (trustlessWorkEscrow?.releaser && address.toLowerCase() === trustlessWorkEscrow.releaser.toLowerCase()) ||
-    (platformAddress && address.toLowerCase() === platformAddress.toLowerCase())
-  );
-  const isResolver = address && (
-    (trustlessWorkEscrow?.resolver && address.toLowerCase() === trustlessWorkEscrow.resolver.toLowerCase()) ||
-    isReleaseSigner
-  );
+  const matches = (candidate?: string | null) =>
+    Boolean(address && candidate && address.toLowerCase() === candidate.toLowerCase());
+
+  // Authoritative Trustless Work role wins; legacy address is only a fallback.
+  const isApprover = trustlessWorkEscrow?.approver
+    ? matches(trustlessWorkEscrow.approver)
+    : matches(escrow?.sender_address);
+  const isMarker = trustlessWorkEscrow?.marker
+    ? matches(trustlessWorkEscrow.marker)
+    : matches(escrow?.receiver_address);
+  const isReleaseSigner = trustlessWorkEscrow?.releaser
+    ? matches(trustlessWorkEscrow.releaser)
+    : matches(platformAddress);
+  const isResolver = trustlessWorkEscrow?.resolver
+    ? matches(trustlessWorkEscrow.resolver)
+    : isReleaseSigner;
 
   const canFund = status === 'created' || status === 'pending_signature';
   const canMarkMilestone = status === 'funded';
@@ -1004,6 +1015,14 @@ export default function EscrowDetailPage({
   const showMilestoneButton = canMarkMilestone && isMarker;
   const showReleaseButton = canRelease && isReleaseSigner;
   const showResolveButton = canResolve && isResolver;
+
+  const phaseMessage = phase === 'building'
+    ? 'Building transaction...'
+    : phase === 'signing'
+      ? 'Awaiting wallet signature...'
+      : phase === 'submitting'
+        ? 'Submitting transaction...'
+        : 'Processing...';
 
   const handleFundEscrow = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.amount || !escrow.receiver_address) {
@@ -1032,7 +1051,7 @@ export default function EscrowDetailPage({
   }, [escrow, address, execute]);
 
   const handleMarkCompleted = useCallback(async () => {
-    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address) {
+    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
       setErrorMessages(['Missing required escrow data for milestone update.']);
       return;
     }
@@ -1051,7 +1070,7 @@ export default function EscrowDetailPage({
         contractId: escrow.contract_id,
         engagementId: escrow.engagement_id,
         senderAddress: escrow.sender_address,
-        receiverAddress: address,
+        receiverAddress: escrow.receiver_address,
         amount: escrow.amount,
         status: 'milestone_approved',
       },
@@ -1248,25 +1267,9 @@ export default function EscrowDetailPage({
           )}
         </div>
 
-        {errorMessages.length > 0 && (
-          <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee2e2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
-            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#b91c1c', fontSize: '0.9rem' }}>
-              {errorMessages.map((msg, i) => (
-                <li key={i}>{msg}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {errorMessages.length > 0 && <ErrorAlert messages={errorMessages} />}
 
-        {actionError && actionError.length > 0 && (
-          <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee2e2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
-            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#b91c1c', fontSize: '0.9rem' }}>
-              {actionError.map((msg, i) => (
-                <li key={i}>{msg}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {actionError && actionError.length > 0 && <ErrorAlert messages={actionError} />}
 
         <div className="responsive-grid" style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 2.05fr) minmax(18rem, 1fr)' }}>
           <div style={styles.leftPanel}>
@@ -1287,7 +1290,7 @@ export default function EscrowDetailPage({
                 action="fund"
                 status={status}
                 isLoading={actioning}
-                loadingMessage="Processing..."
+                loadingMessage={phaseMessage}
                 onClick={handleFundEscrow}
               />
             )}
@@ -1297,7 +1300,7 @@ export default function EscrowDetailPage({
                 action="milestone"
                 status={status}
                 isLoading={actioning}
-                loadingMessage="Processing..."
+                loadingMessage={phaseMessage}
                 onClick={handleMarkCompleted}
               />
             )}
@@ -1307,7 +1310,7 @@ export default function EscrowDetailPage({
                 action="release"
                 status={status}
                 isLoading={actioning}
-                loadingMessage="Processing..."
+                loadingMessage={phaseMessage}
                 onClick={handleReleaseFunds}
               />
             )}

@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
+
+export type EscrowActionPhase = 'building' | 'signing' | 'submitting' | null;
 
 type EscrowActionConfig = {
   apiRoute: string;
@@ -11,11 +13,13 @@ type EscrowActionConfig = {
 export function useEscrowAction() {
   const { signXDR } = useWallet();
   const [actioning, setActioning] = useState(false);
+  const [phase, setPhase] = useState<EscrowActionPhase>(null);
   const [actionError, setActionError] = useState<string[] | null>(null);
 
-  async function execute(config: EscrowActionConfig) {
+  const execute = useCallback(async (config: EscrowActionConfig) => {
     setActioning(true);
     setActionError(null);
+    setPhase('building');
 
     try {
       const apiRes = await fetch(config.apiRoute, {
@@ -25,15 +29,17 @@ export function useEscrowAction() {
       });
 
       if (!apiRes.ok) {
-        const err = await apiRes.json().catch(() => ({}));
-        throw new Error(err.error ?? `API error ${apiRes.status}`);
+        const payload = await apiRes.json().catch(() => ({}));
+        throw getErrorMessages(payload, `API error ${apiRes.status}`);
       }
 
       const { unsignedXdr } = await apiRes.json();
       if (!unsignedXdr) throw new Error('No unsigned XDR returned from API');
 
+      setPhase('signing');
       const signedXdr = await signXDR(unsignedXdr);
 
+      setPhase('submitting');
       const sendRes = await fetch('/api/escrow/send-transaction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -41,18 +47,21 @@ export function useEscrowAction() {
       });
 
       if (!sendRes.ok) {
-        const err = await sendRes.json().catch(() => ({}));
-        throw new Error(err.error ?? `Send transaction error ${sendRes.status}`);
+        const payload = await sendRes.json().catch(() => ({}));
+        throw getErrorMessages(payload, `Send transaction error ${sendRes.status}`);
       }
 
       const result = await sendRes.json();
-      console.log('[escrow-action] Transaction confirmed:', result);
+      console.log('[escrow-action] Transaction confirmed:', result.txHash);
+      return result;
     } catch (error) {
       setActionError(getErrorMessages(error, 'Action failed.'));
+      return null;
     } finally {
+      setPhase(null);
       setActioning(false);
     }
-  }
+  }, [signXDR]);
 
-  return { execute, actioning, actionError };
+  return { execute, actioning, phase, actionError };
 }
