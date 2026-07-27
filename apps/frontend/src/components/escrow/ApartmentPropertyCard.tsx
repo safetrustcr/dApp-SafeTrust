@@ -20,6 +20,7 @@ type ApartmentPropertyCardProps = {
   bedrooms?: number | null;
   bathrooms?: number | null;
   paySlot?: ReactNode;
+  belowHeadingSlot?: ReactNode;
 };
 
 const styles = {
@@ -29,6 +30,11 @@ const styles = {
     justifyContent: "space-between",
     gap: "1rem",
     flexWrap: "wrap",
+    borderBottom: "1px solid #f3f4f6",
+    paddingBottom: "1rem",
+  } satisfies CSSProperties,
+  paySlotWrap: {
+    flexShrink: 0,
   } satisfies CSSProperties,
   imageGrid: {
     display: "grid",
@@ -90,6 +96,7 @@ export function ApartmentPropertyCard({
   bedrooms,
   bathrooms,
   paySlot,
+  belowHeadingSlot,
 }: ApartmentPropertyCardProps) {
   const images = buildImageList(imageUrls);
   const addressLine = formatAddress(address);
@@ -98,8 +105,10 @@ export function ApartmentPropertyCard({
     <div style={{ display: "grid", gap: "1rem" }}>
       <div style={styles.headingRow}>
         <h2 style={{ margin: 0, fontSize: "1.5rem" }}>{name}</h2>
-        {paySlot}
+        {paySlot != null ? <div style={styles.paySlotWrap}>{paySlot}</div> : null}
       </div>
+
+      {belowHeadingSlot}
 
       <div style={styles.imageGrid}>
         {images.map((src, i) => (
