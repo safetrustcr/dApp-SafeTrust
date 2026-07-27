@@ -292,29 +292,30 @@ export default function EscrowCreatePage({
 
             {/* Apartment card + PAY button */}
             <ApartmentPropertyCard
-            name={apartment.name}
-            imageUrls={apartment.image_urls}
-            address={apartment.address}
-            description={apartment.description}
-            petFriendly={apartment.pet_friendly ?? false}
-            bedrooms={apartment.bedrooms}
-            bathrooms={apartment.bathrooms}
-            paySlot={
-              ownerWallet ? (
+              name={apartment.name}
+              imageUrls={apartment.image_urls}
+              address={apartment.address}
+              description={apartment.description}
+              petFriendly={apartment.pet_friendly ?? false}
+              bedrooms={apartment.bedrooms}
+              bathrooms={apartment.bathrooms}
+              paySlot={
                 <EscrowPayFlow
                   apartmentId={params.id}
                   apartmentName={apartment.name}
-                  ownerWalletAddress={ownerWallet}
+                  ownerWalletAddress={ownerWallet ?? ""}
                   amount={apartment.price}
                 />
-              ) : (
-                <p style={styles.walletDisabled}>
-                  Owner wallet is not available yet. Payment is disabled until
-                  the owner&apos;s Stellar wallet is linked.
-                </p>
-              )
-            }
-          />
+              }
+              belowHeadingSlot={
+                !ownerWallet ? (
+                  <p style={styles.walletDisabled}>
+                    Owner wallet is not available yet. Payment is disabled
+                    until the owner&apos;s Stellar wallet is linked.
+                  </p>
+                ) : null
+              }
+            />
 
             {/* Security deposit amount banner */}
             <div style={styles.amountBanner}>
