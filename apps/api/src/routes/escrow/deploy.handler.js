@@ -5,7 +5,20 @@ import { trustlessWork } from '../../lib/trustlesswork.js';
  * Receives escrow creation request, calls TrustlessWork, and returns unsigned XDR.
  */
 export async function deployEscrowHandler(req, res) {
-  const { apartmentId, tenantAddress, ownerAddress, amount, engagementId } = req.body;
+  const { apartmentId, tenantAddress, ownerAddress, amount, engagementId } = req.body || {};
+
+  const missing = [];
+  if (!apartmentId) missing.push('apartmentId');
+  if (!tenantAddress) missing.push('tenantAddress');
+  if (!ownerAddress) missing.push('ownerAddress');
+  if (amount === undefined || amount === null || amount === '') missing.push('amount');
+  if (!engagementId) missing.push('engagementId');
+
+  if (missing.length > 0) {
+    return res.status(400).json({
+      error: `Missing required field(s): ${missing.join(', ')}`,
+    });
+  }
 
   try {
     const response = await trustlessWork.post('/deployer/single-release', {
