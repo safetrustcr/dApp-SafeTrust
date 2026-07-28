@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS public.users (
     CONSTRAINT valid_user_role CHECK (role IN ('GUEST', 'STAFF', 'MANAGER'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 CREATE INDEX IF NOT EXISTS idx_users_firebase_uid
     ON public.users(firebase_uid)
     WHERE firebase_uid IS NOT NULL;

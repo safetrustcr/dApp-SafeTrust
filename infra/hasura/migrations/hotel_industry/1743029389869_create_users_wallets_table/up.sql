@@ -20,5 +20,4 @@ CREATE TABLE IF NOT EXISTS users_wallets (
 
 -- Create indexes for performance
 CREATE INDEX idx_users_wallets_user_id ON users_wallets(user_id);
-CREATE INDEX idx_users_wallets_wallet_address ON users_wallets(wallet_address);
 CREATE INDEX idx_users_wallets_is_primary ON users_wallets(is_primary);

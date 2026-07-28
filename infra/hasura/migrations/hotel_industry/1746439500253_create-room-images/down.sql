@@ -1,2 +1,2 @@
-DROP INDEX IF EXISTS idx_room_id;
+-- Drop table
 DROP TABLE IF EXISTS room_images;

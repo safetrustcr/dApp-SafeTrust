@@ -16,17 +16,6 @@ CREATE TABLE room_types (
 CREATE INDEX idx_room_types_name ON room_types(name);
 
 -- Grant permissions
-DO $$ BEGIN
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
-        CREATE ROLE authenticated;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN
-        CREATE ROLE service_role;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'admin') THEN
-        CREATE ROLE admin;
-    END IF;
-END $$;
 
 GRANT SELECT ON public.room_types TO authenticated;
 GRANT SELECT ON public.room_types TO service_role;
