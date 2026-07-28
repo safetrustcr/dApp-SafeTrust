@@ -18,7 +18,12 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+// Capture the raw request body so webhook signatures (HMAC) can be verified.
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 
 const router = require('./routes');
 app.use(router);

@@ -1,5 +1,6 @@
 "use client";
 
+import { Bath, BedDouble, MapPin, PawPrint } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 
 const FALLBACK_IMAGE = "/img/room1.png";
@@ -20,6 +21,7 @@ type ApartmentPropertyCardProps = {
   bedrooms?: number | null;
   bathrooms?: number | null;
   paySlot?: ReactNode;
+  belowHeadingSlot?: ReactNode;
 };
 
 const styles = {
@@ -29,6 +31,11 @@ const styles = {
     justifyContent: "space-between",
     gap: "1rem",
     flexWrap: "wrap",
+    borderBottom: "1px solid #f3f4f6",
+    paddingBottom: "1rem",
+  } satisfies CSSProperties,
+  paySlotWrap: {
+    flexShrink: 0,
   } satisfies CSSProperties,
   imageGrid: {
     display: "grid",
@@ -47,16 +54,6 @@ const styles = {
     gap: "0.5rem",
     flexWrap: "wrap",
   } satisfies CSSProperties,
-  pill: {
-    display: "inline-flex",
-    alignItems: "center",
-    border: "1px solid #d1d5db",
-    borderRadius: "9999px",
-    padding: "0.2rem 0.75rem",
-    fontSize: "0.8rem",
-    color: "#374151",
-    backgroundColor: "#f9fafb",
-  } satisfies CSSProperties,
   mutedText: {
     margin: 0,
     color: "#6b7280",
@@ -69,6 +66,33 @@ function formatAddress(address: ApartmentAddress | null | undefined): string {
   return [address.street, address.neighborhood, address.city]
     .filter(Boolean)
     .join(", ");
+}
+
+function AmenityPill({
+  icon: Icon,
+  label,
+}: {
+  icon: typeof BedDouble;
+  label: string;
+}) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.35rem",
+        border: "1px solid #fed7aa",
+        borderRadius: "9999px",
+        padding: "0.25rem 0.85rem",
+        fontSize: "0.8rem",
+        color: "#374151",
+        backgroundColor: "#fff7ed",
+      }}
+    >
+      <Icon size={13} color="#f97316" strokeWidth={2} />
+      {label}
+    </span>
+  );
 }
 
 function buildImageList(imageUrls: string[] | null | undefined): string[] {
@@ -90,6 +114,7 @@ export function ApartmentPropertyCard({
   bedrooms,
   bathrooms,
   paySlot,
+  belowHeadingSlot,
 }: ApartmentPropertyCardProps) {
   const images = buildImageList(imageUrls);
   const addressLine = formatAddress(address);
@@ -98,8 +123,10 @@ export function ApartmentPropertyCard({
     <div style={{ display: "grid", gap: "1rem" }}>
       <div style={styles.headingRow}>
         <h2 style={{ margin: 0, fontSize: "1.5rem" }}>{name}</h2>
-        {paySlot}
+        {paySlot != null ? <div style={styles.paySlotWrap}>{paySlot}</div> : null}
       </div>
+
+      {belowHeadingSlot}
 
       <div style={styles.imageGrid}>
         {images.map((src, i) => (
@@ -118,14 +145,32 @@ export function ApartmentPropertyCard({
         ))}
       </div>
 
-      {addressLine && <p style={styles.mutedText}>{addressLine}</p>}
+      {addressLine && (
+        <p
+          style={{
+            ...styles.mutedText,
+            display: "flex",
+            alignItems: "center",
+            gap: "0.35rem",
+          }}
+        >
+          <MapPin size={14} color="#f97316" />
+          <span>{addressLine}</span>
+        </p>
+      )}
 
       <div style={styles.amenityRow}>
         {/* TODO: wire bedrooms after migration */}
-        <span style={styles.pill}>{bedrooms != null ? `${bedrooms} bd` : "2 bd"}</span>
-        {petFriendly && <span style={styles.pill}>pet friendly</span>}
+        <AmenityPill
+          icon={BedDouble}
+          label={bedrooms != null ? `${bedrooms} bd` : "2 bd"}
+        />
+        {petFriendly && <AmenityPill icon={PawPrint} label="pet friendly" />}
         {/* TODO: wire bathrooms after migration */}
-        <span style={styles.pill}>{bathrooms != null ? `${bathrooms} ba` : "1 ba"}</span>
+        <AmenityPill
+          icon={Bath}
+          label={bathrooms != null ? `${bathrooms} ba` : "1 ba"}
+        />
       </div>
 
       {description && (

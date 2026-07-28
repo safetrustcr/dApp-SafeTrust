@@ -1,0 +1,5 @@
+ALTER TABLE public.trustless_work_escrows
+  ALTER COLUMN marker   TYPE VARCHAR(255),
+  ALTER COLUMN approver TYPE VARCHAR(255),
+  ALTER COLUMN releaser TYPE VARCHAR(255),
+  ALTER COLUMN resolver TYPE VARCHAR(255);

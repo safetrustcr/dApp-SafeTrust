@@ -3,18 +3,22 @@
 import { cn } from "@/lib/utils";
 
 export type EscrowStatus =
+  | "created"
   | "pending_signature"
   | "funded"
   | "active"
+  | "milestone_approved"
   | "completed"
   | "disputed"
   | "resolved"
   | "cancelled";
 
 const STATUS_STYLES: Record<EscrowStatus, string> = {
+  created:            "bg-yellow-100 text-yellow-700",
   pending_signature: "bg-red-100 text-red-600",
   funded:            "bg-blue-100 text-blue-700",
   active:            "bg-green-100 text-green-700",
+  milestone_approved:"bg-indigo-100 text-indigo-700",
   completed:         "bg-emerald-100 text-emerald-700",
   disputed:          "bg-red-100    text-red-800    dark:bg-red-900    dark:text-red-300",
   resolved:          "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
@@ -22,9 +26,11 @@ const STATUS_STYLES: Record<EscrowStatus, string> = {
 };
 
 const STATUS_LABELS: Record<EscrowStatus, string> = {
+  created:            "Created",
   pending_signature: "Pending",
   funded:            "Deposit blocked",
   active:            "Paid",
+  milestone_approved:"Milestone approved",
   completed:         "Deposit released",
   disputed:          "Disputed",
   resolved:          "Resolved",
