@@ -33,7 +33,7 @@ function makeRequest(url: string, cookies: Record<string, string> = {}) {
 }
 
 const FAKE_JWT =
-  'header.' + btoa(JSON.stringify({ uid: 'test-uid-123' })) + '.sig';
+  'header.' + btoa(JSON.stringify({ uid: 'test-uid-123' })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '') + '.sig';
 
 beforeEach(() => {
   vi.clearAllMocks();

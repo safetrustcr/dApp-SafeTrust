@@ -5,6 +5,12 @@ import { fetchUserRole } from '@/lib/middleware/fetch-user-role';
 const HOST_ONLY_ROUTES = ['/dashboard/apartments'];
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  // TODO(SECURITY): JWKS signature verification is not implemented.
+  // Currently we only validate token structure (3 segments) and decode the payload.
+  // A forged token with a chosen uid bypasses role gating and is cached for an hour.
+  // Follow-up: verify Firebase ID tokens against Google's JWKS endpoint
+  // (https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com)
+  // using the `jose` library before trusting the payload.
   const { pathname } = request.nextUrl;
 
   const token =
@@ -31,7 +37,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
     if (!role) {
       try {
-        const payloadB64 = token.split('.')[1];
+        const segments = token.split('.');
+        if (segments.length !== 3 || !segments[1]) {
+          throw new Error('Invalid token format');
+        }
+        const payloadB64 = segments[1]
+          .replace(/-/g, '+')
+          .replace(/_/g, '/')
+          .padEnd(Math.ceil(segments[1].length / 4) * 4, '=');
         const payload = JSON.parse(atob(payloadB64)) as { uid?: string; sub?: string };
         const uid = payload.uid ?? payload.sub ?? '';
         role = await fetchUserRole(uid);
@@ -49,6 +62,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
           sameSite: 'lax',
           maxAge: 3600,
           path: '/',
+          secure: true,
         });
       }
       return res;
@@ -62,7 +76,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     }
 
     if (HOST_ONLY_ROUTES.some((p) => pathname.startsWith(p)) && role !== 'host') {
-      return NextResponse.redirect(new URL('/dashboard/guest', request.url));
+      return setRoleCookie(NextResponse.redirect(new URL('/dashboard/guest', request.url)));
     }
 
     return setRoleCookie(NextResponse.next());
