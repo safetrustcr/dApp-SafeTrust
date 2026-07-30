@@ -8,6 +8,8 @@ import {
   Users,
   Building2,
   HelpCircle,
+  Zap,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -83,12 +85,47 @@ const ADMIN_ACTIONS: Action[] = [
   },
 ];
 
+const NOTIFICATIONS_ACTION: Action = {
+  title: 'Notifications',
+  description: 'View your notifications',
+  icon: Bell,
+  route: '/dashboard/notifications',
+};
+
 const HELP_ACTION: Action = {
   title: 'Get Help',
   description: 'Contact support or view help docs',
   icon: HelpCircle,
   route: '/support',
 };
+
+interface ActionButtonProps {
+  action: Action;
+  variant?: 'outline' | 'ghost';
+  onClick: () => void;
+}
+
+function ActionButton({ action, variant = 'outline', onClick }: ActionButtonProps) {
+  return (
+    <Button
+      variant={variant}
+      className="w-full justify-start h-auto py-3 px-4 dark:border-gray-700 dark:hover:bg-gray-800 transition-all duration-150 hover:shadow-sm"
+      onClick={onClick}
+    >
+      <div className="flex items-center space-x-3">
+        <div className="p-1.5 rounded-md bg-primary/10 text-primary dark:bg-primary/20 shrink-0">
+          <action.icon className="h-4 w-4" />
+        </div>
+        <div className="text-left min-w-0">
+          <div className="font-medium dark:text-white text-sm">{action.title}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {action.description}
+          </div>
+        </div>
+      </div>
+    </Button>
+  );
+}
 
 interface QuickActionsProps {
   userRole: 'guest' | 'hotel' | 'admin';
@@ -107,52 +144,34 @@ export function QuickActions({ userRole }: QuickActionsProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium dark:text-white">
+        <CardTitle className="text-sm font-medium dark:text-white flex items-center gap-2">
+          <Zap className="h-4 w-4 text-primary" />
           Quick Actions
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-2">
           {actions.map((action) => (
-            <Button
-              key={action.title}
+            <ActionButton
+              key={action.route}
+              action={action}
               variant="outline"
-              className="w-full justify-start h-auto py-3 px-4 dark:border-gray-700 dark:hover:bg-gray-800"
               onClick={() => router.push(action.route)}
-            >
-              <div className="flex items-center space-x-3">
-                <div className="p-1.5 rounded-md bg-primary/10 text-primary dark:bg-primary/20">
-                  <action.icon className="h-4 w-4" />
-                </div>
-                <div className="text-left">
-                  <div className="font-medium dark:text-white">{action.title}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {action.description}
-                  </div>
-                </div>
-              </div>
-            </Button>
+            />
           ))}
         </div>
 
-        <div className="border-t dark:border-gray-700 pt-4">
-          <Button
+        <div className="border-t dark:border-gray-700 pt-4 space-y-2">
+          <ActionButton
+            action={NOTIFICATIONS_ACTION}
             variant="ghost"
-            className="w-full justify-start h-auto py-3 px-4 dark:hover:bg-gray-800"
+            onClick={() => router.push(NOTIFICATIONS_ACTION.route)}
+          />
+          <ActionButton
+            action={HELP_ACTION}
+            variant="ghost"
             onClick={() => router.push(HELP_ACTION.route)}
-          >
-            <div className="flex items-center space-x-3">
-              <div className="p-1.5 rounded-md bg-muted dark:bg-gray-800">
-                <HELP_ACTION.icon className="h-4 w-4" />
-              </div>
-              <div className="text-left">
-                <div className="font-medium dark:text-white">{HELP_ACTION.title}</div>
-                <div className="text-xs text-muted-foreground">
-                  {HELP_ACTION.description}
-                </div>
-              </div>
-            </div>
-          </Button>
+          />
         </div>
       </CardContent>
     </Card>
