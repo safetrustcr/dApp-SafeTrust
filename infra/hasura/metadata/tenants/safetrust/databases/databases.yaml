@@ -15,4 +15,16 @@
         from_env: PG_DATABASE_URL
       isolation_level: read-committed
       use_prepared_statements: false
-  tables: []
+  tables:
+    - table:
+        schema: public
+        name: hotels
+    - table:
+        schema: public
+        name: rooms
+    - table:
+        schema: public
+        name: reservations
+    - table:
+        schema: hotel_industry
+        name: pricing_rules
