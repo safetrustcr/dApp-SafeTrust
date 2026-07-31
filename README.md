@@ -100,27 +100,6 @@ pnpm install          # always run from repo root
 cp apps/frontend/.env.example apps/frontend/.env.local
 ```
 
-Open `apps/frontend/.env.local` and fill in every value. The table below summarises what is required and where each value comes from.
-
-| Variable | Required | Source |
-|---|---|---|
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | ✅ | Firebase Console → Project Settings → Your apps |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | ✅ | same |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | ✅ | same |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | ✅ | same |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | ✅ | same |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | ✅ | same |
-| `NEXT_PUBLIC_HASURA_GRAPHQL_URL` | ✅ | `http://localhost:8080/v1/graphql` (default) |
-| `NEXT_PUBLIC_HASURA_WS_URL` | ✅ | `ws://localhost:8080/v1/graphql` (default) |
-| `HASURA_ADMIN_SECRET` | ✅ | Must match `HASURA_GRAPHQL_ADMIN_SECRET` in `infra/hasura/.env` |
-| `NEXT_PUBLIC_BACKEND_URL` | ✅ | `http://localhost:3002` (default) |
-| `TRUSTLESS_WORK_API_KEY` | ✅ | See below — **crashes the server if missing** |
-| `TRUSTLESS_WORK_API_URL` | ✅ | `https://dev.api.trustlesswork.com` (testnet default) |
-| `NEXT_PUBLIC_PLATFORM_ADDRESS` | ✅ | Your SafeTrust Stellar wallet address |
-| `NEXT_PUBLIC_USDC_ADDRESS` | ✅ | Pre-filled in `.env.example` — do not change for testnet |
-
-> ⚠️ `TRUSTLESS_WORK_API_KEY`, `TRUSTLESS_WORK_API_URL`, and `HASURA_ADMIN_SECRET` are read at module load time. If any of them is missing, Next.js will crash immediately on `pnpm run dev`.
-
 #### Getting a TrustlessWork API key
 
 1. Go to [dapp.trustlesswork.com](https://dapp.trustlesswork.com) and connect your **Freighter wallet**.
@@ -155,29 +134,9 @@ See [Step 2: Set up environment variables](#2-set-up-environment-variables) in t
 
 ---
 
-## Backend Setup (Hasura + Docker)
+## Backend Setup (Hasura + Docker )
 
 ### Environment — `infra/hasura/.env`
-
-```bash
-# PostgreSQL
-POSTGRES_PASSWORD=postgrespassword
-
-# Hasura admin secret (choose any string)
-HASURA_GRAPHQL_ADMIN_SECRET=myadminsecretkey
-
-# Firebase JWT verification — replace YOUR_FIREBASE_PROJECT_ID with your actual project ID
-HASURA_GRAPHQL_JWT_SECRET='{"type":"RS256","jwk_url":"https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com","audience":"YOUR_FIREBASE_PROJECT_ID","issuer":"https://securetoken.google.com/YOUR_FIREBASE_PROJECT_ID"}'
-
-# Firebase Admin SDK — from the service account JSON you downloaded
-FIREBASE_PROJECT_ID=
-FIREBASE_CLIENT_EMAIL=           # ends in iam.gserviceaccount.com — not a personal Gmail
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-
-# Webhook
-HASURA_EVENT_SECRET=dev-event-secret-local
-WEBHOOK_URL=http://safetrust-webhook:3000
-```
 
 > ⚠️ `FIREBASE_PRIVATE_KEY` must use literal `\n` for newlines. Wrap the value in double quotes exactly as shown above.
 
@@ -286,18 +245,7 @@ const useGlobalAuthenticationStore = () => ({ address: null, setToken: () => {} 
 
 ---
 
-## Related Repositories
+## 📜 License
 
-| Repository | Purpose |
-|---|---|
-| [frontend-SafeTrust](https://github.com/safetrustcr/frontend-SafeTrust) | Full Next.js frontend (source for `apps/frontend` slices) |
-| [backend-SafeTrust](https://github.com/safetrustcr/backend-SafeTrust) | Full Hasura backend (source for migrations and seeds) |
-| [landing-SafeTrust](https://github.com/safetrustcr/landing-SafeTrust) | Marketing landing page |
+© 2026 SafeTrust. Released under the [MIT License](https://opensource.org/license/MIT).
 
----
-
-<div align="center">
-
-Built with 🔐 by the [SafeTrust](https://github.com/safetrustcr) team · [safetrustcr.vercel.app](https://safetrustcr.vercel.app)
-
-</div>
