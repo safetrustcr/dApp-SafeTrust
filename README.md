@@ -151,12 +151,6 @@ bin/dc_prep
 
 `bin/dc_prep` runs in order: starts containers → waits for Hasura health → applies migrations → reloads metadata → applies seeds. Takes ~30 s on first run.
 
-**Verify it's working:**
-
-```bash
-open http://localhost:8080/console          # Hasura console
-curl http://localhost:3000/health           # webhook: { "status": "ok" }
-```
 
 ### Reset the database
 
