@@ -138,8 +138,6 @@ See [Step 2: Set up environment variables](#2-set-up-environment-variables) in t
 
 ### Environment — `infra/hasura/.env`
 
-> ⚠️ `FIREBASE_PRIVATE_KEY` must use literal `\n` for newlines. Wrap the value in double quotes exactly as shown above.
-
 ### Start the backend
 
 ```bash
