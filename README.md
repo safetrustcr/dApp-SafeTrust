@@ -176,14 +176,6 @@ From the **repo root**, in a separate terminal:
 pnpm run dev
 ```
 
-Turborepo starts `apps/frontend` (port 3001) and `apps/api` (port 3000) in parallel.
-
-| URL | What you see |
-|---|---|
-| `http://localhost:3001` | Redirects to `/login` |
-| `http://localhost:3001/login` | Login form with wallet options |
-| `http://localhost:3001/register` | Register form |
-| `http://localhost:8080/console` | Hasura console |
 
 ### Generate GraphQL types (optional)
 
@@ -229,18 +221,10 @@ Full API reference: [docs.trustlesswork.com](https://docs.trustlesswork.com)
 Before opening a PR:
 
 1. Run `pnpm run dev` — both apps must start without errors.
-2. `/login` and `/register` must compile clean.
-3. No `console.log` in production paths, no unexplained `any` or `@ts-ignore`.
-4. Link the issue your PR closes.
+2. No `console.log` in production paths, no unexplained `any` or `@ts-ignore`.
+3. Link the issue your PR closes.
 
 **Branch naming:** `feat/<issue-number>-short-description` · `fix/<issue-number>-short-description`
-
-**Stub convention** — if your issue depends on a package another contributor is building, stub it rather than blocking:
-
-```tsx
-// TODO: wire in Batch 2 — @/core/store/data
-const useGlobalAuthenticationStore = () => ({ address: null, setToken: () => {} });
-```
 
 - [Contributing Guide](https://github.com/safetrustcr/Frontend/issues/34)
 - [Git Guidelines](https://github.com/safetrustcr/Frontend/issues/35)
@@ -250,4 +234,3 @@ const useGlobalAuthenticationStore = () => ({ address: null, setToken: () => {} 
 ## 📜 License
 
 © 2026 SafeTrust. Released under the [MIT License](https://opensource.org/license/MIT).
-
