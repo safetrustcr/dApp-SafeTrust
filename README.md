@@ -138,6 +138,10 @@ See [Step 2: Set up environment variables](#2-set-up-environment-variables) in t
 
 ### Environment — `infra/hasura/.env`
 
+```bash
+cp infra/hasura/.env.example infra/hasura/.env.local
+```
+
 ### Start the backend
 
 ```bash
