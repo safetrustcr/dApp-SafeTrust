@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS public.users (
 CREATE INDEX IF NOT EXISTS idx_users_firebase_uid
     ON public.users(firebase_uid)
     WHERE firebase_uid IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
+
 
 CREATE OR REPLACE FUNCTION update_users_updated_at()
 RETURNS TRIGGER AS $$
