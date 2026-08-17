@@ -1,6 +1,7 @@
 "use client";
 
 import { ApolloProviderWrapper } from "@/providers/ApolloProviderWrapper";
+import { PollarProvider } from "@/components/auth/pollar/PollarProvider";
 import { Toaster } from "@/components/ui/sonner";
 
 interface ClientProvidersProps {
@@ -10,8 +11,10 @@ interface ClientProvidersProps {
 export function ClientProviders({ children }: ClientProvidersProps) {
   return (
     <ApolloProviderWrapper>
-      {children}
-      <Toaster />
+      <PollarProvider>
+        {children}
+        <Toaster />
+      </PollarProvider>
     </ApolloProviderWrapper>
   );
 }
