@@ -1118,7 +1118,8 @@ export default function EscrowDetailPage({
     setErrorMessages([]);
 
     try {
-      const response = await fetch('/api/escrow/resolve-dispute', {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/escrow/resolve-dispute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1140,7 +1141,7 @@ export default function EscrowDetailPage({
       const signedXdr = await signXDR(payload.unsignedXdr);
 
       setLoadingMessage('Submitting transaction...');
-      const submitResponse = await fetch('/api/escrow/send-transaction', {
+      const submitResponse = await fetch(`${baseUrl}/api/escrow/send-transaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

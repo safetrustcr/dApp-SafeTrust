@@ -94,7 +94,8 @@ export function EscrowPayFlow({
     setErrorMessages([]);
 
     try {
-      const response = await fetch('/api/escrow/deploy', {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/escrow/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,8 +131,9 @@ export function EscrowPayFlow({
     setErrorMessages([]);
 
     try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
       const signedXdr = await signXDR(deployState.unsignedXDR);
-      const response = await fetch('/api/escrow/send-transaction', {
+      const response = await fetch(`${baseUrl}/api/escrow/send-transaction`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
