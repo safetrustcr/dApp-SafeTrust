@@ -1,7 +1,8 @@
 import express from 'express';
 import { deployEscrowHandler } from './deploy.handler.js';
 
-const router = express.Router();
+import { Router } from 'express';
+const router = Router();
 
 /**
  * POST /api/escrow/deploy

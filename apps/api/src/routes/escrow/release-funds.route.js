@@ -1,7 +1,8 @@
 import express from 'express';
 import { releaseFundsHandler } from './release-funds.handler.js';
 
-const router = express.Router();
+import { Router } from 'express';
+const router = Router();
 
 /**
  * POST /api/escrow/release-funds
