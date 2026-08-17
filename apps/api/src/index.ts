@@ -10,7 +10,17 @@ import releaseFundsRouter from './routes/escrow/release-funds.route.js';
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-app.use(cors());
+// CORS configuration - restrict to trusted frontend origins
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',')
+  : ['http://localhost:3001'];
+
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
 app.use(express.json());
 
 // Health check
