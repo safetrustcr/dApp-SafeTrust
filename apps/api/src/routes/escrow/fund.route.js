@@ -1,7 +1,7 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { fundEscrowHandler } from './fund.handler.js';
 
-const router = express.Router();
+const router = Router();
 
 /**
  * POST /api/escrow/fund
