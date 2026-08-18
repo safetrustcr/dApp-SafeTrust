@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import authRouter from './routes/auth/sync-user.route.js';
 import promoteToHostRouter from './routes/auth/promote-to-host.route.js';
+import activateWalletRouter from './routes/auth/activate-wallet.route.js';
 import deployEscrowRouter from './routes/escrow/deploy.route.js';
 import fundEscrowRouter from './routes/escrow/fund.route.js';
 import milestoneStatusRouter from './routes/escrow/milestone-status.route.js';
@@ -32,6 +33,7 @@ app.get('/health', (req, res) => {
 // Auth routes
 app.use('/api/auth', authRouter);
 app.use('/api/auth', promoteToHostRouter);
+app.use('/api/auth', activateWalletRouter);
 
 // Escrow routes
 app.use('/api/escrow', deployEscrowRouter);
