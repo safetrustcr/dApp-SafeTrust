@@ -18,10 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import Illustration from "@/components/auth/ui/Illustration";
 import Cookies from "js-cookie";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { toast } from "sonner";
+import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
+import { usePollarWalletSync } from "@/components/auth/pollar/usePollarWalletSync";
 
 const COUNTRY_CODES = [
   { code: "+506", country: "Costa Rica", flag: "🇨🇷" },
@@ -44,6 +47,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export default function RegisterPage() {
   const router = useRouter();
+
+  usePollarWalletSync();
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -267,6 +273,21 @@ export default function RegisterPage() {
               <p className="text-center text-sm text-red-600">{error}</p>
             )}
           </form>
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <Separator />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white dark:bg-[#0a0a0a] px-2 text-muted-foreground dark:text-gray-400">
+                or
+              </span>
+            </div>
+          </div>
+
+          <PollarLoginButton
+            onWalletReady={() => router.push("/dashboard/escrow-dashboard")}
+          />
 
           <div className="text-center text-sm">
             Already have an account?{" "}

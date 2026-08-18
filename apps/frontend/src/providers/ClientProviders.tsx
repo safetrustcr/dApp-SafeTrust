@@ -1,5 +1,6 @@
 "use client";
 
+import { PollarProvider } from "@pollar/react";
 import { ApolloProviderWrapper } from "@/providers/ApolloProviderWrapper";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -10,8 +11,14 @@ interface ClientProvidersProps {
 export function ClientProviders({ children }: ClientProvidersProps) {
   return (
     <ApolloProviderWrapper>
-      {children}
-      <Toaster />
+      <PollarProvider
+        client={{
+          apiKey: process.env.NEXT_PUBLIC_POLLAR_PUBLISHABLE_KEY!,
+        }}
+      >
+        {children}
+        <Toaster />
+      </PollarProvider>
     </ApolloProviderWrapper>
   );
 }
