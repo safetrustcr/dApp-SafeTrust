@@ -21,13 +21,13 @@ function PollarWalletStatusInner() {
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2">
+    <div className="flex items-center gap-2.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 dark:border-orange-900 dark:bg-orange-950">
       <Wallet size={14} className="text-orange-500" strokeWidth={2.2} />
       <div>
-        <p className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+        <p className="m-0 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
           Stellar wallet
         </p>
-        <p className="font-mono text-sm font-semibold text-amber-900">
+        <p className="m-0 font-mono text-[0.8rem] font-semibold text-orange-800 dark:text-orange-300">
           {wallet.address.slice(0, 8)}…{wallet.address.slice(-6)}
         </p>
       </div>
