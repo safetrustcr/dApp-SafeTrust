@@ -107,11 +107,12 @@ describe("activateWalletHandler", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "https://api.pollar.xyz/v1/wallets/activate",
+      "https://sdk.api.pollar.xyz/v2/wallet/activate",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
           Authorization: "Bearer sk_test_pollar",
+          "x-pollar-api-key": "sk_test_pollar",
         }),
       }),
     );

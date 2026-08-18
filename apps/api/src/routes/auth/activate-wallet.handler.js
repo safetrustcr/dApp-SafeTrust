@@ -1,4 +1,5 @@
-const POLLAR_ACTIVATE_URL = "https://api.pollar.xyz/v1/wallets/activate";
+const POLLAR_ACTIVATE_URL =
+  process.env.POLLAR_ACTIVATE_URL || "https://sdk.api.pollar.xyz/v2/wallet/activate";
 
 function decodeUid(token) {
   const payload = JSON.parse(
@@ -37,6 +38,7 @@ export const activateWalletHandler = async (req, res) => {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.POLLAR_SECRET_KEY}`,
+        "x-pollar-api-key": process.env.POLLAR_SECRET_KEY,
       },
       body: JSON.stringify({ userId: uid }),
     });

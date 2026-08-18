@@ -22,6 +22,8 @@ import Illustration from "@/components/auth/ui/Illustration";
 import Cookies from "js-cookie";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { toast } from "sonner";
+import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
+import { PollarWalletStatus } from "@/components/auth/pollar/PollarWalletStatus";
 
 const COUNTRY_CODES = [
   { code: "+506", country: "Costa Rica", flag: "🇨🇷" },
@@ -267,6 +269,14 @@ export default function RegisterPage() {
               <p className="text-center text-sm text-red-600">{error}</p>
             )}
           </form>
+
+          <div className="space-y-3 pt-2">
+            <p className="text-center text-xs uppercase tracking-wide text-muted-foreground">
+              or get a Stellar wallet without Freighter
+            </p>
+            <PollarWalletStatus />
+            <PollarLoginButton />
+          </div>
 
           <div className="text-center text-sm">
             Already have an account?{" "}
