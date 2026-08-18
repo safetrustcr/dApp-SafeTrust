@@ -24,7 +24,7 @@ import Cookies from "js-cookie";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { toast } from "sonner";
 import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
-import { usePollarWalletSync } from "@/components/auth/pollar/usePollarWalletSync";
+import { PollarWalletStatus } from "@/components/auth/pollar/PollarWalletStatus";
 
 const COUNTRY_CODES = [
   { code: "+506", country: "Costa Rica", flag: "🇨🇷" },
@@ -47,8 +47,6 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export default function RegisterPage() {
   const router = useRouter();
-
-  usePollarWalletSync();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -285,6 +283,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          <PollarWalletStatus />
           <PollarLoginButton
             onWalletReady={() => router.push("/dashboard/escrow-dashboard")}
           />

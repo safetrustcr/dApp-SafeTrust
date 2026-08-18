@@ -1,46 +1,46 @@
 "use client";
 
-import { useEffect } from "react";
-import { usePollar } from "@pollar/react";
+import { useEffect, useRef } from "react";
+import { usePollarWallet } from "./PollarProvider";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 
-// Syncs the Pollar-provisioned Stellar G-address to public.user_wallets via
-// POST /api/auth/activate-wallet in apps/api, and mirrors it into the
-// existing wallet auth store so route guards (e.g. Login.tsx) redirect the
-// same way they do for Freighter/MetaMask connections.
+/**
+ * Syncs a Pollar G-address to public.user_wallets via POST /api/auth/activate-wallet.
+ * Runs once per address when the guest already has a Firebase session.
+ */
 export function usePollarWalletSync() {
-  const { isAuthenticated, wallet } = usePollar();
-  const connectWalletStore = useGlobalAuthenticationStore(
-    (state) => state.connectWalletStore,
-  );
+  const { address } = usePollarWallet();
+  const token = useGlobalAuthenticationStore((state) => state.token);
+  const syncedAddress = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated || !wallet?.address) return;
+    if (!address || !token || syncedAddress.current === address) {
+      return;
+    }
 
-    connectWalletStore(wallet.address, "pollar");
+    const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3002";
 
     const syncWallet = async () => {
       try {
-        const backendUrl =
-          process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3002";
-
-        await fetch(`${backendUrl}/api/auth/activate-wallet`, {
+        const response = await fetch(`${apiUrl}/api/auth/activate-wallet`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            walletAddress: wallet.address,
-            chainType: "STELLAR",
-            isPrimary: true,
-            provider: "pollar",
-          }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         });
 
-        console.log("[pollar] wallet synced to user_wallets:", wallet.address);
+        if (!response.ok) {
+          console.error("[pollar] wallet sync failed:", response.status);
+          return;
+        }
+
+        syncedAddress.current = address;
       } catch (error) {
         console.error("[pollar] wallet sync failed:", error);
       }
     };
 
-    syncWallet();
-  }, [isAuthenticated, wallet?.address, connectWalletStore]);
+    void syncWallet();
+  }, [address, token]);
 }

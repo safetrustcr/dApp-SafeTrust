@@ -1,12 +1,24 @@
 "use client";
 
-import { usePollar } from "@pollar/react";
 import { Wallet } from "lucide-react";
+import { usePollar } from "@pollar/react";
+import { usePollarWallet } from "./PollarProvider";
 
 export function PollarWalletStatus() {
+  const { configured } = usePollarWallet();
+  if (!configured) {
+    return null;
+  }
+
+  return <PollarWalletStatusInner />;
+}
+
+function PollarWalletStatusInner() {
   const { isAuthenticated, wallet } = usePollar();
 
-  if (!isAuthenticated || !wallet?.address) return null;
+  if (!isAuthenticated || !wallet?.address) {
+    return null;
+  }
 
   return (
     <div className="flex items-center gap-2.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 dark:border-orange-900 dark:bg-orange-950">

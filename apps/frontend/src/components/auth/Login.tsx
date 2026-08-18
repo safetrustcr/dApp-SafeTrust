@@ -19,9 +19,9 @@ import { useMultiWallet } from "./wallet/hooks/multi-wallet.hook";
 import { MainWalletSelectionModal } from "./wallet/components/MainWalletSelectionModal";
 import { WalletSelectionModal } from "./wallet/components/WalletSelectionModal";
 import { MetaMaskWalletModal } from "./wallet/components/MetaMaskWalletModal";
-import { PollarLoginButton } from "./pollar/PollarLoginButton";
-import { usePollarWalletSync } from "./pollar/usePollarWalletSync";
 import { toast } from "sonner";
+import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
+import { PollarWalletStatus } from "@/components/auth/pollar/PollarWalletStatus";
 
 const ERROR_MESSAGES: Record<string, string> = {
   "auth/invalid-credential": "Invalid email or password",
@@ -48,8 +48,6 @@ export default function LoginPage() {
 
   const router = useRouter();
   const pathname = usePathname();
-
-  usePollarWalletSync();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -171,6 +169,7 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-3">
+            <PollarWalletStatus />
             <PollarLoginButton
               onWalletReady={() => router.push("/dashboard/escrow-dashboard")}
             />

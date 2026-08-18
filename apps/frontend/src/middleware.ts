@@ -1,8 +1,39 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { fetchUserRole } from '@/lib/middleware/fetch-user-role';
+import {
+  DEFAULT_ROLE,
+  ROLE_COOKIE,
+  ROLE_COOKIE_MAX_AGE,
+  dashboardHomeForRole,
+  isUserRole,
+  type UserRole,
+} from '@/lib/middleware/roles';
 
-const HOST_ONLY_ROUTES = ['/dashboard/apartments'];
+/**
+ * Routes reserved for listing-side users. Guests hitting one are bounced back
+ * to their own dashboard; admins are allowed through.
+ */
+const HOST_ONLY_ROUTES = [
+  '/dashboard/apartments',
+  '/dashboard/escrow-dashboard',
+  '/dashboard/manager',
+];
+
+const GUEST_HOME = '/dashboard/guest';
+
+function decodeUid(token: string): string {
+  const segments = token.split('.');
+  if (segments.length !== 3 || !segments[1]) {
+    throw new Error('Invalid token format');
+  }
+  const payloadB64 = segments[1]
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(Math.ceil(segments[1].length / 4) * 4, '=');
+  const payload = JSON.parse(atob(payloadB64)) as { uid?: string; sub?: string; user_id?: string };
+  return payload.uid ?? payload.user_id ?? payload.sub ?? '';
+}
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   // TODO(SECURITY): JWKS signature verification is not implemented.
@@ -32,51 +63,49 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   }
 
   if (isProtectedRoute && token) {
-    let role = request.cookies.get('user-role')?.value;
+    // Cookie cache first: a hit costs nothing, a miss costs one Hasura query
+    // per hour. An unrecognised value is treated as a miss rather than trusted.
+    const cachedRole = request.cookies.get(ROLE_COOKIE)?.value;
+    let role: UserRole;
     let roleFetched = false;
 
-    if (!role) {
+    if (isUserRole(cachedRole)) {
+      role = cachedRole;
+    } else {
       try {
-        const segments = token.split('.');
-        if (segments.length !== 3 || !segments[1]) {
-          throw new Error('Invalid token format');
-        }
-        const payloadB64 = segments[1]
-          .replace(/-/g, '+')
-          .replace(/_/g, '/')
-          .padEnd(Math.ceil(segments[1].length / 4) * 4, '=');
-        const payload = JSON.parse(atob(payloadB64)) as { uid?: string; sub?: string };
-        const uid = payload.uid ?? payload.sub ?? '';
-        role = await fetchUserRole(uid);
-        roleFetched = true;
+        role = await fetchUserRole(decodeUid(token));
       } catch {
-        role = 'guest';
-        roleFetched = true;
+        role = DEFAULT_ROLE;
       }
+      roleFetched = true;
     }
 
+    // Only written on a cache miss, so the TTL measures age since the lookup
+    // rather than sliding forward on every navigation — that bounds how long a
+    // role change can take to propagate.
     const setRoleCookie = (res: NextResponse) => {
       if (roleFetched) {
-        res.cookies.set('user-role', role!, {
+        res.cookies.set(ROLE_COOKIE, role, {
           httpOnly: true,
           sameSite: 'lax',
-          maxAge: 3600,
+          maxAge: ROLE_COOKIE_MAX_AGE,
           path: '/',
-          secure: true,
+          secure: process.env.NODE_ENV === 'production',
         });
       }
       return res;
     };
 
     if (pathname === '/dashboard') {
-      const dest = role === 'host'
-        ? '/dashboard/escrow-dashboard'
-        : '/dashboard/guest';
-      return setRoleCookie(NextResponse.redirect(new URL(dest, request.url)));
+      return setRoleCookie(
+        NextResponse.redirect(new URL(dashboardHomeForRole(role), request.url)),
+      );
     }
 
-    if (HOST_ONLY_ROUTES.some((p) => pathname.startsWith(p)) && role !== 'host') {
-      return setRoleCookie(NextResponse.redirect(new URL('/dashboard/guest', request.url)));
+    if (HOST_ONLY_ROUTES.some((p) => pathname.startsWith(p)) && role === 'guest') {
+      const blockedUrl = new URL(GUEST_HOME, request.url);
+      blockedUrl.searchParams.set('blocked', 'true');
+      return setRoleCookie(NextResponse.redirect(blockedUrl));
     }
 
     return setRoleCookie(NextResponse.next());

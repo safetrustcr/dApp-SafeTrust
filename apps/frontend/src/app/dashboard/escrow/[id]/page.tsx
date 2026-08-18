@@ -101,7 +101,7 @@ export default function EscrowCreatePage({
                   <EscrowPayFlow
                     apartmentId={params.id}
                     apartmentName={apartment.name}
-                    ownerAddress={ownerWallet}  {/* ← was ownerWalletAddress */}
+                    ownerAddress={ownerWallet}
                     amount={apartment.price}
                   />
                 ) : (
