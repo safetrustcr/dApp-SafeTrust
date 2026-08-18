@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import authRouter from './routes/auth/sync-user.route.js';
+import promoteToHostRouter from './routes/auth/promote-to-host.route.js';
 import deployEscrowRouter from './routes/escrow/deploy.route.js';
 import fundEscrowRouter from './routes/escrow/fund.route.js';
 import milestoneStatusRouter from './routes/escrow/milestone-status.route.js';
@@ -30,6 +31,7 @@ app.get('/health', (req, res) => {
 
 // Auth routes
 app.use('/api/auth', authRouter);
+app.use('/api/auth', promoteToHostRouter);
 
 // Escrow routes
 app.use('/api/escrow', deployEscrowRouter);
