@@ -187,6 +187,17 @@ Full API reference: [docs.trustlesswork.com](https://docs.trustlesswork.com)
 - [Contributing Guide](https://github.com/safetrustcr/Frontend/issues/34)
 - [Git Guidelines](https://github.com/safetrustcr/Frontend/issues/35)
 
+### AI-native development (optional)
+
+`mcp.json` at the repo root connects Cursor and Claude Code to:
+
+- TrustlessWork docs and live escrow tools
+- Stellar Raven — Stellar ecosystem docs + live data
+
+Cursor picks up `mcp.json` automatically.
+For `stellar-raven`: run `/mcp` → Authenticate → sign in in browser.
+No API keys required for any server.
+
 ---
 
 ## License
