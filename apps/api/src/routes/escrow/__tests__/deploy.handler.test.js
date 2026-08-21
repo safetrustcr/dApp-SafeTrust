@@ -5,7 +5,12 @@ vi.mock('../../../lib/trustlesswork.js', () => ({
   trustlessWork: { post: vi.fn() },
 }));
 
+vi.mock('../../../services/idempotency.js', () => ({
+  checkIdempotency: vi.fn(),
+}));
+
 import { trustlessWork } from '../../../lib/trustlesswork.js';
+import { checkIdempotency } from '../../../services/idempotency.js';
 import { mockReq, mockRes } from './helpers.js';
 
 describe('deployEscrowHandler', () => {
@@ -13,6 +18,29 @@ describe('deployEscrowHandler', () => {
     vi.clearAllMocks();
     process.env.PLATFORM_STELLAR_ADDRESS = 'GPLATFORM111111111111111111111111111111111111111111111111';
     process.env.PLATFORM_FEE_PERCENT = '1';
+    checkIdempotency.mockResolvedValue({ exists: false });
+  });
+
+  it('returns the cached result and skips TrustlessWork when the engagementId was already deployed', async () => {
+    checkIdempotency.mockResolvedValueOnce({
+      exists: true,
+      result: { engagement_id: 'ENG001', contract_id: 'CONTRACT001', status: 'funded' },
+    });
+
+    const res = mockRes();
+    await deployEscrowHandler(
+      mockReq({ apartmentId: 'APT001', tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
+      res,
+    );
+
+    expect(res._status).toBe(200);
+    expect(res._body).toEqual({
+      unsignedXDR: null,
+      engagementId: 'ENG001',
+      contractId: 'CONTRACT001',
+      cached: true,
+    });
+    expect(trustlessWork.post).not.toHaveBeenCalled();
   });
 
   it('returns 400 when apartmentId is missing', async () => {
