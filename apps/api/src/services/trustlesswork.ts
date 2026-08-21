@@ -1,6 +1,3 @@
-const BASE_URL = process.env.TRUSTLESS_WORK_API_URL;
-const API_KEY = process.env.TRUSTLESS_WORK_API_KEY;
-
 export class TrustlessWorkRequestError extends Error {
   statusCode: number;
   messages?: string[];
@@ -37,8 +34,8 @@ export async function trustlessWorkRequest<T>(
   path: string,
   options: TrustlessWorkRequestOptions = {},
 ): Promise<T> {
-  const baseUrl = process.env.TRUSTLESS_WORK_API_URL ?? BASE_URL;
-  const apiKey = process.env.TRUSTLESS_WORK_API_KEY ?? API_KEY;
+  const baseUrl = process.env.TRUSTLESS_WORK_API_URL;
+  const apiKey = process.env.TRUSTLESS_WORK_API_KEY;
 
   if (!baseUrl || !apiKey) {
     throw new TrustlessWorkRequestError(
@@ -47,15 +44,27 @@ export async function trustlessWorkRequest<T>(
     );
   }
 
-  const response = await fetch(`${baseUrl}${path}`, {
-    method: options.method ?? 'POST',
-    signal: AbortSignal.timeout(15_000),
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      method: options.method ?? 'POST',
+      signal: AbortSignal.timeout(15_000),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'TimeoutError') {
+      throw new TrustlessWorkRequestError(
+        `TrustlessWork request to ${path} timed out after 15s.`,
+        504,
+        ['Request to TrustlessWork timed out.'],
+      );
+    }
+    throw err;
+  }
 
   const raw = await response.text();
   let data: T & Record<string, unknown>;
@@ -64,7 +73,7 @@ export async function trustlessWorkRequest<T>(
   } catch {
     throw new TrustlessWorkRequestError(
       `TrustlessWork request to ${path} returned non-JSON response (status ${response.status}).`,
-      response.status,
+      response.status >= 500 ? response.status : 502,
       ['Response body is not valid JSON.'],
     );
   }

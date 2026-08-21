@@ -26,22 +26,6 @@ type MilestoneUpdateResult = {
   update_escrowMilestones: { returning: { id: string }[] };
 };
 
-type MilestoneAggResult = {
-  escrowMilestones_aggregate: {
-    aggregate: {
-      count: number;
-    };
-  };
-};
-
-type ApprovedMilestoneAggResult = {
-  escrowMilestones_aggregate: {
-    aggregate: {
-      count: number;
-    };
-  };
-};
-
 async function resolveEscrowId(contractId: string): Promise<string> {
   const data = await hasuraRequest<EscrowIdResult>(
     `query GetEscrowId($contractId: String!) {
@@ -174,18 +158,17 @@ export async function dbApproveMilestone(
     throw new Error(`Milestone not found: ${milestoneId} for contractId: ${contractId}`);
   }
 
-  const totalAgg = await hasuraRequest<MilestoneAggResult>(
-    `query TotalMilestones($escrowId: uuid!) {
-      escrowMilestones_aggregate(where: { escrowId: { _eq: $escrowId } }) {
+  type MilestoneCountsResult = {
+    total: { aggregate: { count: number } };
+    approved: { aggregate: { count: number } };
+  };
+
+  const counts = await hasuraRequest<MilestoneCountsResult>(
+    `query MilestoneCounts($escrowId: uuid!) {
+      total: escrowMilestones_aggregate(where: { escrowId: { _eq: $escrowId } }) {
         aggregate { count }
       }
-    }`,
-    { escrowId },
-  );
-
-  const approvedAgg = await hasuraRequest<ApprovedMilestoneAggResult>(
-    `query ApprovedMilestones($escrowId: uuid!) {
-      escrowMilestones_aggregate(
+      approved: escrowMilestones_aggregate(
         where: { escrowId: { _eq: $escrowId }, status: { _eq: "approved" } }
       ) {
         aggregate { count }
@@ -194,8 +177,8 @@ export async function dbApproveMilestone(
     { escrowId },
   );
 
-  const total = totalAgg.escrowMilestones_aggregate.aggregate.count;
-  const approved = approvedAgg.escrowMilestones_aggregate.aggregate.count;
+  const total = counts.total.aggregate.count;
+  const approved = counts.approved.aggregate.count;
 
   if (approved >= total) {
     const result = await hasuraRequest<UpdateResult>(

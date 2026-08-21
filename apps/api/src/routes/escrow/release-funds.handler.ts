@@ -46,11 +46,20 @@ export const releaseFundsHandler = async (
       },
     );
 
+    // Note: unsignedXdr is the canonical key; unsignedXDR is kept for legacy frontend consumers
+    // and will be removed once all callers migrate to unsignedXdr.
     const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
 
+    if (!unsignedXdr || result.status === 'FAILED') {
+      return res.status(502).json({
+        error: result.message ?? 'TrustlessWork release-funds returned no unsigned transaction.',
+        payload: result,
+      });
+    }
+
     return res.status(200).json({
-      unsignedXdr: unsignedXdr ?? '',
-      unsignedXDR: unsignedXdr ?? '',
+      unsignedXdr,
+      unsignedXDR: unsignedXdr,
       txHash: result.txHash ?? '',
       contractId,
       engagementId: engagementId ?? '',

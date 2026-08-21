@@ -5,7 +5,11 @@ const HASURA_URL =
 const HASURA_ADMIN_SECRET = process.env.HASURA_ADMIN_SECRET;
 
 if (!HASURA_ADMIN_SECRET) {
-  console.warn('Warning: Missing HASURA_ADMIN_SECRET environment variable in apps/api');
+  const message = 'Missing HASURA_ADMIN_SECRET environment variable in apps/api';
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(message);
+  }
+  console.warn(`Warning: ${message}`);
 }
 
 const _HASURA_ADMIN_SECRET: string = HASURA_ADMIN_SECRET || '';
@@ -25,7 +29,15 @@ export async function hasuraRequest<T>(
   });
 
   const text = await response.text();
-  const json = (text ? JSON.parse(text) : {}) as { data?: T; errors?: { message: string }[] };
+  let json: { data?: T; errors?: { message: string }[] };
+  try {
+    json = (text ? JSON.parse(text) : {}) as { data?: T; errors?: { message: string }[] };
+  } catch {
+    if (!response.ok) {
+      throw new Error(`Hasura request failed with status ${response.status} (non-JSON response)`);
+    }
+    json = {} as { data?: T; errors?: { message: string }[] };
+  }
 
   if (!response.ok) {
     const msg = json.errors?.map((e) => e.message).join(', ') ?? `Hasura request failed (${response.status})`;

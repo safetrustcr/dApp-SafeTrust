@@ -45,8 +45,8 @@ export const deployEscrowHandler = async (
 
     const engagementId = crypto.randomUUID();
 
-    const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS || process.env.PLATFORM_STELLAR_ADDRESS;
-    const trustlineAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS || process.env.USDC_TRUSTLINE_ADDRESS;
+    const platformAddress = process.env.PLATFORM_STELLAR_ADDRESS || process.env.NEXT_PUBLIC_PLATFORM_ADDRESS;
+    const trustlineAddress = process.env.USDC_TRUSTLINE_ADDRESS || process.env.NEXT_PUBLIC_USDC_ADDRESS;
 
     if (!platformAddress) {
       return res.status(500).json({
@@ -116,6 +116,7 @@ export const deployEscrowHandler = async (
     const messages = getErrorMessages(error, 'Failed to deploy escrow.');
     return res.status(500).json({
       error: messages[0],
+      messages,
     });
   }
 };

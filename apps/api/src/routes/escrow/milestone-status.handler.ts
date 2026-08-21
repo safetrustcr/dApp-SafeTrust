@@ -69,6 +69,13 @@ export const milestoneStatusHandler = async (
       },
     );
 
+    if (!result.unsignedXdr) {
+      return res.status(502).json({
+        error: 'TrustlessWork milestone-status request returned no unsigned transaction.',
+        payload: result,
+      });
+    }
+
     return res.status(200).json({
       unsignedXdr: result.unsignedXdr,
       txHash: result.txHash,
