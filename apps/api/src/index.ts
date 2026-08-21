@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { tenantMiddleware } from './middleware/tenant.middleware.js';
 import authRouter from './routes/auth/sync-user.route.js';
 import promoteToHostRouter from './routes/auth/promote-to-host.route.js';
 import activateWalletRouter from './routes/auth/activate-wallet.route.js';
@@ -26,6 +27,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+app.use(tenantMiddleware);
 
 // Health check
 app.get('/health', (req, res) => {
