@@ -1,4 +1,5 @@
 import { trustlessWork } from '../../lib/trustlesswork.js';
+import { checkIdempotency } from '../../services/idempotency.js';
 
 /**
  * Scaffold escrow deploy handler
@@ -21,6 +22,17 @@ export async function deployEscrowHandler(req, res) {
   }
 
   try {
+    const { exists, result } = await checkIdempotency(engagementId);
+    if (exists) {
+      console.log(`[escrow/deploy] idempotent — returning cached result for ${engagementId}`);
+      return res.status(200).json({
+        unsignedXDR: null,
+        engagementId,
+        contractId: result.contract_id,
+        cached: true,
+      });
+    }
+
     const response = await trustlessWork.post('/deployer/single-release', {
       signer: tenantAddress,
       engagementId,
