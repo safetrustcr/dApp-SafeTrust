@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "trustlesswork-docs": {
+      "type": "streamable-http",
+      "url": "https://docs.trustlesswork.com/trustless-work/~gitbook/mcp",
+      "headers": {}
+    },
+    "trustlesswork": {
+      "type": "streamable-http",
+      "url": "https://mcp.trustlesswork.com/mcp",
+      "headers": {}
+    },
+    "stellar-raven": {
+      "type": "streamable-http",
+      "url": "https://raven.stellar.org/mcp",
+      "headers": {}
+    }
+  }
+}
