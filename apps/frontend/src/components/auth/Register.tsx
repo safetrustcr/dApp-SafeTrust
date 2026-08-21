@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import Illustration from "@/components/auth/ui/Illustration";
 import Cookies from "js-cookie";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -46,6 +47,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export default function RegisterPage() {
   const router = useRouter();
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -270,13 +272,21 @@ export default function RegisterPage() {
             )}
           </form>
 
-          <div className="space-y-3 pt-2">
-            <p className="text-center text-xs uppercase tracking-wide text-muted-foreground">
-              or get a Stellar wallet without Freighter
-            </p>
-            <PollarWalletStatus />
-            <PollarLoginButton />
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <Separator />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white dark:bg-[#0a0a0a] px-2 text-muted-foreground dark:text-gray-400">
+                or
+              </span>
+            </div>
           </div>
+
+          <PollarWalletStatus />
+          <PollarLoginButton
+            onWalletReady={() => router.push("/dashboard/escrow-dashboard")}
+          />
 
           <div className="text-center text-sm">
             Already have an account?{" "}
