@@ -67,4 +67,52 @@ describe('fetchUserRole', () => {
     const result = await fetchUserRole('test-uid');
     expect(result).toBe('guest');
   });
+
+  it('resolves the highest-privilege role when a user holds several', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          user_roles: [{ role: { name: 'guest' } }, { role: { name: 'host' } }],
+        },
+      }),
+    } as unknown as Response);
+
+    const result = await fetchUserRole('test-uid');
+    expect(result).toBe('host');
+  });
+
+  it('resolves admin over host regardless of row order', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          user_roles: [{ role: { name: 'admin' } }, { role: { name: 'host' } }],
+        },
+      }),
+    } as unknown as Response);
+
+    const result = await fetchUserRole('test-uid');
+    expect(result).toBe('admin');
+  });
+
+  it('ignores role names outside the known vocabulary', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          user_roles: [{ role: { name: 'superuser' } }],
+        },
+      }),
+    } as unknown as Response);
+
+    const result = await fetchUserRole('test-uid');
+    expect(result).toBe('guest');
+  });
+
+  it('returns guest without querying Hasura when uid is empty', async () => {
+    const result = await fetchUserRole('');
+    expect(result).toBe('guest');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 });

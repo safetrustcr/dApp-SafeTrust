@@ -1,29 +1,31 @@
-const HASURA_URL =
-  process.env.HASURA_GRAPHQL_URL ??
-  process.env.HASURA_URL ??
-  'http://localhost:8080/v1/graphql';
-const HASURA_ADMIN_SECRET = process.env.HASURA_ADMIN_SECRET;
+const HASURA_URL = process.env.HASURA_GRAPHQL_URL ?? 'http://localhost:8080/v1/graphql';
 
-if (!HASURA_ADMIN_SECRET) {
-  const message = 'Missing HASURA_ADMIN_SECRET environment variable in apps/api';
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(message);
+export class HasuraRequestError extends Error {
+  constructor(message: string, readonly details?: unknown) {
+    super(message);
+    this.name = 'HasuraRequestError';
   }
-  console.warn(`Warning: ${message}`);
 }
 
-const _HASURA_ADMIN_SECRET: string = HASURA_ADMIN_SECRET || '';
-
+/**
+ * Executes a GraphQL operation against Hasura with the admin secret.
+ * Server-side only — the admin secret must never reach the browser.
+ */
 export async function hasuraRequest<T>(
   query: string,
-  variables?: Record<string, unknown>
+  variables: Record<string, unknown> = {},
 ): Promise<T> {
+  const adminSecret = process.env.HASURA_ADMIN_SECRET;
+  if (!adminSecret) {
+    throw new HasuraRequestError('Missing required env var: HASURA_ADMIN_SECRET');
+  }
+
   const response = await fetch(HASURA_URL, {
     method: 'POST',
     signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
-      'x-hasura-admin-secret': _HASURA_ADMIN_SECRET,
+      'x-hasura-admin-secret': adminSecret,
     },
     body: JSON.stringify({ query, variables }),
   });
@@ -34,22 +36,24 @@ export async function hasuraRequest<T>(
     json = (text ? JSON.parse(text) : {}) as { data?: T; errors?: { message: string }[] };
   } catch {
     if (!response.ok) {
-      throw new Error(`Hasura request failed with status ${response.status} (non-JSON response)`);
+      throw new HasuraRequestError(`Hasura request failed with status ${response.status} (non-JSON response)`);
     }
     json = {} as { data?: T; errors?: { message: string }[] };
   }
 
   if (!response.ok) {
-    const msg = json.errors?.map((e) => e.message).join(', ') ?? `Hasura request failed (${response.status})`;
-    throw new Error(msg);
+    const message =
+      json.errors?.map((e) => e.message).join(', ') ??
+      `Hasura request failed (${response.status})`;
+    throw new HasuraRequestError(message, json.errors);
   }
 
   if (json.errors?.length) {
-    throw new Error(json.errors.map((e) => e.message).join(', '));
+    throw new HasuraRequestError(json.errors.map((e) => e.message).join(', '), json.errors);
   }
 
   if (!json.data) {
-    throw new Error('Hasura response missing data');
+    throw new HasuraRequestError('Hasura response missing data');
   }
 
   return json.data;

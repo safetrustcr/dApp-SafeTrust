@@ -108,14 +108,78 @@ describe('middleware', () => {
     expect(setCookie).toContain('user-role=host');
   });
 
-  it('authenticated on /dashboard/apartments/new with user-role cookie guest redirects to /dashboard/guest', async () => {
+  it('authenticated on /dashboard with user-role cookie admin redirects to /dashboard/users', async () => {
+    const request = makeRequest('http://localhost/dashboard', {
+      'firebase-token': FAKE_JWT,
+      'user-role': 'admin',
+    });
+    const response = await middleware(request);
+    expect(response.status).toBe(307);
+    expect(new URL(response.headers.get('Location')!).pathname).toBe('/dashboard/users');
+    expect(mockFetchUserRole).not.toHaveBeenCalled();
+  });
+
+  it('unrecognised user-role cookie is ignored and the role is re-fetched', async () => {
+    mockFetchUserRole.mockResolvedValueOnce('host');
+    const request = makeRequest('http://localhost/dashboard', {
+      'firebase-token': FAKE_JWT,
+      'user-role': 'superuser',
+    });
+    const response = await middleware(request);
+    expect(mockFetchUserRole).toHaveBeenCalledWith('test-uid-123');
+    expect(new URL(response.headers.get('Location')!).pathname).toBe('/dashboard/escrow-dashboard');
+  });
+
+  it('authenticated on /dashboard/apartments/new with user-role cookie guest redirects to /dashboard/guest?blocked=true', async () => {
     const request = makeRequest('http://localhost/dashboard/apartments/new', {
       'firebase-token': FAKE_JWT,
       'user-role': 'guest',
     });
     const response = await middleware(request);
     expect(response.status).toBe(307);
+    const url = new URL(response.headers.get('Location')!);
+    expect(url.pathname).toBe('/dashboard/guest');
+    expect(url.searchParams.get('blocked')).toBe('true');
+  });
+
+  it('guest is blocked from /dashboard/escrow-dashboard', async () => {
+    const request = makeRequest('http://localhost/dashboard/escrow-dashboard', {
+      'firebase-token': FAKE_JWT,
+      'user-role': 'guest',
+    });
+    const response = await middleware(request);
+    expect(response.status).toBe(307);
+    const url = new URL(response.headers.get('Location')!);
+    expect(url.pathname).toBe('/dashboard/guest');
+    expect(url.searchParams.get('blocked')).toBe('true');
+  });
+
+  it('guest is blocked from /dashboard/manager', async () => {
+    const request = makeRequest('http://localhost/dashboard/manager', {
+      'firebase-token': FAKE_JWT,
+      'user-role': 'guest',
+    });
+    const response = await middleware(request);
+    expect(response.status).toBe(307);
     expect(new URL(response.headers.get('Location')!).pathname).toBe('/dashboard/guest');
+  });
+
+  it('admin is allowed through host-only routes', async () => {
+    const request = makeRequest('http://localhost/dashboard/apartments/new', {
+      'firebase-token': FAKE_JWT,
+      'user-role': 'admin',
+    });
+    const response = await middleware(request);
+    expect(response.status).toBe(200);
+  });
+
+  it('guest is allowed on non-host-only dashboard routes', async () => {
+    const request = makeRequest('http://localhost/dashboard/favorites', {
+      'firebase-token': FAKE_JWT,
+      'user-role': 'guest',
+    });
+    const response = await middleware(request);
+    expect(response.status).toBe(200);
   });
 
   it('authenticated on /dashboard/apartments/new with user-role cookie host allows through', async () => {
