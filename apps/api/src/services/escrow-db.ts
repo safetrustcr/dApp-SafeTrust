@@ -109,7 +109,8 @@ export async function dbFundEscrow(contractId: string, amount: number): Promise<
     `mutation FundEscrow($contractId: String!, $amount: numeric!) {
       update_trustlessWorkEscrows(
         where: { contractId: { _eq: $contractId } }
-        _set: { status: "funded", balance: $amount }
+        _set: { status: "funded" }
+        _inc: { balance: $amount }
       ) {
         returning { id }
       }
