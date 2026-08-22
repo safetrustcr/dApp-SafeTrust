@@ -96,6 +96,15 @@ export const recoverFromTxhashHandler = async (
       });
     } catch (error) {
       console.error('[recover-from-txhash] TW indexer call failed:', error);
+      if (error instanceof TrustlessWorkRequestError) {
+        return res.status(error.statusCode).json({
+          error: error.message,
+          messages: error.messages,
+          payload: error.payload,
+        });
+      }
+      const messages = getErrorMessages(error, 'Failed to verify transaction with the indexer.');
+      return res.status(502).json({ error: messages[0], messages });
     }
 
     const status = ACTION_STATUS[action];
