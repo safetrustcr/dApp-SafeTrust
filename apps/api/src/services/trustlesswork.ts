@@ -73,7 +73,7 @@ export async function trustlessWorkRequest<T>(
   } catch {
     throw new TrustlessWorkRequestError(
       `TrustlessWork request to ${path} returned non-JSON response (status ${response.status}).`,
-      response.status >= 500 ? response.status : 502,
+      502,
       ['Response body is not valid JSON.'],
     );
   }
@@ -84,7 +84,8 @@ export async function trustlessWorkRequest<T>(
         ? data.message
         : `TrustlessWork request to ${path} failed with status ${response.status}.`,
     ];
-    throw new TrustlessWorkRequestError(messages[0], response.status, messages, data);
+    const statusCode = response.status >= 500 || response.status === 429 ? 502 : 422;
+    throw new TrustlessWorkRequestError(messages[0], statusCode, messages, data);
   }
 
   return data;
