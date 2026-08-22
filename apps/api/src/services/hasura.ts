@@ -31,10 +31,15 @@ export async function hasuraRequest<T>(
   });
 
   const text = await response.text();
-  const json = (text ? JSON.parse(text) : {}) as {
-    data?: T;
-    errors?: { message: string }[];
-  };
+  let json: { data?: T; errors?: { message: string }[] };
+  try {
+    json = (text ? JSON.parse(text) : {}) as { data?: T; errors?: { message: string }[] };
+  } catch {
+    if (!response.ok) {
+      throw new HasuraRequestError(`Hasura request failed with status ${response.status} (non-JSON response)`);
+    }
+    json = {} as { data?: T; errors?: { message: string }[] };
+  }
 
   if (!response.ok) {
     const message =
@@ -52,4 +57,107 @@ export async function hasuraRequest<T>(
   }
 
   return json.data;
+}
+
+type InsertEscrowInput = {
+  contractId: string;
+  engagementId: string;
+  propertyId: string;
+  senderAddress: string;
+  receiverAddress: string;
+  amount: number;
+  status: string;
+};
+
+type InsertEscrowResult = {
+  insert_escrows_one: { id: string };
+};
+
+export async function insertEscrowRecord(input: InsertEscrowInput): Promise<InsertEscrowResult> {
+  return hasuraRequest<InsertEscrowResult>(
+    `mutation InsertEscrow(
+      $contract_id: String!
+      $engagement_id: String!
+      $property_id: uuid!
+      $sender_address: String!
+      $receiver_address: String!
+      $amount: numeric!
+      $status: String!
+    ) {
+      insert_escrows_one(object: {
+        contract_id: $contract_id
+        engagement_id: $engagement_id
+        property_id: $property_id
+        sender_address: $sender_address
+        receiver_address: $receiver_address
+        amount: $amount
+        status: $status
+      }) {
+        id
+      }
+    }`,
+    {
+      contract_id: input.contractId,
+      engagement_id: input.engagementId,
+      property_id: input.propertyId,
+      sender_address: input.senderAddress,
+      receiver_address: input.receiverAddress,
+      amount: input.amount,
+      status: input.status,
+    },
+  );
+}
+
+type EscrowAmountLookupResult = {
+  escrows: { amount: number }[];
+};
+
+export async function getEscrowAmountByContractId(contractId: string): Promise<number | null> {
+  const data = await hasuraRequest<EscrowAmountLookupResult>(
+    `query GetEscrowAmount($contract_id: String!) {
+      escrows(where: { contract_id: { _eq: $contract_id } }, limit: 1) {
+        amount
+      }
+    }`,
+    { contract_id: contractId },
+  );
+  return data.escrows[0]?.amount ?? null;
+}
+
+type UpdateEscrowStatusResult = {
+  update_escrows: { affected_rows: number };
+};
+
+export async function updateEscrowStatus(
+  engagementId: string,
+  status: string,
+): Promise<UpdateEscrowStatusResult> {
+  return hasuraRequest<UpdateEscrowStatusResult>(
+    `mutation UpdateEscrowStatus($engagement_id: String!, $status: String!) {
+      update_escrows(
+        where: { engagement_id: { _eq: $engagement_id } }
+        _set: { status: $status }
+      ) {
+        affected_rows
+      }
+    }`,
+    { engagement_id: engagementId, status },
+  );
+}
+
+export async function updateEscrowStatusByContractId(
+  contractId: string,
+  status: string,
+): Promise<UpdateEscrowStatusResult> {
+  return hasuraRequest<UpdateEscrowStatusResult>(
+    `mutation UpdateEscrowStatusByContractId($contract_id: String!, $status: String!) {
+      update_escrows(
+        where: { contract_id: { _eq: $contract_id } }
+        _set: { status: $status }
+      ) {
+        affected_rows
+      }
+    }`,
+    { contract_id: contractId, status },
+  );
 }

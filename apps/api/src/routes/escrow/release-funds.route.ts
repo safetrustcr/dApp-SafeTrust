@@ -1,12 +1,9 @@
-import express from 'express';
+import { Router } from 'express';
 import { releaseFundsHandler } from './release-funds.handler.js';
 
-import { Router } from 'express';
 const router = Router();
 
-/**
- * POST /api/escrow/release-funds
- */
 router.post('/release-funds', releaseFundsHandler);
+router.post('/release', releaseFundsHandler);
 
 export default router;

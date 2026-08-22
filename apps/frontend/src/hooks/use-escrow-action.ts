@@ -22,7 +22,12 @@ export function useEscrowAction() {
     setPhase('building');
 
     try {
-      const apiRes = await fetch(config.apiRoute, {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const targetUrl = config.apiRoute.startsWith('http')
+        ? config.apiRoute
+        : `${baseUrl}${config.apiRoute}`;
+
+      const apiRes = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config.apiBody),
@@ -40,7 +45,7 @@ export function useEscrowAction() {
       const signedXdr = await signXDR(unsignedXdr);
 
       setPhase('submitting');
-      const sendRes = await fetch('/api/escrow/send-transaction', {
+      const sendRes = await fetch(`${baseUrl}/api/escrow/send-transaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ signedXdr, ...config.sendTransactionBody }),
