@@ -82,7 +82,12 @@ export const recoverFromTxhashHandler = async (
       return res.status(400).json({ error: 'Missing required field: contractId' });
     }
 
-    const missing = REQUIRED_FIELDS[action].filter((field) => req.body[field] === undefined);
+    const missing = REQUIRED_FIELDS[action].filter((field) => {
+      const value = req.body[field];
+      if (value == null) return true;
+      if (field === 'amount') return typeof value !== 'number' || !Number.isFinite(value) || value <= 0;
+      return typeof value !== 'string' || value.trim().length === 0;
+    });
     if (missing.length > 0) {
       return res.status(400).json({
         error: `${action} action requires: contractId, ${missing.join(', ')}`,
