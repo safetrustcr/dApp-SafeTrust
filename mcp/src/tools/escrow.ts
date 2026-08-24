@@ -44,21 +44,11 @@ export function registerEscrowTools(server: McpServer) {
         'unsigned XDR for the tenant to sign with Freighter.',
       inputSchema: {
         apartmentId: z.string().uuid().describe('UUID of the apartment being rented'),
-        tenantAddress: stellarAddress.describe(
-          'Tenant Stellar wallet — approver role, signs the deploy',
-        ),
-        ownerAddress: stellarAddress.describe(
-          'Owner Stellar wallet — serviceProvider + receiver roles',
-        ),
+        senderAddress: stellarAddress.describe('Tenant Stellar wallet — approver role, signs the deploy'),
+        receiverAddress: stellarAddress.describe('Owner Stellar wallet — serviceProvider + receiver roles'),
         amount: z.number().positive().describe('Deposit amount in USDC'),
-        engagementId: z
-          .string()
-          .min(1)
-          .optional()
-          .describe('Idempotency key sent to TrustlessWork. A UUID is generated when omitted.'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    },
+      annotations: { readOnlyHint: false, destructiveHint: false }
     async ({ apartmentId, tenantAddress, ownerAddress, amount, engagementId }) => {
       const engagement = engagementId ?? randomUUID();
 
