@@ -7,8 +7,9 @@ import type { EscrowStatus } from '@/components/dashboard/EscrowStatusBadge';
 import { truncateStellarAddress } from '@/lib/utils';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { useActiveWallet } from '@/hooks/use-active-wallet';
-import { useState, useCallback, type CSSProperties, ReactNode } from 'react';
+import { useState, useCallback, useEffect, type CSSProperties, ReactNode } from 'react';
 import { useEscrowAction } from '@/hooks/use-escrow-action';
+import { useEscrowStream } from '@/hooks/use-escrow-stream';
 import Image from 'next/image';
 import {
   Bell,
@@ -941,14 +942,28 @@ export default function EscrowDetailPage({
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.escrowId);
 
-  const { data, loading, error } = useQuery(GET_ESCROW_BY_ANY_ID, {
+  const { data, loading, error, refetch } = useQuery(GET_ESCROW_BY_ANY_ID, {
     variables: {
       id: isUuid ? params.escrowId : null,
       engagement_id: params.escrowId,
       contract_id: params.escrowId,
     },
-    pollInterval: 2000,
+    // pollInterval removed — real-time updates are delivered via SSE (useEscrowStream)
   });
+
+  // Derive the Stellar contract ID once data is available so we can open the
+  // SSE connection with the authoritative on-chain identifier.
+  const contractId = data?.escrows?.[0]?.contract_id ?? data?.trustlessWorkEscrows?.[0]?.contract_id ?? null;
+
+  const { streamData } = useEscrowStream(contractId);
+
+  // When the SSE stream pushes a status change, trigger a targeted Apollo
+  // refetch so all derived state (status, view config, etc.) stays in sync.
+  useEffect(() => {
+    if (streamData) {
+      void refetch();
+    }
+  }, [streamData?.updated_at, refetch]);
 
   const escrow = data?.escrows?.[0] as EscrowRecord | undefined;
   const trustlessWorkEscrow = data?.trustlessWorkEscrows?.[0] as TrustlessWorkEscrowRecord | undefined;
