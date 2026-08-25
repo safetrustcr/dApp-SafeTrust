@@ -6,6 +6,7 @@ import deployEscrowRouter from './routes/escrow/deploy.route.js';
 import fundEscrowRouter from './routes/escrow/fund.route.js';
 import milestoneStatusRouter from './routes/escrow/milestone-status.route.js';
 import releaseFundsRouter from './routes/escrow/release-funds.route.js';
+import messagesRouter from './routes/messages/send.route.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -36,6 +37,9 @@ app.use('/api/escrow', deployEscrowRouter);
 app.use('/api/escrow', fundEscrowRouter);
 app.use('/api/escrow', milestoneStatusRouter);
 app.use('/api/escrow', releaseFundsRouter);
+
+// Messages routes
+app.use('/api/messages', messagesRouter);
 
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);
