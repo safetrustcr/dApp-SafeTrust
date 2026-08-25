@@ -47,6 +47,9 @@ app.use('/api/escrow', releaseFundsRouter);
 app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 
+// Messages routes
+app.use('/api/messages', messagesRouter);
+
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);
 });
