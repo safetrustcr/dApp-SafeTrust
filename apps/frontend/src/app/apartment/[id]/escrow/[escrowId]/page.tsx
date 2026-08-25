@@ -6,7 +6,7 @@ import { GET_ESCROW_BY_ANY_ID } from '@/graphql/queries/escrow-queries';
 import type { EscrowStatus } from '@/components/dashboard/EscrowStatusBadge';
 import { truncateStellarAddress } from '@/lib/utils';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
-import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
+import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { useState, useCallback, type CSSProperties, ReactNode } from 'react';
 import { useEscrowAction } from '@/hooks/use-escrow-action';
 import Image from 'next/image';
@@ -931,7 +931,7 @@ export default function EscrowDetailPage({
   params: { id: string; escrowId: string };
   searchParams: { status?: string };
 }) {
-  const { address, signXDR } = useWallet();
+  const { address, walletType, isReady, signAndSubmit } = useActiveWallet();
   const { execute, actioning, phase, actionError } = useEscrowAction();
   const [actionLoading, setActionLoading] = useState<EscrowAction | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -1118,7 +1118,8 @@ export default function EscrowDetailPage({
     setErrorMessages([]);
 
     try {
-      const response = await fetch('/api/escrow/resolve-dispute', {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/escrow/resolve-dispute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1136,29 +1137,14 @@ export default function EscrowDetailPage({
         return;
       }
 
-      setLoadingMessage('Awaiting wallet signature...');
-      const signedXdr = await signXDR(payload.unsignedXdr);
-
-      setLoadingMessage('Submitting transaction...');
-      const submitResponse = await fetch('/api/escrow/send-transaction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signedXdr,
-          contractId: escrow.contract_id,
-          engagementId: escrow.engagement_id,
-          senderAddress: escrow.sender_address,
-          receiverAddress: escrow.receiver_address,
-          amount: escrow.amount,
-          status: 'resolved',
-        }),
-      });
-
-      const submitPayload = await submitResponse.json();
-      if (!submitResponse.ok) {
-        setErrorMessages(getErrorMessages(submitPayload, 'Failed to submit resolution transaction.'));
+      const unsignedXdr = payload.unsignedXdr as string | undefined;
+      if (!unsignedXdr) {
+        setErrorMessages(['No unsigned XDR returned from API']);
         return;
       }
+
+      setLoadingMessage('Awaiting wallet signature...');
+      await signAndSubmit(unsignedXdr);
 
       setErrorMessages([]);
     } catch (err) {
@@ -1167,7 +1153,7 @@ export default function EscrowDetailPage({
       setActionLoading(null);
       setLoadingMessage('');
     }
-  }, [escrow, address, signXDR, approverFunds, receiverFunds]);
+  }, [escrow, address, signAndSubmit, approverFunds, receiverFunds]);
 
   if (loading && !escrow) {
     return (
@@ -1348,7 +1334,7 @@ export default function EscrowDetailPage({
               </EscrowActionButton>
             )}
 
-            {!address && (canFund || canMarkMilestone || canRelease || canResolve) && (
+            {!isReady && (canFund || canMarkMilestone || canRelease || canResolve) && (
               <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: '0.5rem', border: '1px solid #fcd34d' }}>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#92400e' }}>
                   Connect your Stellar wallet to perform this action.

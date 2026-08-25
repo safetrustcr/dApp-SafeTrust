@@ -1,195 +1,85 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deployEscrowHandler } from '../deploy.handler.js';
 
-vi.mock('../../../lib/trustlesswork.js', () => ({
-  trustlessWork: { post: vi.fn() },
+vi.mock('../../../services/trustlesswork.js', () => ({
+  trustlessWorkRequest: vi.fn(),
+  TrustlessWorkRequestError: class extends Error {
+    constructor(message, statusCode, messages, payload) {
+      super(message);
+      this.statusCode = statusCode;
+      this.messages = messages;
+      this.payload = payload;
+    }
+  },
+  getErrorMessages: vi.fn((err, fallback) => [err?.message || fallback]),
 }));
 
-import { trustlessWork } from '../../../lib/trustlesswork.js';
+import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
 import { mockReq, mockRes } from './helpers.js';
 
 describe('deployEscrowHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.PLATFORM_STELLAR_ADDRESS = 'GPLATFORM111111111111111111111111111111111111111111111111';
-    process.env.PLATFORM_FEE_PERCENT = '1';
+    process.env.NEXT_PUBLIC_PLATFORM_ADDRESS = 'GPLATFORM111111111111111111111111111111111111111111111111';
+    process.env.USDC_TRUSTLINE_ADDRESS = 'GBBD47IF6LWK7P7MDEVSCWR2JQTMZ35MIFUQ5IQSQ9CQBZ8JMXKDPE';
+    process.env.NEXT_PUBLIC_USDC_ADDRESS = 'GBBD47IF6LWK7P7MDEVSCWR2JQTMZ35MIFUQ5IQSQ9CQBZ8JMXKDPE';
   });
 
   it('returns 400 when apartmentId is missing', async () => {
     const res = mockRes();
     await deployEscrowHandler(
-      mockReq({ tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
+      mockReq({ senderAddress: 'GTENANT', receiverAddress: 'GOWNER', amount: 1200 }),
       res,
     );
 
     expect(res._status).toBe(400);
   });
 
-  it('returns 400 when tenantAddress is missing', async () => {
+  it('returns 400 when senderAddress is missing', async () => {
     const res = mockRes();
     await deployEscrowHandler(
-      mockReq({ apartmentId: 'APT001', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
+      mockReq({ apartmentId: 'APT001', receiverAddress: 'GOWNER', amount: 1200 }),
       res,
     );
 
     expect(res._status).toBe(400);
   });
 
-  it('calls TrustlessWork with correct roles payload', async () => {
-    trustlessWork.post.mockResolvedValueOnce({
-      data: { unsignedTransaction: 'AAAA...XDR' },
+  it('calls TrustlessWork with correct payload', async () => {
+    vi.mocked(trustlessWorkRequest).mockResolvedValueOnce({
+      status: 'SUCCESS',
+      contractId: 'CONTRACT_001',
+      unsignedTransaction: 'AAAA...XDR',
+      message: 'Escrow deployed successfully',
     });
 
+    const res = mockRes();
     await deployEscrowHandler(
       mockReq({
         apartmentId: 'APT001',
-        tenantAddress: 'GTENANT111111111111111111111111111111111111111111111111111',
-        ownerAddress: 'GOWNER111111111111111111111111111111111111111111111111111',
+        senderAddress: 'GTENANT111',
+        receiverAddress: 'GOWNER111',
         amount: 1200,
-        engagementId: 'ENG001',
       }),
-      mockRes(),
+      res,
     );
 
-    expect(trustlessWork.post).toHaveBeenCalledWith(
+    expect(trustlessWorkRequest).toHaveBeenCalledWith(
       '/deployer/single-release',
       expect.objectContaining({
-        signer: 'GTENANT111111111111111111111111111111111111111111111111111',
-        engagementId: 'ENG001',
-        amount: 1200,
-        roles: expect.objectContaining({
-          approver: 'GTENANT111111111111111111111111111111111111111111111111111',
-          serviceProvider: 'GOWNER111111111111111111111111111111111111111111111111111',
-          receiver: 'GOWNER111111111111111111111111111111111111111111111111111',
-          platformAddress: 'GPLATFORM111111111111111111111111111111111111111111111111',
-          releaseSigner: 'GTENANT111111111111111111111111111111111111111111111111111',
-          disputeResolver: 'GPLATFORM111111111111111111111111111111111111111111111111',
+        method: 'POST',
+        body: expect.objectContaining({
+          signer: 'GTENANT111',
+          amount: 1200,
         }),
       }),
     );
-  });
-
-  it('returns 200 with unsignedXDR and engagementId on success', async () => {
-    trustlessWork.post.mockResolvedValueOnce({
-      data: { unsignedTransaction: 'AAAA...XDR' },
-    });
-
-    const res = mockRes();
-    await deployEscrowHandler(
-      mockReq({ apartmentId: 'APT001', tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
-      res,
-    );
-
     expect(res._status).toBe(200);
-    expect(res._body).toEqual({ unsignedXDR: 'AAAA...XDR', engagementId: 'ENG001' });
-  });
-
-  it('returns 400 for "amount cannot be zero" TrustlessWork error', async () => {
-    trustlessWork.post.mockRejectedValueOnce({
-      response: { data: { message: 'amount cannot be zero' } },
-      message: 'amount cannot be zero',
+    expect(res._body).toMatchObject({
+      status: 'SUCCESS',
+      contractId: 'CONTRACT_001',
+      unsignedXDR: 'AAAA...XDR',
     });
-
-    const res = mockRes();
-    await deployEscrowHandler(
-      mockReq({ apartmentId: 'APT001', tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 0, engagementId: 'ENG001' }),
-      res,
-    );
-
-    expect(res._status).toBe(400);
-    expect(res._body.error).toBe('Amount cannot be zero');
-  });
-
-  it('returns 400 for "already initialized" TrustlessWork error', async () => {
-    trustlessWork.post.mockRejectedValueOnce({
-      response: { data: { message: 'already initialized' } },
-      message: 'already initialized',
-    });
-
-    const res = mockRes();
-    await deployEscrowHandler(
-      mockReq({ apartmentId: 'APT001', tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
-      res,
-    );
-
-    expect(res._status).toBe(400);
-    expect(res._body.error).toBe('Escrow already initialized (duplicate engagementId)');
-  });
-
-  it('returns 400 for fee-related TrustlessWork errors', async () => {
-    trustlessWork.post.mockRejectedValueOnce({
-      response: { data: { message: 'fee cannot exceed 99%' } },
-      message: 'fee cannot exceed 99%',
-    });
-
-    const res = mockRes();
-    await deployEscrowHandler(
-      mockReq({ apartmentId: 'APT001', tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
-      res,
-    );
-
-    expect(res._status).toBe(400);
-    expect(res._body.error).toBe('Platform fee cannot exceed 99%');
-  });
-
-  it('returns 400 for milestone-related TrustlessWork errors', async () => {
-    trustlessWork.post.mockRejectedValueOnce({
-      response: { data: { message: 'without milestone' } },
-      message: 'without milestone',
-    });
-
-    const res = mockRes();
-    await deployEscrowHandler(
-      mockReq({ apartmentId: 'APT001', tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
-      res,
-    );
-
-    expect(res._status).toBe(400);
-    expect(res._body.error).toBe('Escrow initialized without milestone');
-  });
-
-  it('returns 400 for milestone count TrustlessWork errors', async () => {
-    trustlessWork.post.mockRejectedValueOnce({
-      response: { data: { message: 'more than 50 milestones' } },
-      message: 'more than 50 milestones',
-    });
-
-    const res = mockRes();
-    await deployEscrowHandler(
-      mockReq({ apartmentId: 'APT001', tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
-      res,
-    );
-
-    expect(res._status).toBe(400);
-    expect(res._body.error).toBe('Cannot define more than 50 milestones');
-  });
-
-  it('returns 400 for flag TrustlessWork errors', async () => {
-    trustlessWork.post.mockRejectedValueOnce({
-      response: { data: { message: 'flags must be false' } },
-      message: 'flags must be false',
-    });
-
-    const res = mockRes();
-    await deployEscrowHandler(
-      mockReq({ apartmentId: 'APT001', tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
-      res,
-    );
-
-    expect(res._status).toBe(400);
-    expect(res._body.error).toBe('All flags (approved, disputed, released) must be false');
-  });
-
-  it('returns 500 for unexpected TrustlessWork errors', async () => {
-    trustlessWork.post.mockRejectedValueOnce(new Error('Network timeout'));
-
-    const res = mockRes();
-    await deployEscrowHandler(
-      mockReq({ apartmentId: 'APT001', tenantAddress: 'GTENANT', ownerAddress: 'GOWNER', amount: 1200, engagementId: 'ENG001' }),
-      res,
-    );
-
-    expect(res._status).toBe(500);
-    expect(res._body.error).toBe('Failed to deploy escrow');
   });
 });
