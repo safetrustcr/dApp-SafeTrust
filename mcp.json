@@ -14,6 +14,16 @@
       "type": "streamable-http",
       "url": "https://raven.stellar.org/mcp",
       "headers": {}
+    },
+    "safetrust": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["mcp/dist/index.js"],
+      "env": {
+        "HASURA_GRAPHQL_URL": "http://localhost:8080/v1/graphql",
+        "HASURA_ADMIN_SECRET": "myadminsecretkey",
+        "SAFETRUST_API_URL": "http://localhost:3002"
+      }
     }
   }
 }

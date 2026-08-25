@@ -193,6 +193,9 @@ Full API reference: [docs.trustlesswork.com](https://docs.trustlesswork.com)
 
 - TrustlessWork docs and live escrow tools
 - Stellar Raven — Stellar ecosystem docs + live data
+- `safetrust` — SafeTrust's own MCP server ([`mcp/`](./mcp)): escrow tools, live Hasura
+  queries and architecture context. Build it first with
+  `pnpm --filter @safetrust/mcp build`, then restart the editor.
 
 Cursor picks up `mcp.json` automatically.
 For `stellar-raven`: run `/mcp` → Authenticate → sign in in browser.
