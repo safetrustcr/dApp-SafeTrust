@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
@@ -42,16 +41,18 @@ export function registerEscrowTools(server: McpServer) {
         'Deploy a SafeTrust single-release escrow for an apartment booking. Calls apps/api ' +
         'POST /api/escrow/deploy, which applies SafeTrust role mappings and returns an ' +
         'unsigned XDR for the tenant to sign with Freighter.',
-      inputSchema: {
+      inputSchema: z.object({
         apartmentId: z.string().uuid().describe('UUID of the apartment being rented'),
-        senderAddress: stellarAddress.describe('Tenant Stellar wallet — approver role, signs the deploy'),
-        receiverAddress: stellarAddress.describe('Owner Stellar wallet — serviceProvider + receiver roles'),
+        tenantAddress: stellarAddress.describe('Tenant Stellar wallet — approver role, signs the deploy'),
+        ownerAddress: stellarAddress.describe('Owner Stellar wallet — serviceProvider + receiver roles'),
+        senderAddress: stellarAddress.optional().describe('Tenant Stellar wallet (alias for tenantAddress)'),
+        receiverAddress: stellarAddress.optional().describe('Owner Stellar wallet (alias for ownerAddress)'),
         amount: z.number().positive().describe('Deposit amount in USDC'),
-      },
-      annotations: { readOnlyHint: false, destructiveHint: false }
+        engagementId: z.string().optional().describe('Optional custom engagement UUID/idempotency key'),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
     async ({ apartmentId, tenantAddress, ownerAddress, amount, engagementId }) => {
-      const engagement = engagementId ?? randomUUID();
-
       try {
         const { ok, status, data } = await apiRequest<{
           unsignedXDR?: string | null;
@@ -62,7 +63,7 @@ export function registerEscrowTools(server: McpServer) {
           details?: unknown;
         }>('/api/escrow/deploy', {
           method: 'POST',
-          body: { apartmentId, tenantAddress, ownerAddress, amount, engagementId: engagement },
+          body: { apartmentId, tenantAddress, ownerAddress, amount, engagementId: engagementId },
         });
 
         if (!ok) {
@@ -75,7 +76,7 @@ export function registerEscrowTools(server: McpServer) {
         if (data.cached) {
           return textResult(
             'Escrow already deployed for this engagementId (idempotent replay).',
-            `engagementId: ${data.engagementId ?? engagement}`,
+            `engagementId: ${data.engagementId ?? engagementId}`,
             `contractId: ${data.contractId ?? 'unknown'}`,
           );
         }
@@ -84,7 +85,7 @@ export function registerEscrowTools(server: McpServer) {
 
         return textResult(
           'Escrow deploy initiated.',
-          `engagementId: ${data.engagementId ?? engagement}`,
+          `engagementId: ${data.engagementId ?? engagementId}`,
           `unsignedXDR: ${xdr ? `${xdr.slice(0, 48)}… (${xdr.length} chars)` : 'none returned'}`,
           '',
           'Next: sign the XDR with Freighter in the browser, then submit it through the',
