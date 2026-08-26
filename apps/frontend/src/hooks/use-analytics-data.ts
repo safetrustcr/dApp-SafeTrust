@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@apollo/client";
 import { Eye, MousePointerClick, Users, BarChart3 } from "lucide-react";
 import {
   AnalyticsData,
   MetricData,
   calculateChange,
-  generateMockData,
 } from "@/lib/chart-utils";
+import { GET_ESCROW_ANALYTICS } from "@/graphql/queries/escrow-queries";
 
 interface UseAnalyticsDataOptions {
   dateRange: { start: Date; end: Date } | null;
@@ -20,145 +21,119 @@ interface UseAnalyticsDataReturn {
   refetch: () => void;
 }
 
+/** Format a Date as a `YYYY-MM-DD` string suitable for a Postgres `date` arg. */
+function toDateString(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
 /**
  * Provides analytics data for the escrow dashboard.
  *
- * TODO: wire to real escrow analytics data (Batch N).
- * For now this returns deterministic mock data so the dashboard can be
- * developed and reviewed independently of the analytics backend.
+ * Data is sourced from the `get_escrow_analytics_by_day` Hasura stored
+ * function which aggregates `trustless_work_webhook_events` and `users`
+ * by day.
  */
 export const useAnalyticsData = ({
   dateRange,
-  refreshInterval = 60000, // 1 minute default
+  refreshInterval = 60_000,
 }: UseAnalyticsDataOptions): UseAnalyticsDataReturn => {
-  const [data, setData] = useState<AnalyticsData[]>([]);
-  const [metrics, setMetrics] = useState<MetricData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const startDate = dateRange?.start ?? new Date(Date.now() - 30 * 86_400_000);
+  const endDate = dateRange?.end ?? new Date();
 
-  const calculateDaysBetween = useCallback((start: Date, end: Date): number => {
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
-  }, []);
-
-  const generateMetrics = useCallback(
-    (analyticsData: AnalyticsData[]): MetricData[] => {
-      if (analyticsData.length < 1) return [];
-
-      const latest = analyticsData[analyticsData.length - 1];
-      const previous =
-        analyticsData.length > 1
-          ? analyticsData[analyticsData.length - 2]
-          : { pageViews: 0, clicks: 0, users: 0 };
-
-      const totalPageViews = analyticsData.reduce(
-        (sum, item) => sum + item.pageViews,
-        0,
-      );
-      const totalClicks = analyticsData.reduce(
-        (sum, item) => sum + item.clicks,
-        0,
-      );
-      const totalUsers = analyticsData.reduce(
-        (sum, item) => sum + item.users,
-        0,
-      );
-      // Using peak daily active users as a simplified engagement metric.
-      const maxDailyUsers = Math.max(
-        ...analyticsData.map((item) => item.users),
-      );
-
-      return [
-        {
-          label: "Total Page Views",
-          value: totalPageViews,
-          change: calculateChange(latest.pageViews, previous.pageViews),
-          trend: latest.pageViews >= previous.pageViews ? "up" : "down",
-          icon: Eye,
-          color: "primary",
-        },
-        {
-          label: "Total Interactions",
-          value: totalClicks,
-          change: calculateChange(latest.clicks, previous.clicks),
-          trend: latest.clicks >= previous.clicks ? "up" : "down",
-          icon: MousePointerClick,
-          color: "success",
-        },
-        {
-          label: "Active Users (Peak)",
-          value: maxDailyUsers,
-          change: calculateChange(latest.users, previous.users),
-          trend: latest.users >= previous.users ? "up" : "down",
-          icon: Users,
-          color: "info",
-        },
-        {
-          label: "Avg Actions/User",
-          value:
-            totalUsers > 0 ? (totalPageViews + totalClicks) / totalUsers : 0,
-          change: 0, // Simplified
-          trend: "neutral",
-          icon: BarChart3,
-          color: "warning",
-        },
-      ];
+  const { data, loading, error, refetch } = useQuery(GET_ESCROW_ANALYTICS, {
+    variables: {
+      start_date: toDateString(startDate),
+      end_date: toDateString(endDate),
+      tenant_id: "safetrust",
     },
-    [],
-  );
+    pollInterval: refreshInterval,
+  });
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const analyticsData: AnalyticsData[] = useMemo(() => {
+    const rows: Array<{
+      day: string;
+      page_views: number;
+      clicks: number;
+      users: number;
+    }> | null | undefined = data?.getEscrowAnalyticsByDay;
 
-    try {
-      const days = dateRange
-        ? calculateDaysBetween(dateRange.start, dateRange.end)
-        : 30;
+    if (!Array.isArray(rows)) return [];
 
-      // TODO: wire to real escrow analytics data (Batch N).
-      // Replace generateMockData with a call to the escrow analytics service.
-      let processedData = generateMockData(days);
+    return rows.map((row) => ({
+      date: row.day,
+      pageViews: Number(row.page_views),
+      clicks: Number(row.clicks),
+      users: Number(row.users),
+    }));
+  }, [data]);
 
-      if (dateRange) {
-        processedData = processedData.filter((item) => {
-          const itemDate = new Date(`${item.date}T00:00:00`);
-          return itemDate >= dateRange.start && itemDate <= dateRange.end;
-        });
-      }
+  const metrics: MetricData[] = useMemo(() => {
+    if (analyticsData.length < 1) return [];
 
-      setData(processedData);
-      setMetrics(generateMetrics(processedData));
-    } catch (err) {
-      setError("Failed to fetch analytics data");
-      console.error("Analytics data fetch error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dateRange, calculateDaysBetween, generateMetrics]);
+    const latest = analyticsData[analyticsData.length - 1];
+    const previous =
+      analyticsData.length > 1
+        ? analyticsData[analyticsData.length - 2]
+        : { pageViews: 0, clicks: 0, users: 0 };
 
-  const refetch = useCallback(() => {
-    fetchData();
-  }, [fetchData]);
+    const totalPageViews = analyticsData.reduce(
+      (sum, item) => sum + item.pageViews,
+      0,
+    );
+    const totalClicks = analyticsData.reduce(
+      (sum, item) => sum + item.clicks,
+      0,
+    );
+    const totalUsers = analyticsData.reduce(
+      (sum, item) => sum + item.users,
+      0,
+    );
+    const maxDailyUsers = Math.max(
+      ...analyticsData.map((item) => item.users),
+    );
 
-  // Initial data fetch
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Set up automatic refresh
-  useEffect(() => {
-    if (refreshInterval > 0) {
-      const interval = setInterval(fetchData, refreshInterval);
-      return () => clearInterval(interval);
-    }
-  }, [fetchData, refreshInterval]);
+    return [
+      {
+        label: "Total Page Views",
+        value: totalPageViews,
+        change: calculateChange(latest.pageViews, previous.pageViews),
+        trend: latest.pageViews >= previous.pageViews ? "up" : "down",
+        icon: Eye,
+        color: "primary",
+      },
+      {
+        label: "Total Interactions",
+        value: totalClicks,
+        change: calculateChange(latest.clicks, previous.clicks),
+        trend: latest.clicks >= previous.clicks ? "up" : "down",
+        icon: MousePointerClick,
+        color: "success",
+      },
+      {
+        label: "Active Users (Peak)",
+        value: maxDailyUsers,
+        change: calculateChange(latest.users, previous.users),
+        trend: latest.users >= previous.users ? "up" : "down",
+        icon: Users,
+        color: "info",
+      },
+      {
+        label: "Avg Actions/User",
+        value:
+          totalUsers > 0 ? (totalPageViews + totalClicks) / totalUsers : 0,
+        change: 0,
+        trend: "neutral",
+        icon: BarChart3,
+        color: "warning",
+      },
+    ];
+  }, [analyticsData]);
 
   return {
-    data,
+    data: analyticsData,
     metrics,
-    isLoading,
-    error,
+    isLoading: loading,
+    error: error?.message ?? null,
     refetch,
   };
 };
