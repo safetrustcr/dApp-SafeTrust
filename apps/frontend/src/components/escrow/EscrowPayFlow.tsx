@@ -24,14 +24,6 @@ type DeployResponse = {
   message?: string;
 };
 
-type SendTransactionResponse = {
-  contractId: string;
-  engagementId: string;
-  escrowId: string;
-  status: string;
-  transactionHash: string | null;
-};
-
 const flowStyles = {
   button: {
     border: '1px solid #f97316',
@@ -62,7 +54,7 @@ export function EscrowPayFlow({
   amount,
 }: EscrowPayFlowProps) {
   const router = useRouter();
-  const { address, walletType, isReady, signAndSubmit } = useActiveWallet();
+  const { address, isReady, signAndSubmit } = useActiveWallet();
   const [deploying, setDeploying] = useState(false);
   const [signing, setSigning] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
@@ -142,20 +134,6 @@ export function EscrowPayFlow({
     }
   };
 
-      const payload = (await response.json()) as SendTransactionResponse & { error?: string; messages?: string[] };
-      if (!response.ok) {
-        setErrorMessages(getErrorMessages(payload, 'Failed to send signed transaction.'));
-        return;
-      }
-
-      router.push(`/apartment/${apartmentId}/escrow/${payload.engagementId}`);
-    } catch (error) {
-      setErrorMessages(getErrorMessages(error, 'Failed to complete escrow signing.'));
-    } finally {
-      setSigning(false);
-    }
-  };
-
   return (
     <>
       <span
@@ -163,7 +141,7 @@ export function EscrowPayFlow({
         title={
           !hasOwnerWallet
             ? 'Owner wallet not available'
-            : !isWalletConnected
+            : !isReady
               ? 'Connect wallet to pay'
               : deployState
                 ? 'Sign and submit escrow transaction'
