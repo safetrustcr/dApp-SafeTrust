@@ -11,6 +11,8 @@ import milestoneStatusRouter from './routes/escrow/milestone-status.route.js';
 import releaseFundsRouter from './routes/escrow/release-funds.route.js';
 import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.js';
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
+import statusStreamRouter from './routes/escrow/status-stream.route.js';
+import messagesRouter from './routes/messages/send.route.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -46,6 +48,10 @@ app.use('/api/escrow', milestoneStatusRouter);
 app.use('/api/escrow', releaseFundsRouter);
 app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
+app.use('/api/escrow', statusStreamRouter);
+
+// Messages routes (router registered when available)
+app.use('/api/messages', messagesRouter);
 
 // Messages routes
 app.use('/api/messages', messagesRouter);
