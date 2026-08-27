@@ -39,14 +39,22 @@ describe('fetchUserRole', () => {
     expect(result).toBe('guest');
   });
 
-  it('returns guest when fetch throws', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+  it('returns guest and logs error when fetch throws', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const networkError = new Error('Network error');
+    mockFetch.mockRejectedValueOnce(networkError);
 
     const result = await fetchUserRole('test-uid');
     expect(result).toBe('guest');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'fetchUserRole: failed to reach Hasura or request failed',
+      networkError,
+    );
+    consoleSpy.mockRestore();
   });
 
-  it('returns guest when response.ok is false', async () => {
+  it('returns guest and logs error when response.ok is false', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
@@ -54,18 +62,29 @@ describe('fetchUserRole', () => {
 
     const result = await fetchUserRole('test-uid');
     expect(result).toBe('guest');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'fetchUserRole: Hasura returned non-ok HTTP status 401',
+    );
+    consoleSpy.mockRestore();
   });
 
-  it('returns guest when Hasura returns errors field', async () => {
+  it('returns guest and logs error when Hasura returns errors field', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errors = [{ message: 'Some error' }];
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        errors: [{ message: 'Some error' }],
+        errors,
       }),
     } as unknown as Response);
 
     const result = await fetchUserRole('test-uid');
     expect(result).toBe('guest');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'fetchUserRole: Hasura returned GraphQL errors',
+      errors,
+    );
+    consoleSpy.mockRestore();
   });
 
   it('resolves the highest-privilege role when a user holds several', async () => {
