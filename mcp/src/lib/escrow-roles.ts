@@ -39,15 +39,15 @@ release semantics — the two paths should converge.
 
 ## Database mapping (public.trustless_work_escrows)
 
-| Column | Holds |
-|---|---|
-| \`marker\` | \`serviceProvider\` — owner/host wallet |
-| \`approver\` | \`approver\` — tenant/guest wallet |
-| \`releaser\` | \`releaseSigner\` — platform wallet |
-| \`resolver\` | \`disputeResolver\` — platform wallet |
+| Column | TW Field | Value |
+|---|---|---|
+| \`marker\` | \`serviceProvider\` | Owner/host Stellar wallet |
+| \`approver\` | \`approver\` | Tenant/guest Stellar wallet |
+| \`releaser\` | \`releaseSigner\` | apps/api path: tenant wallet<br>TrustlessWork direct: platform wallet |
+| \`resolver\` | \`disputeResolver\` | Platform wallet (both paths) |
 
-\`public.escrows\` (the newer single-release table) instead stores
-\`sender_address\` = tenant wallet and \`receiver_address\` = owner wallet.
+Note: \`apps/api\` sets \`releaseSigner = tenantAddress\` (\`senderAddress\`).
+Direct TrustlessWork calls use \`platformAddress\` as \`releaseSigner\`.
 
 ## Trustline
 

@@ -72,9 +72,11 @@ production Hasura instance.
 
 ## Prerequisites
 
-- Hasura + PostgreSQL running (`infra/hasura/bin/dc_prep`) for every read tool.
-- `apps/api` running (`pnpm --filter @safetrust/api dev`) for `deploy-escrow` and
-  `fund-escrow`. Both surface a clear "cannot reach" message when it is down.
+- Hasura + PostgreSQL running (`infra/hasura/bin/dc_prep`) for
+  Hasura-backed tools (`get-apartment`, `list-apartments`, `get-escrow-status`).
+  `explain-escrow-roles` works offline — no Hasura required.
+- `apps/api` running (`pnpm --filter @safetrust/api dev`) for
+  `deploy-escrow` and `fund-escrow`.
 
 ## Known divergence
 
