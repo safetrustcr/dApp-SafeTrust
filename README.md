@@ -39,7 +39,7 @@ Stellar Blockchain (TrustlessWork API)
 │ signed XDR
 services/webhook (Node + Express, port 3002)
 │ SQL
-infra/hasura (Hasura GraphQL, port 8080)
+infra/backend (Hasura GraphQL, port 8080)
 │ GraphQL
 apps/frontend (Next.js 14, port 3001)
 ```
@@ -82,7 +82,7 @@ cp apps/frontend/.env.example apps/frontend/.env.local
 
 **Step 2 — Hasura / Backend:**
 ```bash
-cp infra/hasura/.env.example infra/hasura/.env.local
+cp infra/backend/.env.example infra/backend/.env.local
 ```
 
 Fill in both files before continuing. See the sections below for how to obtain each value.
@@ -96,7 +96,7 @@ SafeTrust uses Firebase for authentication.
 1. Go to [console.firebase.google.com](https://console.firebase.google.com) → create a project.
 2. **Authentication → Sign-in method** → enable **Email/Password**.
 3. **Project Settings → Your apps** → register a Web app → copy the config values into `apps/frontend/.env.local`.
-4. **Project Settings → Service Accounts** → Generate new private key → copy `project_id`, `client_email`, `private_key` into `infra/hasura/.env.local`.
+4. **Project Settings → Service Accounts** → Generate new private key → copy `project_id`, `client_email`, `private_key` into `infra/backend/.env.local`.
 
 ---
 
@@ -122,16 +122,16 @@ Full guide: [docs.trustlesswork.com → Request API Key](https://docs.trustlessw
 ### 5. Start the backend
 
 ```bash
-cd infra/hasura
-bin/dc_prep
+cd infra/backend
+bin/start
 ```
 
-`dc_prep` runs in order: starts Docker containers → waits for Hasura health → applies migrations → reloads metadata → applies seeds. Takes ~30 s on first run.
+`bin/start` runs in order: starts Docker containers → waits for Hasura health → applies migrations → reloads metadata → applies seeds. Takes ~30 s on first run.
 
 **Reset the database:**
 ```bash
 docker compose down -v
-bin/dc_prep
+bin/start
 ```
 
 ---

@@ -10,7 +10,7 @@ const resolveDisputeHandler = async (req, res) => {
 
   // 2 — Update public.trustless_work_escrows via Hasura GraphQL mutation.
   // update_trustlessWorkEscrows is camelCase because the table is tracked with
-  // custom_name: trustlessWorkEscrows (see infra/hasura metadata, Issue 5).
+  // custom_name: trustlessWorkEscrows (see infra/backend metadata, Issue 5).
   const mutation = `
     mutation ResolveDispute($contractId: String!) {
       update_trustlessWorkEscrows(

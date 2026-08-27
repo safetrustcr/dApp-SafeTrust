@@ -33,7 +33,7 @@ export async function hasuraRequest<T>(
     });
   } catch (error) {
     throw new HasuraRequestError(
-      `Cannot reach Hasura at ${HASURA_GRAPHQL_URL} — is dc_prep running? ` +
+      `Cannot reach Hasura at ${HASURA_GRAPHQL_URL} — is bin/start running? ` +
         (error instanceof Error ? error.message : String(error)),
     );
   }

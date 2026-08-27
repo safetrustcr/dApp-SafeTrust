@@ -55,7 +55,7 @@ Missing files are skipped rather than failing startup.
 ## Environment
 
 Read from the `env` block in the root `mcp.json` — no `.env` file is needed for local
-development. All of them have defaults that match `dc_prep`.
+development. All of them have defaults that match `bin/start`.
 
 | Variable | Default | Used by |
 |---|---|---|
@@ -72,7 +72,7 @@ production Hasura instance.
 
 ## Prerequisites
 
-- Hasura + PostgreSQL running (`infra/hasura/bin/dc_prep`) for every read tool.
+- Hasura + PostgreSQL running (`infra/backend/bin/start`) for every read tool.
 - `apps/api` running (`pnpm --filter @safetrust/api dev`) for `deploy-escrow` and
   `fund-escrow`. Both surface a clear "cannot reach" message when it is down.
 
