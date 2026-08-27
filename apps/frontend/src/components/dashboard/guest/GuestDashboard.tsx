@@ -7,7 +7,6 @@ import { GET_ALL_APARTMENTS } from "@/graphql/queries/apartment-queries";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
-import { promoteToHost } from "@/lib/auth/promote-to-host";
 
 interface Apartment {
   id: string;
@@ -48,8 +47,8 @@ export default function GuestDashboard() {
   const searchParams = useSearchParams();
   const { token } = useGlobalAuthenticationStore();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isPromoting, setIsPromoting] = useState(false);
-  const [promoteError, setPromoteError] = useState("");
+  const [promoting, setPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
 
   // Set by the middleware when a guest is bounced off a host-only route.
   const wasBlocked = searchParams.get("blocked") === "true";
@@ -59,18 +58,34 @@ export default function GuestDashboard() {
       setPromoteError("You need to be signed in to become a host");
       return;
     }
-
-    setIsPromoting(true);
-    setPromoteError("");
-
+    setPromoting(true);
+    setPromoteError(null);
     try {
-      await promoteToHost(token);
-      // Full reload rather than router.push: the middleware must re-read the
-      // now-cleared role cookie to route this user as a host.
-      window.location.href = "/dashboard/escrow-dashboard";
+      const idToken = token;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+
+      const res = await fetch(`${apiUrl}/api/auth/promote-to-host`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? 'Promotion failed');
+      }
+
+      // Clear role cookie so middleware re-fetches updated role on next request
+      document.cookie = 'user-role=; Max-Age=0; path=/';
+
+      // Redirect to host dashboard — middleware will confirm host role
+      window.location.href = '/dashboard/escrow-dashboard';
+
     } catch (err) {
-      setPromoteError(err instanceof Error ? err.message : "Failed to switch to host view");
-      setIsPromoting(false);
+      setPromoteError(err instanceof Error ? err.message : 'Failed to switch to host view');
+      setPromoting(false);
     }
   }
 
@@ -134,11 +149,11 @@ export default function GuestDashboard() {
             <button
               type="button"
               onClick={handleSwitchToHost}
-              disabled={isPromoting}
+              disabled={promoting}
               className="hidden md:flex items-center gap-1.5 text-sm font-medium text-orange-500 hover:text-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isPromoting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {isPromoting ? "Switching…" : "Switch to Host view"}
+              {promoting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {promoting ? "Switching…" : "Switch to Host view"}
             </button>
             <button type="button" className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
               <Bell className="h-5 w-5 text-gray-600" />
@@ -164,11 +179,11 @@ export default function GuestDashboard() {
             <button
               type="button"
               onClick={handleSwitchToHost}
-              disabled={isPromoting}
+              disabled={promoting}
               className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isPromoting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isPromoting ? "Switching…" : "Switch to Host view"}
+              {promoting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {promoting ? "Switching…" : "Switch to Host view"}
             </button>
           </div>
         )}
