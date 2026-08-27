@@ -18,6 +18,15 @@ const HOST_ONLY_ROUTES = [
   '/dashboard/apartments',
   '/dashboard/escrow-dashboard',
   '/dashboard/manager',
+  '/dashboard/users',
+];
+
+/**
+ * Routes reserved for guest users. Hosts hitting one are redirected to their
+ * escrow dashboard.
+ */
+const GUEST_ONLY_ROUTES = [
+  '/dashboard/guest',
 ];
 
 const GUEST_HOME = '/dashboard/guest';
@@ -74,7 +83,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     } else {
       try {
         role = await fetchUserRole(decodeUid(token));
-      } catch {
+      } catch (error) {
+        console.error('middleware: failed to resolve user role, defaulting to guest', error);
         role = DEFAULT_ROLE;
       }
       roleFetched = true;
@@ -106,6 +116,12 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       const blockedUrl = new URL(GUEST_HOME, request.url);
       blockedUrl.searchParams.set('blocked', 'true');
       return setRoleCookie(NextResponse.redirect(blockedUrl));
+    }
+
+    if (GUEST_ONLY_ROUTES.some((p) => pathname.startsWith(p)) && role === 'host') {
+      return setRoleCookie(
+        NextResponse.redirect(new URL('/dashboard/escrow-dashboard', request.url)),
+      );
     }
 
     return setRoleCookie(NextResponse.next());
