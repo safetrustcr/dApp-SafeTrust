@@ -53,6 +53,9 @@ app.use('/api/escrow', statusStreamRouter);
 // Messages routes (router registered when available)
 app.use('/api/messages', messagesRouter);
 
+// Messages routes
+app.use('/api/messages', messagesRouter);
+
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);
 });

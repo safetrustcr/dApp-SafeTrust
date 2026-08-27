@@ -193,6 +193,27 @@ export const GET_ESCROW_BY_ANY_ID = gql`
   }
 `;
 
+export const GET_ESCROW_ANALYTICS = gql`
+  query GetEscrowAnalytics(
+    $start_date: date!
+    $end_date: date!
+    $tenant_id: String!
+  ) {
+    getEscrowAnalyticsByDay(
+      args: {
+        p_start_date: $start_date
+        p_end_date: $end_date
+        p_tenant_id: $tenant_id
+      }
+    ) {
+      day
+      page_views
+      clicks
+      users
+    }
+  }
+`;
+
 export const GET_ESCROW_DASHBOARD_STATS = gql`
   query GetEscrowDashboardStats($tenant_id: String!) {
     total: trustlessWorkEscrows_aggregate(
