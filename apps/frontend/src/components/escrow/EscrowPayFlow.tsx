@@ -142,20 +142,6 @@ export function EscrowPayFlow({
     }
   };
 
-      const payload = (await response.json()) as SendTransactionResponse & { error?: string; messages?: string[] };
-      if (!response.ok) {
-        setErrorMessages(getErrorMessages(payload, 'Failed to send signed transaction.'));
-        return;
-      }
-
-      router.push(`/apartment/${apartmentId}/escrow/${payload.engagementId}`);
-    } catch (error) {
-      setErrorMessages(getErrorMessages(error, 'Failed to complete escrow signing.'));
-    } finally {
-      setSigning(false);
-    }
-  };
-
   return (
     <>
       <span
