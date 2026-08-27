@@ -14,7 +14,7 @@ const disputeEscrowHandler = async (req, res) => {
   }
 
   // update_trustlessWorkEscrows is camelCase because the table is tracked with
-  // custom_name: trustlessWorkEscrows (see infra/hasura metadata, Issue 5).
+  // custom_name: trustlessWorkEscrows (see infra/backend metadata, Issue 5).
   const mutation = `
     mutation DisputeEscrow($contractId: String!) {
       update_trustlessWorkEscrows(

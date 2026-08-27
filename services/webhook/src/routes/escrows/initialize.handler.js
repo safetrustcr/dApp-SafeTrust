@@ -33,7 +33,7 @@ const initializeEscrowHandler = async (req, res) => {
 
   // 3 — Persist to public.trustless_work_escrows via Hasura GraphQL mutation.
   // Root fields and input type are camelCase because the table is tracked with
-  // custom_name: trustlessWorkEscrows (see infra/hasura metadata, Issue 5).
+  // custom_name: trustlessWorkEscrows (see infra/backend metadata, Issue 5).
   const mutation = `
     mutation InitializeEscrow($object: trustlessWorkEscrows_insert_input!) {
       insert_trustlessWorkEscrows_one(object: $object) {
