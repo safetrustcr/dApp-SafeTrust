@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// ── Mock the Hasura WS service ────────────────────────────────────────────────
 vi.mock('../../../services/hasura-ws.js', () => ({
   subscribeToEscrowStatus: vi.fn(),
 }));
@@ -8,7 +7,6 @@ vi.mock('../../../services/hasura-ws.js', () => ({
 import { subscribeToEscrowStatus } from '../../../services/hasura-ws.js';
 import { escrowStatusStreamHandler } from '../status-stream.handler.js';
 
-// ── Minimal SSE response mock ─────────────────────────────────────────────────
 function mockSseRes() {
   const chunks = [];
   const listeners = {};
@@ -17,6 +15,7 @@ function mockSseRes() {
     _chunks: chunks,
     _status: null,
     _body: undefined,
+    writableEnded: false,
     setHeader: vi.fn(),
     flushHeaders: vi.fn(),
     write(chunk) {
@@ -29,6 +28,9 @@ function mockSseRes() {
     json(body) {
       this._body = body;
       return this;
+    },
+    end() {
+      this.writableEnded = true;
     },
     on(event, cb) {
       listeners[event] = listeners[event] ?? [];
@@ -70,6 +72,37 @@ describe('escrowStatusStreamHandler', () => {
     expect(subscribeToEscrowStatus).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when contractId is blank', () => {
+    const req = mockReq({ contractId: '   ' });
+    const res = mockSseRes();
+
+    escrowStatusStreamHandler(req, res);
+
+    expect(res._status).toBe(400);
+    expect(subscribeToEscrowStatus).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when contractId is duplicated in the query string', () => {
+    const req = mockReq({ contractId: ['CAZT001', 'CAZT002'] });
+    const res = mockSseRes();
+
+    escrowStatusStreamHandler(req, res);
+
+    expect(res._status).toBe(400);
+    expect(res._body).toMatchObject({ error: expect.stringContaining('contractId') });
+    expect(subscribeToEscrowStatus).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when contractId is a nested query object', () => {
+    const req = mockReq({ contractId: { eq: 'CAZT001' } });
+    const res = mockSseRes();
+
+    escrowStatusStreamHandler(req, res);
+
+    expect(res._status).toBe(400);
+    expect(subscribeToEscrowStatus).not.toHaveBeenCalled();
+  });
+
   it('sets SSE headers and sends connected event when contractId is provided', () => {
     const cleanupMock = vi.fn();
     vi.mocked(subscribeToEscrowStatus).mockReturnValue(cleanupMock);
@@ -92,7 +125,7 @@ describe('escrowStatusStreamHandler', () => {
     );
   });
 
-  it('writes a status event when Hasura subscription pushes data', () => {
+  it('writes a status event when Hasura subscription pushes an escrow row', () => {
     let capturedOnData = null;
     vi.mocked(subscribeToEscrowStatus).mockImplementation((_id, onData) => {
       capturedOnData = onData;
@@ -104,19 +137,35 @@ describe('escrowStatusStreamHandler', () => {
 
     escrowStatusStreamHandler(req, res);
 
-    const escrowPayload = {
+    const escrow = {
       id: '1',
       contract_id: 'CAZT001',
       status: 'funded',
-      balance: 100,
+      amount: 1200,
       updated_at: '2025-01-01T00:00:00Z',
     };
 
-    capturedOnData(escrowPayload);
+    capturedOnData({ escrows: [escrow] });
 
     const statusChunk = res._chunks.find((c) => c.includes('event: status'));
     expect(statusChunk).toBeDefined();
-    expect(statusChunk).toContain(JSON.stringify(escrowPayload));
+    expect(statusChunk).toContain(JSON.stringify(escrow));
+  });
+
+  it('does not write a status event when the subscription payload has no escrow', () => {
+    let capturedOnData = null;
+    vi.mocked(subscribeToEscrowStatus).mockImplementation((_id, onData) => {
+      capturedOnData = onData;
+      return vi.fn();
+    });
+
+    const req = mockReq({ contractId: 'CAZT001' });
+    const res = mockSseRes();
+
+    escrowStatusStreamHandler(req, res);
+    capturedOnData({ escrows: [] });
+
+    expect(res._chunks.some((c) => c.includes('event: status'))).toBe(false);
   });
 
   it('calls cleanup when client disconnects', () => {
@@ -131,6 +180,35 @@ describe('escrowStatusStreamHandler', () => {
     req._emit('close');
 
     expect(cleanupMock).toHaveBeenCalledTimes(1);
+    expect(res.writableEnded).toBe(true);
+  });
+
+  it('shuts down the stream once when Hasura reports an error', () => {
+    vi.useFakeTimers();
+    const cleanupMock = vi.fn();
+    let capturedOnError = null;
+    vi.mocked(subscribeToEscrowStatus).mockImplementation((_id, _onData, onError) => {
+      capturedOnError = onError;
+      return cleanupMock;
+    });
+
+    const req = mockReq({ contractId: 'CAZT001' });
+    const res = mockSseRes();
+
+    escrowStatusStreamHandler(req, res);
+
+    capturedOnError(new Error('subscription failed'));
+    capturedOnError(new Error('subscription failed again'));
+    req._emit('close');
+
+    expect(cleanupMock).toHaveBeenCalledTimes(1);
+    expect(res.writableEnded).toBe(true);
+
+    const chunksAfterShutdown = res._chunks.length;
+    vi.advanceTimersByTime(60_000);
+    expect(res._chunks.length).toBe(chunksAfterShutdown);
+
+    vi.useRealTimers();
   });
 
   it('writes heartbeat events at 30-second intervals', () => {
@@ -143,7 +221,7 @@ describe('escrowStatusStreamHandler', () => {
     escrowStatusStreamHandler(req, res);
 
     const initialChunks = res._chunks.length;
-    vi.advanceTimersByTime(60_000); // 2 heartbeat intervals
+    vi.advanceTimersByTime(60_000);
     expect(res._chunks.length).toBe(initialChunks + 2);
     expect(res._chunks[initialChunks]).toContain('event: heartbeat');
 
