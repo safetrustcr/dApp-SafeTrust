@@ -9,7 +9,7 @@ export const HASURA_GRAPHQL_URL =
 /**
  * Hasura admin secret. apps/api reads HASURA_ADMIN_SECRET while the root
  * .env.example names it HASURA_GRAPHQL_ADMIN_SECRET, so accept either before
- * falling back to the dc_prep local default.
+ * falling back to the bin/start local default.
  */
 export const HASURA_ADMIN_SECRET =
   process.env.HASURA_ADMIN_SECRET ??
