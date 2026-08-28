@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ── Resolve paths ──────────────────────────────────────────────────────────────
+# Works from any working directory — paths are always relative to this script.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INFRA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"   # → infra/backend/
+MIGRATIONS_DIR="$INFRA_DIR/migrations"
+INIT_DIR="$INFRA_DIR/init"
+
+# ── Tenants ────────────────────────────────────────────────────────────────────
+# Default: both tenants. Correctly handles the empty-$@ case without word-split.
+if [[ $# -eq 0 ]]; then
+  TENANTS=(safetrust hotel_industry)
+else
+  TENANTS=("$@")
+fi
+
+mkdir -p "$INIT_DIR"
+
+echo ""
+echo "🔧 Generating init SQL..."
+echo "   Tenants: ${TENANTS[*]}"
+echo ""
+
+# ── Generate per-tenant SQL ────────────────────────────────────────────────────
+for TENANT in "${TENANTS[@]}"; do
+  TENANT_MIGRATIONS="$MIGRATIONS_DIR/$TENANT"
+  OUT="$INIT_DIR/${TENANT}.sql"
+
+  if [[ ! -d "$TENANT_MIGRATIONS" ]]; then
+    echo "❌  No migrations directory found: $TENANT_MIGRATIONS"
+    exit 1
+  fi
+
+  # Write header block.
+  # IMPORTANT: lines between <<-HEADER and HEADER are indented with TAB characters.
+  # <<- strips leading tabs only — spaces would appear literally in the output.
+  cat > "$OUT" <<-HEADER
+	-- ════════════════════════════════════════════════════════════════════════════
+	-- Init SQL for tenant: $TENANT
+	-- Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+	-- Source:    infra/backend/migrations/$TENANT/*/up.sql
+	-- DO NOT EDIT — regenerate with: bin/generate-init-sql
+	-- ════════════════════════════════════════════════════════════════════════════
+	HEADER
+
+  # Iterate migration directories in ascending timestamp order.
+  # -print0 + sort -z handles directory names with spaces safely.
+  while IFS= read -r -d '' MIGRATION_DIR; do
+    MIGRATION_NAME="$(basename "$MIGRATION_DIR")"
+    UP_SQL="$MIGRATION_DIR/up.sql"
+
+    if [[ ! -f "$UP_SQL" ]]; then
+      # Skip silently with a comment — don't error
+      echo "" >> "$OUT"
+      echo "-- ── Migration: $MIGRATION_NAME (no up.sql — skipped)" >> "$OUT"
+      continue
+    fi
+
+    {
+      echo ""
+      echo "-- ── Migration: $MIGRATION_NAME"
+      echo ""
+      cat "$UP_SQL"
+    } >> "$OUT"
+
+  done < <(find "$TENANT_MIGRATIONS" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
+
+  # Count migration headers — || true prevents set -e aborting on grep exit 1
+  MIGRATION_COUNT=$(grep -c "^-- ── Migration:" "$OUT" || true)
+  echo "✅  Generated $OUT  ($MIGRATION_COUNT migrations)"
+done
+
+echo ""
+echo "✅  Done."
