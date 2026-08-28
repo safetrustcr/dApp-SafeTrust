@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
@@ -43,17 +44,16 @@ export function registerEscrowTools(server: McpServer) {
         'unsigned XDR for the tenant to sign with Freighter.',
       inputSchema: z.object({
         apartmentId: z.string().uuid().describe('UUID of the apartment being rented'),
-        tenantAddress: stellarAddress.describe('Tenant Stellar wallet — approver role, signs the deploy'),
-        ownerAddress: stellarAddress.describe('Owner Stellar wallet — serviceProvider + receiver roles'),
-        senderAddress: stellarAddress.optional().describe('Tenant Stellar wallet (alias for tenantAddress)'),
-        receiverAddress: stellarAddress.optional().describe('Owner Stellar wallet (alias for ownerAddress)'),
+        senderAddress: stellarAddress.describe('Tenant Stellar wallet — approver role'),
+        receiverAddress: stellarAddress.describe('Owner Stellar wallet — serviceProvider + receiver roles'),
         amount: z.number().positive().describe('Deposit amount in USDC'),
-        engagementId: z.string().optional().describe('Optional custom engagement UUID/idempotency key'),
+        engagementId: z.string().optional().describe('Optional idempotency key — generated if omitted'),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ apartmentId, tenantAddress, ownerAddress, amount, engagementId }) => {
+    async ({ apartmentId, senderAddress, receiverAddress, amount, engagementId }) => {
       try {
+        const engagement = engagementId ?? randomUUID();
         const { ok, status, data } = await apiRequest<{
           unsignedXDR?: string | null;
           engagementId?: string;
@@ -63,7 +63,7 @@ export function registerEscrowTools(server: McpServer) {
           details?: unknown;
         }>('/api/escrow/deploy', {
           method: 'POST',
-          body: { apartmentId, tenantAddress, ownerAddress, amount, engagementId: engagementId },
+          body: { apartmentId, senderAddress, receiverAddress, amount, engagementId: engagement },
         });
 
         if (!ok) {
@@ -159,7 +159,13 @@ export function registerEscrowTools(server: McpServer) {
     },
     async ({ contractId, engagementId }) => {
       if (!contractId && !engagementId) {
-        return errorResult('Provide either contractId or engagementId.');
+        return errorResult('Provide either contractId or engagementId — not both, not neither.');
+      }
+      if (contractId && engagementId) {
+        return errorResult(
+          'Provide only one identifier. ' +
+          'Supplying both contractId and engagementId is ambiguous.'
+        );
       }
 
       const where = buildWhere(

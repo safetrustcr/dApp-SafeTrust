@@ -20,7 +20,6 @@ type Apartment = {
   created_at: string;
   owner?: {
     id: string;
-    email: string;
     first_name: string | null;
     last_name: string | null;
     user_wallets: OwnerWallet[];
@@ -62,7 +61,6 @@ export function registerApartmentTools(server: McpServer) {
             ${APARTMENT_FIELDS}
             owner {
               id
-              email
               first_name
               last_name
               user_wallets(
@@ -96,7 +94,7 @@ export function registerApartmentTools(server: McpServer) {
           `price: ${apartment.price} / month`,
           `warranty_deposit: ${apartment.warranty_deposit} USDC (the escrow amount)`,
           `available: ${apartment.is_available ? 'yes' : 'no'} (from ${apartment.available_from}${apartment.available_until ? ` until ${apartment.available_until}` : ''})`,
-          `owner: ${ownerName || '(no name)'} <${owner?.email ?? 'unknown'}> — user id ${owner?.id ?? 'unknown'}`,
+          `owner: ${ownerName || '(no name)'} — user id ${owner?.id ?? 'unknown'}`,
           wallet
             ? `owner wallet (ownerAddress for deploy-escrow): ${wallet}`
             : 'owner has no STELLAR wallet in public.user_wallets — deploy-escrow will be blocked',
@@ -153,7 +151,6 @@ export function registerApartmentTools(server: McpServer) {
             ${APARTMENT_FIELDS}
             owner {
               id
-              email
             }
           }
         }
@@ -172,7 +169,6 @@ export function registerApartmentTools(server: McpServer) {
           price: apartment.price,
           warranty_deposit: apartment.warranty_deposit,
           is_available: apartment.is_available,
-          owner_email: apartment.owner?.email ?? null,
         }));
 
         return textResult(
