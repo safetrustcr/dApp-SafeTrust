@@ -2,11 +2,16 @@
 
 import Link from "next/link";
 import { useQuery } from "@apollo/client";
-import { Bath, BedDouble, Heart, MapPin, PawPrint, Loader2, Search, Bell, User, ChevronDown } from "lucide-react";
+import {
+  Bath, BedDouble, Heart, MapPin, PawPrint,
+  Loader2, Search, Bell, ChevronDown, User,
+} from "lucide-react";
 import { GET_ALL_APARTMENTS } from "@/graphql/queries/apartment-queries";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
+import { LogoutButton } from "@/components/auth/LogoutButton";
+import { auth } from "@/lib/firebase";
 
 interface Apartment {
   id: string;
@@ -49,54 +54,76 @@ export default function GuestDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [promoting, setPromoting] = useState(false);
   const [promoteError, setPromoteError] = useState<string | null>(null);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const avatarRef = useRef<HTMLDivElement>(null);
 
-  // Set by the middleware when a guest is bounced off a host-only route.
+  // Close avatar dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
+        setAvatarOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Set by middleware when a guest is bounced off a host-only route
   const wasBlocked = searchParams.get("blocked") === "true";
 
   async function handleSwitchToHost() {
-    if (!token) {
-      setPromoteError("You need to be signed in to become a host");
-      return;
-    }
     setPromoting(true);
     setPromoteError(null);
+
     try {
-      const idToken = token;
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        setPromoteError("You need to be signed in to become a host");
+        return;
+      }
+
+      // Force token refresh — stored token may be expired
+      const idToken = await currentUser.getIdToken(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 
       const res = await fetch(`${apiUrl}/api/auth/promote-to-host`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
       });
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? 'Promotion failed');
+        throw new Error(data.error ?? "Promotion failed");
       }
 
       // Clear role cookie so middleware re-fetches updated role on next request
-      document.cookie = 'user-role=; Max-Age=0; path=/';
+      document.cookie = "user-role=; Max-Age=0; path=/";
 
-      // Redirect to host dashboard — middleware will confirm host role
-      window.location.href = '/dashboard/escrow-dashboard';
+      // Full page navigation — forces middleware role check with fresh cookie
+      window.location.href = "/dashboard/escrow-dashboard";
 
     } catch (err) {
-      setPromoteError(err instanceof Error ? err.message : 'Failed to switch to host view');
+      setPromoteError(
+        err instanceof Error ? err.message : "Failed to switch to host view"
+      );
+    } finally {
       setPromoting(false);
     }
   }
 
-  // Decode name from token for avatar
+  // Decode display name from stored token for avatar initials
   const userName = (() => {
     if (!token) return "Account";
     try {
       const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
       const payload = JSON.parse(atob(base64));
-      return payload.name || "Account";
-    } catch { return "Account"; }
+      return payload.name || payload.email?.split("@")[0] || "Account";
+    } catch {
+      return "Account";
+    }
   })();
 
   const initials = userName
@@ -119,6 +146,7 @@ export default function GuestDashboard() {
       {/* ── Top Navbar ── */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+
           {/* Logo */}
           <div className="flex items-center gap-2 shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -146,6 +174,8 @@ export default function GuestDashboard() {
 
           {/* Right actions */}
           <div className="flex items-center gap-3 shrink-0">
+
+            {/* Switch to Host */}
             <button
               type="button"
               onClick={handleSwitchToHost}
@@ -155,26 +185,75 @@ export default function GuestDashboard() {
               {promoting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {promoting ? "Switching…" : "Switch to Host view"}
             </button>
-            <button type="button" className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
+
+            {/* Bell */}
+            <button
+              type="button"
+              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
               <Bell className="h-5 w-5 text-gray-600" />
             </button>
-            <button type="button" className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors">
-              <span className="text-sm font-medium text-gray-700">{userName.split(" ")[0]}</span>
-              <div className="h-7 w-7 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold text-white">
-                {initials}
-              </div>
-            </button>
+
+            {/* Avatar + dropdown */}
+            <div className="relative" ref={avatarRef}>
+              <button
+                type="button"
+                onClick={() => setAvatarOpen((o) => !o)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-sm font-medium text-gray-700">
+                  {userName.split(" ")[0]}
+                </span>
+                <div className="h-7 w-7 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold text-white">
+                  {initials}
+                </div>
+              </button>
+
+              {/* Dropdown */}
+              {avatarOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-xl border border-gray-100 bg-white shadow-lg ring-1 ring-black/5 z-50 overflow-hidden">
+                  {/* User info */}
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+                    <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                      {initials}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{userName}</p>
+                      <p className="text-xs text-gray-400">Guest account</p>
+                    </div>
+                  </div>
+
+                  {/* Profile link */}
+                  <button
+                    type="button"
+                    onClick={() => { setAvatarOpen(false); router.push("/dashboard/profile"); }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <User className="h-4 w-4 text-gray-400" />
+                    My profile
+                  </button>
+
+                  {/* Logout — dropdown variant: light style, red text */}
+                  <div className="border-t border-gray-100">
+                    <LogoutButton variant="dropdown" />
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       </header>
 
       {/* ── Body ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        {/* Blocked banner */}
         {wasBlocked && (
           <div className="mb-6 flex flex-col gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-orange-800">
-              That page is only available to hosts. Switch to a host account to list and manage
-              properties.
+              That page is only available to hosts. Switch to a host account to
+              list and manage properties.
             </p>
             <button
               type="button"
@@ -188,30 +267,37 @@ export default function GuestDashboard() {
           </div>
         )}
 
+        {/* Promote error */}
         {promoteError && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {promoteError}
           </div>
         )}
 
+        {/* Loading */}
         {loading && (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
           </div>
         )}
 
+        {/* Error */}
         {error && (
           <div className="py-12 text-center text-sm text-red-500">
             Failed to load apartments — {error.message}
           </div>
         )}
 
+        {/* Empty state */}
         {!loading && !error && apartments.length === 0 && (
           <div className="py-24 text-center space-y-3">
             <p className="text-lg font-semibold text-gray-900">No apartments listed yet</p>
             <p className="text-sm text-gray-500">
               Be the first to{" "}
-              <Link href="/dashboard/apartments/new" className="text-orange-500 hover:underline font-medium">
+              <Link
+                href="/dashboard/apartments/new"
+                className="text-orange-500 hover:underline font-medium"
+              >
                 list a property
               </Link>
               .
@@ -219,8 +305,10 @@ export default function GuestDashboard() {
           </div>
         )}
 
+        {/* Apartment grid */}
         {!loading && !error && apartments.length > 0 && (
           <div className="grid gap-8 xl:grid-cols-[18rem_1fr]">
+
             {/* ── Sidebar ── */}
             <aside className="space-y-4">
               <div>
@@ -241,6 +329,7 @@ export default function GuestDashboard() {
                   <article
                     key={apt.id}
                     className="flex gap-3 rounded-xl border border-gray-100 bg-white shadow-sm p-2.5 cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => router.push(`/apartment/${apt.id}`)}
                   >
                     <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-gray-100">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -248,7 +337,10 @@ export default function GuestDashboard() {
                         src={getImage(apt, idx)}
                         alt={apt.name}
                         className="h-full w-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length]; }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
+                        }}
                       />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -260,7 +352,7 @@ export default function GuestDashboard() {
                         {formatAddress(apt.address)}
                       </p>
                       <div className="flex items-center justify-between mt-1.5 text-xs">
-                        <span className="text-gray-400">2bd · pet friendly · 1 ba</span>
+                        <span className="text-gray-400">2bd · pet friendly · 1 bathroom</span>
                         <span className="font-bold text-emerald-600">
                           ${apt.price.toLocaleString()}
                         </span>
@@ -275,6 +367,7 @@ export default function GuestDashboard() {
             {featured && (
               <main className="grid gap-6 lg:grid-cols-[1fr_15rem]">
                 <section className="space-y-5">
+
                   {/* Hero image */}
                   <div className="relative aspect-[16/9] overflow-hidden rounded-2xl bg-gray-100 shadow-md">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -282,7 +375,9 @@ export default function GuestDashboard() {
                       src={getImage(featured)}
                       alt={featured.name}
                       className="h-full w-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGES[0]; }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = FALLBACK_IMAGES[0];
+                      }}
                     />
                     <span className="absolute bottom-4 left-4 flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase text-white shadow">
                       🔥 Promoted
@@ -310,14 +405,17 @@ export default function GuestDashboard() {
                           </span>
                         </div>
                       </div>
+
                       <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/apartment/${featured.id}/escrow/create`)}
-                            className="rounded-lg bg-orange-500 px-10 py-3 text-sm font-bold text-white hover:bg-orange-600 transition-colors shadow-sm"
-                          >
-                            BOOK
-                          </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            router.push(`/apartment/${featured.id}/escrow/create`)
+                          }
+                          className="rounded-lg bg-orange-500 px-10 py-3 text-sm font-bold text-white hover:bg-orange-600 transition-colors shadow-sm"
+                        >
+                          BOOK
+                        </button>
                         <p className="text-xl font-bold text-emerald-600">
                           ${featured.price.toLocaleString()}.00{" "}
                           <span className="text-xs font-normal text-gray-400">Per month</span>
@@ -354,7 +452,9 @@ export default function GuestDashboard() {
                         src={src}
                         alt={`${featured.name} ${i + 2}`}
                         className="h-full w-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
-                        onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGES[i]; }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = FALLBACK_IMAGES[i];
+                        }}
                       />
                     </div>
                   ))}

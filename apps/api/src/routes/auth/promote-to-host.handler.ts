@@ -6,10 +6,24 @@ export const promoteToHostHandler = async (
   req: AuthenticatedRequest,
   res: Response
 ): Promise<Response> => {
-  const { uid } = req.user;
+  const { uid, email } = req.user;
 
   try {
-    // Get host role id
+    // Step 1 — Ensure user row exists (sync-user may not have been called)
+    await hasuraRequest(
+      `mutation EnsureUser($id: String!, $email: String!) {
+        insert_users_one(
+          object: { id: $id, email: $email }
+          on_conflict: {
+            constraint: users_pkey
+            update_columns: [last_seen]
+          }
+        ) { id }
+      }`,
+      { id: uid, email: email ?? '' }
+    );
+
+    // Step 2 — Get host role id
     const rolesData = await hasuraRequest<{
       roles: Array<{ id: number; name: string }>;
     }>(
@@ -21,12 +35,11 @@ export const promoteToHostHandler = async (
     );
 
     const hostRoleId = rolesData.roles?.[0]?.id;
-
     if (!hostRoleId) {
       return res.status(500).json({ error: 'host role not found in roles table' });
     }
 
-    // Insert host role — ON CONFLICT DO NOTHING if already host
+    // Step 3 — Insert host role — ON CONFLICT DO NOTHING if already host
     await hasuraRequest(
       `mutation PromoteToHost($userId: String!, $roleId: Int!) {
         insert_user_roles_one(
