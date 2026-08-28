@@ -96,7 +96,7 @@ const HELP_ACTION: Action = {
   title: 'Get Help',
   description: 'Contact support or view help docs',
   icon: HelpCircle,
-  route: '/support',
+  route: '/dashboard/notifications',
 };
 
 interface ActionButtonProps {
