@@ -49,8 +49,8 @@ export const syncUserHandler = async (req, res) => {
                 location: $location
               }
               on_conflict: {
-                constraint: users_pkey
-                update_columns: [phone_number, country_code, location]
+                  constraint: users_email_unique
+                  update_columns: [id, first_name, last_name, phone_number, country_code, location, last_seen]
               }
             ) {
               id

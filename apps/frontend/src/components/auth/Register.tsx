@@ -4,7 +4,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  deleteUser,
+} from "firebase/auth";
 import { FirebaseError } from "firebase/app";
 import { auth } from "@/lib/firebase";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
@@ -27,115 +31,166 @@ import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
 import { PollarWalletStatus } from "@/components/auth/pollar/PollarWalletStatus";
 
 const COUNTRY_CODES = [
-  { code: "+506", country: "Costa Rica", flag: "🇨🇷" },
+  { code: "+506", country: "Costa Rica",    flag: "🇨🇷" },
   { code: "+1",   country: "United States", flag: "🇺🇸" },
-  { code: "+52",  country: "Mexico", flag: "🇲🇽" },
-  { code: "+34",  country: "Spain", flag: "🇪🇸" },
-  { code: "+44",  country: "United Kingdom", flag: "🇬🇧" },
-  { code: "+49",  country: "Germany", flag: "🇩🇪" },
-  { code: "+55",  country: "Brazil", flag: "🇧🇷" },
-  { code: "+57",  country: "Colombia", flag: "🇨🇴" },
-  { code: "+51",  country: "Peru", flag: "🇵🇪" },
-  { code: "+54",  country: "Argentina", flag: "🇦🇷" },
+  { code: "+52",  country: "Mexico",        flag: "🇲🇽" },
+  { code: "+34",  country: "Spain",         flag: "🇪🇸" },
+  { code: "+44",  country: "United Kingdom",flag: "🇬🇧" },
+  { code: "+49",  country: "Germany",       flag: "🇩🇪" },
+  { code: "+55",  country: "Brazil",        flag: "🇧🇷" },
+  { code: "+57",  country: "Colombia",      flag: "🇨🇴" },
+  { code: "+51",  country: "Peru",          flag: "🇵🇪" },
+  { code: "+54",  country: "Argentina",     flag: "🇦🇷" },
 ];
 
-const ERROR_MESSAGES: Record<string, string> = {
+const FIREBASE_ERROR_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists",
-  "auth/weak-password": "Password must be at least 6 characters",
-  "auth/invalid-email": "Invalid email address",
+  "auth/weak-password":        "Password must be at least 6 characters",
+  "auth/invalid-email":        "Invalid email address",
+  "auth/operation-not-allowed":"Email/password registration is not enabled",
+  "auth/network-request-failed":"Network error — please check your connection",
 };
+
+// ── Client-side validation before touching Firebase ──────────────────────────
+function validateForm(fields: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  phone: string;
+  location: string;
+}): string | null {
+  if (!fields.firstName.trim()) return "First name is required";
+  if (!fields.lastName.trim())  return "Last name is required";
+  if (!fields.email.trim())     return "Email is required";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email))
+    return "Please enter a valid email address";
+  if (fields.password.length < 6)
+    return "Password must be at least 6 characters";
+  if (!fields.phone.trim())     return "Phone number is required";
+  if (!/^\d{6,15}$/.test(fields.phone.replace(/\s/g, "")))
+    return "Please enter a valid phone number (digits only)";
+  if (!fields.location)         return "Please select your location";
+  return null; // valid
+}
 
 export default function RegisterPage() {
   const router = useRouter();
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [phoneCountryCode, setPhoneCountryCode] = useState("+506");
-  const [phone, setPhone] = useState("");
-  const [location, setLocation] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [firstName,        setFirstName]        = useState("");
+  const [lastName,         setLastName]          = useState("");
+  const [email,            setEmail]             = useState("");
+  const [password,         setPassword]          = useState("");
+  const [phoneCountryCode, setPhoneCountryCode]  = useState("+506");
+  const [phone,            setPhone]             = useState("");
+  const [location,         setLocation]          = useState("");
+  const [isLoading,        setIsLoading]         = useState(false);
+  const [error,            setError]             = useState("");
 
   const clearError = () => setError("");
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError("");
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) {
-      setError("Server configuration error — please contact support");
-      setIsLoading(false);
-      return;
+    // ── Step 1: validate client-side BEFORE any Firebase call ────────────────
+    const validationError = validateForm({
+      firstName, lastName, email, password, phone, location,
+    });
+    if (validationError) {
+      setError(validationError);
+      return; // stops here — Firebase never called, no zombie account
     }
 
+    const backendUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL ??
+      process.env.NEXT_PUBLIC_API_URL ??
+      "http://localhost:3002";
+
+    setIsLoading(true);
+
+    let firebaseUser = null;
+
     try {
+      // ── Step 2: create Firebase account ────────────────────────────────────
       const credential = await createUserWithEmailAndPassword(
         auth,
-        email,
+        email.trim(),
         password,
       );
+      firebaseUser = credential.user;
 
-      await updateProfile(credential.user, {
-        displayName: `${firstName} ${lastName}`.trim(),
+      await updateProfile(firebaseUser, {
+        displayName: `${firstName.trim()} ${lastName.trim()}`,
       });
 
-      const token = await credential.user.getIdToken();
+      const token = await firebaseUser.getIdToken();
 
+      // ── Step 3: sync to Hasura ──────────────────────────────────────────────
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId  = setTimeout(() => controller.abort(), 8000);
 
-      const syncRes = await fetch(
-        `${backendUrl}/api/auth/sync-user`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-            phone_number: phone,
-            country_code: phoneCountryCode,
-            location,
-          }),
+      const syncRes = await fetch(`${backendUrl}/api/auth/sync-user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization:  `Bearer ${token}`,
         },
-      );
-
-      Cookies.set("firebase-token", token, {
-        expires: 7,
-        secure: true,
-        sameSite: "strict",
+        body: JSON.stringify({
+          first_name:   firstName.trim(),
+          last_name:    lastName.trim(),
+          phone_number: phone.trim(),
+          country_code: phoneCountryCode,
+          location,
+        }),
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
 
       if (!syncRes.ok) {
-        throw new Error("SYNC_USER_FAILED");
+        // DB sync failed — delete the Firebase account to keep state consistent
+        // so the user can try again without hitting "email already in use"
+        await deleteUser(firebaseUser);
+        throw new Error("SYNC_FAILED");
       }
 
+      // ── Step 4: success ─────────────────────────────────────────────────────
+      Cookies.set("firebase-token", token, {
+        expires:  7,
+        secure:   true,
+        sameSite: "strict",
+      });
+
       useGlobalAuthenticationStore.getState().setToken(token);
+
       toast.success("Account created successfully!", {
         description: "Please sign in with your new credentials.",
-        duration: 4000,
+        duration:    4000,
       });
+
       router.push("/login");
+
     } catch (err: unknown) {
+
       if (err instanceof FirebaseError) {
-        toast.error(
-          ERROR_MESSAGES[err.code] ?? "An unexpected error occurred. Please try again.",
-          { duration: 4000 }
-        );
-        setError(
-          ERROR_MESSAGES[err.code] ?? "Registration failed — please try again",
-        );
+        // Firebase rejected the request (bad email, weak password, etc.)
+        // Firebase account was NOT created — safe to show error and let user retry
+        const msg = FIREBASE_ERROR_MESSAGES[err.code] ??
+          "Registration failed — please try again";
+        toast.error(msg, { duration: 4000 });
+        setError(msg);
+
       } else if (err instanceof Error && err.name === "AbortError") {
+        // Timeout after Firebase account was created — we already deleted it above
         toast.error("Registration timed out. Please try again.", { duration: 4000 });
         setError("Registration timed out — please try again");
+
+      } else if (err instanceof Error && err.message === "SYNC_FAILED") {
+        // DB sync failed — Firebase account was deleted above — user can retry
+        toast.error("Registration failed. Please try again.", { duration: 4000 });
+        setError("Could not save your account details — please try again");
+
       } else {
         toast.error("An unexpected error occurred. Please try again.", { duration: 4000 });
         setError("Registration failed — please try again");
@@ -149,6 +204,8 @@ export default function RegisterPage() {
     <div className="flex min-h-screen">
       <div className="flex w-full flex-col items-center justify-center px-4 md:w-1/2">
         <div className="w-full max-w-sm space-y-6">
+
+          {/* Header */}
           <div className="flex items-center justify-between w-full mb-2">
             <div className="flex items-center space-x-2">
               <Image src="/img/logo.png" alt="SafeTrust" width={32} height={32} />
@@ -251,7 +308,7 @@ export default function RegisterPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder="At least 6 characters"
                 required
                 minLength={6}
                 value={password}
@@ -264,7 +321,7 @@ export default function RegisterPage() {
               className="w-full bg-[#2857B8] hover:bg-[#2857B8]/90"
               disabled={isLoading}
             >
-              {isLoading ? "Creating account..." : "Sign Up"}
+              {isLoading ? "Creating account…" : "Sign Up"}
             </Button>
 
             {error && (
