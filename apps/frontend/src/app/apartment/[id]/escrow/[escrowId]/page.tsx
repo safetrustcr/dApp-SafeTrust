@@ -948,17 +948,12 @@ export default function EscrowDetailPage({
       engagement_id: params.escrowId,
       contract_id: params.escrowId,
     },
-    // pollInterval removed — real-time updates are delivered via SSE (useEscrowStream)
   });
 
-  // Derive the Stellar contract ID once data is available so we can open the
-  // SSE connection with the authoritative on-chain identifier.
-  const contractId = data?.escrows?.[0]?.contract_id ?? data?.trustlessWorkEscrows?.[0]?.contract_id ?? null;
-
+  const contractId =
+    data?.escrows?.[0]?.contract_id ?? data?.trustlessWorkEscrows?.[0]?.contract_id ?? null;
   const { streamData } = useEscrowStream(contractId);
 
-  // When the SSE stream pushes a status change, trigger a targeted Apollo
-  // refetch so all derived state (status, view config, etc.) stays in sync.
   useEffect(() => {
     if (streamData) {
       void refetch();

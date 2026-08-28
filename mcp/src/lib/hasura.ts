@@ -1,4 +1,4 @@
-import { HASURA_ADMIN_SECRET, HASURA_GRAPHQL_URL, REQUEST_TIMEOUT_MS } from '../config.js';
+import { HASURA_GRAPHQL_URL, REQUEST_TIMEOUT_MS } from '../config.js';
 
 export class HasuraRequestError extends Error {
   constructor(
@@ -19,6 +19,14 @@ export async function hasuraRequest<T>(
   query: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {
+  const adminSecret = process.env.HASURA_ADMIN_SECRET;
+  if (!adminSecret) {
+    throw new Error(
+      '[safetrust-mcp] HASURA_ADMIN_SECRET is not set. ' +
+      'Copy mcp/.env.example to mcp/.env and fill in the value.'
+    );
+  }
+
   let response: Response;
 
   try {
@@ -27,7 +35,7 @@ export async function hasuraRequest<T>(
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         'Content-Type': 'application/json',
-        'x-hasura-admin-secret': HASURA_ADMIN_SECRET,
+        'x-hasura-admin-secret': adminSecret,
       },
       body: JSON.stringify({ query, variables }),
     });
