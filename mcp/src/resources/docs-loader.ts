@@ -62,7 +62,7 @@ fulfilment, or returned on dispute.
 | \`apps/frontend\` | Next.js 14 app — wallet UI, Freighter signing, its own /api routes |
 | \`apps/api\` | Express escrow/auth API (port 3002) — holds the TrustlessWork API key |
 | \`services/webhook\` | Receives TrustlessWork webhooks and updates escrow rows |
-| \`infra/hasura\` | Hasura metadata + migrations, multi-tenant (safetrust, hotel_industry) |
+| \`infra/backend\` | Hasura metadata + migrations, multi-tenant (safetrust, hotel_industry) |
 | \`packages/graphql\`, \`packages/types\` | Generated GraphQL types and shared TS types |
 | \`mcp\` | This MCP server |
 
