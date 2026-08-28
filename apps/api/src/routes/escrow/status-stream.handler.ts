@@ -2,9 +2,9 @@ import { Request, Response } from 'express';
 import { subscribeToEscrowStatus } from '../../services/hasura-ws.js';
 
 export const escrowStatusStreamHandler = (req: Request, res: Response): void => {
-  const contractId = req.query.contractId as string;
+  const contractId = req.query.contractId;
 
-  if (!contractId || contractId.trim() === '') {
+  if (typeof contractId !== 'string' || contractId.trim() === '') {
     res.status(400).json({ error: 'Missing required query param: contractId' });
     return;
   }
@@ -21,21 +21,32 @@ export const escrowStatusStreamHandler = (req: Request, res: Response): void => 
     res.write('event: heartbeat\ndata: {}\n\n');
   }, 30_000);
 
-  const cleanup = subscribeToEscrowStatus(
+  let closed = false;
+  let unsubscribe = (): void => {};
+
+  const shutdown = (): void => {
+    if (closed) return;
+    closed = true;
+    clearInterval(heartbeat);
+    unsubscribe();
+    if (!res.writableEnded) {
+      res.end();
+    }
+  };
+
+  unsubscribe = subscribeToEscrowStatus(
     contractId,
     (data) => {
       const escrow = data.escrows?.[0];
-      if (escrow) {
+      if (escrow && !closed) {
         res.write(`event: status\ndata: ${JSON.stringify(escrow)}\n\n`);
       }
     },
     (error) => {
       console.error(`[sse] Hasura error for ${contractId}:`, error.message);
+      shutdown();
     },
   );
 
-  req.on('close', () => {
-    clearInterval(heartbeat);
-    cleanup();
-  });
+  req.on('close', shutdown);
 };

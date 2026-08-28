@@ -15,6 +15,7 @@ function mockSseRes() {
     _chunks: chunks,
     _status: null,
     _body: undefined,
+    writableEnded: false,
     setHeader: vi.fn(),
     flushHeaders: vi.fn(),
     write(chunk) {
@@ -27,6 +28,9 @@ function mockSseRes() {
     json(body) {
       this._body = body;
       return this;
+    },
+    end() {
+      this.writableEnded = true;
     },
     on(event, cb) {
       listeners[event] = listeners[event] ?? [];
@@ -70,6 +74,27 @@ describe('escrowStatusStreamHandler', () => {
 
   it('returns 400 when contractId is blank', () => {
     const req = mockReq({ contractId: '   ' });
+    const res = mockSseRes();
+
+    escrowStatusStreamHandler(req, res);
+
+    expect(res._status).toBe(400);
+    expect(subscribeToEscrowStatus).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when contractId is duplicated in the query string', () => {
+    const req = mockReq({ contractId: ['CAZT001', 'CAZT002'] });
+    const res = mockSseRes();
+
+    escrowStatusStreamHandler(req, res);
+
+    expect(res._status).toBe(400);
+    expect(res._body).toMatchObject({ error: expect.stringContaining('contractId') });
+    expect(subscribeToEscrowStatus).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when contractId is a nested query object', () => {
+    const req = mockReq({ contractId: { eq: 'CAZT001' } });
     const res = mockSseRes();
 
     escrowStatusStreamHandler(req, res);
@@ -155,6 +180,35 @@ describe('escrowStatusStreamHandler', () => {
     req._emit('close');
 
     expect(cleanupMock).toHaveBeenCalledTimes(1);
+    expect(res.writableEnded).toBe(true);
+  });
+
+  it('shuts down the stream once when Hasura reports an error', () => {
+    vi.useFakeTimers();
+    const cleanupMock = vi.fn();
+    let capturedOnError = null;
+    vi.mocked(subscribeToEscrowStatus).mockImplementation((_id, _onData, onError) => {
+      capturedOnError = onError;
+      return cleanupMock;
+    });
+
+    const req = mockReq({ contractId: 'CAZT001' });
+    const res = mockSseRes();
+
+    escrowStatusStreamHandler(req, res);
+
+    capturedOnError(new Error('subscription failed'));
+    capturedOnError(new Error('subscription failed again'));
+    req._emit('close');
+
+    expect(cleanupMock).toHaveBeenCalledTimes(1);
+    expect(res.writableEnded).toBe(true);
+
+    const chunksAfterShutdown = res._chunks.length;
+    vi.advanceTimersByTime(60_000);
+    expect(res._chunks.length).toBe(chunksAfterShutdown);
+
+    vi.useRealTimers();
   });
 
   it('writes heartbeat events at 30-second intervals', () => {
