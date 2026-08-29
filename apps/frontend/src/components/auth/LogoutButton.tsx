@@ -31,8 +31,11 @@ export function LogoutButton({ variant = "sidebar" }: LogoutButtonProps) {
     } finally {
       Cookies.remove("firebase-token");
       Cookies.remove("auth-token");
-      // Clear role cookie so middleware doesn't serve stale role on next login
-      document.cookie = "user-role=; Max-Age=0; path=/";
+      // Clear the httpOnly role cookie via the server route so middleware
+      // doesn't serve a stale role on next login. Non-fatal: if this fails,
+      // the Firebase token is already cleared above, so the middleware
+      // redirects to /login regardless and the cookie just expires in 1h.
+      await fetch("/api/auth/role-cookie", { method: "DELETE" }).catch(() => {});
       disconnect();
       router.push("/login");
       router.refresh();
