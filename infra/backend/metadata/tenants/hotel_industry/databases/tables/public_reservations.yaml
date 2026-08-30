@@ -1,0 +1,46 @@
+table:
+  name: reservations
+  schema: public
+object_relationships:
+  - name: room
+    using:
+      foreign_key_constraint_on: room_id
+  - name: escrow_transactions
+    using:
+      foreign_key_constraint_on:
+        table:
+          name: escrow_transactions
+          schema: public
+        columns:
+          - reservation_id
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - reservation_id
+        - wallet_address
+        - room_id
+        - check_in
+        - check_out
+        - capacity
+        - reservation_status
+        - total_amount
+        - created_at
+        - updated_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - reservation_id
+        - wallet_address
+        - room_id
+        - check_in
+        - check_out
+        - capacity
+        - reservation_status
+        - total_amount
+        - created_at
+        - updated_at
+      filter: {}
