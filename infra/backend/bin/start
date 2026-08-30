@@ -138,6 +138,9 @@ for TENANT in "${TENANTS[@]}"; do
     --database-name "$TENANT"
   echo "   ✅ Seeds applied for $TENANT"
 done
+echo ""
+echo "   💡 If you added a new migration, keep init SQL in sync:"
+echo "      bin/generate-init-sql"
 
 if [[ "$TRACK_SAFETRUST_TIMINGS" == "true" ]]; then
   TIMING_SEEDS_SAFETRUST=$((SECONDS - TIMER_START))
