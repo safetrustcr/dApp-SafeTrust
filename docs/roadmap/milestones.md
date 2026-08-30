@@ -47,6 +47,64 @@ The consolidation milestone is complete only when all of the following are true:
 
 By September 30, 2026, SafeTrust should have a working escrow MVP that is contributor-friendly, deployable from the consolidated branch, and ready for a disciplined security and compliance hardening pass.
 
+### Escrow transaction flows
+
+#### Fund Escrow
+
+```mermaid
+flowchart LR
+    A([Execute: <br/> /escrow/single-release/fund-escrow]) --> B["Body sent: <br/> { <br/> 'contractId': 'CAZ6UQX7...', <br/> 'signer': 'GAPPROVER1234567890...', <br/> 'amount': '10' <br/> }"]
+    B --> C{Did it fail?}
+    C -- No --> D["Return the unsigned XDR"]
+    D --> E([Execute: <br/> /helper/send-transaction])
+    C -- Yes --> F["Expected errors: <br/> 1. Amount cannot be equal to or less than zero <br/> 2. The provided escrow properties do not match the stored escrow."]
+    
+    style D color:green
+    style F color:red
+```
+
+#### Approve Milestone
+
+```mermaid
+flowchart LR
+    A([Execute: <br/> /escrow/single-release/approve-milestone]) --> B["Body sent: <br/> { <br/> 'contractId': 'CAZ6UQX7...', <br/> 'milestoneIndex': '1', <br/> 'approver': 'GAPPROVER1234567890...' <br/> }"]
+    B --> C{Did it fail?}
+    C -- No --> D["Return the unsigned XDR"]
+    D --> E([Execute: <br/> /helper/send-transaction])
+    C -- Yes --> F["Expected errors: <br/> 1. Escrow not found <br/> 2. Only the approver can change milestone flag <br/> 3. You cannot approve a milestone that has already been approved previously <br/> 4. The milestone status cannot be empty <br/> 5. Escrow initialized without milestone <br/> 6. Invalid milestone index"]
+    
+    style D color:green
+    style F color:red
+```
+
+#### Change Milestone Status
+
+```mermaid
+flowchart LR
+    A([Execute: <br/> /escrow/single-release/change-milestone-status]) --> B["Body sent: <br/> { <br/> 'contractId': 'CAZ6UQX7...', <br/> 'milestoneIndex': '1', <br/> 'newEvidence': '...', <br/> 'newStatus': 'Completed', <br/> 'serviceProvider': 'GAPPROVER...' <br/> }"]
+    B --> C{Did it fail?}
+    C -- No --> D["Return the unsigned XDR"]
+    D --> E([Execute: <br/> /helper/send-transaction])
+    C -- Yes --> F["Expected errors: <br/> 400 Bad request <br/> 401 Unauthorized <br/> 429 Too Many Requests <br/> 500 Internal Error"]
+    
+    style D color:green
+    style F color:red
+```
+
+#### Deploy Escrow
+
+```mermaid
+flowchart LR
+    A([Execute: <br/> /deployer/single-release]) --> B["Body sent: <br/> { <br/> 'signer': 'GAPPROVER...', <br/> 'engagementId': 'ENG12345', <br/> 'roles': {...}, <br/> 'amount': 1000, <br/> 'milestones': [...], <br/> ... <br/> }"]
+    B --> C{Did it fail?}
+    C -- No --> D["Return the unsigned XDR"]
+    D --> E([Execute: <br/> /helper/send-transaction])
+    C -- Yes --> F["Expected errors: <br/> 400 Bad request <br/> 401 Unauthorized <br/> 429 Too Many Requests <br/> 500 Internal Error"]
+    
+    style D color:green
+    style F color:red
+```
+
 ---
 
 ## Phase 1.5 — Security (Oct 31, 2026)
