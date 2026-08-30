@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { initFirebaseAdmin } from './lib/firebase-admin.js';
 import { tenantMiddleware } from './middleware/tenant.middleware.js';
 import authRouter from './routes/auth/sync-user.route.js';
 import promoteToHostRouter from './routes/auth/promote-to-host.route.js';
@@ -11,9 +12,12 @@ import milestoneStatusRouter from './routes/escrow/milestone-status.route.js';
 import releaseFundsRouter from './routes/escrow/release-funds.route.js';
 import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.js';
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
+import messagesRouter from './routes/messages/send.route.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
+
+initFirebaseAdmin();
 
 // CORS configuration - restrict to trusted frontend origins
 const allowedOrigins = process.env.FRONTEND_URL
