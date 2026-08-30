@@ -2,11 +2,13 @@
   "name": "dapp-safetrust",
   "private": true,
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=@safetrust/web --filter=@safetrust/api",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "codegen": "turbo run codegen"
+    "codegen": "turbo run codegen",
+    "dev:full": "turbo run dev",
+    "dev:mcp": "turbo run dev --filter=@safetrust/mcp"
   },
   "devDependencies": {
     "eslint": "^8.57.1",
