@@ -40,6 +40,7 @@ beforeEach(() => {
 describe('promoteToHostHandler', () => {
   it('looks up the host role id and inserts the assignment', async () => {
     mockHasuraRequest
+      .mockResolvedValueOnce({ insert_users_one: { id: 'test-uid-123' } })
       .mockResolvedValueOnce({ roles: [{ id: 2 }] })
       .mockResolvedValueOnce({ insert_user_roles_one: { id: 'row-1' } });
 
@@ -49,8 +50,8 @@ describe('promoteToHostHandler', () => {
     expect(res._status).toBe(200);
     expect(res._body).toEqual({ role: 'host', promoted: true });
 
-    expect(mockHasuraRequest.mock.calls[0][1]).toEqual({ name: 'host' });
-    expect(mockHasuraRequest.mock.calls[1][1]).toEqual({
+    expect(mockHasuraRequest.mock.calls[1][1]).toEqual(undefined);
+    expect(mockHasuraRequest.mock.calls[2][1]).toEqual({
       userId: 'test-uid-123',
       roleId: 2,
     });
@@ -58,16 +59,19 @@ describe('promoteToHostHandler', () => {
 
   it('does not hardcode a role id — uses whatever the roles table returns', async () => {
     mockHasuraRequest
+      .mockResolvedValueOnce({ insert_users_one: { id: 'test-uid-123' } })
       .mockResolvedValueOnce({ roles: [{ id: 42 }] })
       .mockResolvedValueOnce({ insert_user_roles_one: { id: 'row-2' } });
 
     await promoteToHostHandler(mockReq(), mockRes());
 
-    expect(mockHasuraRequest.mock.calls[1][1]).toMatchObject({ roleId: 42 });
+    expect(mockHasuraRequest.mock.calls[2][1]).toMatchObject({ roleId: 42 });
   });
 
   it('returns 500 when the host role is missing from the roles table', async () => {
-    mockHasuraRequest.mockResolvedValueOnce({ roles: [] });
+    mockHasuraRequest
+      .mockResolvedValueOnce({ insert_users_one: { id: 'test-uid-123' } })
+      .mockResolvedValueOnce({ roles: [] });
 
     const res = mockRes();
     await promoteToHostHandler(mockReq(), res);
@@ -75,7 +79,7 @@ describe('promoteToHostHandler', () => {
     expect(res._status).toBe(500);
     expect(res._body).toEqual({ error: 'Host role is not configured' });
     // The insert must not be attempted without a resolved role id.
-    expect(mockHasuraRequest).toHaveBeenCalledTimes(1);
+    expect(mockHasuraRequest).toHaveBeenCalledTimes(2);
   });
 
   it('returns 500 when Hasura fails', async () => {
@@ -90,6 +94,7 @@ describe('promoteToHostHandler', () => {
 
   it('is idempotent — a repeated promotion still resolves 200', async () => {
     mockHasuraRequest
+      .mockResolvedValueOnce({ insert_users_one: { id: 'test-uid-123' } })
       .mockResolvedValueOnce({ roles: [{ id: 2 }] })
       // on_conflict with update_columns: [] returns null for an existing row.
       .mockResolvedValueOnce({ insert_user_roles_one: null });

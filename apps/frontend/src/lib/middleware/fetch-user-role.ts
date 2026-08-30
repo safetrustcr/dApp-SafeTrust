@@ -56,7 +56,7 @@ export async function fetchUserRole(uid: string): Promise<UserRole> {
     });
 
     if (!response.ok) {
-      console.error('fetchUserRole: non-ok response', response.status);
+      console.error(`fetchUserRole: Hasura returned non-ok HTTP status ${response.status}`);
       return DEFAULT_ROLE;
     }
 
@@ -66,7 +66,7 @@ export async function fetchUserRole(uid: string): Promise<UserRole> {
     };
 
     if (json.errors?.length) {
-      console.error('fetchUserRole: Hasura errors', json.errors);
+      console.error('fetchUserRole: Hasura returned GraphQL errors', json.errors);
       return DEFAULT_ROLE;
     }
 
