@@ -1,0 +1,22 @@
+table:
+  name: room_types
+  schema: public
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - created_at
+        - updated_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - created_at
+        - updated_at
+      filter: {}
