@@ -18,6 +18,14 @@ export type UserRole = typeof USER_ROLES[number];
 export const ROLE_PRECEDENCE: readonly UserRole[] = ['guest', 'host', 'admin'];
 
 /**
+ * Pre-built role rank map for O(1) precedence lookups.
+ * Higher number = higher privilege.
+ */
+const ROLE_RANK: Record<UserRole, number> = Object.fromEntries(
+  ROLE_PRECEDENCE.map((role, index) => [role, index])
+) as Record<UserRole, number>;
+
+/**
  * Returns true when value is a recognised UserRole.
  * Used to validate cookie values and DB results before trusting them.
  */
@@ -39,11 +47,14 @@ export function isUserRole(value: string | undefined): value is UserRole {
  */
 export function resolveHighestRole(names: readonly (string | undefined)[]): UserRole {
   let resolved: UserRole = DEFAULT_ROLE;
+  let highestRank = ROLE_RANK[resolved];
 
   for (const name of names) {
     if (!isUserRole(name)) continue; // invalid entry → skip, check next name
-    if (ROLE_PRECEDENCE.indexOf(name) > ROLE_PRECEDENCE.indexOf(resolved)) {
+    const currentRank = ROLE_RANK[name];
+    if (currentRank > highestRank) {
       resolved = name; // found a higher-privilege role — promote
+      highestRank = currentRank;
     }
   }
 
