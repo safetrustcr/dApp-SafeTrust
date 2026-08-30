@@ -1,0 +1,26 @@
+table:
+  name: user_wallets
+  schema: public
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - created_at
+        - updated_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - created_at
+        - updated_at
+      filter: {}

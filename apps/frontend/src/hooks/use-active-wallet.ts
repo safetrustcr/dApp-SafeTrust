@@ -12,7 +12,18 @@ type ActiveWalletResult = {
 
 export function useActiveWallet(): ActiveWalletResult {
   const { address: freighterAddress, signXDR } = useWallet();
-  const { isAuthenticated, wallet: pollarWallet, getClient } = usePollar();
+  const pollarContext = (() => {
+    try {
+      return usePollar();
+    } catch {
+      return {
+        isAuthenticated: false,
+        wallet: null,
+        getClient: () => null,
+      };
+    }
+  })();
+  const { isAuthenticated, wallet: pollarWallet, getClient } = pollarContext;
 
   const pollarAddress = isAuthenticated ? pollarWallet?.address ?? null : null;
 
