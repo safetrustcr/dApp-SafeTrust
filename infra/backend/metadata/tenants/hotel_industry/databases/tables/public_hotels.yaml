@@ -1,0 +1,37 @@
+table:
+  name: hotels
+  schema: public
+object_relationships:
+  - name: rooms
+    using:
+      foreign_key_constraint_on:
+        table:
+          name: rooms
+          schema: public
+        columns:
+          - hotel_id
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - address
+        - location_area
+        - coordinates
+        - created_at
+        - updated_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - address
+        - location_area
+        - coordinates
+        - created_at
+        - updated_at
+      filter: {}
