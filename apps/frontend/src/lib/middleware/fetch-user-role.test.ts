@@ -8,6 +8,7 @@ const mockFetch = vi.mocked(fetch);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.HASURA_GRAPHQL_URL = 'http://localhost:8080/v1/graphql';
 });
 
 describe('fetchUserRole', () => {

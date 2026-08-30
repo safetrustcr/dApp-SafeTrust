@@ -36,7 +36,7 @@ export const promoteToHostHandler = async (
 
     const hostRoleId = rolesData.roles?.[0]?.id;
     if (!hostRoleId) {
-      return res.status(500).json({ error: 'host role not found in roles table' });
+      return res.status(500).json({ error: 'Host role is not configured' });
     }
 
     // Step 3 — Insert host role — ON CONFLICT DO NOTHING if already host
