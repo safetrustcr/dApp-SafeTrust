@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ── Resolve paths ──────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INFRA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"   # → infra/backend/
+INIT_DIR="$INFRA_DIR/init"
+
+# ── Connection defaults ────────────────────────────────────────────────────────
+# Port 5433 matches docker-compose.yml host-mapped port (5433:5432).
+POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
+POSTGRES_PORT="${POSTGRES_PORT:-5433}"
+POSTGRES_USER="${POSTGRES_USER:-postgres}"
+POSTGRES_DB="${POSTGRES_DB:-postgres}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD environment variable must be set}"
+
+# ── Tenants ────────────────────────────────────────────────────────────────────
+if [[ $# -eq 0 ]]; then
+  TENANTS=(safetrust hotel_industry)
+else
+  TENANTS=("$@")
+fi
+
+# ── Pre-flight: require psql ───────────────────────────────────────────────────
+if ! command -v psql &>/dev/null; then
+  echo "❌  psql not found. Install it first:"
+  echo ""
+  echo "    Ubuntu/Debian:  sudo apt-get install -y postgresql-client"
+  echo "    macOS (Brew):   brew install libpq && brew link --force libpq"
+  echo ""
+  exit 1
+fi
+
+echo ""
+echo "🚀 Deploying init SQL via psql..."
+echo "   Host:    $POSTGRES_HOST:$POSTGRES_PORT"
+echo "   DB:      $POSTGRES_DB"
+echo "   User:    $POSTGRES_USER"
+echo "   Tenants: ${TENANTS[*]}"
+echo ""
+
+TOTAL_START=$SECONDS
+
+# ── Deploy per-tenant ──────────────────────────────────────────────────────────
+for TENANT in "${TENANTS[@]}"; do
+  INIT_SQL="$INIT_DIR/${TENANT}.sql"
+
+  if [[ ! -f "$INIT_SQL" ]]; then
+    echo "❌  Missing init SQL: $INIT_SQL"
+    echo "    Run: bin/generate-init-sql $TENANT"
+    exit 1
+  fi
+
+  # Count migration headers — || true prevents set -e aborting on grep exit 1
+  MIGRATION_COUNT=$(grep -c "^-- ── Migration:" "$INIT_SQL" || true)
+  echo "▶  Deploying $TENANT ($MIGRATION_COUNT migrations)..."
+
+  TENANT_START=$SECONDS
+
+  # PGPASSWORD passed inline — not stored in .pgpass, suitable for local dev/CI.
+  # --set=ON_ERROR_STOP=on halts immediately on any SQL error.
+  PGPASSWORD="$POSTGRES_PASSWORD" psql \
+    --host="$POSTGRES_HOST" \
+    --port="$POSTGRES_PORT" \
+    --username="$POSTGRES_USER" \
+    --dbname="$POSTGRES_DB" \
+    --set=ON_ERROR_STOP=on \
+    -f "$INIT_SQL"
+
+  TENANT_ELAPSED=$((SECONDS - TENANT_START))
+  echo "✅  $TENANT deployed in ${TENANT_ELAPSED}s"
+  echo ""
+done
+
+TOTAL_ELAPSED=$((SECONDS - TOTAL_START))
+echo "✅  All tenants deployed in ${TOTAL_ELAPSED}s"
