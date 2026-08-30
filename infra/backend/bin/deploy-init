@@ -12,7 +12,7 @@ POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-5433}"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-postgres}"
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgrespassword}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD environment variable must be set}"
 
 # ── Tenants ────────────────────────────────────────────────────────────────────
 if [[ $# -eq 0 ]]; then
@@ -58,13 +58,13 @@ for TENANT in "${TENANTS[@]}"; do
   TENANT_START=$SECONDS
 
   # PGPASSWORD passed inline — not stored in .pgpass, suitable for local dev/CI.
-  # --on-error-stop halts immediately on any SQL error.
+  # --set=ON_ERROR_STOP=on halts immediately on any SQL error.
   PGPASSWORD="$POSTGRES_PASSWORD" psql \
     --host="$POSTGRES_HOST" \
     --port="$POSTGRES_PORT" \
     --username="$POSTGRES_USER" \
     --dbname="$POSTGRES_DB" \
-    --on-error-stop \
+    --set=ON_ERROR_STOP=on \
     -f "$INIT_SQL"
 
   TENANT_ELAPSED=$((SECONDS - TENANT_START))

@@ -27,6 +27,7 @@ echo ""
 for TENANT in "${TENANTS[@]}"; do
   TENANT_MIGRATIONS="$MIGRATIONS_DIR/$TENANT"
   OUT="$INIT_DIR/${TENANT}.sql"
+  TMP_OUT="${OUT}.tmp"
 
   if [[ ! -d "$TENANT_MIGRATIONS" ]]; then
     echo "❌  No migrations directory found: $TENANT_MIGRATIONS"
@@ -36,7 +37,7 @@ for TENANT in "${TENANTS[@]}"; do
   # Write header block.
   # IMPORTANT: lines between <<-HEADER and HEADER are indented with TAB characters.
   # <<- strips leading tabs only — spaces would appear literally in the output.
-  cat > "$OUT" <<-HEADER
+  cat > "$TMP_OUT" <<-HEADER
 	-- ════════════════════════════════════════════════════════════════════════════
 	-- Init SQL for tenant: $TENANT
 	-- Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -52,10 +53,9 @@ for TENANT in "${TENANTS[@]}"; do
     UP_SQL="$MIGRATION_DIR/up.sql"
 
     if [[ ! -f "$UP_SQL" ]]; then
-      # Skip silently with a comment — don't error
-      echo "" >> "$OUT"
-      echo "-- ── Migration: $MIGRATION_NAME (no up.sql — skipped)" >> "$OUT"
-      continue
+      echo "❌  Missing up.sql in migration: $MIGRATION_DIR" >&2
+      rm -f "$TMP_OUT"
+      exit 1
     fi
 
     {
@@ -63,9 +63,11 @@ for TENANT in "${TENANTS[@]}"; do
       echo "-- ── Migration: $MIGRATION_NAME"
       echo ""
       cat "$UP_SQL"
-    } >> "$OUT"
+    } >> "$TMP_OUT"
 
   done < <(find "$TENANT_MIGRATIONS" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
+
+  mv "$TMP_OUT" "$OUT"
 
   # Count migration headers — || true prevents set -e aborting on grep exit 1
   MIGRATION_COUNT=$(grep -c "^-- ── Migration:" "$OUT" || true)
