@@ -30,28 +30,30 @@ import { toast } from "sonner";
 import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
 import { PollarWalletStatus } from "@/components/auth/pollar/PollarWalletStatus";
 
+const IS_DEV = process.env.NODE_ENV !== "production";
+
 const COUNTRY_CODES = [
-  { code: "+506", country: "Costa Rica",    flag: "🇨🇷" },
-  { code: "+1",   country: "United States", flag: "🇺🇸" },
-  { code: "+52",  country: "Mexico",        flag: "🇲🇽" },
-  { code: "+34",  country: "Spain",         flag: "🇪🇸" },
-  { code: "+44",  country: "United Kingdom",flag: "🇬🇧" },
-  { code: "+49",  country: "Germany",       flag: "🇩🇪" },
-  { code: "+55",  country: "Brazil",        flag: "🇧🇷" },
-  { code: "+57",  country: "Colombia",      flag: "🇨🇴" },
-  { code: "+51",  country: "Peru",          flag: "🇵🇪" },
-  { code: "+54",  country: "Argentina",     flag: "🇦🇷" },
+  { code: "+506", country: "Costa Rica",     flag: "🇨🇷" },
+  { code: "+1",   country: "United States",  flag: "🇺🇸" },
+  { code: "+52",  country: "Mexico",         flag: "🇲🇽" },
+  { code: "+34",  country: "Spain",          flag: "🇪🇸" },
+  { code: "+44",  country: "United Kingdom", flag: "🇬🇧" },
+  { code: "+49",  country: "Germany",        flag: "🇩🇪" },
+  { code: "+55",  country: "Brazil",         flag: "🇧🇷" },
+  { code: "+57",  country: "Colombia",       flag: "🇨🇴" },
+  { code: "+51",  country: "Peru",           flag: "🇵🇪" },
+  { code: "+54",  country: "Argentina",      flag: "🇦🇷" },
 ];
 
 const FIREBASE_ERROR_MESSAGES: Record<string, string> = {
-  "auth/email-already-in-use": "An account with this email already exists",
-  "auth/weak-password":        "Password must be at least 6 characters",
-  "auth/invalid-email":        "Invalid email address",
-  "auth/operation-not-allowed":"Email/password registration is not enabled",
+  "auth/email-already-in-use":  "An account with this email already exists",
+  "auth/weak-password":         "Password must be at least 6 characters",
+  "auth/invalid-email":         "Invalid email address",
+  "auth/operation-not-allowed": "Email/password registration is not enabled",
   "auth/network-request-failed":"Network error — please check your connection",
 };
 
-// ── Client-side validation before touching Firebase ──────────────────────────
+// ── Client-side validation — runs BEFORE any Firebase call ───────────────────
 function validateForm(fields: {
   firstName: string;
   lastName: string;
@@ -71,21 +73,24 @@ function validateForm(fields: {
   if (!/^\d{6,15}$/.test(fields.phone.replace(/\s/g, "")))
     return "Please enter a valid phone number (digits only)";
   if (!fields.location)         return "Please select your location";
-  return null; // valid
+  return null;
 }
 
 export default function RegisterPage() {
   const router = useRouter();
 
-  const [firstName,        setFirstName]        = useState("");
-  const [lastName,         setLastName]          = useState("");
-  const [email,            setEmail]             = useState("");
-  const [password,         setPassword]          = useState("");
-  const [phoneCountryCode, setPhoneCountryCode]  = useState("+506");
-  const [phone,            setPhone]             = useState("");
-  const [location,         setLocation]          = useState("");
-  const [isLoading,        setIsLoading]         = useState(false);
-  const [error,            setError]             = useState("");
+  const [firstName,        setFirstName]       = useState("");
+  const [lastName,         setLastName]        = useState("");
+  const [email,            setEmail]           = useState("");
+  const [password,         setPassword]        = useState("");
+  const [phoneCountryCode, setPhoneCountryCode]= useState("+506");
+  const [phone,            setPhone]           = useState("");
+  const [location,         setLocation]        = useState("");
+  const [isLoading,        setIsLoading]       = useState(false);
+  const [error,            setError]           = useState("");
+
+  // Dev-only: role selection — never sent in production
+  const [devRole, setDevRole] = useState<"guest" | "host">("guest");
 
   const clearError = () => setError("");
 
@@ -93,13 +98,13 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
 
-    // ── Step 1: validate client-side BEFORE any Firebase call ────────────────
+    // ── Step 1: client-side validation — Firebase never called if this fails ─
     const validationError = validateForm({
       firstName, lastName, email, password, phone, location,
     });
     if (validationError) {
       setError(validationError);
-      return; // stops here — Firebase never called, no zombie account
+      return;
     }
 
     const backendUrl =
@@ -108,11 +113,10 @@ export default function RegisterPage() {
       "http://localhost:3002";
 
     setIsLoading(true);
-
     let firebaseUser = null;
 
     try {
-      // ── Step 2: create Firebase account ────────────────────────────────────
+      // ── Step 2: create Firebase account ──────────────────────────────────
       const credential = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
@@ -126,7 +130,7 @@ export default function RegisterPage() {
 
       const token = await firebaseUser.getIdToken();
 
-      // ── Step 3: sync to Hasura ──────────────────────────────────────────────
+      // ── Step 3: sync to Hasura ────────────────────────────────────────────
       const controller = new AbortController();
       const timeoutId  = setTimeout(() => controller.abort(), 8000);
 
@@ -142,6 +146,9 @@ export default function RegisterPage() {
           phone_number: phone.trim(),
           country_code: phoneCountryCode,
           location,
+          // ── Dev-only: pass selected role so the API can assign it ─────────
+          // The API ignores this field entirely in production.
+          ...(IS_DEV && { dev_role: devRole }),
         }),
         signal: controller.signal,
       });
@@ -149,13 +156,12 @@ export default function RegisterPage() {
       clearTimeout(timeoutId);
 
       if (!syncRes.ok) {
-        // DB sync failed — delete the Firebase account to keep state consistent
-        // so the user can try again without hitting "email already in use"
+        // Sync failed — delete Firebase account so user can retry cleanly
         await deleteUser(firebaseUser);
         throw new Error("SYNC_FAILED");
       }
 
-      // ── Step 4: success ─────────────────────────────────────────────────────
+      // ── Step 4: success ───────────────────────────────────────────────────
       Cookies.set("firebase-token", token, {
         expires:  7,
         secure:   true,
@@ -165,32 +171,26 @@ export default function RegisterPage() {
       useGlobalAuthenticationStore.getState().setToken(token);
 
       toast.success("Account created successfully!", {
-        description: "Please sign in with your new credentials.",
-        duration:    4000,
+        description: IS_DEV
+          ? `Registered as ${devRole}. Please sign in.`
+          : "Please sign in with your new credentials.",
+        duration: 4000,
       });
 
       router.push("/login");
 
     } catch (err: unknown) {
-
       if (err instanceof FirebaseError) {
-        // Firebase rejected the request (bad email, weak password, etc.)
-        // Firebase account was NOT created — safe to show error and let user retry
         const msg = FIREBASE_ERROR_MESSAGES[err.code] ??
           "Registration failed — please try again";
         toast.error(msg, { duration: 4000 });
         setError(msg);
-
       } else if (err instanceof Error && err.name === "AbortError") {
-        // Timeout after Firebase account was created — we already deleted it above
         toast.error("Registration timed out. Please try again.", { duration: 4000 });
         setError("Registration timed out — please try again");
-
       } else if (err instanceof Error && err.message === "SYNC_FAILED") {
-        // DB sync failed — Firebase account was deleted above — user can retry
         toast.error("Registration failed. Please try again.", { duration: 4000 });
         setError("Could not save your account details — please try again");
-
       } else {
         toast.error("An unexpected error occurred. Please try again.", { duration: 4000 });
         setError("Registration failed — please try again");
@@ -315,6 +315,53 @@ export default function RegisterPage() {
                 onChange={(e) => { setPassword(e.target.value); clearError(); }}
               />
             </div>
+
+            {/* ── Dev-only role selector ────────────────────────────────────────
+                Visible only in development. Never shown in production.
+                Lets you test guest vs host dashboard flow without needing
+                to call promote-to-host after every fresh DB reset.
+            ─────────────────────────────────────────────────────────────────── */}
+            {IS_DEV && (
+              <div className="space-y-2 rounded-lg border border-dashed border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-3 py-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="inline-flex items-center rounded-md bg-amber-100 dark:bg-amber-900 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                    DEV ONLY
+                  </span>
+                  <Label htmlFor="devRole" className="text-xs text-amber-700 dark:text-amber-400">
+                    Register as
+                  </Label>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDevRole("guest")}
+                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      devRole === "guest"
+                        ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+                    }`}
+                  >
+                    🏠 Guest
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDevRole("host")}
+                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      devRole === "host"
+                        ? "border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
+                    }`}
+                  >
+                    🏢 Host
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1">
+                  {devRole === "host"
+                    ? "Will redirect to /dashboard/escrow-dashboard after login"
+                    : "Will redirect to /dashboard/guest after login"}
+                </p>
+              </div>
+            )}
 
             <Button
               type="submit"
