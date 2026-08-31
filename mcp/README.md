@@ -52,6 +52,17 @@ unsigned XDR that a wallet (Freighter) has to sign, exactly like the HTTP routes
 File-backed resources are read on each request, so edits show up without a restart.
 Missing files are skipped rather than failing startup.
 
+### Lazy loading
+
+Startup performs **zero network calls**. Every tool and resource handler is registered
+immediately with an `async` callback that only fires when an editor actually invokes it,
+so `pnpm dev:full` starts instantly (~0 ms) even when Docker (Hasura) and `apps/api` are
+not running yet. The resource `uri`, `name`, `description` and `mimeType` are registered
+up-front; data — local file reads or Hasura/`apps/api` requests — is fetched only on the
+first client request. If Hasura is down when a read fires, `lib/hasura.ts` returns a
+helpful "Cannot reach Hasura … is bin/start running?" message instead of crashing the
+server (audited for issue #390).
+
 ## Environment
 
 Read from the `env` block in the root `mcp.json` — no `.env` file is needed for local
