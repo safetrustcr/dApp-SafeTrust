@@ -1,12 +1,12 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { hasuraRequest } from '../../services/hasura.js';
 
 export const promoteToHostHandler = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response
 ): Promise<Response> => {
-  const { uid, email } = req.user;
+  const { uid, email } = (req as AuthenticatedRequest).user;
 
   try {
     // Step 1 — Ensure user row exists (sync-user may not have been called)
