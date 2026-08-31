@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { TrustlessWorkProvider } from "@/providers/TrustlessWorkProvider";
 import { Toaster } from "@/components/ui/sonner"
+import { HasuraDownBanner } from "@/components/ui/HasuraDownBanner";
 
 // @ts-ignore: allow side-effect import of global css
 import "./globals.css";
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <TrustlessWorkProvider>
               {children}
               <Toaster richColors position="top-right" />
+              {process.env.NODE_ENV !== "production" && <HasuraDownBanner />}
             </TrustlessWorkProvider>
           </ClientProviders>
         </ThemeProvider>
