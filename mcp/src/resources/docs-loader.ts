@@ -5,6 +5,24 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { HASURA_GRAPHQL_URL, SAFETRUST_API_URL, repoRoot } from '../config.js';
 import { escrowRolesDoc } from '../lib/escrow-roles.js';
 
+/** Resource contents type — same shape the MCP SDK expects. */
+interface ResourceContents {
+  uri: string;
+  text: string;
+  mimeType: string;
+}
+
+/** Graceful error fallback when a resource handler fails. */
+function resourceError(uri: string, message: string): { contents: ResourceContents[] } {
+  return {
+    contents: [{
+      uri,
+      text: `Error loading resource: ${message}`,
+      mimeType: 'text/plain',
+    }],
+  };
+}
+
 type DocFile = {
   /** Resource name — also the last segment of the safetrust://docs/… URI. */
   name: string;
@@ -122,16 +140,26 @@ export function loadSafeTrustDocs(server: McpServer) {
         description: `${doc.description} (${doc.path})`,
         mimeType: doc.path.endsWith('.md') ? 'text/markdown' : 'text/plain',
       },
-      async () => ({
+      async () => {
         // Read on demand so edits to the file show up without restarting the server.
-        contents: [
-          {
+        // Lazy: no I/O at registration time — only when a client requests this resource.
+        try {
+          return {
+            contents: [
+              {
+                uri,
+                text: readFileSync(absolutePath, 'utf-8'),
+                mimeType: doc.path.endsWith('.md') ? 'text/markdown' : 'text/plain',
+              },
+            ],
+          };
+        } catch (err) {
+          return resourceError(
             uri,
-            text: readFileSync(absolutePath, 'utf-8'),
-            mimeType: doc.path.endsWith('.md') ? 'text/markdown' : 'text/plain',
-          },
-        ],
-      }),
+            `Could not read ${doc.path}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      },
     );
 
     registered += 1;
@@ -146,15 +174,25 @@ export function loadSafeTrustDocs(server: McpServer) {
         'Escrow lifecycle, monorepo layout, Hasura tables and TrustlessWork role mappings.',
       mimeType: 'text/markdown',
     },
-    async () => ({
-      contents: [
-        {
-          uri: 'safetrust://docs/architecture',
-          text: architectureDoc(),
-          mimeType: 'text/markdown',
-        },
-      ],
-    }),
+    async () => {
+      // Lazy: architecture context is built on first request, not at startup.
+      try {
+        return {
+          contents: [
+            {
+              uri: 'safetrust://docs/architecture',
+              text: architectureDoc(),
+              mimeType: 'text/markdown',
+            },
+          ],
+        };
+      } catch (err) {
+        return resourceError(
+          'safetrust://docs/architecture',
+          `Could not build architecture doc: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    },
   );
 
   return { root, registered: registered + 1 };
