@@ -53,11 +53,8 @@ The current tenant metadata tracks these table sets:
 
 ## Bootstrap: Deploying Both Tenants
 
-From `infra/backend`, deploy both tenants together:
+From the repository root, deploy both tenants together:
 
-```bash
-cd infra/backend
-bin/start safetrust hotel_industry
 ```
 
 For fresh environments that should apply the prebuilt SQL init path directly,
