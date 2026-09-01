@@ -1,4 +1,4 @@
-# TrustlessWork API Integration
+# TrustlessWork
 
 This is the escrow integration contract SafeTrust relies on for TrustlessWork-driven Stellar transactions. The implementation is centered in the backend escrow routes and the frontend provider configuration, with the backend acting as the trusted API gateway for all privileged TrustlessWork calls.
 
