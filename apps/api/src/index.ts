@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { initFirebaseAdmin } from './lib/firebase-admin.js';
 import { tenantMiddleware } from './middleware/tenant.middleware.js';
 import authRouter from './routes/auth/sync-user.route.js';
 import promoteToHostRouter from './routes/auth/promote-to-host.route.js';
@@ -13,6 +14,9 @@ import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.j
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
 import messagesRouter from './routes/messages/send.route.js';
+
+// Must be called before any route handler uses getAuth()
+initFirebaseAdmin();
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -49,9 +53,6 @@ app.use('/api/escrow', releaseFundsRouter);
 app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);
-
-// Messages routes (router registered when available)
-app.use('/api/messages', messagesRouter);
 
 // Messages routes
 app.use('/api/messages', messagesRouter);

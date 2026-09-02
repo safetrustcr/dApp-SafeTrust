@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { hasuraRequest } from '../../services/hasura.js';
 
@@ -16,10 +16,10 @@ type SendMessageResponse = {
 };
 
 export const sendMessageHandler = async (
-  req: AuthenticatedRequest & { body: SendMessageBody },
+  req: Request<unknown, unknown, SendMessageBody>,
   res: Response<SendMessageResponse | { error: string }>
 ): Promise<Response> => {
-  const { uid } = req.user;
+  const { uid } = (req as AuthenticatedRequest).user;
   const { conversationId, body, isAutomated = false, eventType } = req.body;
 
   if (!conversationId || !body?.trim()) {
