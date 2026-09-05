@@ -1,9 +1,9 @@
 {
-  "docker_up": 84,
-  "hasura_health": 84,
-  "migrations_safetrust": 87,
-  "metadata_deploy_safetrust": 90,
-  "metadata_reload": 92,
-  "seeds_safetrust": 94,
-  "total": 94
+  "docker_up": 121,
+  "hasura_health": 121,
+  "migrations_safetrust": 124,
+  "metadata_deploy_safetrust": 127,
+  "metadata_reload": 129,
+  "seeds_safetrust": 130,
+  "total": 130
 }
