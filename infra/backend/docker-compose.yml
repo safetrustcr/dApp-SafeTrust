@@ -30,7 +30,7 @@ services:
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
       HASURA_GRAPHQL_ADMIN_SECRET: "myadminsecretkey"
       HASURA_GRAPHQL_JWT_SECRET: ${HASURA_GRAPHQL_JWT_SECRET}
-      WEBHOOK_URL: http://safetrust-webhook:3000
+      WEBHOOK_URL: http://safetrust-api:3002
       HASURA_EVENT_SECRET: ${HASURA_EVENT_SECRET}
     depends_on:
       postgres:
@@ -44,34 +44,38 @@ services:
     networks:
       - safetrust-network
 
-  webhook:
+  api:
     build:
-      context: ../../services/webhook
+      context: ../../apps/api
       dockerfile: Dockerfile
-    container_name: safetrust-webhook
+    container_name: safetrust-api
     ports:
-      - "3000:3000"
+      - "3002:3002"
     environment:
       NODE_ENV: development
-      PORT: 3000
+      PORT: '3002'
       POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      POSTGRES_PORT: '5432'
       POSTGRES_DB: postgres
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
       FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL}
       FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY}
+      HASURA_GRAPHQL_URL: http://graphql-engine:8080/v1/graphql
+      HASURA_ADMIN_SECRET: "myadminsecretkey"
+      HASURA_EVENT_SECRET: ${HASURA_EVENT_SECRET}
+      TRUSTLESS_WORK_API_KEY: ${TRUSTLESS_WORK_API_KEY}
+      TRUSTLESS_WORK_API_URL: https://dev.api.trustlesswork.com
+      POLLAR_SECRET_KEY: ${POLLAR_SECRET_KEY}
       FRONTEND_URL: http://localhost:3001
-      HASURA_GRAPHQL_ENDPOINT: http://graphql-engine:8080/v1/graphql
-      HASURA_GRAPHQL_ADMIN_SECRET: "myadminsecretkey"
     depends_on:
       postgres:
         condition: service_healthy
       graphql-engine:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
       interval: 30s
       timeout: 10s
       retries: 3
