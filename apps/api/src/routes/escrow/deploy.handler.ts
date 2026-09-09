@@ -1,122 +1,142 @@
 import { Request, Response } from 'express';
-import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
-import crypto from 'node:crypto';
+import { checkIdempotency } from '../../services/idempotency.js';
+import { hasuraRequest } from '../../services/hasura.js';
+import { trustlessWorkRequest } from '../../services/trustlesswork.js';
 
 type DeployRequestBody = {
-  apartmentId?: string;
-  senderAddress?: string;
-  receiverAddress?: string;
-  amount?: number;
-};
-
-type InitializeSingleReleaseEscrowResponse = {
-  status: 'SUCCESS' | 'FAILED';
-  contractId: string;
-  unsignedTransaction?: string;
-  message: string;
+  apartmentId: string;
+  senderAddress: string;
+  receiverAddress: string;
+  amount: number;
+  engagementId?: string;
 };
 
 type DeployResponse = {
   status: string;
-  contractId: string;
+  contractId?: string;
   unsignedXDR: string;
-  message: string;
   engagementId: string;
+  cached?: boolean;
 };
 
 export const deployEscrowHandler = async (
-  req: Request<{}, DeployResponse | { error: string; payload?: unknown; messages?: string[] }, DeployRequestBody>,
-  res: Response<DeployResponse | { error: string; payload?: unknown; messages?: string[] }>
-): Promise<Response> => {
+  req: Request<Record<string, never>, DeployResponse | { error: string }, DeployRequestBody>,
+  res: Response<DeployResponse | { error: string }>
+): Promise<void> => {
+  const { apartmentId, senderAddress, receiverAddress, amount, engagementId } =
+    req.body;
+
+  if (!apartmentId || !senderAddress || !receiverAddress || !amount) {
+    res.status(400).json({
+      error: 'Missing required fields: apartmentId, senderAddress, receiverAddress, amount',
+    });
+    return;
+  }
+
+  const resolvedEngagementId = engagementId ?? `engagement-${apartmentId}`;
+
+  // ── Idempotency check ──────────────────────────────────────────────────
+  const idempotencyResult = await checkIdempotency(resolvedEngagementId);
+
+  if (idempotencyResult.exists) {
+    console.log(
+      `[escrow/deploy] idempotent hit — engagementId: ${resolvedEngagementId}, ` +
+      `contractId: ${idempotencyResult.result.contract_id}`
+    );
+    res.status(200).json({
+      status: 'CACHED',
+      engagementId: resolvedEngagementId,
+      contractId: idempotencyResult.result.contract_id ?? undefined,
+      unsignedXDR: '',
+      cached: true,
+    });
+    return;
+  }
+  // ── End idempotency check ──────────────────────────────────────────────
+
+  const platformAddress =
+    process.env.PLATFORM_STELLAR_ADDRESS ??
+    process.env.NEXT_PUBLIC_PLATFORM_ADDRESS;
+
+  const usdcIssuer =
+    process.env.USDC_TRUSTLINE_ADDRESS ??
+    process.env.NEXT_PUBLIC_USDC_ADDRESS ??
+    'GBBD47IF6LWK7P7MDEVSCWR2JQTMZ35MIFUQ5IQSQ9CQBZ8JMXKDPE';
+
   try {
-    const { apartmentId, senderAddress, receiverAddress, amount } = req.body || {};
-
-    if (!apartmentId || !senderAddress || !receiverAddress) {
-      return res.status(400).json({
-        error: 'Missing required escrow deployment fields.',
-      });
-    }
-
-    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({
-        error: 'Invalid amount: must be a positive number.',
-      });
-    }
-
-    const engagementId = crypto.randomUUID();
-
-    const platformAddress = process.env.PLATFORM_STELLAR_ADDRESS || process.env.NEXT_PUBLIC_PLATFORM_ADDRESS;
-    const trustlineAddress = process.env.USDC_TRUSTLINE_ADDRESS || process.env.NEXT_PUBLIC_USDC_ADDRESS;
-
-    if (!platformAddress) {
-      return res.status(500).json({
-        error: 'Missing platform address for escrow role configuration.',
-      });
-    }
-
-    if (!trustlineAddress) {
-      return res.status(500).json({
-        error: 'Missing trustline address for escrow configuration.',
-      });
-    }
-
-    const payload = {
-      signer: senderAddress,
-      engagementId,
-      title: `Security deposit for apartment ${apartmentId}`,
-      description: `Security deposit escrow for apartment ${apartmentId}`,
-      amount,
-      platformFee: 0,
-      roles: {
-        approver: senderAddress,
-        serviceProvider: receiverAddress,
-        platformAddress,
-        releaseSigner: platformAddress,
-        disputeResolver: platformAddress,
-        receiver: receiverAddress,
+    const twData = await trustlessWorkRequest<{
+      status: string;
+      contractId?: string;
+      unsignedTransaction?: string;
+      message?: string;
+    }>('/deployer/single-release', {
+      method: 'POST',
+      body: {
+        engagementId: resolvedEngagementId,
+        title: `SafeTrust Rental — ${apartmentId}`,
+        signer: senderAddress,
+        amount,
+        roles: {
+          approver: senderAddress,
+          serviceProvider: receiverAddress,
+          receiver: receiverAddress,
+          platformAddress,
+          releaseSigner: senderAddress,
+          disputeResolver: platformAddress,
+        },
+        payment: {
+          asset: {
+            code: 'USDC',
+            issuer: usdcIssuer,
+          },
+          amount: String(amount),
+        },
       },
-      trustline: {
-        symbol: 'USDC',
-        address: trustlineAddress,
-      },
-      milestones: [{ description: `Release security deposit for apartment ${apartmentId}` }],
-    };
+    });
 
-    const result = await trustlessWorkRequest<InitializeSingleReleaseEscrowResponse>(
-      '/deployer/single-release',
+    // Persist pending escrow to DB
+    await hasuraRequest(
+      `mutation InsertEscrow(
+        $contractId: String!
+        $engagementId: String!
+        $apartmentId: uuid!
+        $senderAddress: String!
+        $receiverAddress: String!
+        $amount: numeric!
+        $unsignedXdr: String
+      ) {
+        insert_escrows_one(object: {
+          contract_id: $contractId
+          engagement_id: $engagementId
+          apartment_id: $apartmentId
+          property_id: $apartmentId
+          sender_address: $senderAddress
+          receiver_address: $receiverAddress
+          amount: $amount
+          status: "pending_signature"
+          unsigned_xdr: $unsignedXdr
+          tenant_id: "safetrust"
+        }) { id }
+      }`,
       {
-        method: 'POST',
-        body: payload,
-      },
+        contractId: twData.contractId ?? resolvedEngagementId,
+        engagementId: resolvedEngagementId,
+        apartmentId,
+        senderAddress,
+        receiverAddress,
+        amount,
+        unsignedXdr: twData.unsignedTransaction ?? '',
+      }
     );
 
-    if (result.status !== 'SUCCESS' || !result.unsignedTransaction) {
-      return res.status(502).json({
-        error: result.message ?? 'TrustlessWork escrow deploy failed.',
-        payload: result,
-      });
-    }
-
-    return res.status(200).json({
-      status: result.status,
-      contractId: result.contractId,
-      unsignedXDR: result.unsignedTransaction,
-      message: result.message,
-      engagementId,
+    res.status(200).json({
+      status: twData.status,
+      contractId: twData.contractId,
+      unsignedXDR: twData.unsignedTransaction ?? '',
+      engagementId: resolvedEngagementId,
     });
-  } catch (error) {
-    if (error instanceof TrustlessWorkRequestError) {
-      return res.status(error.statusCode).json({
-        error: error.message,
-        messages: error.messages,
-        payload: error.payload,
-      });
-    }
-
-    const messages = getErrorMessages(error, 'Failed to deploy escrow.');
-    return res.status(500).json({
-      error: messages[0],
-      messages,
-    });
+  } catch (err) {
+    console.error('[escrow/deploy] error:', err);
+    res.status(500).json({ error: String(err) });
   }
 };

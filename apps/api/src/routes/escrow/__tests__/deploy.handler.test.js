@@ -14,6 +14,15 @@ vi.mock('../../../services/trustlesswork.js', () => ({
   getErrorMessages: vi.fn((err, fallback) => [err?.message || fallback]),
 }));
 
+vi.mock('../../../services/idempotency.js', () => ({
+  checkIdempotency: vi.fn(),
+}));
+
+vi.mock('../../../services/hasura.js', () => ({
+  hasuraRequest: vi.fn(),
+}));
+
+import { checkIdempotency } from '../../../services/idempotency.js';
 import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
 import { mockReq, mockRes } from './helpers.js';
 
@@ -32,7 +41,6 @@ describe('deployEscrowHandler', () => {
       mockReq({ senderAddress: 'GTENANT', receiverAddress: 'GOWNER', amount: 1200 }),
       res,
     );
-
     expect(res._status).toBe(400);
   });
 
@@ -42,11 +50,11 @@ describe('deployEscrowHandler', () => {
       mockReq({ apartmentId: 'APT001', receiverAddress: 'GOWNER', amount: 1200 }),
       res,
     );
-
     expect(res._status).toBe(400);
   });
 
   it('calls TrustlessWork with correct payload', async () => {
+    vi.mocked(checkIdempotency).mockResolvedValueOnce({ exists: false });
     vi.mocked(trustlessWorkRequest).mockResolvedValueOnce({
       status: 'SUCCESS',
       contractId: 'CONTRACT_001',
