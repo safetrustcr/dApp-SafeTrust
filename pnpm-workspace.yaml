@@ -3,6 +3,7 @@ packages:
   - 'packages/*'
   - 'mcp'
 allowBuilds:
+  '@firebase/util': set this to true or false
   '@stellar/stellar-sdk': false
   blake-hash: false
   bufferutil: false

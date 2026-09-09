@@ -1,14 +1,14 @@
 const POLLAR_ACTIVATE_URL =
   process.env.POLLAR_ACTIVATE_URL || "https://sdk.api.pollar.xyz/v2/wallet/activate";
 
-function decodeUid(token) {
+function decodeUid(token: string) {
   const payload = JSON.parse(
     Buffer.from(token.split(".")[1], "base64url").toString(),
   );
   return payload.user_id || payload.sub;
 }
 
-export const activateWalletHandler = async (req, res) => {
+export const activateWalletHandler = async (req: { body?: {}; headers: any; }, res: { _status?: null; _body?: undefined; status: any; json?: (payload: any) => { _status: null; _body: undefined; status(code: any): /*elided*/ any; json(payload: any): /*elided*/ any; }; }) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -16,7 +16,9 @@ export const activateWalletHandler = async (req, res) => {
       return res.status(401).json({ error: "Missing token" });
     }
 
-    if (!process.env.POLLAR_SECRET_KEY) {
+    const pollarSecretKey = process.env.POLLAR_SECRET_KEY;
+
+    if (!pollarSecretKey) {
       return res.status(500).json({ error: "Pollar is not configured" });
     }
 
@@ -37,8 +39,8 @@ export const activateWalletHandler = async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.POLLAR_SECRET_KEY}`,
-        "x-pollar-api-key": process.env.POLLAR_SECRET_KEY,
+        Authorization: `Bearer ${pollarSecretKey}`,
+        "x-pollar-api-key": pollarSecretKey,
       },
       body: JSON.stringify({ userId: uid }),
     });
@@ -49,19 +51,32 @@ export const activateWalletHandler = async (req, res) => {
       return res.status(502).json({ error: "Pollar activation failed" });
     }
 
-    const pollarBody = await pollarRes.json();
+    const pollarBody = (await pollarRes.json()) as { address?: string };
     const address = pollarBody.address;
 
     if (!address) {
       return res.status(502).json({ error: "Pollar returned no address" });
     }
 
-    const hasuraRes = await fetch(process.env.HASURA_GRAPHQL_URL, {
+    const hasuraGraphqlUrl = process.env.HASURA_GRAPHQL_URL;
+    const hasuraAdminSecret = process.env.HASURA_ADMIN_SECRET;
+
+    if (!hasuraGraphqlUrl) {
+      return res.status(500).json({ error: "Hasura is not configured" });
+    }
+
+    if (!hasuraAdminSecret) {
+      return res.status(500).json({ error: "Hasura admin secret is not configured" });
+    }
+
+    const hasuraHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+      "x-hasura-admin-secret": hasuraAdminSecret,
+    };
+
+    const hasuraRes = await fetch(hasuraGraphqlUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-hasura-admin-secret": process.env.HASURA_ADMIN_SECRET,
-      },
+      headers: hasuraHeaders,
       body: JSON.stringify({
         query: `
           mutation UpsertPollarWallet($userId: String!, $address: String!) {
@@ -87,7 +102,10 @@ export const activateWalletHandler = async (req, res) => {
       }),
     });
 
-    const data = await hasuraRes.json();
+    const data = (await hasuraRes.json()) as {
+      errors?: unknown;
+      [key: string]: unknown;
+    };
 
     if (data.errors) {
       console.error("[activate-wallet] Hasura error:", data.errors);

@@ -15,6 +15,11 @@ import statusStreamRouter from './routes/escrow/status-stream.route.js';
 import messagesRouter from './routes/messages/send.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 
+import { initFirebaseAdmin } from './lib/firebase-admin.js';
+
+initFirebaseAdmin();
+
+
 const app = express();
 const PORT = process.env.PORT || 3002;
 
