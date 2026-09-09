@@ -1,18 +1,5 @@
 import { DEFAULT_ROLE, isUserRole, resolveHighestRole, type UserRole } from './roles';
 
-// NOTE: role-utils.ts uses 'hotel' for this role;
-// Hasura returns 'host' per issue #287 — middleware uses 'host'.
-
-/**
- * Resolves a user's effective role from Hasura.
- *
- * Fetches ALL role assignments (no limit) so resolveHighestRole can pick the
- * most permissive one. A user promoted from guest → host holds two rows; with
- * limit:1 the wrong row could be returned depending on row order.
- *
- * Fails open to 'guest' — a role lookup outage must never lock a user out,
- * and 'guest' is least-privileged so failing open cannot grant extra access.
- */
 export async function fetchUserRole(uid: string): Promise<UserRole> {
   if (!uid) {
     console.error('fetchUserRole: empty uid — returning default role');
@@ -23,18 +10,17 @@ export async function fetchUserRole(uid: string): Promise<UserRole> {
     process.env.HASURA_GRAPHQL_URL ??
     process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL ??
     '';
-  const adminSecret = process.env.HASURA_ADMIN_SECRET ?? '';
 
   if (!hasuraUrl) {
     console.error('fetchUserRole: HASURA_GRAPHQL_URL not set');
     return DEFAULT_ROLE;
   }
 
+  const adminSecret = process.env.HASURA_ADMIN_SECRET ?? '';
+
   try {
     const response = await fetch(hasuraUrl, {
       method: 'POST',
-      // Middleware runs on every dashboard navigation — bound the wait so a
-      // slow Hasura degrades to 'guest' instead of hanging the request.
       signal: AbortSignal.timeout(3000),
       headers: {
         'Content-Type':          'application/json',
@@ -48,15 +34,12 @@ export async function fetchUserRole(uid: string): Promise<UserRole> {
             }
           }
         `,
-        // No limit — fetch all assignments so resolveHighestRole works correctly.
-        // A user promoted from guest → host holds two rows; limit:1 may return
-        // the wrong one depending on insertion order.
         variables: { uid },
       }),
     });
 
     if (!response.ok) {
-      console.error('fetchUserRole: non-ok response', response.status);
+      console.error(`fetchUserRole: Hasura returned non-ok HTTP status ${response.status}`);
       return DEFAULT_ROLE;
     }
 
@@ -66,7 +49,7 @@ export async function fetchUserRole(uid: string): Promise<UserRole> {
     };
 
     if (json.errors?.length) {
-      console.error('fetchUserRole: Hasura errors', json.errors);
+      console.error('fetchUserRole: Hasura returned GraphQL errors', json.errors);
       return DEFAULT_ROLE;
     }
 

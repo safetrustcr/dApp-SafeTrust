@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 
 export type AuthenticatedUser = {
+  role: string;
   uid: string;
   email?: string;
 };

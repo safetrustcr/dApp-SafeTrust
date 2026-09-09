@@ -13,6 +13,7 @@ import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.j
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
 import messagesRouter from './routes/messages/send.route.js';
+import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -21,6 +22,8 @@ const PORT = process.env.PORT || 3002;
 const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',')
   : ['http://localhost:3001'];
+
+app.use('/api/auth', syncWalletRouter);
 
 app.use(cors({
   origin: allowedOrigins,
