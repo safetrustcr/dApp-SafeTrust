@@ -1,240 +1,91 @@
-# SafeTrust Hasura GraphQL Schema
+# Hasura Schema
 
-Reference for the Hasura GraphQL engine in `infra/backend` that powers the
-frontend's data layer. The API is multi-tenant: two Postgres **sources** are
-tracked against the same `PG_DATABASE_URL`.
+Hasura provides the GraphQL read API and event trigger pipeline for SafeTrust.
+It connects to PostgreSQL and exposes two tenant sources.
 
-- GraphQL endpoint: `http://localhost:8080/v1/graphql` (also available via the
-  `HASURA_GRAPHQL_URL` / `NEXT_PUBLIC_HASURA_GRAPHQL_URL` env vars).
-- Everything under `infra/backend/metadata/` is merged from a shared `base/`
-  plus per-tenant overrides by `build-metadata.sh`.
+## Source configuration
 
----
+```mermaid
+graph TD
+    Hasura["Hasura GraphQL Engine\nport 8080"]
+    ST["Source: safetrust\npostgres://postgres@postgres:5432/postgres"]
+    HI["Source: hotel_industry\npostgres://postgres@postgres:5432/postgres"]
+    PG["PostgreSQL\nport 5433"]
 
-## Two sources and their tracked tables
+    Hasura --> ST
+    Hasura --> HI
+    ST --> PG
+    HI --> PG
+```
 
-Sources are declared in
-`infra/backend/metadata/tenants/<tenant>/databases/databases.yaml`.
+Both sources connect to the same PostgreSQL instance but expose different
+schema views and table permissions.
 
-### `safetrust` source
+## safetrust source tables
 
-Tables are tracked via `infra/backend/metadata/tenants/safetrust/databases/tables/tables.yaml`
-(which `!include`s the per-table YAML files in the same directory):
-
-| Table (schema `public`) | Metadata file |
+| Table | Description |
 |---|---|
-| `users` | `public_users.yaml` |
-| `user_wallets` | `public_user_wallets.yaml` |
-| `roles` | `public_roles.yaml` |
-| `user_roles` | `public_user_roles.yaml` |
-| `apartments` | `public_apartments.yaml` |
-| `escrows` | `public_escrows.yaml` |
-| `trustless_work_escrows` | `public_trustless_work_escrows.yaml` |
-| `escrow_milestones` | `public_escrow_milestones.yaml` |
-| `trustless_work_webhook_events` | `public_trustless_work_webhook_events.yaml` |
+| `public.users` | Registered users — id is Firebase UID (TEXT) |
+| `public.user_wallets` | Stellar wallet addresses per user |
+| `public.user_roles` | Many-to-many: users ↔ roles |
+| `public.roles` | Role definitions: guest, host, admin |
+| `public.apartments` | Rental listings owned by hosts |
+| `public.escrows` | SafeTrust escrow business records |
+| `public.trustless_work_escrows` | On-chain escrow mirror |
+| `public.escrow_milestones` | Per-escrow milestone schedule |
+| `public.trustless_work_webhook_events` | TrustlessWork event log |
 
-### `hotel_industry` source
+## hotel_industry source tables
 
-Declared inline in `databases/databases.yaml` (no separate `tables/` directory):
-
-| Table | Schema |
+| Table | Description |
 |---|---|
-| `hotels` | `public` |
-| `rooms` | `public` |
-| `reservations` | `public` |
-| `pricing_rules` | `hotel_industry` |
+| `public.hotels` | Hotel properties |
+| `public.rooms` | Rooms within hotels |
+| `public.room_types` | Room category definitions |
+| `public.room_images` | Room photo references |
+| `public.reservations` | Booking records |
+| `public.escrow_transactions` | Escrow records for hotel bookings |
+| `public.escrow_transaction_users` | User associations per escrow |
+| `public.pricing_rules` | Dynamic pricing rules |
+| `public.user_wallets` | Tenant-scoped wallet records |
 
-> Every SafeTrust row carries `tenant_id = 'safetrust'` so both tenants can
-> share one database.
+## Event triggers
 
----
+Hasura sends HTTP event callbacks to `apps/api` when data changes.
+The `WEBHOOK_URL` environment variable points to the API:
 
-## Key GraphQL queries
-
-### `GET_ALL_APARTMENTS`
-
-`apps/frontend/src/graphql/queries/apartment-queries.ts`
-
-Lists available apartments (soft-deleted rows excluded via `deleted_at`, only
-`is_available: true`) with pagination and an aggregate count:
-
-```graphql
-query GetAllApartments($limit: Int!, $offset: Int!) {
-  apartments(
-    limit: $limit
-    offset: $offset
-    where: { deleted_at: { _is_null: true }, is_available: { _eq: true } }
-    order_by: { created_at: desc }
-  ) { id name description price warranty_deposit is_available image_urls address available_from available_until owner_id }
-  apartments_aggregate(
-    where: { deleted_at: { _is_null: true }, is_available: { _eq: true } }
-  ) { aggregate { count } }
-}
+```
+WEBHOOK_URL=http://safetrust-api:3002   # Docker Compose (internal network)
+WEBHOOK_URL=http://host.docker.internal:3002  # Local pnpm dev
 ```
 
-Used by `GuestDashboard.tsx` and the guest suggestions page.
+## Migrations
 
-### `GET_ESCROW_BY_ANY_ID`
+Migrations are managed per tenant in:
 
-`apps/frontend/src/graphql/queries/escrow-queries.ts`
-
-Fetches a single escrow by any of its identifiers (`id`, `engagement_id`, or
-`contract_id`) plus nested tenant-wallet / apartment-owner data, and the
-matching `trustlessWorkEscrows` row (camelCase fields `approver`, `marker`,
-`releaser`, `resolver`):
-
-```graphql
-query GetEscrowByAnyId($id: uuid, $engagement_id: String, $contract_id: String) {
-  escrows(where: { _or: [ { id: { _eq: $id } }, { engagement_id: { _eq: $engagement_id } }, { contract_id: { _eq: $contract_id } } ] }) {
-    id contract_id engagement_id amount status created_at updated_at
-    sender_address receiver_address resolution_notes
-    tenant_wallet { user { id first_name last_name email phone_number country_code } }
-    apartment { id name description image_urls price warranty_deposit address owner { id first_name last_name email phone_number country_code user_wallets(where: { is_primary: { _eq: true } }, limit: 1) { wallet_address } } }
-  }
-  trustlessWorkEscrows: trustlessWorkEscrows(where: { contractId: { _eq: $contract_id } }, limit: 1) {
-    approver marker releaser resolver
-  }
-}
+```
+infra/backend/migrations/
+├── safetrust/       ← safetrust schema migrations
+└── hotel_industry/  ← hotel_industry schema migrations
 ```
 
-Used by `apps/frontend/src/app/apartment/[id]/escrow/[escrowId]/page.tsx`.
-
-### `GetUserRoles` (middleware)
-
-`apps/frontend/src/lib/middleware/fetch-user-role.ts`
-
-The Next.js middleware resolves a user's effective role by fetching **all**
-role assignments (no limit — a user promoted guest → host holds two rows, and
-`limit: 1` could return the wrong one) and picking the highest-privilege role:
-
-```graphql
-query GetUserRoles($uid: String!) {
-  user_roles(where: { user_id: { _eq: $uid } }) {
-    role { name }
-  }
-}
-```
-
-Fails open to `guest` on any error so a role lookup outage can never lock a user
-out. Valid roles are `guest`, `host`, `admin` (see
-`apps/frontend/src/lib/middleware/roles.ts`).
-
----
-
-## Metadata build system
-
-All scripts live in `infra/backend/metadata/` and require the Hasura CLI and
-`yq` (Mike Farah) installed.
-
-### `build-metadata.sh`
-
+Apply with:
 ```bash
-./build-metadata.sh                       # build all tenants
-./build-metadata.sh safetrust             # build one tenant
+cd infra/backend
+hasura migrate apply \
+  --database-name safetrust \
+  --endpoint http://localhost:8080 \
+  --admin-secret myadminsecretkey
 ```
 
-Merges the shared `metadata/base` with `metadata/tenants/<tenant>` by deep-
-merging YAML (tenant files override `base`), writing the result to
-`metadata/build/<tenant>/`.
+## Metadata
 
-### `deploy-tenant.sh`
-
-```bash
-./deploy-tenant.sh safetrust
-./deploy-tenant.sh safetrust --admin-secret SECRET --endpoint http://localhost:8080
+```
+infra/backend/metadata/
+├── base/            ← Shared config (actions, network, opentelemetry)
+└── tenants/
+    ├── safetrust/   ← safetrust table tracking + relationships
+    └── hotel_industry/  ← hotel_industry table tracking + relationships
 ```
 
-Requires a `metadata/build/<tenant>` (run `build-metadata.sh` first). Registers
-the Postgres source if missing (`pg_add_source`), then applies full metadata
-with permissions, relationships, and row-level filters via `hasura metadata
-apply`.
-
-### `setup-tenant.sh`
-
-```bash
-./setup-tenant.sh safetrust
-./setup-tenant.sh safetrust --admin-secret SECRET --endpoint http://localhost:8080
-```
-
-Runs `build-metadata.sh` then `deploy-tenant.sh` for one tenant in a single
-command.
-
-> In normal local development you rarely run these directly — `bin/start`
-> (`infra/backend/bin/start`) orchestrates the whole flow: docker up → wait for
-> health → register sources → `hasura migrate apply` → setup-tenant → send
-> transaction → reload metadata → apply seeds.
-
----
-
-## Opening the Hasura console
-
-```bash
-hasura console --endpoint http://localhost:8080 --admin-secret myadminsecretkey
-```
-
-Runs the browser console against the local Hasura instance (defaults shown in
-`infra/backend/bin/start`).
-
----
-
-## Reloading metadata
-
-```bash
-hasura metadata reload --endpoint http://localhost:8080 --admin-secret myadminsecretkey
-```
-
-`bin/start` runs this automatically after deploy. Run it whenever you change
-metadata files outside the deploy flow so the running engine picks up the
-latest tracked schema.
-
----
-
-## Metadata inconsistency fix
-
-**What causes it:** An inconsistent/invalid metadata state — typically adding a
-table, relationship, permission, or action whose referenced object (role,
-source, table, column, or remote schema) does not yet exist or was removed.
-Hasura reports these as `PG unavailable` / consistency errors and will refuse
-to serve the affected GraphQL schema until resolved.
-
-Common triggers in this repo:
-
-- Deploying metadata before the tables exist (ordering matters — `bin/start`
-  runs `migrate apply` **before** `metadata apply` for exactly this reason).
-- Referencing a tracked table or relationship that isn't in the built metadata.
-
-**How to resolve:**
-
-1. Fix the underlying cause (apply migrations first, re-add the missing table /
-   relationship, or correct the YAML).
-2. Rebuild and redeploy the tenant metadata:
-
-   ```bash
-   ./build-metadata.sh safetrust
-   ./deploy-tenant.sh safetrust --admin-secret myadminsecretkey
-   ```
-
-   or use `setup-tenant.sh` for the build+deploy in one call.
-3. Reload the metadata and confirm consistency:
-
-   ```bash
-   hasura metadata reload --endpoint http://localhost:8080 --admin-secret myadminsecretkey
-   ```
-
-   In the console, the **Settings** tab shows the list of inconsistent objects;
-   once the underlying object exists, reload resolves them.
-
----
-
-## Admin secret note
-
-The development admin secret is `myadminsecretkey`. It appears as a default in:
-
-- `infra/backend/bin/start`
-- `infra/backend/metadata/deploy-tenant.sh`
-- `infra/backend/metadata/setup-tenant.sh`
-- `infra/backend/.env.example` (`HASURA_GRAPHQL_ADMIN_SECRET`)
-
-> ⚠️ **You MUST change this before any production deployment.** Use a long,
-> random value and set it consistently via the `HASURA_GRAPHQL_ADMIN_SECRET`
-> env var and `--admin-secret` flags. Never commit a real secret.
+The `build-metadata.sh` script merges base + tenant metadata before applying.
