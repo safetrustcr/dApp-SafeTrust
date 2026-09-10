@@ -59,6 +59,7 @@ export async function executeGraphQL<T>(
       'x-hasura-admin-secret': adminSecret,
     },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!res.ok) {

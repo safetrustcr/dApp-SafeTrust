@@ -2,8 +2,14 @@ import type { Request, Response } from 'express';
 import { getAuth }                 from 'firebase-admin/auth';
 import { executeGraphQL }          from '../../lib/hasura.js';
 
-const POLLAR_ACTIVATE_URL =
-  process.env.POLLAR_ACTIVATE_URL ?? 'https://sdk.api.pollar.xyz/v2/wallet/activate';
+const rawUrl = process.env.POLLAR_ACTIVATE_URL ?? 'https://sdk.api.pollar.xyz/v2/wallet/activate';
+const pollarUrlObj = new URL(rawUrl);
+
+if (pollarUrlObj.protocol !== 'https:') {
+  throw new Error('POLLAR_ACTIVATE_URL must use HTTPS');
+}
+
+const POLLAR_ACTIVATE_URL = pollarUrlObj.toString();
 
 const UPSERT_WALLET = `
   mutation UpsertPollarWallet($userId: String!, $address: String!) {
@@ -66,7 +72,7 @@ export const activateWalletHandler = async (
     if (!pollarRes.ok) {
       const details = await pollarRes.text();
       console.error(`[activate-wallet] Pollar error: ${pollarRes.status} ${details}`);
-      return res.status(502).json({ error: 'Pollar wallet activation failed' });
+      return res.status(502).json({ error: 'Pollar activation failed' });
     }
 
     const pollarBody = (await pollarRes.json()) as { address?: string };
@@ -91,6 +97,6 @@ export const activateWalletHandler = async (
 
   } catch (err) {
     console.error('[activate-wallet] ❌ error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Database sync failed' });
   }
 };
