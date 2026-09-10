@@ -77,7 +77,10 @@ const { address, signTransaction, provider } = useActiveWallet();
 ```
 
 The `is_primary` flag in `public.user_wallets` determines which wallet
-is the active signer for escrow transactions.
+is the active signer for escrow transactions. A partial unique index enforces
+at most one primary wallet per user. Both wallet upsert paths demote the user's
+current primary and promote the selected wallet in one Hasura mutation, so the
+change is atomic.
 
 ## Wallet address storage
 
@@ -89,7 +92,11 @@ wallet_address text UNIQUE
 chain_type     text  -- always 'STELLAR'
 is_primary     bool
 provider       text  -- 'freighter' | 'pollar' | 'albedo'
+
+UNIQUE (user_id) WHERE is_primary IS TRUE
 ```
 
 Upsert uses `ON CONFLICT (wallet_address) DO UPDATE SET is_primary, provider`
-— connecting the same wallet twice is idempotent.
+— connecting the same wallet twice is idempotent. Queries that select an
+escrow signer order primary wallets by `updated_at DESC, id ASC` before applying
+`limit: 1` for deterministic behavior.

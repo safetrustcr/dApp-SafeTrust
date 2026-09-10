@@ -50,10 +50,11 @@ sequenceDiagram
 ## Idempotency
 
 Every deploy request is guarded by `checkIdempotency(engagementId)` before
-reaching TrustlessWork. The guard queries `public.escrows.engagement_id`
-(UNIQUE constraint) and short-circuits with `{ cached: true }` if a row
-already exists. This prevents double-click PAY from creating two on-chain
-escrows before the DB constraint can fire.
+reaching TrustlessWork. Through the `safetrust` Hasura source, the guard queries
+the `engagement_id` column on `public.escrows` (`public` is the PostgreSQL
+schema) and short-circuits with `{ cached: true }` if a row already exists.
+This prevents double-click PAY from creating two on-chain escrows before the DB
+constraint can fire.
 
 ## Roles in escrow contract
 

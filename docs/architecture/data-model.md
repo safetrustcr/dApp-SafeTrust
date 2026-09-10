@@ -1,12 +1,17 @@
 # Data Model
 
-SafeTrust uses PostgreSQL with two schemas managed by Hasura: `safetrust`
-(core platform) and `hotel_industry` (hospitality vertical).
+Hasura exposes `safetrust` (core platform) and `hotel_industry`
+(hospitality vertical) as separate sources and tenant identifiers. Both sources
+connect to the same PostgreSQL database through `PG_DATABASE_URL`; their names
+are not PostgreSQL schemas. Most tables, including `public.escrows` and the
+hotel tables, are in the `public` schema. Only
+`hotel_industry.pricing_rules` uses the `hotel_industry` schema.
 
 ## Core entity relationships
 
 ```mermaid
 erDiagram
+    %% All entities shown here are tables in the PostgreSQL public schema.
     users {
         string id PK
         string email
@@ -82,9 +87,9 @@ erDiagram
 
 ```mermaid
 graph TD
-    TW["trustless_work_escrows\nBlockchain mirror\ncontract_id · status · amount"]
-    M["escrow_milestones\nRelease schedule\ntitle · amount · milestone_index"]
-    E["escrows\nSafeTrust business log\nengagement_id · sender · receiver · tenant_id"]
+    TW["public.trustless_work_escrows\nBlockchain mirror\ncontract_id · status · amount"]
+    M["public.escrow_milestones\nRelease schedule\ntitle · amount · milestone_index"]
+    E["public.escrows\nSafeTrust business log\nengagement_id · sender · receiver · tenant_id"]
 
     TW --> M
     E --> M
@@ -102,6 +107,7 @@ Every escrow write follows this hierarchy:
 | `escrows` | `UNIQUE(engagement_id)` | Idempotency guard — prevents double-deploy |
 | `user_roles` | `UNIQUE(user_id, role_id)` | Idempotent promote-to-host |
 | `user_wallets` | `UNIQUE(wallet_address)` | One wallet entry per address |
+| `user_wallets` | `UNIQUE(user_id) WHERE is_primary IS TRUE` | At most one primary wallet per user |
 | `users` | `UNIQUE(email)` | Firebase UID upsert anchor |
 
 ## Roles

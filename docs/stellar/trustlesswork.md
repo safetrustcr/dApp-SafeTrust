@@ -14,7 +14,7 @@ graph LR
     Soroban["Stellar Soroban\nSmart Contract"]
 
     API -->|"POST /deployer/single-release"| TW
-    API -->|"POST /escrow/fund"| TW
+    API -->|"POST /escrow/single-release/v2/fund"| TW
     API -->|"POST /escrow/approve-milestone"| TW
     API -->|"POST /escrow/release-funds"| TW
     API -->|"POST /escrow/dispute"| TW
@@ -26,7 +26,7 @@ graph LR
 | Endpoint | Called by | Purpose |
 |---|---|---|
 | `POST /deployer/single-release` | `deploy.handler.ts` | Deploy escrow contract, returns unsignedXDR |
-| `POST /escrow/fund` | `fund.handler.ts` | Submit signed fund transaction |
+| `POST /escrow/single-release/v2/fund` | `fund.handler.ts` | Build and return an unsigned fund transaction |
 | `POST /escrow/approve-milestone` | `approve-milestone.handler.ts` | Guest approves milestone |
 | `POST /escrow/release-funds` | `release-funds.handler.ts` | Release funds to host |
 | `POST /escrow/dispute` | `dispute.handler.ts` | Open a dispute |
@@ -51,6 +51,8 @@ Never expose this key in the frontend bundle.
 {
   engagementId: string,       // SafeTrust business identifier
   title: string,              // e.g. "SafeTrust Rental — APT001"
+  signer: string,             // guest G-address
+  amount: number,             // numeric amount expected by the deploy endpoint
   roles: {
     approver: string,         // guest G-address
     serviceProvider: string,  // host G-address

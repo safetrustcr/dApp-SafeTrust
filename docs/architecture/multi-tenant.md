@@ -1,7 +1,10 @@
 # Multi-Tenant Design
 
 SafeTrust uses Hasura's multi-source feature to serve two tenants from a
-single PostgreSQL instance. Each tenant has its own schema and metadata.
+single PostgreSQL database. `safetrust` and `hotel_industry` are Hasura source
+names and tenant identifiers, not PostgreSQL schemas. Both use
+`PG_DATABASE_URL`; most tables live in PostgreSQL's `public` schema, while only
+`hotel_industry.pricing_rules` lives in the `hotel_industry` schema.
 
 ## Tenant topology
 
@@ -9,13 +12,19 @@ single PostgreSQL instance. Each tenant has its own schema and metadata.
 graph TD
     API["apps/api\nX-Tenant-ID header"]
     Hasura["Hasura GraphQL Engine"]
-    ST["safetrust schema\npublic.users\npublic.escrows\npublic.apartments\npublic.roles"]
-    HI["hotel_industry schema\npublic.hotels\npublic.rooms\npublic.reservations\npublic.pricing_rules"]
+    ST["Hasura source: safetrust\ncore platform metadata"]
+    HI["Hasura source: hotel_industry\nhospitality metadata"]
+    DB["One PostgreSQL database\nPG_DATABASE_URL"]
+    Public["PostgreSQL schema: public\nusers · escrows · apartments\nhotels · rooms · reservations"]
+    Hotel["PostgreSQL schema: hotel_industry\npricing_rules only"]
 
-    API -->|"X-Tenant-ID: safetrust"| Hasura
-    API -->|"X-Tenant-ID: hotel_industry"| Hasura
+    API -->|"X-Tenant-ID selects source"| Hasura
     Hasura --> ST
     Hasura --> HI
+    ST --> DB
+    HI --> DB
+    DB --> Public
+    DB --> Hotel
 ```
 
 ## Tenant middleware
@@ -63,8 +72,8 @@ for the `hotel_industry` source.
 ```typescript
 // In any handler:
 if (req.tenant === 'hotel_industry') {
-  // query public.hotels, public.reservations
+  // query public.hotels and public.reservations through the hotel_industry source
 } else {
-  // query public.apartments, public.escrows
+  // query public.apartments and public.escrows through the safetrust source
 }
 ```

@@ -13,6 +13,12 @@ const POLLAR_ACTIVATE_URL = pollarUrlObj.toString();
 
 const UPSERT_WALLET = `
   mutation UpsertPollarWallet($userId: String!, $address: String!) {
+    update_user_wallets(
+      where: { user_id: { _eq: $userId }, is_primary: { _eq: true } }
+      _set: { is_primary: false }
+    ) {
+      affected_rows
+    }
     insert_user_wallets_one(
       object: {
         user_id:        $userId
@@ -86,6 +92,7 @@ export const activateWalletHandler = async (
 
     // ── 3. Persist wallet address to user_wallets ─────────────────────────
     const walletData = await executeGraphQL<{
+      update_user_wallets: { affected_rows: number };
       insert_user_wallets_one: { id: string; wallet_address: string };
     }>(UPSERT_WALLET, { userId: uid, address });
 

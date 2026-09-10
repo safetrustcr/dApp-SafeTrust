@@ -31,6 +31,7 @@ pnpm install
 ```bash
 cd infra/backend
 bin/start safetrust hotel_industry
+cd ../..
 ```
 
 ## Run tests before opening a PR

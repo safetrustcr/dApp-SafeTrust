@@ -14,7 +14,7 @@ graph TD
 
     DC --> PG
     DC --> HE
-    DC --> API
+    DC -.->|"full Compose only"| API
     HE -->|"depends_on healthy"| PG
     API -->|"depends_on healthy"| PG
     API -->|"depends_on healthy"| HE
@@ -32,7 +32,9 @@ graph TD
 ### graphql-engine (Hasura)
 - Image: `hasura/graphql-engine:v2.47.0`
 - Port: `8080:8080`
-- `WEBHOOK_URL=http://safetrust-api:3002` — internal Docker network hostname
+- `WEBHOOK_URL` is configurable; local development defaults to
+  `http://host.docker.internal:3002`
+- `host.docker.internal:host-gateway` maps the host on native Linux
 - `HASURA_ADMIN_SECRET=myadminsecretkey` (dev only)
 
 ### api (apps/api)
@@ -43,15 +45,21 @@ graph TD
 ## Local dev vs Docker Compose
 
 In local `pnpm dev`, `apps/api` runs as a Turborepo process on port 3002 —
-the Docker `api` container is not started. Hasura must still reach `apps/api`
-for event triggers. Set in `infra/backend/.env`:
+`bin/start` starts only `postgres` and `graphql-engine`, leaving port 3002 to
+that process. Hasura must still reach `apps/api` for event triggers. Set in
+`infra/backend/.env`:
 
 ```dotenv
 # For local pnpm dev — Hasura (Docker) calls host machine
 WEBHOOK_URL=http://host.docker.internal:3002
+```
 
-# For full Docker Compose — internal network hostname
-WEBHOOK_URL=http://safetrust-api:3002
+To run all three services in Compose, explicitly select the internal API
+hostname:
+
+```bash
+cd infra/backend
+WEBHOOK_URL=http://safetrust-api:3002 docker compose up -d
 ```
 
 ## Docker Engine CE migration
@@ -65,16 +73,34 @@ QEMU-based OOM crashes under load.
 # Remove Docker Desktop
 sudo apt remove docker-desktop
 
-# Add Docker Engine CE repository (use Ubuntu codename, not distro)
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu noble stable" \
+# Add the repository for the detected Ubuntu or Debian release
+sudo apt update
+sudo apt install ca-certificates curl
+. /etc/os-release
+case "$ID" in
+  ubuntu|debian) docker_distribution="$ID" ;;
+  *) echo "Unsupported distribution: $ID" >&2; exit 1 ;;
+esac
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL "https://download.docker.com/linux/${docker_distribution}/gpg" \
+  -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/${docker_distribution} ${VERSION_CODENAME} stable" \
   | sudo tee /etc/apt/sources.list.d/docker.list
 
 # Install
-sudo apt update && sudo apt install docker-ce docker-ce-cli containerd.io
+sudo apt update && sudo apt install docker-ce docker-ce-cli containerd.io jq
 
-# Fix credential helper (Docker Desktop leaves a broken config)
-echo '{"auths": {}}' > ~/.docker/config.json
+# Back up the Docker CLI config, then remove only Docker Desktop's broken helper
+if [ -f "$HOME/.docker/config.json" ]; then
+  cp -p "$HOME/.docker/config.json" "$HOME/.docker/config.json.bak"
+  docker_config_tmp="$(mktemp)"
+  jq 'if .credsStore == "desktop" then del(.credsStore) else . end' \
+    "$HOME/.docker/config.json" > "$docker_config_tmp"
+  chmod --reference="$HOME/.docker/config.json" "$docker_config_tmp"
+  mv "$docker_config_tmp" "$HOME/.docker/config.json"
+fi
 
 # Use default context
 docker context use default
@@ -86,8 +112,11 @@ sudo usermod -aG docker $USER
 ## Useful commands
 
 ```bash
-# Start all infrastructure
+# Start PostgreSQL and Hasura for local development (run pnpm dev separately)
 cd infra/backend && bin/start safetrust hotel_industry
+
+# Start the full Compose stack, including the API container
+WEBHOOK_URL=http://safetrust-api:3002 docker compose up -d
 
 # Stop and remove volumes (full reset)
 docker compose down -v

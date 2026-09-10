@@ -26,7 +26,7 @@ echo ""
 
 # ── 1. Start containers ───────────────────────────────────────────────────────
 echo "📦 Starting containers..."
-docker compose up -d
+docker compose up -d postgres graphql-engine
 
 if [[ "$TRACK_SAFETRUST_TIMINGS" == "true" ]]; then
   TIMING_DOCKER_UP=$((SECONDS - TIMER_START))
@@ -167,7 +167,7 @@ echo "✅ SafeTrust backend ready"
 echo "   Tenants deployed: ${TENANTS[*]}"
 echo "   GraphQL:          http://localhost:8080/v1/graphql"
 echo "   PostgreSQL:       localhost:5433"
-echo "   API-webhook:      http://localhost:3002"
+echo "   API-webhook:      http://localhost:3002 (start with pnpm dev)"
 echo ""
 echo "👉 To open Hasura console:"
 echo "   hasura console --endpoint http://localhost:8080 --admin-secret $HASURA_ADMIN_SECRET"
