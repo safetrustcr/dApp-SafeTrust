@@ -99,8 +99,9 @@ export default function GuestDashboard() {
         throw new Error(data.error ?? "Promotion failed");
       }
 
-      // Clear role cookie so middleware re-fetches updated role on next request
-      document.cookie = "user-role=; Max-Age=0; path=/";
+      // httpOnly cookies cannot be cleared with document.cookie — the browser
+      // silently ignores it. This server route issues the correct Set-Cookie header.
+      await fetch('/api/auth/role-cookie', { method: 'DELETE' });
 
       // Full page navigation — forces middleware role check with fresh cookie
       window.location.href = "/dashboard/escrow-dashboard";
