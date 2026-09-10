@@ -61,6 +61,7 @@ export const activateWalletHandler = async (
     // ── 2. Activate Pollar embedded wallet ────────────────────────────────
     const pollarRes = await fetch(POLLAR_ACTIVATE_URL, {
       method:  'POST',
+      redirect: 'error',
       headers: {
         'Content-Type':     'application/json',
         'Authorization':    `Bearer ${process.env.POLLAR_SECRET_KEY}`,

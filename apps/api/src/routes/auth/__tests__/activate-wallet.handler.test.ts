@@ -116,6 +116,7 @@ describe('activateWalletHandler', () => {
       'https://sdk.api.pollar.xyz/v2/wallet/activate',
       expect.objectContaining({
         method: 'POST',
+        redirect: 'error',
         headers: expect.objectContaining({
           Authorization: 'Bearer sk_test_pollar',
           'x-pollar-api-key': 'sk_test_pollar',
