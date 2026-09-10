@@ -26,8 +26,8 @@ type SyncWalletResponse = {
  * Called after Freighter connects or after Pollar activates a wallet.
  *
  * Idempotent — uses ON CONFLICT on wallet_address to update is_primary.
- * If isPrimary is true, the caller should also set other wallets to
- * is_primary: false (future: handle via DB trigger or separate query).
+ * When isPrimary is true, the same Hasura mutation first demotes the user's
+ * current primary wallet so the change is atomic.
  */
 export const syncWalletHandler = async (
   req: AuthenticatedRequest & { body: SyncWalletBody },
@@ -68,6 +68,12 @@ export const syncWalletHandler = async (
         $isPrimary: Boolean!
         $provider: String
       ) {
+        update_user_wallets(
+          where: { user_id: { _eq: $userId }, is_primary: { _eq: true } }
+          _set: { is_primary: false }
+        ) @include(if: $isPrimary) {
+          affected_rows
+        }
         insert_user_wallets_one(
           object: {
             user_id: $userId
@@ -77,7 +83,7 @@ export const syncWalletHandler = async (
             provider: $provider
           }
           on_conflict: {
-            constraint: user_wallets_wallet_address_key
+            constraint: unique_wallet_address
             update_columns: [is_primary, provider]
           }
         ) {

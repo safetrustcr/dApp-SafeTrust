@@ -1,89 +1,103 @@
-# Local Development Setup Guide
+# Bootstrap Guide
 
-Welcome to the dApp-SafeTrust project! This guide covers the complete local development setup from prerequisites to running the application.
+Get SafeTrust running locally from scratch.
 
-## 1. Prerequisites
+## Prerequisites
 
-Ensure you have the following installed before starting:
-
-| Tool | Version | Installation Command / Link |
+| Tool | Version | Purpose |
 |---|---|---|
-| Docker | Latest | [Install Docker Desktop](https://www.docker.com/products/docker-desktop/) |
-| Node.js | &ge;18 | `nvm install 18 && nvm use 18` |
-| pnpm | &ge;8 | `npm install -g pnpm` |
-| Hasura CLI | Latest | `curl -L https://github.com/hasura/graphql-engine/raw/stable/cli/get.sh \| bash` |
+| Node.js | 20+ | Runtime |
+| pnpm | 9+ | Package manager |
+| Docker Engine CE | 24+ | Hasura + PostgreSQL |
+| Hasura CLI | latest | Migrations + metadata |
 
-## 2. Setup Steps
+> **Docker note:** Use Docker Engine CE (native Linux), not Docker Desktop.
+> Docker Desktop uses QEMU emulation which causes OOM crashes under load.
+> See [infra/docker.md](./docker.md) for migration steps.
 
-Follow these 6 steps to get your local environment running:
+## 1. Clone and install
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/safetrustcr/dApp-SafeTrust.git
-   cd dApp-SafeTrust
-   ```
+```bash
+git clone https://github.com/safetrustcr/dApp-SafeTrust.git
+cd dApp-SafeTrust
+git checkout consolidation-pattern
+pnpm install
+```
 
-2. **Install dependencies**
-   ```bash
-   pnpm install
-   ```
+## 2. Configure environment variables
 
-3. **Configure environment variables**
-   Copy the example environment files:
-   ```bash
-   cp apps/api/.env.example apps/api/.env
-   cp apps/web/.env.example apps/web/.env
-   ```
-   *Make sure `HASURA_GRAPHQL_URL` is set correctly in `apps/api/.env`.*
+```bash
+# apps/api
+cp apps/api/.env.example apps/api/.env
+# Fill in:
+#   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
+#   TRUSTLESS_WORK_API_KEY
+#   POLLAR_SECRET_KEY (optional)
 
-4. **Bootstrap the infrastructure**
-   Run the following command to start the services (including Hasura):
-   ```bash
-   bin/start safetrust hotel_industry
-   ```
+# apps/frontend
+cp apps/frontend/.env.example apps/frontend/.env.local
+# Fill in:
+#   NEXT_PUBLIC_API_URL=http://localhost:3002
+#   NEXT_PUBLIC_HASURA_GRAPHQL_URL=http://localhost:8080/v1/graphql
+#   NEXT_PUBLIC_FIREBASE_* (from Firebase Console → Project Settings)
+```
 
-5. **Verify Hasura is healthy**
-   Check that Hasura is running properly by verifying the endpoints in the Verification section below.
+## 3. Start the backend infrastructure
 
-6. **Start the development server**
-   ```bash
-   pnpm dev
-   ```
+```bash
+cd infra/backend
+bin/start safetrust hotel_industry
+```
 
-## 3. Bootstrap Paths
+This command:
+1. Starts PostgreSQL and Hasura via Docker Compose
+2. Applies migrations for both tenants
+3. Applies Hasura metadata
+4. Outputs service URLs when ready
 
-We support two bootstrap paths depending on whether you need metadata tracking:
+Expected output:
+```
+✅ SafeTrust backend ready
+   Tenants deployed: safetrust hotel_industry
+   GraphQL:          http://localhost:8080/v1/graphql
+   PostgreSQL:       localhost:5433
+   API:              http://localhost:3002
+```
 
-| Path | Command | Time | Hasura tracking |
-|---|---|---|---|
-| Tracked | `bin/start` | ~45s | ✅ updated |
-| Fast | `bin/deploy-init` | ~8s | ❌ bypassed |
+## 4. Start the development server
 
-## 4. Verification
+```bash
+cd ../..   # back to repo root
+pnpm dev
+```
 
-Verify that your services are running correctly:
+This starts:
+- `apps/api` on port 3002
+- `apps/frontend` on port 3001
 
-| Service | URL | Expected Status |
-|---|---|---|
-| Web App | [http://localhost:3001](http://localhost:3001) | Loads successfully |
-| API Health | [http://localhost:3002/health](http://localhost:3002/health) | Returns 200 OK |
-| Hasura Console | [http://localhost:8080/console](http://localhost:8080/console) | Console UI loads |
+Open `http://localhost:3001`.
 
-## 5. Common Errors and Fixes
+## 5. Verify
 
-If you encounter issues, check these common errors and their exact fixes:
+```bash
+# API health
+curl http://localhost:3002/health
+# → { "status": "ok" }
 
-1. **`EADDRINUSE 3001`**
-   *Fix:* `lsof -ti:3001 | xargs kill -9`
+# Hasura GraphQL
+curl http://localhost:8080/healthz
+# → OK
 
-2. **`Failed to parse URL from undefined`**
-   *Fix:* add `HASURA_GRAPHQL_URL` to `apps/api/.env`
+# Run tests
+pnpm test
+# → all packages passing
+```
 
-3. **`fetchUserRole: TimeoutError`**
-   *Fix:* Hasura not running, start Docker first
+## Common issues
 
-4. **`usePollar must be used inside PollarProvider`**
-   *Fix:* add `PollarProvider` to `layout.tsx`
-
-5. **`Hasura health check timeout`**
-   *Fix:* `docker compose pull` first
+| Symptom | Fix |
+|---|---|
+| `bin/start` fails with metadata error | Always start both tenants: `bin/start safetrust hotel_industry` |
+| `HASURA_ADMIN_SECRET not set` | Add `HASURA_ADMIN_SECRET=myadminsecretkey` to `apps/api/.env` |
+| `Failed to promote user to host` | Seed the roles table: run `07_roles_seed.sql` in Hasura console |
+| `usePollar must be used inside PollarProvider` | Add `PollarProvider` to `apps/frontend/src/app/layout.tsx` |

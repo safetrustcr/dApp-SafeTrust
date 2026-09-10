@@ -30,8 +30,10 @@ services:
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
       HASURA_GRAPHQL_ADMIN_SECRET: "myadminsecretkey"
       HASURA_GRAPHQL_JWT_SECRET: ${HASURA_GRAPHQL_JWT_SECRET}
-      WEBHOOK_URL: http://safetrust-api:3002
+      WEBHOOK_URL: ${WEBHOOK_URL:-http://host.docker.internal:3002}
       HASURA_EVENT_SECRET: ${HASURA_EVENT_SECRET}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

@@ -123,6 +123,13 @@ describe('activateWalletHandler', () => {
         }),
       }),
     );
+    const hasuraRequest = JSON.parse(
+      fetchMock.mock.calls[1][1]?.body as string,
+    ) as { query: string; variables: Record<string, unknown> };
+    expect(hasuraRequest.query.indexOf('update_user_wallets')).toBeLessThan(
+      hasuraRequest.query.indexOf('insert_user_wallets_one'),
+    );
+    expect(hasuraRequest.variables).toEqual({ userId: 'uid-1', address: 'GTESTADDRESS' });
     expect(res._status).toBe(200);
     expect(res._body).toEqual({
       address: 'GTESTADDRESS',
