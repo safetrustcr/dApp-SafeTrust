@@ -19,142 +19,92 @@ const styles = {
     backgroundColor: "#ffffff",
     overflow: "hidden",
   } satisfies CSSProperties,
-
-  amountBanner: {
+  depositBanner: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#fff7ed",
     borderTop: "1px solid #fed7aa",
-    padding: "1rem 1.5rem",
+    padding: "0.875rem 1.5rem",
     flexWrap: "wrap" as const,
     gap: "0.5rem",
   } satisfies CSSProperties,
-
-  amountLabel: {
+  depositLabel: {
     margin: 0,
     fontSize: "0.85rem",
     color: "#92400e",
     fontWeight: 500,
   } satisfies CSSProperties,
-
-  amountValue: {
+  depositValue: {
     margin: 0,
-    fontSize: "1.25rem",
+    fontSize: "1.2rem",
     fontWeight: 800,
     color: "#f97316",
   } satisfies CSSProperties,
-
-  amountUnit: {
-    fontSize: "0.8rem",
+  depositUnit: {
+    fontSize: "0.75rem",
     fontWeight: 500,
     color: "#92400e",
+    marginLeft: "0.25rem",
   } satisfies CSSProperties,
-
   ownerSection: {
     borderTop: "1px solid #fed7aa",
-    padding: "1.5rem",
+    padding: "1.25rem 1.5rem",
     display: "grid",
-    gap: "1.25rem",
+    gap: "1rem",
   } satisfies CSSProperties,
-
   ownerHeading: {
     margin: 0,
-    fontSize: "1rem",
+    fontSize: "0.95rem",
     fontWeight: 700,
     color: "#111827",
   } satisfies CSSProperties,
-
-  ownerGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(14rem, 1fr))",
-    gap: "1rem",
-  } satisfies CSSProperties,
-
-  ownerRow: {
+  ownerPills: {
     display: "flex",
-    alignItems: "flex-start",
-    gap: "0.65rem",
+    flexWrap: "wrap" as const,
+    gap: "0.75rem",
   } satisfies CSSProperties,
-
-  ownerIconWrap: {
-    width: "2rem",
-    height: "2rem",
+  pill: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.4rem",
+    padding: "0.35rem 0.75rem",
     borderRadius: "9999px",
     backgroundColor: "#fff7ed",
     border: "1px solid #fed7aa",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    marginTop: "0.1rem",
-  } satisfies CSSProperties,
-
-  ownerLabel: {
-    margin: 0,
-    fontSize: "0.75rem",
-    color: "#9ca3af",
+    fontSize: "0.85rem",
     fontWeight: 500,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.04em",
+    color: "#92400e",
+    whiteSpace: "nowrap" as const,
   } satisfies CSSProperties,
-
-  ownerValue: {
-    margin: "0.2rem 0 0",
-    fontWeight: 600,
-    color: "#111827",
-    fontSize: "0.9rem",
-    wordBreak: "break-word" as const,
-  } satisfies CSSProperties,
-
-  mutedText: {
+  noData: {
     margin: 0,
     color: "#6b7280",
-    fontSize: "0.9rem",
+    fontSize: "0.875rem",
     padding: "1.5rem",
   } satisfies CSSProperties,
 } as const;
 
-function OwnerContactRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Mail;
-  label: string;
-  value: string;
-}) {
+function ContactPill({ icon: Icon, value }: { icon: typeof Mail; value: string }) {
   return (
-    <div style={styles.ownerRow}>
-      <div style={styles.ownerIconWrap}>
-        <Icon size={14} color="#f97316" strokeWidth={2.2} />
-      </div>
-      <div>
-        <p style={styles.ownerLabel}>{label}</p>
-        <p style={styles.ownerValue}>{value}</p>
-      </div>
-    </div>
+    <span style={styles.pill}>
+      <Icon size={13} color="#f97316" strokeWidth={2.2} aria-hidden />
+      {value}
+    </span>
   );
 }
 
-// pending_signature → tenant still has to fund the escrow.
-// Shows the apartment card, PAY flow, deposit amount, and owner contact.
-export function EscrowPendingView({ escrow }: { escrow: EscrowDetail }) {
-  const apartment = escrow.apartment;
+// Accept EscrowDetail | undefined — the page may not have data yet
+export function EscrowPendingView({ escrow }: { escrow?: EscrowDetail }) {
+  const apartment = escrow?.apartment;
   const owner = apartment?.owner;
-
-  // Stellar address the deposit is released to: the escrow's stored receiver
-  // once deployed, otherwise the owner's primary wallet. Never owner.id.
-  const ownerAddress =
-    escrow.receiver_address ?? ownerWalletAddress(owner) ?? "";
-
-  const depositDue = apartment?.warranty_deposit ?? escrow.amount;
+  const ownerAddr = escrow?.receiver_address ?? ownerWalletAddress(owner) ?? "";
+  const depositDue = escrow?.amount ?? apartment?.warranty_deposit;
+  const hasPhone = Boolean(owner?.phone_number);
 
   return (
     <div style={{ display: "grid", gap: "1.5rem" }}>
       <div style={styles.card}>
-
-        {/* ── Apartment property card + PAY button ─────────────────────── */}
         {apartment ? (
           <ApartmentPropertyCard
             name={apartment.name}
@@ -165,49 +115,37 @@ export function EscrowPendingView({ escrow }: { escrow: EscrowDetail }) {
               <EscrowPayFlow
                 apartmentId={apartment.id}
                 apartmentName={apartment.name}
-                ownerAddress={ownerAddress}
-                amount={escrow.amount}
+                ownerAddress={ownerAddr}
+                amount={escrow?.amount ?? 0}
               />
             }
           />
         ) : (
-          <p style={styles.mutedText}>Property details unavailable.</p>
+          <p style={styles.noData}>Property details unavailable.</p>
         )}
 
-        {/* ── Security deposit amount banner ───────────────────────────── */}
-        <div style={styles.amountBanner}>
-          <p style={styles.amountLabel}>Security deposit due</p>
-          <p style={styles.amountValue}>
-            {formatMoney(depositDue)}{" "}
-            <span style={styles.amountUnit}>USDC</span>
+        {/* Security deposit banner */}
+        <div style={styles.depositBanner}>
+          <p style={styles.depositLabel}>Security deposit due</p>
+          <p style={styles.depositValue}>
+            {formatMoney(depositDue)}
+            <span style={styles.depositUnit}>USDC</span>
           </p>
         </div>
 
-        {/* ── Owner contact ─────────────────────────────────────────────── */}
+        {/* Owner contact pills */}
         {owner && (
           <div style={styles.ownerSection}>
             <h3 style={styles.ownerHeading}>Owner contact</h3>
-            <div style={styles.ownerGrid}>
+            <div style={styles.ownerPills}>
+              {hasPhone && (
+                <ContactPill icon={Phone} value={formatOwnerPhone(owner)} />
+              )}
               {owner.email && (
-                <OwnerContactRow
-                  icon={Mail}
-                  label="Email"
-                  value={owner.email}
-                />
+                <ContactPill icon={Mail} value={owner.email} />
               )}
-              {(owner.phone_number || owner.country_code) && (
-                <OwnerContactRow
-                  icon={Phone}
-                  label="Phone"
-                  value={formatOwnerPhone(owner)}
-                />
-              )}
-              {ownerAddress && (
-                <OwnerContactRow
-                  icon={Wallet}
-                  label="Stellar wallet"
-                  value={formatWallet(ownerAddress)}
-                />
+              {ownerAddr && (
+                <ContactPill icon={Wallet} value={formatWallet(ownerAddr)} />
               )}
             </div>
           </div>

@@ -1154,7 +1154,13 @@ export default function EscrowDetailPage({
       }
 
       setLoadingMessage('Awaiting wallet signature...');
-      await signAndSubmit(unsignedXdr);
+      await signAndSubmit(unsignedXdr, {
+        contractId: escrow.contract_id,
+        engagementId: escrow.engagement_id,
+        senderAddress: escrow.sender_address,
+        receiverAddress: escrow.receiver_address,
+        status: 'resolved',
+      });
 
       setErrorMessages([]);
     } catch (err) {
@@ -1275,7 +1281,7 @@ export default function EscrowDetailPage({
 
             <hr style={styles.divider} />
 
-            {view.label === 'pending' && <EscrowPendingView escrow={escrow} />}
+            {view.label === 'pending' && <EscrowPendingView escrow={escrow as any} />}
             {view.label === 'paid' && <PaidStubView escrow={escrow} />}
             {view.label === 'blocked' && <BlockedStubView escrow={escrow} />}
             {view.label === 'disputed' && <DisputedView escrow={escrow} />}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { ethers } from "ethers";
 import { Button } from "@/components/ui/button";
 import { 
@@ -24,6 +25,7 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
   const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
 
   // Check if MetaMask is installed
   useEffect(() => {
@@ -80,11 +82,6 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
     window.open("https://metamask.io/download/", "_blank");
   };
 
-  const refreshConnection = () => {
-    setError(null);
-    setIsConnecting(false);
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -106,10 +103,13 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
             /* MetaMask Not Installed */
             <div className="space-y-6 text-center">
               <div className="flex justify-center">
-                <img 
-                  src="/img/wallet/metamask.png" 
+                <Image 
+                  src={imgError ? "/img/logo.png" : "/img/wallet/metamask.png"} 
                   alt="MetaMask"
-                  className="w-16 h-16 rounded-lg"
+                  width={64}
+                  height={64}
+                  className="rounded-lg object-contain"
+                  onError={() => setImgError(true)}
                 />
               </div>
               
@@ -140,10 +140,13 @@ export const MetaMaskWalletModal: React.FC<MetaMaskWalletModalProps> = ({
             /* MetaMask Installed - Troubleshooting */
             <div className="space-y-6 text-center">
               <div className="flex justify-center">
-                <img 
-                  src="/img/wallet/metamask.png" 
+                <Image 
+                  src={imgError ? "/img/logo.png" : "/img/wallet/metamask.png"} 
                   alt="MetaMask"
-                  className="w-16 h-16 rounded-lg"
+                  width={64}
+                  height={64}
+                  className="rounded-lg object-contain"
+                  onError={() => setImgError(true)}
                 />
               </div>
               

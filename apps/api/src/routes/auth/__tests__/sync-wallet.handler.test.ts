@@ -55,7 +55,7 @@ describe('syncWalletHandler', () => {
   it('atomically demotes the existing primary before promoting a wallet', async () => {
     const res = mockRes();
 
-    await syncWalletHandler(mockReq(true), res as unknown as Response);
+    await syncWalletHandler(mockReq(true), res as unknown as Response, vi.fn());
 
     const [query, variables] = vi.mocked(hasuraRequest).mock.calls[0];
     expect(query.indexOf('update_user_wallets')).toBeLessThan(

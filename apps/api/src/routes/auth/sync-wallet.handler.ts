@@ -1,6 +1,12 @@
-import { Response } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { hasuraRequest } from '../../services/hasura.js';
+
+type ApiResponse<T = unknown> = {
+  status(code: number): {
+    json(body: T): ApiResponse<T>;
+  };
+  json(body: T): ApiResponse<T>;
+};
 
 type SyncWalletBody = {
   walletAddress: string;
@@ -30,9 +36,7 @@ type SyncWalletResponse = {
  * current primary wallet so the change is atomic.
  */
 export const syncWalletHandler = async (
-  req: AuthenticatedRequest & { body: SyncWalletBody },
-  res: Response<SyncWalletResponse | { error: string }>
-): Promise<Response> => {
+req: AuthenticatedRequest & { body: SyncWalletBody; }, res: ApiResponse<SyncWalletResponse | { error: string; }>, next: unknown): Promise<ApiResponse<SyncWalletResponse | { error: string; }>> => {
   const { uid } = req.user;
   const { walletAddress, chainType, isPrimary = false, provider } = req.body;
 

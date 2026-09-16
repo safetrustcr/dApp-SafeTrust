@@ -1,9 +1,10 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
+import { getAuth } from 'firebase-admin/auth';
 
 export type AuthenticatedUser = {
-  role: string;
   uid: string;
-  email?: string;
+  email: string | undefined;
+  role: string;
 };
 
 export interface AuthenticatedRequest extends Request {
@@ -11,44 +12,34 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Extracts the Firebase uid from the Bearer token on the request.
- *
- * TODO(SECURITY): the token signature is not verified — this only decodes the
- * payload, matching the existing sync-user handler. A forged token with a
- * chosen uid can therefore self-assign a role. Verify with firebase-admin
- * (`verifyIdToken`) before this is exposed beyond the host promotion flow.
+ * Verifies the Firebase Bearer token.
+ * Sets req.user = { uid, email, role: 'guest' } — role is resolved from the
+ * DB by the promote-to-host handler or the tenant middleware downstream.
+ * The default 'guest' ensures every authenticated request has a typed role.
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export const authenticateFirebase: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing token' });
+    res.status(401).json({ error: 'Missing or malformed Bearer token' });
     return;
   }
 
-  const token = authHeader.slice('Bearer '.length).trim();
+  const idToken = authHeader.split(' ')[1];
 
   try {
-    const segments = token.split('.');
-    if (segments.length !== 3 || !segments[1]) {
-      throw new Error('Malformed token');
-    }
-
-    const payload = JSON.parse(Buffer.from(segments[1], 'base64url').toString()) as {
-      user_id?: string;
-      sub?: string;
-      uid?: string;
-      email?: string;
+    const decoded = await getAuth().verifyIdToken(idToken, true);
+    (req as AuthenticatedRequest).user = {
+      uid: decoded.uid,
+      email: decoded.email,
+      role: 'guest', // resolved from DB by downstream middleware/handlers
     };
-
-    const uid = payload.user_id ?? payload.uid ?? payload.sub;
-    if (!uid) {
-      throw new Error('Token missing uid');
-    }
-
-    (req as AuthenticatedRequest).user = { uid, email: payload.email };
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid token' });
+    res.status(401).json({ error: 'Invalid or expired Firebase token' });
   }
-}
+};
