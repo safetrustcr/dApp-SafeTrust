@@ -1,9 +1,17 @@
 "use client";
 // apps/frontend/src/components/dashboard/profile/EditProfileForm.tsx
-import type { CSSProperties } from 'react';
+import type { CSSProperties, FormEvent } from 'react';
+
+export type ProfileFormValues = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+};
 
 type EditProfileFormProps = {
-  onSave?: (data: Record<string, string>) => void;
+  initialValues?: ProfileFormValues;
+  onSave: (data: ProfileFormValues) => void;
 };
 
 const styles = {
@@ -23,27 +31,51 @@ const styles = {
   } satisfies CSSProperties,
 } as const;
 
-export function EditProfileForm({ onSave }: EditProfileFormProps) {
+const PROFILE_FIELDS = [
+  { name: 'firstName', label: 'First name' },
+  { name: 'lastName', label: 'Last name' },
+  { name: 'email', label: 'Email' },
+  { name: 'phone', label: 'Phone' },
+] as const;
+
+export function EditProfileForm({ initialValues, onSave }: EditProfileFormProps) {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    onSave({
+      firstName: String(formData.get('firstName') ?? ''),
+      lastName: String(formData.get('lastName') ?? ''),
+      email: String(formData.get('email') ?? ''),
+      phone: String(formData.get('phone') ?? ''),
+    });
+  };
+
   return (
-    <div style={styles.form}>
+    <form style={styles.form} onSubmit={handleSubmit}>
       <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#111827' }}>
         Edit profile
       </h3>
-      {(['First name', 'Last name', 'Email', 'Phone'] as const).map((field) => (
-        <div key={field} style={styles.field}>
-          <label style={styles.label}>{field}</label>
-          <input type="text" style={styles.input} placeholder={field} />
+      {PROFILE_FIELDS.map(({ name, label }) => (
+        <div key={name} style={styles.field}>
+          <label htmlFor={`profile-${name}`} style={styles.label}>{label}</label>
+          <input
+            id={`profile-${name}`}
+            name={name}
+            type={name === 'email' ? 'email' : name === 'phone' ? 'tel' : 'text'}
+            style={styles.input}
+            placeholder={label}
+            defaultValue={initialValues?.[name]}
+          />
         </div>
       ))}
       <div>
         <button
-          type="button"
+          type="submit"
           style={styles.button}
-          onClick={() => onSave?.({})}
         >
           Save changes
         </button>
       </div>
-    </div>
+    </form>
   );
 }

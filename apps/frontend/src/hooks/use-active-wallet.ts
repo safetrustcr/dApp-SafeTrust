@@ -8,11 +8,24 @@ import { usePollar } from '@/hooks/use-pollar';       // adjust import if needed
 
 export type WalletType = 'freighter' | 'pollar' | null;
 
+export type TransactionSubmission = {
+  contractId: string;
+  engagementId: string;
+  senderAddress: string;
+  receiverAddress: string;
+  status?: 'funded' | 'milestone_approved' | 'completed' | 'resolved';
+};
+
+export type SignAndSubmit = (
+  unsignedXDR: string,
+  submission: TransactionSubmission,
+) => Promise<void>;
+
 export type ActiveWallet = {
   address: string | null;
   walletType: WalletType;
   isReady: boolean;
-  signAndSubmit: (unsignedXDR: string) => Promise<void>;
+  signAndSubmit: SignAndSubmit;
 };
 
 /**
@@ -38,11 +51,11 @@ export function useActiveWallet(): ActiveWallet {
       : null;
 
   const signAndSubmit = useCallback(
-    async (unsignedXDR: string): Promise<void> => {
+    async (unsignedXDR: string, submission: TransactionSubmission): Promise<void> => {
       if (isFreighterReady && freighter?.signAndSubmit) {
-        await freighter.signAndSubmit(unsignedXDR);
+        await freighter.signAndSubmit(unsignedXDR, submission);
       } else if (isPollarReady && pollar?.signAndSubmit) {
-        await pollar.signAndSubmit(unsignedXDR);
+        await pollar.signAndSubmit(unsignedXDR, submission);
       } else {
         throw new Error('No wallet available to sign transaction');
       }

@@ -86,7 +86,13 @@ export function EscrowPayFlow({
     setSigning(true);
     setErrorMessages([]);
     try {
-      await signAndSubmit(deployState.unsignedXDR);
+      await signAndSubmit(deployState.unsignedXDR, {
+        contractId: deployState.contractId,
+        engagementId: deployState.engagementId,
+        senderAddress: address,
+        receiverAddress: ownerAddress,
+        status: 'funded',
+      });
       router.push(`/apartment/${apartmentId}/escrow/${deployState.engagementId}`);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to sign escrow.'));
@@ -101,22 +107,29 @@ export function EscrowPayFlow({
 
   if (!hasOwnerWallet) {
     return (
-      <span
-        title="Owner wallet not available"
-        style={{ display: 'inline-block', cursor: 'not-allowed' }}
-      >
-        <button
-          type="button"
-          disabled
-          style={{
-            ...buttonStyle,
-            opacity: 0.45,
-            cursor: 'not-allowed',
-          }}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+        <span
+          title="Owner wallet not available"
+          style={{ display: 'inline-block', cursor: 'not-allowed' }}
         >
-          PAY
-        </button>
-      </span>
+          <button
+            type="button"
+            disabled
+            style={{
+              ...buttonStyle,
+              opacity: 0.45,
+              cursor: 'not-allowed',
+            }}
+          >
+            PAY
+          </button>
+        </span>
+        {!isReady && (
+          <p role="status" style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280', textAlign: 'right' }}>
+            Connect your Stellar wallet to continue.
+          </p>
+        )}
+      </div>
     );
   }
 
@@ -135,6 +148,12 @@ export function EscrowPayFlow({
       >
         {payButtonLabel}
       </button>
+
+      {!isReady && (
+        <p role="status" style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280', textAlign: 'right' }}>
+          Connect your Stellar wallet to continue.
+        </p>
+      )}
 
       {deployState && (
         <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280', textAlign: 'right' }}>

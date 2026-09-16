@@ -99,8 +99,8 @@ export function EscrowPendingView({ escrow }: { escrow?: EscrowDetail }) {
   const apartment = escrow?.apartment;
   const owner = apartment?.owner;
   const ownerAddr = escrow?.receiver_address ?? ownerWalletAddress(owner) ?? "";
-  const depositDue = apartment?.warranty_deposit ?? escrow?.amount;
-  const hasPhone = Boolean(owner?.phone_number || owner?.country_code);
+  const depositDue = escrow?.amount ?? apartment?.warranty_deposit;
+  const hasPhone = Boolean(owner?.phone_number);
 
   return (
     <div style={{ display: "grid", gap: "1.5rem" }}>

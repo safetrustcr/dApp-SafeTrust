@@ -4,7 +4,6 @@ import type { CSSProperties } from 'react';
 
 type BookingEscrowWrapperProps = {
   bookingId: string;
-  onComplete?: () => void;
 };
 
 const styles = {
@@ -48,17 +47,6 @@ const styles = {
     fontSize: '0.875rem',
     lineHeight: 1.55,
   } satisfies CSSProperties,
-  button: {
-    border: '1px solid #f97316',
-    backgroundColor: '#f97316',
-    color: '#ffffff',
-    fontWeight: 700,
-    padding: '0.65rem 1.5rem',
-    borderRadius: '0.75rem',
-    cursor: 'pointer',
-    fontSize: '0.95rem',
-    width: '100%',
-  } satisfies CSSProperties,
 } as const;
 
 /**
@@ -68,13 +56,10 @@ const styles = {
  * Wired to apps/api POST /api/escrow/deploy once hotel_industry
  * escrow routes are ported from apps/frontend (issue #308).
  *
- * For now renders booking context and a placeholder CTA so hotel
- * escrow pages compile and render without crashing.
+ * For now renders booking context and an explicit unavailable state so hotel
+ * escrow pages compile and render without exposing a false completion step.
  */
-export function BookingEscrowWrapper({
-  bookingId,
-  onComplete,
-}: BookingEscrowWrapperProps) {
+export function BookingEscrowWrapper({ bookingId }: BookingEscrowWrapperProps) {
   return (
     <div style={styles.card}>
       <h2 style={styles.heading}>Secure your booking</h2>
@@ -82,15 +67,10 @@ export function BookingEscrowWrapper({
         Booking ID: <span style={styles.badge}>{bookingId}</span>
       </p>
       <p style={styles.notice}>
-        Hotel escrow payments use the TrustlessWork single-release contract on
-        Stellar. Your deposit is locked until check-out is confirmed by both
-        parties. Full escrow flow coming in issue #308.
+        Hotel escrow payment is not available yet. Stay on this page until the
+        TrustlessWork single-release flow is enabled in issue #308; no deposit
+        has been submitted or locked.
       </p>
-      {onComplete && (
-        <button type="button" style={styles.button} onClick={onComplete}>
-          Continue
-        </button>
-      )}
     </div>
   );
 }

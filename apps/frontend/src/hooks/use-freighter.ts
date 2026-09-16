@@ -4,10 +4,11 @@
 // This hook provides the shape useActiveWallet expects.
 
 import { useState, useEffect } from 'react';
+import type { SignAndSubmit } from '@/hooks/use-active-wallet';
 
 export type FreighterWallet = {
   address: string | null;
-  signAndSubmit: ((xdr: string) => Promise<void>) | null;
+  signAndSubmit: SignAndSubmit | null;
 };
 
 /**
@@ -39,8 +40,8 @@ export function useFreighter(): FreighterWallet {
     return () => { cancelled = true; };
   }, []);
 
-  const signAndSubmit = address
-    ? async (xdr: string): Promise<void> => {
+  const signAndSubmit: SignAndSubmit | null = address
+    ? async (xdr, submission): Promise<void> => {
         try {
           // @ts-expect-error — window.freighterApi
           const api = window.freighterApi;
@@ -49,11 +50,18 @@ export function useFreighter(): FreighterWallet {
           });
           // Submit is handled by the frontend send-transaction route
           const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
-          await fetch(`${baseUrl}/api/escrow/send-transaction`, {
+          const response = await fetch(`${baseUrl}/api/escrow/send-transaction`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ signedXDR: signedTransaction }),
+            body: JSON.stringify({ signedXdr: signedTransaction, ...submission }),
           });
+          if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            const detail = payload && typeof payload === 'object' && 'error' in payload
+              ? String(payload.error)
+              : `HTTP ${response.status}`;
+            throw new Error(`Transaction submission failed: ${detail}`);
+          }
         } catch (err) {
           throw new Error(`Freighter signing failed: ${String(err)}`);
         }

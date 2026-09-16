@@ -7,12 +7,10 @@ type ReservationSummaryProps = {
   checkOut?: string;
   guests?: number;
   nights?: number;
-  pricePerNight?: number;
   hotelName?: string;
   description?: string;
   price?: number;
   tax?: number;
-  total?: number;
 };
 
 const styles = {
@@ -34,7 +32,9 @@ const styles = {
 
 function fmt(val?: number) { return val !== undefined ? `$${val.toLocaleString('en-US')}` : '—'; }
 
-export default function ReservationSummary({ checkIn, checkOut, guests, nights, pricePerNight, total }: ReservationSummaryProps) {
+export default function ReservationSummary({ checkIn, checkOut, guests, nights, price, tax }: ReservationSummaryProps) {
+  const total = price !== undefined && tax !== undefined ? price + tax : undefined;
+
   return (
     <div style={styles.card}>
       <h3 style={styles.heading}>Reservation summary</h3>
@@ -42,7 +42,7 @@ export default function ReservationSummary({ checkIn, checkOut, guests, nights, 
       <div style={styles.row}><p style={styles.label}>Check-out</p><p style={styles.value}>{checkOut ?? '—'}</p></div>
       <div style={styles.row}><p style={styles.label}>Guests</p><p style={styles.value}>{guests ?? '—'}</p></div>
       <div style={styles.row}><p style={styles.label}>Nights</p><p style={styles.value}>{nights ?? '—'}</p></div>
-      <div style={styles.row}><p style={styles.label}>Price / night</p><p style={styles.value}>{fmt(pricePerNight)}</p></div>
+      <div style={styles.row}><p style={styles.label}>Price / night</p><p style={styles.value}>{fmt(price)}</p></div>
       <hr style={styles.divider} />
       <div style={styles.row}><p style={styles.label}>Total</p><p style={styles.total}>{fmt(total)}</p></div>
     </div>

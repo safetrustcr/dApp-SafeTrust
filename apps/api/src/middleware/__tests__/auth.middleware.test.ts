@@ -40,7 +40,7 @@ describe('authenticateFirebase', () => {
 
     await authenticateFirebase(req, res, next);
 
-    expect(mockVerifyIdToken).toHaveBeenCalledWith('valid-token');
+    expect(mockVerifyIdToken).toHaveBeenCalledWith('valid-token', true);
     expect(next).toHaveBeenCalledOnce();
     expect((req as AuthenticatedRequest).user).toEqual({
       uid: 'uid-1',

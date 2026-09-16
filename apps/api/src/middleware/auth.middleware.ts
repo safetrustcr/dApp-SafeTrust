@@ -32,7 +32,7 @@ export const authenticateFirebase: RequestHandler = async (
   const idToken = authHeader.split(' ')[1];
 
   try {
-    const decoded = await getAuth().verifyIdToken(idToken);
+    const decoded = await getAuth().verifyIdToken(idToken, true);
     (req as AuthenticatedRequest).user = {
       uid: decoded.uid,
       email: decoded.email,

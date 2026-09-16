@@ -12,6 +12,13 @@ export class TrustlessWorkRequestError extends Error {
   }
 }
 
+export class TrustlessWorkConfigurationError extends TrustlessWorkRequestError {
+  constructor(message: string) {
+    super(message, 500);
+    this.name = 'TrustlessWorkConfigurationError';
+  }
+}
+
 type TrustlessWorkRequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -22,7 +29,9 @@ function getTrustlessWorkConfig(): { baseUrl: string; apiKey: string } {
   const apiKey = process.env.TRUSTLESS_WORK_API_KEY;
 
   if (!baseUrl || !apiKey) {
-    throw new Error('Missing TRUSTLESS_WORK_API_URL or TRUSTLESS_WORK_API_KEY');
+    throw new TrustlessWorkConfigurationError(
+      'Missing TRUSTLESS_WORK_API_URL or TRUSTLESS_WORK_API_KEY',
+    );
   }
 
   return { baseUrl, apiKey };

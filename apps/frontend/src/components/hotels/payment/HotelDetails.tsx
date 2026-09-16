@@ -3,7 +3,6 @@
 type CSSProperties = Record<string, string | number | undefined>;
 
 type HotelDetailsProps = {
-  name?: string;
   location?: string;
   details ?: string;
   goodToKnow?: string;
@@ -32,17 +31,17 @@ const styles = {
 const FALLBACK = '/img/room1.png';
 
 /* eslint-disable @next/next/no-img-element */
-export default function HotelDetails({ name = 'Hotel', location = '—', imageUrl, pricePerNight }: HotelDetailsProps) {
+export default function HotelDetails({ hotelName = 'Hotel', location = '—', imageUrl, pricePerNight }: HotelDetailsProps) {
   return (
     <div style={styles.card}>
       <img
         src={imageUrl ?? FALLBACK}
-        alt={name}
+        alt={hotelName}
         style={styles.img}
         onError={(e) => { const img = e.target as HTMLImageElement; img.onerror = null; img.src = FALLBACK; }}
       />
       <div style={styles.body}>
-        <p style={styles.name}>{name}</p>
+        <p style={styles.name}>{hotelName}</p>
         <p style={styles.location}>{location}</p>
         {pricePerNight !== undefined && (
           <p style={styles.price}>${pricePerNight.toLocaleString('en-US')} <span style={{ fontWeight: 400, fontSize: '0.75rem', color: '#6b7280' }}>/ night</span></p>

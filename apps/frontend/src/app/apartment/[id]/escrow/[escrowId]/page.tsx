@@ -1154,7 +1154,13 @@ export default function EscrowDetailPage({
       }
 
       setLoadingMessage('Awaiting wallet signature...');
-      await signAndSubmit(unsignedXdr);
+      await signAndSubmit(unsignedXdr, {
+        contractId: escrow.contract_id,
+        engagementId: escrow.engagement_id,
+        senderAddress: escrow.sender_address,
+        receiverAddress: escrow.receiver_address,
+        status: 'resolved',
+      });
 
       setErrorMessages([]);
     } catch (err) {
