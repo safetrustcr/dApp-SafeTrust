@@ -1,13 +1,3 @@
-const BASE_URL = process.env.TRUSTLESS_WORK_API_URL;
-const API_KEY = process.env.TRUSTLESS_WORK_API_KEY;
-
-if (!BASE_URL || !API_KEY) {
-  throw new Error('Missing TRUSTLESS_WORK_API_URL or TRUSTLESS_WORK_API_KEY');
-}
-
-const _BASE_URL: string = BASE_URL;
-const _API_KEY: string = API_KEY;
-
 export class TrustlessWorkRequestError extends Error {
   statusCode: number;
   messages?: string[];
@@ -27,6 +17,17 @@ type TrustlessWorkRequestOptions = {
   body?: unknown;
 };
 
+function getTrustlessWorkConfig(): { baseUrl: string; apiKey: string } {
+  const baseUrl = process.env.TRUSTLESS_WORK_API_URL;
+  const apiKey = process.env.TRUSTLESS_WORK_API_KEY;
+
+  if (!baseUrl || !apiKey) {
+    throw new Error('Missing TRUSTLESS_WORK_API_URL or TRUSTLESS_WORK_API_KEY');
+  }
+
+  return { baseUrl, apiKey };
+}
+
 export function extractTransactionHash(result: Record<string, unknown>): string | null {
   if (typeof result.transactionHash === 'string' && result.transactionHash.length > 0) {
     return result.transactionHash;
@@ -44,12 +45,14 @@ export async function trustlessWorkRequest<T>(
   path: string,
   options: TrustlessWorkRequestOptions = {},
 ): Promise<T> {
-  const response = await fetch(`${_BASE_URL}${path}`, {
+  const { baseUrl, apiKey } = getTrustlessWorkConfig();
+
+  const response = await fetch(`${baseUrl}${path}`, {
     method: options.method ?? 'POST',
     signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': _API_KEY,
+      'x-api-key': apiKey,
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });

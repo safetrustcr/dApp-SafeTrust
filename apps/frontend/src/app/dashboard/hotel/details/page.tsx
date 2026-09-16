@@ -6,6 +6,14 @@ import Information from "@/components/hotels/details/Information";
 import Details from "@/components/hotels/details/Details";
 import HotelMap from "@/components/hotels/payment/Map";
 
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      [elementName: string]: any;
+    }
+  }
+}
+
 export default function HotelPage() {
   const images = [
     "/img/room1.png",

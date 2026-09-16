@@ -30,9 +30,7 @@ type SyncWalletResponse = {
  * current primary wallet so the change is atomic.
  */
 export const syncWalletHandler = async (
-  req: AuthenticatedRequest & { body: SyncWalletBody },
-  res: Response<SyncWalletResponse | { error: string }>
-): Promise<Response> => {
+req: AuthenticatedRequest & { body: SyncWalletBody; }, res: Response<SyncWalletResponse | { error: string; }>, next: unknown): Promise<Response> => {
   const { uid } = req.user;
   const { walletAddress, chainType, isPrimary = false, provider } = req.body;
 

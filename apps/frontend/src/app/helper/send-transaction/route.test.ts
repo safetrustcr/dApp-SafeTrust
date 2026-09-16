@@ -403,7 +403,7 @@ describe('POST /helper/send-transaction — idempotent legacy insert', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.escrowId).toBe('existing-escrow-id');
-    expect(mockInsertEscrow).not.toHaveBeenCalled();
+    expect(mockInsertEscrow).toHaveBeenCalledTimes(0);
   });
 
   it('inserts new record when no existing public.escrows found', async () => {

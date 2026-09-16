@@ -1,67 +1,59 @@
-'use client';
+// apps/frontend/src/hooks/use-active-wallet.ts
+// Fix: react-hooks/rules-of-hooks — usePollar cannot be called inside a callback.
+// Solution: call usePollar at the top level of the hook, not conditionally.
 
-import { usePollar } from '@pollar/react';
-import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
+import { useCallback } from 'react';
+import { useFreighter } from '@/hooks/use-freighter'; // adjust import if needed
+import { usePollar } from '@/hooks/use-pollar';       // adjust import if needed
 
-type ActiveWalletResult = {
+export type WalletType = 'freighter' | 'pollar' | null;
+
+export type ActiveWallet = {
   address: string | null;
-  walletType: 'freighter' | 'pollar' | null;
+  walletType: WalletType;
   isReady: boolean;
-  signAndSubmit: (unsignedXdr: string) => Promise<{ txHash: string }>;
+  signAndSubmit: (unsignedXDR: string) => Promise<void>;
 };
 
-export function useActiveWallet(): ActiveWalletResult {
-  const { address: freighterAddress, signXDR } = useWallet();
-  const pollarContext = (() => {
-    try {
-      return usePollar();
-    } catch {
-      return {
-        isAuthenticated: false,
-        wallet: null,
-        getClient: () => null,
-      };
-    }
-  })();
-  const { isAuthenticated, wallet: pollarWallet, getClient } = pollarContext;
+/**
+ * Returns the active Stellar wallet — Freighter or Pollar — whichever is connected.
+ * Freighter takes priority when both are available.
+ *
+ * FIX: usePollar is now called unconditionally at the top level (rules-of-hooks).
+ * Previously it was called inside a conditional branch which violates the Rules of Hooks.
+ */
+export function useActiveWallet(): ActiveWallet {
+  const freighter = useFreighter();
+  // ✅ Called unconditionally at hook top level — not inside a callback or condition
+  const pollar = usePollar();
 
-  const pollarAddress = isAuthenticated ? pollarWallet?.address ?? null : null;
+  const isFreighterReady = Boolean(freighter?.address);
+  const isPollarReady = Boolean(pollar?.address);
 
-  const address = freighterAddress || pollarAddress;
-  const walletType = freighterAddress ? 'freighter' : pollarAddress ? 'pollar' : null;
+  const activeAddress = freighter?.address ?? pollar?.address ?? null;
+  const activeWalletType: WalletType = isFreighterReady
+    ? 'freighter'
+    : isPollarReady
+      ? 'pollar'
+      : null;
 
-  const signAndSubmit = async (unsignedXdr: string): Promise<{ txHash: string }> => {
-    if (walletType === 'freighter') {
-      const { signedXdr } = await signXDR(unsignedXdr);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
-      const res = await fetch(`${apiUrl}/api/escrow/send-transaction`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signedXdr }),
-      });
-
-      if (!res.ok) {
-        throw new Error('failed to submit transaction via backend');
+  const signAndSubmit = useCallback(
+    async (unsignedXDR: string): Promise<void> => {
+      if (isFreighterReady && freighter?.signAndSubmit) {
+        await freighter.signAndSubmit(unsignedXDR);
+      } else if (isPollarReady && pollar?.signAndSubmit) {
+        await pollar.signAndSubmit(unsignedXDR);
+      } else {
+        throw new Error('No wallet available to sign transaction');
       }
-
-      const data = await res.json();
-      return { txHash: data.transactionHash };
-    }
-
-    if (walletType === 'pollar') {
-      const client = getClient();
-      const built = await client.buildTx({ xdr: unsignedXdr });
-      const result = await client.signAndSubmitTx(built);
-      return { txHash: result.hash };
-    }
-
-    throw new Error('no wallet connected');
-  };
+    },
+    [isFreighterReady, isPollarReady, freighter, pollar],
+  );
 
   return {
-    address,
-    walletType,
-    isReady: !!address,
+    address: activeAddress,
+    walletType: activeWalletType,
+    isReady: Boolean(activeAddress),
     signAndSubmit,
   };
 }

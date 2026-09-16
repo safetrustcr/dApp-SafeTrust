@@ -10,7 +10,8 @@ import { truncateStellarAddress } from '@/lib/utils';
 type EscrowPayFlowProps = {
   apartmentId: string;
   apartmentName: string;
-  ownerWalletAddress: string;
+  /** Stellar G-address of the apartment owner — receiver role in the escrow. */
+  ownerAddress: string;
   amount: number;
 };
 
@@ -24,95 +25,54 @@ type DeployResponse = {
   message?: string;
 };
 
-type SendTransactionResponse = {
-  contractId: string;
-  engagementId: string;
-  escrowId: string;
-  status: string;
-  transactionHash: string | null;
-};
-
-const flowStyles = {
-  button: {
-    border: '1px solid #f97316',
-    backgroundColor: '#f97316',
-    color: '#ffffff',
-    fontWeight: 700,
-    padding: '0.6rem 1.5rem',
-    borderRadius: '0.75rem',
-  },
-  panel: {
-    border: '1px solid #fed7aa',
-    borderRadius: '1rem',
-    backgroundColor: '#ffffff',
-    padding: '1rem',
-  },
-  errorList: {
-    margin: 0,
-    paddingLeft: '1.25rem',
-    color: '#b91c1c',
-    fontSize: '0.9rem',
-  },
-} as const;
-
 export function EscrowPayFlow({
   apartmentId,
   apartmentName,
-  ownerWalletAddress,
+  ownerAddress,
   amount,
 }: EscrowPayFlowProps) {
   const router = useRouter();
-  const { address, walletType, isReady, signAndSubmit } = useActiveWallet();
+  const { address, isReady, signAndSubmit } = useActiveWallet();
   const [deploying, setDeploying] = useState(false);
   const [signing, setSigning] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [deployState, setDeployState] = useState<DeployResponse | null>(null);
 
-  const hasOwnerWallet = STELLAR_ADDRESS_RE.test(ownerWalletAddress);
+  const hasOwnerWallet = STELLAR_ADDRESS_RE.test(ownerAddress);
   const canPay = isReady && hasOwnerWallet;
 
   const payButtonLabel = useMemo(() => {
-    if (deploying) return 'Deploying escrow...';
-    if (signing) return 'Awaiting wallet signature...';
+    if (deploying) return 'Deploying…';
+    if (signing) return 'Signing…';
+    if (deployState) return 'Sign & Send';
     return 'PAY';
-  }, [deploying, signing]);
+  }, [deploying, signing, deployState]);
 
   const handleDeploy = async () => {
     if (!address) {
-      setErrorMessages(['Connect your Stellar wallet before deploying escrow.']);
+      setErrorMessages(['Connect your Stellar wallet before paying.']);
       return;
     }
-
-    if (!hasOwnerWallet) {
-      setErrorMessages(['Owner wallet not available — payment is disabled until the owner links a Stellar wallet.']);
-      return;
-    }
-
     setDeploying(true);
     setDeployState(null);
     setErrorMessages([]);
-
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
       const response = await fetch(`${baseUrl}/api/escrow/deploy`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           apartmentId,
           senderAddress: address,
-          receiverAddress: ownerWalletAddress,
+          receiverAddress: ownerAddress,
           amount,
         }),
       });
-
       const payload = await response.json();
       if (!response.ok) {
         setErrorMessages(getErrorMessages(payload, 'Failed to deploy escrow.'));
         return;
       }
-
       setDeployState(payload as DeployResponse);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to deploy escrow.'));
@@ -122,85 +82,86 @@ export function EscrowPayFlow({
   };
 
   const handleSignAndSend = async () => {
-    if (!deployState || !address) {
-      return;
-    }
-
+    if (!deployState || !address) return;
     setSigning(true);
     setErrorMessages([]);
-
     try {
-      // Reemplaza signXDR y fetch por la función unificada del hook
       await signAndSubmit(deployState.unsignedXDR);
-
-      // Redirige directamente usando el engagementId obtenido en el deploy
       router.push(`/apartment/${apartmentId}/escrow/${deployState.engagementId}`);
     } catch (error) {
-      setErrorMessages(getErrorMessages(error, 'Failed to complete escrow signing.'));
+      setErrorMessages(getErrorMessages(error, 'Failed to sign escrow.'));
     } finally {
       setSigning(false);
     }
   };
 
-  return (
-    <>
+  // ── Render: PAY button only — no extra panel, no double error banner ──────
+  // The button sits inline in ApartmentPropertyCard's header row.
+  // Error messages render below the button, inside the card header area.
+
+  if (!hasOwnerWallet) {
+    return (
       <span
-        style={{ display: 'inline-block', cursor: !canPay ? 'not-allowed' : undefined }}
-        title={
-          !hasOwnerWallet
-            ? 'Owner wallet not available'
-            : !isWalletConnected
-              ? 'Connect wallet to pay'
-              : deployState
-                ? 'Sign and submit escrow transaction'
-                : `Deploy escrow for ${apartmentName}`
-        }
+        title="Owner wallet not available"
+        style={{ display: 'inline-block', cursor: 'not-allowed' }}
       >
         <button
           type="button"
-          onClick={deployState ? handleSignAndSend : handleDeploy}
-          disabled={!canPay || deploying || signing}
+          disabled
           style={{
-            ...flowStyles.button,
-            opacity: !canPay || deploying || signing ? 0.7 : 1,
-            cursor: deploying || signing ? 'wait' : !canPay ? 'not-allowed' : 'pointer',
-            pointerEvents: !canPay ? 'none' : undefined,
+            ...buttonStyle,
+            opacity: 0.45,
+            cursor: 'not-allowed',
           }}
         >
-          {payButtonLabel}
+          PAY
         </button>
       </span>
+    );
+  }
 
-      <div style={flowStyles.panel}>
-        <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Wallet signing</h3>
-        {!hasOwnerWallet && (
-          <p style={{ margin: 0, color: '#b91c1c', fontSize: '0.9rem' }}>
-            Owner wallet not available — payment is disabled until the owner links a Stellar wallet.
-          </p>
-        )}
-        {hasOwnerWallet && !deployState && (
-          <p style={{ margin: 0, color: '#6b7280', fontSize: '0.9rem' }}>
-            Deploy the escrow first, then Freighter will open so you can sign the XDR.
-          </p>
-        )}
-        {deployState && (
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            <p style={{ margin: 0, color: '#6b7280', fontSize: '0.9rem' }}>
-              Unsigned XDR is ready for engagement <strong>{deployState.engagementId}</strong>.
-            </p>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: '#9ca3af' }}>
-              Contract ID: <span title={deployState.contractId}>{truncateStellarAddress(deployState.contractId)}</span>
-            </p>
-          </div>
-        )}
-        {errorMessages.length > 0 && (
-          <ul style={flowStyles.errorList}>
-            {errorMessages.map((message, index) => (
-              <li key={index}>{message}</li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+      <button
+        type="button"
+        onClick={deployState ? handleSignAndSend : handleDeploy}
+        disabled={!canPay || deploying || signing}
+        style={{
+          ...buttonStyle,
+          opacity: !canPay || deploying || signing ? 0.65 : 1,
+          cursor: deploying || signing ? 'wait' : !canPay ? 'not-allowed' : 'pointer',
+          minWidth: '5.5rem',
+        }}
+      >
+        {payButtonLabel}
+      </button>
+
+      {deployState && (
+        <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280', textAlign: 'right' }}>
+          XDR ready ·{' '}
+          <span title={deployState.contractId}>
+            {truncateStellarAddress(deployState.contractId)}
+          </span>
+        </p>
+      )}
+
+      {errorMessages.length > 0 && (
+        <ul style={{ margin: 0, paddingLeft: '1rem', color: '#b91c1c', fontSize: '0.8rem', textAlign: 'left' }}>
+          {errorMessages.map((msg, i) => <li key={i}>{msg}</li>)}
+        </ul>
+      )}
+    </div>
   );
 }
+
+const buttonStyle = {
+  border: '1px solid #f97316',
+  backgroundColor: '#f97316',
+  color: '#ffffff',
+  fontWeight: 700,
+  padding: '0.5rem 1.75rem',
+  borderRadius: '0.75rem',
+  fontSize: '0.95rem',
+  letterSpacing: '0.03em',
+  lineHeight: 1,
+} as const;

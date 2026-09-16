@@ -37,9 +37,9 @@ function verifySignature(rawBody: string, signature: string, secret: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.TRUSTLESS_WORK_WEBHOOK_SECRET;
+  const secret = process.env.HASURA_ADMIN_SECRET;
   if (!secret) {
-    return NextResponse.json({ error: 'Missing TRUSTLESS_WORK_WEBHOOK_SECRET' }, { status: 500 });
+    return NextResponse.json({ error: 'Missing HASURA_ADMIN_SECRET' }, { status: 500 });
   }
 
   const signature = getSignatureHeader(request);

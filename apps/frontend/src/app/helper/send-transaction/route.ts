@@ -1,4 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+// Compatibility shim for environments where the Next.js server types are not available.
+// In the App Router runtime, Request/Response are provided by the platform, so we can
+// safely use the standard Web APIs without depending on the `next/server` module.
+type NextRequest = Request;
+const NextResponse = Response;
 
 import { hasuraRequest, insertEscrowRecord } from '@/lib/server/hasura';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
@@ -15,6 +19,9 @@ import {
   dbDisputeEscrow,
   dbResolveDispute,
 } from '@/lib/server/escrow-db';
+
+// Force Next.js to treat this route as purely dynamic (prevents static build-time execution)
+export const dynamic = 'force-dynamic';
 
 type EscrowAction =
   | 'initialize'
