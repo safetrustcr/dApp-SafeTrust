@@ -14,8 +14,8 @@ import {
 
 const styles = {
   card: {
-    border: "1px solid #fed7aa",
-    borderRadius: "1rem",
+    border: "none",
+    borderRadius: 0,
     backgroundColor: "#ffffff",
     overflow: "hidden",
   } satisfies CSSProperties,
@@ -23,9 +23,10 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff7ed",
-    borderTop: "1px solid #fed7aa",
-    padding: "0.875rem 1.5rem",
+    backgroundColor: "#fff9f0",
+    borderTop: "1px solid #e7e2da",
+    borderBottom: "1px solid #e7e2da",
+    padding: "0.75rem 1rem",
     flexWrap: "wrap" as const,
     gap: "0.5rem",
   } satisfies CSSProperties,
@@ -37,7 +38,7 @@ const styles = {
   } satisfies CSSProperties,
   depositValue: {
     margin: 0,
-    fontSize: "1.2rem",
+    fontSize: "1.05rem",
     fontWeight: 800,
     color: "#f97316",
   } satisfies CSSProperties,
@@ -48,8 +49,7 @@ const styles = {
     marginLeft: "0.25rem",
   } satisfies CSSProperties,
   ownerSection: {
-    borderTop: "1px solid #fed7aa",
-    padding: "1.25rem 1.5rem",
+    padding: "1rem",
     display: "grid",
     gap: "1rem",
   } satisfies CSSProperties,
@@ -68,10 +68,10 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: "0.4rem",
-    padding: "0.35rem 0.75rem",
+    padding: "0.2rem 0.4rem",
     borderRadius: "9999px",
-    backgroundColor: "#fff7ed",
-    border: "1px solid #fed7aa",
+    backgroundColor: "transparent",
+    border: "none",
     fontSize: "0.85rem",
     fontWeight: 500,
     color: "#92400e",
@@ -103,7 +103,7 @@ export function EscrowPendingView({ escrow }: { escrow?: EscrowDetail }) {
   const hasPhone = Boolean(owner?.phone_number);
 
   return (
-    <div style={{ display: "grid", gap: "1.5rem" }}>
+    <div style={{ display: "grid", gap: "1.1rem" }}>
       <div style={styles.card}>
         {apartment ? (
           <ApartmentPropertyCard

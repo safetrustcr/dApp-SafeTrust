@@ -29,14 +29,14 @@ export function InvoiceHeader({
   return (
     <div
       style={{
-        padding: '0 0 1.25rem',
+        padding: '0 0 0.75rem',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>
+        <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#202124', lineHeight: 1.1 }}>
           {invoiceNumber}
         </h1>
-        <EscrowStatusBadge status={status} className="px-4 py-1 text-sm font-bold" />
+        <EscrowStatusBadge status={status} className="px-3 py-1 text-xs font-bold" />
       </div>
       {status !== 'pending_signature' && paidAt && (
         <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#6b7280' }}>

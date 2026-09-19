@@ -89,7 +89,7 @@ type EscrowRecord = {
 
 const styles = {
   pageWrapper: {
-    backgroundColor: '#eeeeee',
+    backgroundColor: '#f5f5f5',
     minHeight: '100vh',
   } satisfies CSSProperties,
   topBar: {
@@ -97,10 +97,10 @@ const styles = {
     borderBottom: '1px solid #e5e7eb',
   } satisfies CSSProperties,
   topBarInner: {
-    maxWidth: '76rem',
-    minHeight: '4.5rem',
+    maxWidth: '68rem',
+    minHeight: '3.75rem',
     margin: '0 auto',
-    padding: '0 2rem',
+    padding: '0 1.5rem',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -109,17 +109,17 @@ const styles = {
   brand: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.75rem',
+    gap: '0.5rem',
     color: '#202124',
-    fontSize: '1.65rem',
+    fontSize: '1.2rem',
     fontWeight: 800,
     whiteSpace: 'nowrap',
   } satisfies CSSProperties,
   searchBar: {
-    flex: '1 1 28rem',
-    maxWidth: '31rem',
-    minWidth: '16rem',
-    height: '2rem',
+    flex: '1 1 20rem',
+    maxWidth: '18rem',
+    minWidth: '12rem',
+    height: '1.75rem',
     borderRadius: '999px',
     backgroundColor: '#d9d9d9',
     display: 'flex',
@@ -144,34 +144,34 @@ const styles = {
     whiteSpace: 'nowrap',
   } satisfies CSSProperties,
   page: {
-    maxWidth: '76rem',
+    maxWidth: '68rem',
     margin: '0 auto',
-    padding: '2.2rem 2rem 3.5rem',
+    padding: '2.75rem 1.5rem 3.5rem',
     color: '#202124',
   } satisfies CSSProperties,
   invoiceHeading: {
     display: 'flex',
     alignItems: 'center',
-    gap: '1.5rem',
+    gap: '0.85rem',
     flexWrap: 'wrap',
   } satisfies CSSProperties,
   grid: {
     display: 'grid',
-    gap: '1.75rem',
-    marginTop: '2rem',
+    gap: '1.25rem',
+    marginTop: '1.5rem',
     alignItems: 'start',
   } satisfies CSSProperties,
   leftPanel: {
     backgroundColor: '#ffffff',
-    border: '1px solid #d4d4d4',
-    borderRadius: '0.35rem',
-    padding: '1.75rem',
+    border: '1px solid #dedede',
+    borderRadius: '0.25rem',
+    padding: '0.9rem',
   } satisfies CSSProperties,
   rightPanel: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2rem',
-    paddingTop: '1.55rem',
+    gap: '1rem',
+    padding: '1.7rem 1rem 0',
   } satisfies CSSProperties,
   splitGrid: {
     display: 'grid',
@@ -186,12 +186,12 @@ const styles = {
   input: {
     width: '100%',
     border: '1px solid #d8d8d8',
-    borderRadius: '0.35rem',
-    padding: '1rem 1.1rem',
+    borderRadius: '0.2rem',
+    padding: '0.75rem',
     font: 'inherit',
     fontSize: '0.78rem',
     resize: 'none',
-    minHeight: '6rem',
+    minHeight: '5rem',
     backgroundColor: '#ffffff',
     color: '#5f6368',
     lineHeight: 1.28,
@@ -205,7 +205,7 @@ const styles = {
   divider: {
     border: 'none',
     borderTop: '1px solid #cfcfcf',
-    margin: '1rem 0 1.7rem',
+    margin: '0.85rem 0 1.25rem',
   } satisfies CSSProperties,
   productCell: {
     display: 'flex',
@@ -339,10 +339,10 @@ function StatusPill({ status }: { status: EscrowStatus }) {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        minHeight: '2rem',
-        borderRadius: '0.8rem',
-        padding: '0 1rem',
-        fontSize: '0.82rem',
+        minHeight: '1.5rem',
+        borderRadius: '999px',
+        padding: '0 0.7rem',
+        fontSize: '0.68rem',
         fontWeight: 700,
         ...STATUS_COLORS[status],
       }}
@@ -357,7 +357,7 @@ function PageTopBar() {
     <header style={styles.topBar}>
       <div style={styles.topBarInner}>
         <div style={styles.brand}>
-          <Image src="/img/logo.png" alt="SafeTrust" width={44} height={44} priority />
+          <Image src="/img/logo.png" alt="SafeTrust" width={28} height={28} priority />
           <span>SafeTrust</span>
         </div>
 
@@ -398,22 +398,22 @@ function PageTopBar() {
 
 function ProcessTimeline({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
   return (
-    <div style={{ display: 'grid', gap: '1.55rem' }}>
+    <div style={{ display: 'grid', gap: '1.1rem' }}>
       {PROCESS_STEPS.map(({ step, title, body, icon: Icon }, index) => {
         const isReached = step <= currentStep;
         const markerColor = isReached ? '#4ff291' : '#d8d8d8';
         const lineColor = isReached && step < currentStep ? '#5ddf94' : '#d0d0d0';
 
         return (
-          <div key={step} style={{ display: 'grid', gridTemplateColumns: '2.4rem 1fr', gap: '1rem' }}>
+          <div key={step} style={{ display: 'grid', gridTemplateColumns: '1.75rem 1fr', gap: '0.7rem' }}>
             <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
               {index < PROCESS_STEPS.length - 1 && (
                 <span
                   aria-hidden="true"
                   style={{
                     position: 'absolute',
-                    top: '1.75rem',
-                    bottom: '-1.55rem',
+                    top: '1.4rem',
+                    bottom: '-1.1rem',
                     width: '1px',
                     backgroundColor: lineColor,
                   }}
@@ -423,8 +423,8 @@ function ProcessTimeline({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
                 style={{
                   position: 'relative',
                   zIndex: 1,
-                  width: '1.75rem',
-                  height: '1.75rem',
+                  width: '1.4rem',
+                  height: '1.4rem',
                   borderRadius: '999px',
                   backgroundColor: markerColor,
                   color: '#057a46',
@@ -434,12 +434,12 @@ function ProcessTimeline({ currentStep }: { currentStep: 1 | 2 | 3 | 4 }) {
                   border: '1px solid #23ca76',
                 }}
               >
-                <Icon size={14} strokeWidth={2.1} />
+                  <Icon size={12} strokeWidth={2.1} />
               </span>
             </div>
             <div style={{ paddingTop: '0.12rem' }}>
-              <p style={{ margin: 0, color: '#5f6368', fontSize: '0.79rem', lineHeight: 1.35 }}>
-                <strong style={{ display: 'block', color: '#3c4043', marginBottom: '0.2rem' }}>{title}</strong>
+              <p style={{ margin: 0, color: '#737373', fontSize: '0.64rem', lineHeight: 1.3 }}>
+                <strong style={{ display: 'block', color: '#27272a', marginBottom: '0.16rem', fontSize: '0.76rem' }}>{title}</strong>
                 {body}
               </p>
             </div>
@@ -1257,7 +1257,7 @@ export default function EscrowDetailPage({
       <div className="responsive-page" style={styles.page}>
         <div>
           <div style={styles.invoiceHeading}>
-            <h1 style={{ margin: 0, fontSize: '1.9rem', fontWeight: 900, letterSpacing: '0.02em' }}>
+            <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, letterSpacing: '0.01em' }}>
               {invoiceNumber}
             </h1>
             <StatusPill status={status} />
@@ -1273,9 +1273,9 @@ export default function EscrowDetailPage({
 
         {actionError && actionError.length > 0 && <ErrorAlert messages={actionError} />}
 
-        <div className="responsive-grid" style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 2.05fr) minmax(18rem, 1fr)' }}>
+        <div className="responsive-grid" style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 1.8fr) minmax(15rem, 0.9fr)' }}>
           <div style={styles.leftPanel}>
-            <h2 style={{ marginTop: 0, marginBottom: '0.9rem', fontSize: '1.55rem', fontWeight: 900 }}>
+            <h2 style={{ marginTop: 0, marginBottom: '0.65rem', fontSize: '1rem', fontWeight: 700 }}>
               {view.title}
             </h2>
 
@@ -1361,18 +1361,18 @@ export default function EscrowDetailPage({
 
           <div style={styles.rightPanel}>
             <div>
-              <h3 style={{ marginTop: 0, marginBottom: '1.15rem', fontSize: '1.1rem', fontWeight: 900 }}>Notes</h3>
+              <h3 style={{ marginTop: 0, marginBottom: '0.7rem', fontSize: '0.85rem', fontWeight: 700 }}>Notes</h3>
               <textarea
                 id="escrow-notes-input"
-                style={{ ...styles.input, minHeight: '6.9rem' }}
+                style={{ ...styles.input, minHeight: '5.15rem' }}
                 placeholder="Add notes..."
               />
             </div>
 
-            <hr style={{ border: 'none', borderTop: '1px solid #c5c5c5', margin: '0' }} />
+            <hr style={{ border: 'none', borderTop: '1px solid #d4d4d4', margin: '0.1rem 0' }} />
 
             <div>
-              <h3 style={{ marginTop: 0, marginBottom: '1.45rem', fontSize: '1.1rem', fontWeight: 900 }}>Process</h3>
+              <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '0.85rem', fontWeight: 700 }}>Process</h3>
               <ProcessTimeline currentStep={view.step} />
             </div>
           </div>

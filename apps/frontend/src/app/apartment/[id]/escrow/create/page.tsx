@@ -14,15 +14,16 @@ import { GET_APARTMENT_BY_ID } from "@/graphql/queries/apartment-queries";
 
 const styles = {
   page: {
-    maxWidth: "72rem",
+    maxWidth: "68rem",
     margin: "0 auto",
-    padding: "2rem 1.5rem 3rem",
+    padding: "2.75rem 1.5rem 3.5rem",
     color: "#111827",
+    minHeight: "calc(100vh - 4rem)",
   } satisfies CSSProperties,
 
   card: {
-    border: "1px solid #fed7aa",
-    borderRadius: "1rem",
+    border: "1px solid #dedede",
+    borderRadius: "0.25rem",
     backgroundColor: "#ffffff",
     overflow: "hidden",
   } satisfies CSSProperties,
@@ -31,9 +32,10 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff7ed",
-    borderTop: "1px solid #fed7aa",
-    padding: "1rem 1.5rem",
+    backgroundColor: "#fff9f0",
+    borderTop: "1px solid #e7e2da",
+    borderBottom: "1px solid #e7e2da",
+    padding: "0.75rem 1rem",
     flexWrap: "wrap" as const,
     gap: "0.5rem",
   } satisfies CSSProperties,
@@ -47,7 +49,7 @@ const styles = {
 
   amountValue: {
     margin: 0,
-    fontSize: "1.25rem",
+    fontSize: "1.05rem",
     fontWeight: 800,
     color: "#f97316",
   } satisfies CSSProperties,
@@ -59,8 +61,7 @@ const styles = {
   } satisfies CSSProperties,
 
   ownerSection: {
-    borderTop: "1px solid #fed7aa",
-    padding: "1.5rem",
+    padding: "1rem",
     display: "grid",
     gap: "1.25rem",
   } satisfies CSSProperties,
@@ -74,8 +75,8 @@ const styles = {
 
   ownerGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(14rem, 1fr))",
-    gap: "1rem",
+    gridTemplateColumns: "repeat(auto-fit, minmax(12rem, 1fr))",
+    gap: "0.75rem",
   } satisfies CSSProperties,
 
   ownerRow: {
@@ -85,11 +86,11 @@ const styles = {
   } satisfies CSSProperties,
 
   ownerIconWrap: {
-    width: "2rem",
-    height: "2rem",
+    width: "1.5rem",
+    height: "1.5rem",
     borderRadius: "9999px",
-    backgroundColor: "#fff7ed",
-    border: "1px solid #fed7aa",
+    backgroundColor: "#fff9f0",
+    border: "none",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -119,9 +120,9 @@ const styles = {
     color: "#92400e",
     fontSize: "0.85rem",
     backgroundColor: "#fff7ed",
-    border: "1px solid #fed7aa",
-    borderRadius: "0.75rem",
-    padding: "0.75rem 1rem",
+    border: "1px solid #f2c58a",
+    borderRadius: "0.25rem",
+    padding: "0.65rem 0.8rem",
     lineHeight: 1.5,
   } satisfies CSSProperties,
 
@@ -254,8 +255,9 @@ export default function EscrowCreatePage({
   const depositAmount = apartment?.warranty_deposit ?? apartment?.price ?? 0;
 
   return (
-    <div style={styles.page}>
-      <EscrowDetailLayout invoiceNumber="INV4257-09-012" status="pending">
+    <div style={{ backgroundColor: "#f5f5f5", minHeight: "calc(100vh - 4rem)" }}>
+      <div style={styles.page}>
+        <EscrowDetailLayout invoiceNumber="INV4257-09-012" status="pending">
 
         {/* ── Loading ───────────────────────────────────────────────────── */}
         {loading && (
@@ -366,7 +368,8 @@ export default function EscrowCreatePage({
           </div>
         )}
 
-      </EscrowDetailLayout>
+        </EscrowDetailLayout>
+      </div>
     </div>
   );
 }
