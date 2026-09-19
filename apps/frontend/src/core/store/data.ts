@@ -38,12 +38,17 @@ export const useGlobalAuthenticationStore = create<AuthState>()(
         set({ token });
       },
 
-      connectWalletStore: (address, name) =>
-        set({ address, name, walletType: name, isConnected: true }),
+      connectWalletStore: (address, name) => {
+        if (typeof document !== "undefined") {
+          document.cookie = `auth-token=mock-wallet-token-${address}; max-age=${7 * 24 * 60 * 60}; path=/; samesite=strict`;
+        }
+        set({ address, name, walletType: name, isConnected: true });
+      },
 
       disconnectWalletStore: () => {
         if (typeof document !== "undefined") {
           document.cookie = "firebase-token=; max-age=0; path=/;";
+          document.cookie = "auth-token=; max-age=0; path=/;";
         }
         set({
           address: null,
@@ -57,6 +62,7 @@ export const useGlobalAuthenticationStore = create<AuthState>()(
       disconnect: () => {
         if (typeof document !== "undefined") {
           document.cookie = "firebase-token=; max-age=0; path=/;";
+          document.cookie = "auth-token=; max-age=0; path=/;";
         }
         set({
           address: null,

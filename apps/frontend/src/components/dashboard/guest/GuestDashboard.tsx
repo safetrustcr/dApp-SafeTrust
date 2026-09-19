@@ -5,8 +5,9 @@ import { useQuery } from "@apollo/client";
 import { Bath, BedDouble, Heart, MapPin, PawPrint, Loader2, Search, Bell, User, ChevronDown } from "lucide-react";
 import { GET_ALL_APARTMENTS } from "@/graphql/queries/apartment-queries";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
+import { promoteToHost } from "@/lib/auth/promote-to-host";
 
 interface Apartment {
   id: string;
@@ -44,8 +45,34 @@ function getImage(apt: Apartment, fallbackIndex = 0): string {
 
 export default function GuestDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { token } = useGlobalAuthenticationStore();
   const [searchQuery, setSearchQuery] = useState("");
+  const [isPromoting, setIsPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState("");
+
+  // Set by the middleware when a guest is bounced off a host-only route.
+  const wasBlocked = searchParams.get("blocked") === "true";
+
+  async function handleSwitchToHost() {
+    if (!token) {
+      setPromoteError("You need to be signed in to become a host");
+      return;
+    }
+
+    setIsPromoting(true);
+    setPromoteError("");
+
+    try {
+      await promoteToHost(token);
+      // Full reload rather than router.push: the middleware must re-read the
+      // now-cleared role cookie to route this user as a host.
+      window.location.href = "/dashboard/escrow-dashboard";
+    } catch (err) {
+      setPromoteError(err instanceof Error ? err.message : "Failed to switch to host view");
+      setIsPromoting(false);
+    }
+  }
 
   // Decode name from token for avatar
   const userName = (() => {
@@ -106,10 +133,12 @@ export default function GuestDashboard() {
           <div className="flex items-center gap-3 shrink-0">
             <button
               type="button"
-              onClick={() => router.push("/dashboard")}
-              className="hidden md:flex items-center gap-1.5 text-sm font-medium text-orange-500 hover:text-orange-600 transition-colors"
+              onClick={handleSwitchToHost}
+              disabled={isPromoting}
+              className="hidden md:flex items-center gap-1.5 text-sm font-medium text-orange-500 hover:text-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Switch to Host view
+              {isPromoting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {isPromoting ? "Switching…" : "Switch to Host view"}
             </button>
             <button type="button" className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
               <Bell className="h-5 w-5 text-gray-600" />
@@ -126,6 +155,30 @@ export default function GuestDashboard() {
 
       {/* ── Body ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {wasBlocked && (
+          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-orange-800">
+              That page is only available to hosts. Switch to a host account to list and manage
+              properties.
+            </p>
+            <button
+              type="button"
+              onClick={handleSwitchToHost}
+              disabled={isPromoting}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isPromoting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isPromoting ? "Switching…" : "Switch to Host view"}
+            </button>
+          </div>
+        )}
+
+        {promoteError && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {promoteError}
+          </div>
+        )}
+
         {loading && (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="h-8 w-8 animate-spin text-orange-500" />

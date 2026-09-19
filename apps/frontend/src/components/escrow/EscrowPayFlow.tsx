@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
-import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
+import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { truncateStellarAddress } from '@/lib/utils';
 
@@ -62,15 +62,14 @@ export function EscrowPayFlow({
   amount,
 }: EscrowPayFlowProps) {
   const router = useRouter();
-  const { address, signXDR } = useWallet();
+  const { address, walletType, isReady, signAndSubmit } = useActiveWallet();
   const [deploying, setDeploying] = useState(false);
   const [signing, setSigning] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [deployState, setDeployState] = useState<DeployResponse | null>(null);
 
-  const isWalletConnected = Boolean(address);
   const hasOwnerWallet = STELLAR_ADDRESS_RE.test(ownerWalletAddress);
-  const canPay = isWalletConnected && hasOwnerWallet;
+  const canPay = isReady && hasOwnerWallet;
 
   const payButtonLabel = useMemo(() => {
     if (deploying) return 'Deploying escrow...';
@@ -94,7 +93,8 @@ export function EscrowPayFlow({
     setErrorMessages([]);
 
     try {
-      const response = await fetch('/api/escrow/deploy', {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/escrow/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,24 +130,17 @@ export function EscrowPayFlow({
     setErrorMessages([]);
 
     try {
-      const signedXdr = await signXDR(deployState.unsignedXDR);
-      const response = await fetch('/api/escrow/send-transaction', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          signedXdr,
-          action: 'initialize',
-          contractId: deployState.contractId,
-          engagementId: deployState.engagementId,
-          apartmentId,
-          senderAddress: address,
-          receiverAddress: ownerWalletAddress,
-          releaser: process.env.NEXT_PUBLIC_PLATFORM_ADDRESS,
-          amount,
-        }),
-      });
+      // Reemplaza signXDR y fetch por la función unificada del hook
+      await signAndSubmit(deployState.unsignedXDR);
+
+      // Redirige directamente usando el engagementId obtenido en el deploy
+      router.push(`/apartment/${apartmentId}/escrow/${deployState.engagementId}`);
+    } catch (error) {
+      setErrorMessages(getErrorMessages(error, 'Failed to complete escrow signing.'));
+    } finally {
+      setSigning(false);
+    }
+  };
 
       const payload = (await response.json()) as SendTransactionResponse & { error?: string; messages?: string[] };
       if (!response.ok) {

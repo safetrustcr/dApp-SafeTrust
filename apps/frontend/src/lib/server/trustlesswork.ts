@@ -27,6 +27,19 @@ type TrustlessWorkRequestOptions = {
   body?: unknown;
 };
 
+export function extractTransactionHash(result: Record<string, unknown>): string | null {
+  if (typeof result.transactionHash === 'string' && result.transactionHash.length > 0) {
+    return result.transactionHash;
+  }
+  if (typeof result.txHash === 'string' && result.txHash.length > 0) {
+    return result.txHash;
+  }
+  if (typeof result.hash === 'string' && result.hash.length > 0) {
+    return result.hash;
+  }
+  return null;
+}
+
 export async function trustlessWorkRequest<T>(
   path: string,
   options: TrustlessWorkRequestOptions = {},

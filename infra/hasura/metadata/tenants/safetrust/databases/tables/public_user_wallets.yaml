@@ -14,6 +14,7 @@ select_permissions:
         - wallet_address
         - chain_type
         - is_primary
+        - provider
         - created_at
         - updated_at
       filter:
@@ -27,6 +28,7 @@ select_permissions:
         - wallet_address
         - chain_type
         - is_primary
+        - provider
         - created_at
         - updated_at
       filter:
@@ -42,6 +44,7 @@ insert_permissions:
         - wallet_address
         - chain_type
         - is_primary
+        - provider
       set:
         user_id: X-Hasura-User-Id
         created_at: "now()"
@@ -54,6 +57,7 @@ insert_permissions:
         - wallet_address
         - chain_type
         - is_primary
+        - provider
       set:
         user_id: X-Hasura-User-Id
         created_at: "now()"

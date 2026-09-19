@@ -1,6 +1,7 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  - 'mcp'
 allowBuilds:
   '@stellar/stellar-sdk': false
   blake-hash: false

@@ -2,6 +2,11 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import authRouter from './routes/auth/sync-user.route.js';
+import activateWalletRouter from './routes/auth/activate-wallet.route.js';
+import deployEscrowRouter from './routes/escrow/deploy.route.js';
+import fundEscrowRouter from './routes/escrow/fund.route.js';
+import milestoneStatusRouter from './routes/escrow/milestone-status.route.js';
+import releaseFundsRouter from './routes/escrow/release-funds.route.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -16,9 +21,13 @@ app.get('/health', (req, res) => {
 
 // Auth routes
 app.use('/api/auth', authRouter);
+app.use('/api/auth', activateWalletRouter);
 
-// TODO: wire escrow routes after trustlesswork.js ESM migration
-// app.use('/api/escrow', escrowRouter);
+// Escrow routes
+app.use('/api/escrow', deployEscrowRouter);
+app.use('/api/escrow', fundEscrowRouter);
+app.use('/api/escrow', milestoneStatusRouter);
+app.use('/api/escrow', releaseFundsRouter);
 
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);

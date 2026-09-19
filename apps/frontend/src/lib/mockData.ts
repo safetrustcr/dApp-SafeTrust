@@ -120,7 +120,9 @@ export const generateMockEscrows = (count: number = 10): EscrowData[] => {
   });
 };
 
-// Generate mock notifications
+/**
+ * @deprecated RoleEscrowDashboardPage derives notifications from Hasura escrow data.
+ */
 export const generateMockNotifications = (escrows: EscrowData[]): NotificationData[] => {
   const notifications: NotificationData[] = [];
   
@@ -187,7 +189,9 @@ export const generateMockNotifications = (escrows: EscrowData[]): NotificationDa
   );
 };
 
-// Helper functions to be used in the components
+/**
+ * @deprecated RoleEscrowDashboardPage now loads escrows with GET_ESCROWS.
+ */
 export const fetchMockEscrows = async (): Promise<EscrowData[]> => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
