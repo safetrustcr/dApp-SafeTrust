@@ -15,6 +15,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "SafeTrust",
   description: "Decentralized P2P Escrow on Stellar Blockchain",
+  icons: {
+    icon: "/img/logo.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
