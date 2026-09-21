@@ -30,8 +30,6 @@ import { toast } from "sonner";
 import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
 import { PollarWalletStatus } from "@/components/auth/pollar/PollarWalletStatus";
 
-const IS_DEV = process.env.NODE_ENV !== "production";
-
 const COUNTRY_CODES = [
   { code: "+506", country: "Costa Rica",     flag: "🇨🇷" },
   { code: "+1",   country: "United States",  flag: "🇺🇸" },
@@ -89,9 +87,6 @@ export default function RegisterPage() {
   const [isLoading,        setIsLoading]       = useState(false);
   const [error,            setError]           = useState("");
 
-  // Dev-only: role selection — never sent in production
-  const [devRole, setDevRole] = useState<"guest" | "host">("guest");
-
   const clearError = () => setError("");
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -146,9 +141,6 @@ export default function RegisterPage() {
           phone_number: phone.trim(),
           country_code: phoneCountryCode,
           location,
-          // ── Dev-only: pass selected role so the API can assign it ─────────
-          // The API ignores this field entirely in production.
-          ...(IS_DEV && { dev_role: devRole }),
         }),
         signal: controller.signal,
       });
@@ -171,9 +163,7 @@ export default function RegisterPage() {
       useGlobalAuthenticationStore.getState().setToken(token);
 
       toast.success("Account created successfully!", {
-        description: IS_DEV
-          ? `Registered as ${devRole}. Please sign in.`
-          : "Please sign in with your new credentials.",
+        description: "Please sign in with your new credentials.",
         duration: 4000,
       });
 
@@ -315,53 +305,6 @@ export default function RegisterPage() {
                 onChange={(e) => { setPassword(e.target.value); clearError(); }}
               />
             </div>
-
-            {/* ── Dev-only role selector ────────────────────────────────────────
-                Visible only in development. Never shown in production.
-                Lets you test guest vs host dashboard flow without needing
-                to call promote-to-host after every fresh DB reset.
-            ─────────────────────────────────────────────────────────────────── */}
-            {IS_DEV && (
-              <div className="space-y-2 rounded-lg border border-dashed border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-3 py-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="inline-flex items-center rounded-md bg-amber-100 dark:bg-amber-900 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-                    DEV ONLY
-                  </span>
-                  <Label htmlFor="devRole" className="text-xs text-amber-700 dark:text-amber-400">
-                    Register as
-                  </Label>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDevRole("guest")}
-                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                      devRole === "guest"
-                        ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
-                    }`}
-                  >
-                    🏠 Guest
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDevRole("host")}
-                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                      devRole === "host"
-                        ? "border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
-                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
-                    }`}
-                  >
-                    🏢 Host
-                  </button>
-                </div>
-                <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1">
-                  {devRole === "host"
-                    ? "Will redirect to /dashboard/escrow-dashboard after login"
-                    : "Will redirect to /dashboard/guest after login"}
-                </p>
-              </div>
-            )}
 
             <Button
               type="submit"

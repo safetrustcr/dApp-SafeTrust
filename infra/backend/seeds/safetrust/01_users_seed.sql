@@ -28,5 +28,15 @@ VALUES
         '+506',
         'Escazú, Costa Rica',
         NOW()
+    ),
+    (
+        'demo-admin-uid-003',
+        'admin@safetrust.local',
+        'Ada',
+        'Admin',
+        '88005566',
+        '+506',
+        'San José, Costa Rica',
+        NOW()
     )
 ON CONFLICT (id) DO NOTHING;

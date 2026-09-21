@@ -6,11 +6,6 @@ interface SyncUserBody {
   phone_number?: string;
   country_code?: string;
   location?:     string;
-  /**
-   * Dev-only: assign a role at registration time.
-   * Ignored entirely when NODE_ENV === 'production'.
-   */
-  dev_role?: 'guest' | 'host';
 }
 
 // ── GraphQL documents ─────────────────────────────────────────────────────────
@@ -106,7 +101,7 @@ export const syncUserHandler = async (
     const [firstName = '', ...rest]  = name.split(' ');
     const lastName                   = rest.join(' ');
 
-    const { phone_number, country_code, location, dev_role } = req.body;
+    const { phone_number, country_code, location } = req.body;
 
     // ── 2. Upsert user in Hasura ─────────────────────────────────────────────
     const upsertData = await executeGraphQL<{
@@ -123,33 +118,20 @@ export const syncUserHandler = async (
 
     const user = upsertData.insert_users_one;
 
-    // ── 3. Dev-only: assign role at registration time ────────────────────────
-    // Ignored in production — lets developers seed guest/host roles without
-    // going through the full promote-to-host flow during local testing.
-    const VALID_DEV_ROLES = ['guest', 'host'] as const;
+    // ── 3. Assign every self-registered account the baseline guest role ─────
+    // Elevated roles are deliberately granted through the host/admin workflows,
+    // never from browser-controlled registration input.
+    const roleData = await executeGraphQL<{ roles: Array<{ id: number }> }>(
+      GET_ROLE_ID,
+      { roleName: 'guest' },
+    );
 
-    if (
-      process.env.NODE_ENV !== 'production' &&
-      dev_role &&
-      VALID_DEV_ROLES.includes(dev_role)
-    ) {
-      const roleData = await executeGraphQL<{ roles: Array<{ id: number }> }>(
-        GET_ROLE_ID,
-        { roleName: dev_role },
-      );
-
-      const roleId = roleData.roles[0]?.id;
-
-      if (roleId !== undefined) {
-        await executeGraphQL(ASSIGN_ROLE, { userId: uid, roleId });
-        console.log(`[sync-user] [DEV] role '${dev_role}' → ${uid}`);
-      } else {
-        console.warn(
-          `[sync-user] [DEV] role '${dev_role}' not found in roles table — ` +
-          'run 07_roles_seed.sql to add it'
-        );
-      }
+    const guestRoleId = roleData.roles[0]?.id;
+    if (guestRoleId === undefined) {
+      throw new Error('Guest role is not configured. Run the SafeTrust database seeds.');
     }
+
+    await executeGraphQL(ASSIGN_ROLE, { userId: uid, roleId: guestRoleId });
 
     console.log(`[sync-user] ✅ user synced — uid: ${uid}`);
     return res.status(200).json({ success: true, user });
