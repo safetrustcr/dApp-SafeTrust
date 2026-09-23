@@ -138,6 +138,16 @@ for TENANT in "${TENANTS[@]}"; do
     --database-name "$TENANT"
   echo "   ✅ Seeds applied for $TENANT"
 done
+
+if [[ " ${TENANTS[*]} " == *" safetrust "* ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  echo "👤 Provisioning SafeTrust Firebase demo users..."
+  (
+    cd "$REPOSITORY_ROOT"
+    pnpm --filter @safetrust/api exec tsx scripts/seed-firebase-users.ts
+  )
+fi
 echo ""
 echo "   💡 If you added a new migration, keep init SQL in sync:"
 echo "      bin/generate-init-sql"

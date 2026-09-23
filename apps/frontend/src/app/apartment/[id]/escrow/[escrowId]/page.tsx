@@ -292,8 +292,13 @@ function getEscrowViewConfig(status: EscrowStatus): ViewConfig {
         title: 'Escrow Deployed — Awaiting Deposit',
         step: 1,
       };
-    case 'funded':
     case 'active':
+    case 'funded':
+      return {
+        label: 'paid',
+        title: 'Payment batch',
+        step: 2,
+      };
     case 'milestone_approved':
       return {
         label: 'blocked',
@@ -1041,7 +1046,7 @@ export default function EscrowDetailPage({
     }
 
     setErrorMessages([]);
-    await execute({
+    const result = await execute({
       apiRoute: '/api/escrow/fund',
       apiBody: {
         contractId: escrow.contract_id,
@@ -1058,7 +1063,8 @@ export default function EscrowDetailPage({
         status: 'funded',
       },
     });
-  }, [escrow, address, execute]);
+    if (result) await refetch();
+  }, [escrow, address, execute, refetch]);
 
   const handleMarkCompleted = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
@@ -1067,7 +1073,7 @@ export default function EscrowDetailPage({
     }
 
     setErrorMessages([]);
-    await execute({
+    const result = await execute({
       apiRoute: '/api/escrow/milestone-status',
       apiBody: {
         contractId: escrow.contract_id,
@@ -1085,7 +1091,8 @@ export default function EscrowDetailPage({
         status: 'milestone_approved',
       },
     });
-  }, [escrow, address, execute]);
+    if (result) await refetch();
+  }, [escrow, address, execute, refetch]);
 
   const handleReleaseFunds = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
@@ -1094,7 +1101,7 @@ export default function EscrowDetailPage({
     }
 
     setErrorMessages([]);
-    await execute({
+    const result = await execute({
       apiRoute: '/api/escrow/release',
       apiBody: {
         contractId: escrow.contract_id,
@@ -1110,7 +1117,8 @@ export default function EscrowDetailPage({
         status: 'completed',
       },
     });
-  }, [escrow, address, execute]);
+    if (result) await refetch();
+  }, [escrow, address, execute, refetch]);
 
   const handleResolveDispute = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {

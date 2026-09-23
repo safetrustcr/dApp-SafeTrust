@@ -32,7 +32,7 @@ export function SideBar({
   return (
     <div
       className={cn(
-        "fixed top-16 flex flex-col h-[calc(100vh-4rem)] bg-background border-r transition-all duration-300 z-40 dark:bg-gray-900 dark:border-gray-700",
+        "fixed top-16 flex h-[calc(100vh-4rem)] flex-col overflow-y-auto overscroll-contain bg-background border-r transition-all duration-300 z-40 dark:bg-gray-900 dark:border-gray-700",
         variant === "drawer"
           ? cn(
               "left-0 w-64 md:hidden transform",
@@ -42,7 +42,7 @@ export function SideBar({
         className,
       )}
     >
-      <div className="flex h-full flex-col items-start gap-4 py-4 px-2 lg:px-4">
+      <div className="flex min-h-full flex-col items-start gap-4 py-4 px-2 lg:px-4">
         <Link
           href="/dashboard/escrow"
           onClick={onClose}
