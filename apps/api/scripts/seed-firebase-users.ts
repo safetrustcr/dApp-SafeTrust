@@ -4,9 +4,13 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { initFirebaseAdmin } from '../src/lib/firebase-admin.js';
+import { ensureUserRole, syncUserProfile, type SafeTrustRole } from '../src/services/user-provisioning.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = resolve(scriptDir, '../..');
+// scripts/ is nested at apps/api/scripts, so the repository root is three
+// levels up. Resolving only two levels up made startup look under /apps/ and
+// silently skip the configured Firebase credentials.
+const repositoryRoot = resolve(scriptDir, '../../..');
 
 // Backend startup is normally run from infra/backend. Load its local config
 // first, while allowing shell variables to take precedence.
@@ -22,7 +26,12 @@ type DemoUser = {
   uid: string;
   email: string;
   displayName: string;
-  role: 'guest' | 'host' | 'admin';
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  countryCode: string;
+  location: string;
+  role: SafeTrustRole;
 };
 
 const demoUsers: DemoUser[] = [
@@ -30,18 +39,24 @@ const demoUsers: DemoUser[] = [
     uid: 'demo-tenant-uid-001',
     email: 'john_s@gmail.com',
     displayName: 'John Smith',
+    firstName: 'John', lastName: 'Smith', phoneNumber: '88001122',
+    countryCode: '+506', location: 'San José, Costa Rica',
     role: 'guest',
   },
   {
     uid: 'demo-owner-uid-002',
     email: 'albertoCasas100@gmail.com',
     displayName: 'Alberto Casas',
+    firstName: 'Alberto', lastName: 'Casas', phoneNumber: '88003344',
+    countryCode: '+506', location: 'Escazú, Costa Rica',
     role: 'host',
   },
   {
     uid: 'demo-admin-uid-003',
     email: 'admin@safetrust.local',
     displayName: 'Ada Admin',
+    firstName: 'Ada', lastName: 'Admin', phoneNumber: '88005566',
+    countryCode: '+506', location: 'San José, Costa Rica',
     role: 'admin',
   },
 ];
@@ -119,6 +134,16 @@ async function main(): Promise<void> {
 
   for (const user of demoUsers) {
     const action = await provisionUser(user, password);
+    await syncUserProfile({
+      id: user.uid,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phoneNumber: user.phoneNumber,
+      countryCode: user.countryCode,
+      location: user.location,
+    });
+    await ensureUserRole(user.uid, user.role);
     console.log(`[firebase-seed] ${action}: ${user.email} (${user.role})`);
   }
 }

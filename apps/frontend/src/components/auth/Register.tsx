@@ -163,11 +163,13 @@ export default function RegisterPage() {
       useGlobalAuthenticationStore.getState().setToken(token);
 
       toast.success("Account created successfully!", {
-        description: "Please sign in with your new credentials.",
+        description: "Taking you to your SafeTrust dashboard.",
         duration: 4000,
       });
 
-      router.push("/login");
+      // The account is already authenticated. Middleware resolves its database
+      // role and sends guests, hosts, and controllers to their correct view.
+      router.push("/dashboard");
 
     } catch (err: unknown) {
       if (err instanceof FirebaseError) {

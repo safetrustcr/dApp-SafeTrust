@@ -31,6 +31,7 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 # Fill in:
 #   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
+#   FIREBASE_SEED_PASSWORD (development password for seeded demo accounts)
 #   TRUSTLESS_WORK_API_KEY
 #   POLLAR_SECRET_KEY (optional)
 
@@ -54,6 +55,8 @@ This command:
 2. Applies migrations for both tenants
 3. Applies Hasura metadata
 4. Outputs service URLs when ready
+5. When Firebase Admin credentials and `FIREBASE_SEED_PASSWORD` are configured,
+   provisions the seeded guest, host, and admin demo users in Firebase Authentication
 
 Expected output:
 ```

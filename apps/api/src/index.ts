@@ -14,6 +14,7 @@ import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
 import messagesRouter from './routes/messages/send.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
+import adminUsersRouter from './routes/admin/users.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
@@ -32,7 +33,7 @@ app.use('/api/auth', syncWalletRouter);
 
 app.use(cors({
   origin: allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
@@ -48,6 +49,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/auth', promoteToHostRouter);
 app.use('/api/auth', activateWalletRouter);
+app.use('/api/admin', adminUsersRouter);
 
 // Escrow routes
 app.use('/api/escrow', deployEscrowRouter);
