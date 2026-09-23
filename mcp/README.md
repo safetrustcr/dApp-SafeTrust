@@ -28,6 +28,7 @@ Restart the MCP client after a rebuild — stdio servers are started once per se
 | `deploy-escrow` | Deploys a single-release escrow via `apps/api` `POST /api/escrow/deploy`, returns the unsigned XDR | `apps/api` |
 | `fund-escrow` | Builds the funding transaction via `POST /api/escrow/fund` | `apps/api` |
 | `get-escrow-status` | Looks up `public.escrows` by `contractId` or `engagementId` | Hasura |
+| `orchestrate-escrow` | Walks the deploy to fund to release lifecycle one step at a time, returning the exact next tool call and the XDR that needs signing. Stateless: pass `engagementId` and `contractId` back in to resume | — |
 | `explain-escrow-roles` | SafeTrust ↔ TrustlessWork role mapping reference | — |
 | `get-apartment` | Apartment details plus the owner's Stellar wallet | Hasura |
 | `list-apartments` | Search listings by name, price and availability | Hasura |
@@ -38,6 +39,22 @@ Restart the MCP client after a rebuild — stdio servers are started once per se
 
 `deploy-escrow` and `fund-escrow` never sign or submit anything — they return the
 unsigned XDR that a wallet (Freighter) has to sign, exactly like the HTTP routes do.
+
+## Escrow lifecycle
+
+`orchestrate-escrow` is the entry point when you do not already know the sequence.
+It holds no state; each call tells you what to do and what to pass back.
+
+```
+orchestrate-escrow step=start            -> call deploy-escrow, sign the XDR in Freighter
+orchestrate-escrow step=after-deploy     -> call fund-escrow, sign the XDR in Freighter
+orchestrate-escrow step=after-fund       -> milestone-status, then release-funds
+orchestrate-escrow step=status           -> call get-escrow-status
+```
+
+Signing always happens in the browser through Freighter, never server side, and
+the MCP server never calls TrustlessWork directly: every escrow operation goes
+through `apps/api`.
 
 ## Available resources
 

@@ -239,4 +239,111 @@ export function registerEscrowTools(server: McpServer) {
     },
     async () => textResult(escrowRolesDoc(), '', `apps/api base URL: ${SAFETRUST_API_URL}`),
   );
+
+  server.registerTool(
+    'orchestrate-escrow',
+    {
+      title: 'Orchestrate escrow',
+      description:
+        'Step-by-step guide for the full SafeTrust escrow lifecycle. Call with ' +
+        'step="start" to begin, then follow the "next" instruction in each response. ' +
+        'Stateless: pass engagementId and contractId from previous steps to resume.',
+      inputSchema: {
+        step: z
+          .enum(['start', 'after-deploy', 'after-fund', 'status'])
+          .describe('Current step in the lifecycle'),
+        apartmentId: z.string().uuid().optional().describe('Required for step="start"'),
+        senderAddress: stellarAddress.optional().describe('Tenant paying into the escrow'),
+        receiverAddress: stellarAddress.optional().describe('Host receiving the funds'),
+        amount: z.number().positive().optional().describe('Escrow amount in USDC'),
+        engagementId: z.string().optional().describe('Returned by deploy-escrow'),
+        contractId: z.string().optional().describe('Returned by deploy-escrow'),
+      },
+      // Pure guidance: it reads nothing and changes nothing, it only says what to
+      // call next. readOnlyHint lets a client run it without prompting.
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ step, apartmentId, senderAddress, receiverAddress, amount, engagementId, contractId }) => {
+      switch (step) {
+        case 'start': {
+          const missing = [
+            apartmentId ? null : 'apartmentId',
+            senderAddress ? null : 'senderAddress',
+            receiverAddress ? null : 'receiverAddress',
+            amount === undefined ? 'amount' : null,
+          ].filter((name): name is string => name !== null);
+          if (missing.length > 0) {
+            return errorResult(
+              `For step="start", provide: ${missing.join(', ')}.`,
+              '',
+              'apartmentId comes from list-apartments; senderAddress is the tenant and',
+              'receiverAddress the host, both Stellar public keys (G…, 56 chars).',
+            );
+          }
+          return textResult(
+            '── Step 1: Deploy escrow ──────────────────────────────────',
+            'Call deploy-escrow with these parameters:',
+            jsonBlock({ apartmentId, senderAddress, receiverAddress, amount }),
+            '',
+            'deploy-escrow returns an unsignedXDR.',
+            'Sign it with Freighter in the browser, then submit it.',
+            'Then call orchestrate-escrow again with:',
+            '  step: "after-deploy"',
+            '  engagementId: (from the deploy-escrow response)',
+            '  contractId:   (from the deploy-escrow response)',
+            '  senderAddress: (same as above)',
+            '  amount:        (same as above)',
+          );
+        }
+
+        case 'after-deploy': {
+          const missing = [
+            contractId ? null : 'contractId',
+            senderAddress ? null : 'senderAddress',
+            amount === undefined ? 'amount' : null,
+          ].filter((name): name is string => name !== null);
+          if (missing.length > 0) {
+            return errorResult(`For step="after-deploy", provide: ${missing.join(', ')}.`);
+          }
+          return textResult(
+            '── Step 2: Fund escrow ────────────────────────────────────',
+            `contractId: ${contractId}`,
+            engagementId ? `engagementId: ${engagementId}` : '',
+            '',
+            'The deploy XDR has been signed and submitted.',
+            'Now call fund-escrow with:',
+            jsonBlock({ contractId, signer: senderAddress, amount }),
+            '',
+            'fund-escrow returns another unsignedXDR.',
+            'Sign it with Freighter, then submit it.',
+            'Then call orchestrate-escrow with step="after-fund" to continue.',
+          );
+        }
+
+        case 'after-fund':
+          return textResult(
+            '── Step 3: Escrow funded ──────────────────────────────────',
+            'The escrow is now funded and locked on Stellar.',
+            '',
+            'When the host completes the service:',
+            '  1. Host marks the milestone done (POST /api/escrow/milestone-status)',
+            '  2. Tenant calls release-funds (POST /api/escrow/release-funds)',
+            '',
+            'To check current status:',
+            '  call get-escrow-status with contractId or engagementId',
+            '',
+            escrowRolesDoc(),
+          );
+
+        case 'status':
+          if (!contractId && !engagementId) {
+            return errorResult('Provide contractId or engagementId to check status.');
+          }
+          return textResult(
+            'Call get-escrow-status with:',
+            jsonBlock({ contractId, engagementId }),
+          );
+      }
+    },
+  );
 }
