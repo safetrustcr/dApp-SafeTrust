@@ -6,6 +6,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
     "codegen": "turbo run codegen",
     "dev:full": "turbo run dev",
     "dev:mcp": "turbo run dev --filter=@safetrust/mcp"

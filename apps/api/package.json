@@ -10,7 +10,8 @@
     "build": "tsc",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "vitest run tests/integration.test.ts"
   },
   "dependencies": {
     "axios": "^1.18.0",
