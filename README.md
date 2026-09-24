@@ -61,6 +61,21 @@ apps/frontend (Next.js 14, port 3001)
 npm install -g pnpm hasura-cli
 ```
 
+### Makefile shortcuts
+
+From the repo root, common workflows are also available via `make`:
+
+```bash
+make help   # list targets
+make full   # start Docker infra + api/web dev servers
+make infra  # start Docker infra (both tenants)
+make dev    # start api + web
+make test   # run tests
+make lint   # lint all packages
+make build  # build all packages
+make stop   # stop Docker infra
+```
+
 ### 1. Clone and install
 
 ```bash
