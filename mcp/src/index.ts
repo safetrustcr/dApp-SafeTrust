@@ -7,6 +7,7 @@ import { loadSafeTrustDocs } from './resources/docs-loader.js';
 import { registerApartmentTools } from './tools/apartments.js';
 import { registerEscrowTools } from './tools/escrow.js';
 import { registerHasuraTools } from './tools/hasura.js';
+import { registerHealthTools } from './tools/health.js';
 
 const server = new McpServer({
   name: 'safetrust',
@@ -16,6 +17,7 @@ const server = new McpServer({
 registerEscrowTools(server);
 registerApartmentTools(server);
 registerHasuraTools(server);
+registerHealthTools(server);
 
 const docs = loadSafeTrustDocs(server);
 
