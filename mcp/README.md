@@ -25,6 +25,7 @@ Restart the MCP client after a rebuild — stdio servers are started once per se
 
 | Tool | What it does | Needs |
 |---|---|---|
+| `check-stack-health` | Ping apps/api, Hasura, and TrustlessWork testnet and report their status | apps/api, Hasura, TrustlessWork |
 | `deploy-escrow` | Deploys a single-release escrow via `apps/api` `POST /api/escrow/deploy`, returns the unsigned XDR | `apps/api` |
 | `fund-escrow` | Builds the funding transaction via `POST /api/escrow/fund` | `apps/api` |
 | `orchestrate-escrow` | Stateless step-by-step guide through the whole deploy → sign → fund → release lifecycle | — |
