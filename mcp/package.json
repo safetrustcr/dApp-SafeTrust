@@ -10,8 +10,8 @@
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
     "lint": "echo \"no lint configured\"",
-    "test": "echo \"no tests\"",
-    "test:integration": "tsx --test tests/integration.test.ts"
+    "test": "vitest run",
+    "test:integration": "vitest run tests/integration"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
