@@ -32,14 +32,13 @@ const styles = {
   } satisfies CSSProperties,
 } as const;
 
+import { Image } from "@/components/ui/image";
+
 const FALLBACK = '/img/room1.png';
 
 /**
  * Gallery — horizontal image strip for hotel detail pages.
- * Uses a plain <img> with onerror fallback (intentional — hotel images
- * are external URLs; next/image requires domain allow-list config).
  */
-/* eslint-disable @next/next/no-img-element */
 export default function Gallery({ images }: GalleryProps) {
   if (!images.length) {
     return <div style={styles.empty}>No photos available</div>;
@@ -50,17 +49,16 @@ export default function Gallery({ images }: GalleryProps) {
   return (
     <div style={styles.grid}>
       {shown.map((src, i) => (
-        <img
-          key={i}
-          src={src}
-          alt={`Hotel photo ${i + 1}`}
-          style={styles.img}
-          onError={(e) => {
-            const img = e.target as HTMLImageElement;
-            img.onerror = null;
-            img.src = FALLBACK;
-          }}
-        />
+        <div key={i} className="relative aspect-[4/3] w-full overflow-hidden">
+          <Image
+            src={src || FALLBACK}
+            alt={`Hotel photo ${i + 1}`}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+            priority={i === 0}
+            className="object-cover"
+          />
+        </div>
       ))}
     </div>
   );

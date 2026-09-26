@@ -1,13 +1,20 @@
-interface ImageProps {
-  src: string;
-  alt?: string;
-  className?: string;
-}
+import NextImage, { type ImageProps as NextImageProps } from "next/image";
+import { cn } from "@/lib/utils";
 
-export default function Image({ src, alt = "Image", className }: ImageProps) {
+const skipOptimization = (src: NextImageProps["src"]) =>
+  typeof src === "string" &&
+  (src.startsWith("data:") || src.toLowerCase().endsWith(".svg"));
+
+export type ImageProps = NextImageProps & { alt: string };
+
+export function Image({ className, unoptimized, ...props }: ImageProps) {
   return (
-    <div className={`w-full h-auto rounded-lg overflow-hidden ${className}`}>
-      <img src={src} alt={alt} className="w-full h-full object-cover" />
-    </div>
+    <NextImage
+      className={cn(className)}
+      unoptimized={unoptimized ?? skipOptimization(props.src)}
+      {...props}
+    />
   );
 }
+
+export default Image;
