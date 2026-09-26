@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { truncateStellarAddress } from '@/lib/utils';
+import { postEscrowApi } from '@/lib/api/escrow';
 
 type EscrowPayFlowProps = {
   apartmentId: string;
@@ -57,23 +58,13 @@ export function EscrowPayFlow({
     setDeployState(null);
     setErrorMessages([]);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
-      const response = await fetch(`${baseUrl}/api/escrow/deploy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apartmentId,
-          senderAddress: address,
-          receiverAddress: ownerAddress,
-          amount,
-        }),
+      const payload = await postEscrowApi<DeployResponse>('/api/escrow/deploy', {
+        apartmentId,
+        senderAddress: address,
+        receiverAddress: ownerAddress,
+        amount,
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        setErrorMessages(getErrorMessages(payload, 'Failed to deploy escrow.'));
-        return;
-      }
-      setDeployState(payload as DeployResponse);
+      setDeployState(payload);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to deploy escrow.'));
     } finally {
@@ -87,11 +78,13 @@ export function EscrowPayFlow({
     setErrorMessages([]);
     try {
       await signAndSubmit(deployState.unsignedXDR, {
+        action: 'initialize',
         contractId: deployState.contractId,
         engagementId: deployState.engagementId,
+        propertyId: apartmentId,
         senderAddress: address,
         receiverAddress: ownerAddress,
-        status: 'funded',
+        amount,
       });
       router.push(`/apartment/${apartmentId}/escrow/${deployState.engagementId}`);
     } catch (error) {
