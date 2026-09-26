@@ -13,6 +13,19 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "test:integration": {
+      "dependsOn": ["^test:integration"],
+      "env": [
+        "TRUSTLESS_WORK_API_KEY",
+        "INTEGRATION_SENDER_ADDRESS",
+        "INTEGRATION_RECEIVER_ADDRESS",
+        "INTEGRATION_APARTMENT_ID",
+        "HASURA_GRAPHQL_URL",
+        "HASURA_ADMIN_SECRET",
+        "API_URL"
+      ],
+      "cache": false
+    },
     "codegen": {
       "cache": false
     },
