@@ -9,8 +9,9 @@ type FundRequestBody = {
 };
 
 type FundEscrowTWResponse = {
-  unsignedXdr: string;
-  txHash: string;
+  unsignedXdr?: string;
+  unsignedTransaction?: string;
+  txHash?: string;
 };
 
 type FundResponse = {
@@ -40,14 +41,15 @@ export const fundEscrowHandler = async (
     }
 
     const result = await trustlessWorkRequest<FundEscrowTWResponse>(
-      '/escrow/single-release/v2/fund',
+      '/escrow/single-release/fund-escrow',
       {
         method: 'POST',
         body: { contractId, signer, amount },
       },
     );
 
-    if (!result.unsignedXdr) {
+    const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
+    if (!unsignedXdr) {
       return res.status(502).json({
         error: 'TrustlessWork fund request returned no unsigned transaction.',
         payload: result,
@@ -55,8 +57,8 @@ export const fundEscrowHandler = async (
     }
 
     return res.status(200).json({
-      unsignedXdr: result.unsignedXdr,
-      txHash: result.txHash,
+      unsignedXdr,
+      txHash: result.txHash ?? '',
       contractId,
       engagementId,
     });

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { TrustlessWorkProvider } from "@/providers/TrustlessWorkProvider";
 import { Toaster } from "@/components/ui/sonner"
 import { HasuraDownBanner } from "@/components/ui/HasuraDownBanner";
 
@@ -26,11 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <ClientProviders>
-            <TrustlessWorkProvider>
-              {children}
-              <Toaster richColors position="top-right" />
-              {process.env.NODE_ENV !== "production" && <HasuraDownBanner />}
-            </TrustlessWorkProvider>
+            {children}
+            <Toaster richColors position="top-right" />
+            {process.env.NODE_ENV !== "production" && <HasuraDownBanner />}
           </ClientProviders>
         </ThemeProvider>
       </body>

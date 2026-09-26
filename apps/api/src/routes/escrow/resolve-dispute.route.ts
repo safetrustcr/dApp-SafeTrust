@@ -1,9 +1,7 @@
 import { Router } from 'express';
 import { authenticateFirebase } from '../../middleware/auth.middleware.js';
-import { fundEscrowHandler } from './fund.handler.js';
+import { resolveDisputeHandler } from './resolve-dispute.handler.js';
 
 const router = Router();
-
-router.post('/fund', authenticateFirebase, fundEscrowHandler);
-
+router.post('/resolve-dispute', authenticateFirebase, resolveDisputeHandler);
 export default router;

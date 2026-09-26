@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import type { SignAndSubmit } from '@/hooks/use-active-wallet';
+import { postEscrowApi } from '@/lib/api/escrow';
 
 export type FreighterWallet = {
   address: string | null;
@@ -48,20 +49,10 @@ export function useFreighter(): FreighterWallet {
           const { signedTransaction } = await api.signTransaction(xdr, {
             networkPassphrase: process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'Test SDF Network ; September 2015',
           });
-          // Submit is handled by the frontend send-transaction route
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
-          const response = await fetch(`${baseUrl}/api/escrow/send-transaction`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ signedXdr: signedTransaction, ...submission }),
+          await postEscrowApi('/api/escrow/send-transaction', {
+            signedXdr: signedTransaction,
+            ...submission,
           });
-          if (!response.ok) {
-            const payload = await response.json().catch(() => null);
-            const detail = payload && typeof payload === 'object' && 'error' in payload
-              ? String(payload.error)
-              : `HTTP ${response.status}`;
-            throw new Error(`Transaction submission failed: ${detail}`);
-          }
         } catch (err) {
           throw new Error(`Freighter signing failed: ${String(err)}`);
         }

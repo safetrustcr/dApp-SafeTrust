@@ -50,19 +50,15 @@ describe('milestoneStatusHandler', () => {
     );
 
     expect(trustlessWorkRequest).toHaveBeenCalledWith(
-      '/escrow/single-release/v2/change-milestone-status',
+      '/escrow/single-release/change-milestone-status',
       {
         method: 'POST',
         body: {
           contractId: 'CAZT001',
           serviceProvider: 'GOWNER111',
-          updates: [
-            {
-              index: 0,
-              newStatus: 'completed',
-              newEvidence: 'Rental period completed',
-            },
-          ],
+          milestoneIndex: '0',
+          newStatus: 'completed',
+          newEvidence: 'Rental period completed',
         },
       },
     );
@@ -72,7 +68,7 @@ describe('milestoneStatusHandler', () => {
       txHash: 'hash-456',
       contractId: 'CAZT001',
       engagementId: 'eng-1',
-      status: 'milestone_approved',
+      status: 'funded',
     });
   });
 });

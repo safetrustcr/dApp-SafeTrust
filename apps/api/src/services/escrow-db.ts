@@ -123,6 +123,30 @@ export async function dbFundEscrow(contractId: string, amount: number): Promise<
   }
 }
 
+export async function dbMarkMilestoneCompleted(
+  contractId: string,
+  milestoneId: string,
+): Promise<void> {
+  const escrowId = await resolveEscrowId(contractId);
+  const result = await hasuraRequest<MilestoneUpdateResult>(
+    `mutation CompleteMilestone($escrowId: uuid!, $milestoneId: String!) {
+      update_escrowMilestones(
+        where: {
+          escrowId: { _eq: $escrowId }
+          milestoneId: { _eq: $milestoneId }
+          status: { _eq: "pending" }
+        }
+        _set: { status: "completed" }
+      ) { returning { id } }
+    }`,
+    { escrowId, milestoneId },
+  );
+
+  if (result.update_escrowMilestones.returning.length === 0) {
+    throw new Error(`Milestone is not pending: ${milestoneId} for contractId: ${contractId}`);
+  }
+}
+
 export async function dbApproveMilestone(
   contractId: string,
   milestoneId: string,
@@ -141,7 +165,7 @@ export async function dbApproveMilestone(
         where: {
           escrowId: { _eq: $escrowId }
           milestoneId: { _eq: $milestoneId }
-          status: { _eq: "pending" }
+          status: { _eq: "completed" }
         }
         _set: {
           status: "approved"

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
+import { postEscrowApi } from '@/lib/api/escrow';
 
 export type EscrowActionPhase = 'building' | 'signing' | 'submitting' | null;
 
@@ -22,41 +23,21 @@ export function useEscrowAction() {
     setPhase('building');
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      const targetUrl = config.apiRoute.startsWith('http')
-        ? config.apiRoute
-        : `${baseUrl}${config.apiRoute}`;
-
-      const apiRes = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config.apiBody),
-      });
-
-      if (!apiRes.ok) {
-        const payload = await apiRes.json().catch(() => ({}));
-        throw getErrorMessages(payload, `API error ${apiRes.status}`);
-      }
-
-      const { unsignedXdr } = await apiRes.json();
+      const built = await postEscrowApi<{ unsignedXdr?: string }>(
+        config.apiRoute,
+        config.apiBody,
+      );
+      const { unsignedXdr } = built;
       if (!unsignedXdr) throw new Error('No unsigned XDR returned from API');
 
       setPhase('signing');
       const signedXdr = await signXDR(unsignedXdr);
 
       setPhase('submitting');
-      const sendRes = await fetch(`${baseUrl}/api/escrow/send-transaction`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signedXdr, ...config.sendTransactionBody }),
-      });
-
-      if (!sendRes.ok) {
-        const payload = await sendRes.json().catch(() => ({}));
-        throw getErrorMessages(payload, `Send transaction error ${sendRes.status}`);
-      }
-
-      const result = await sendRes.json();
+      const result = await postEscrowApi<Record<string, unknown>>(
+        '/api/escrow/send-transaction',
+        { signedXdr, ...config.sendTransactionBody },
+      );
       console.log('[escrow-action] Transaction confirmed:', result.txHash);
       return result;
     } catch (error) {
