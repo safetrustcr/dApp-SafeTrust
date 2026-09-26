@@ -3,7 +3,7 @@
 //
 // Consumers pass either:
 //   - a parsed JSON payload (e.g. { error, message, messages }) returned from
-//     our own API routes (/api/escrow/deploy, /helper/send-transaction), or
+//     our own API routes (/api/escrow/deploy, /api/escrow/send-transaction), or
 //   - a caught `unknown` error from a try/catch block.
 
 type ErrorLikePayload = {

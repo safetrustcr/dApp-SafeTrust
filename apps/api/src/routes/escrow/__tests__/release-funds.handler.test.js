@@ -34,7 +34,7 @@ describe('releaseFundsHandler', () => {
     expect(res._body.error).toContain('releaseSigner');
   });
 
-  it('calls TrustlessWork /escrow/single-release/v2/release-funds with correct body', async () => {
+  it('calls the documented TrustlessWork release endpoint with correct body', async () => {
     vi.mocked(trustlessWorkRequest).mockResolvedValueOnce({
       unsignedXdr: 'RELEASE_XDR_001',
       txHash: 'hash-789',
@@ -47,7 +47,7 @@ describe('releaseFundsHandler', () => {
     );
 
     expect(trustlessWorkRequest).toHaveBeenCalledWith(
-      '/escrow/single-release/v2/release-funds',
+      '/escrow/single-release/release-funds',
       {
         method: 'POST',
         body: { contractId: 'CAZT001', releaseSigner: 'GRELEASER' },

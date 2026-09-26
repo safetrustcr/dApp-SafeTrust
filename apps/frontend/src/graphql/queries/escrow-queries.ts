@@ -197,6 +197,10 @@ export const GET_ESCROW_BY_ANY_ID = gql`
       marker
       releaser
       resolver
+      milestones {
+        milestoneId
+        status
+      }
     }
   }
 `;
@@ -265,4 +269,3 @@ export const GET_ESCROW_DASHBOARD_STATS = gql`
     }
   }
 `;
-

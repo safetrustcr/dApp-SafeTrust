@@ -6,9 +6,11 @@ import authRouter from './routes/auth/sync-user.route.js';
 import promoteToHostRouter from './routes/auth/promote-to-host.route.js';
 import activateWalletRouter from './routes/auth/activate-wallet.route.js';
 import deployEscrowRouter from './routes/escrow/deploy.route.js';
+import approveMilestoneRouter from './routes/escrow/approve-milestone.route.js';
 import fundEscrowRouter from './routes/escrow/fund.route.js';
 import milestoneStatusRouter from './routes/escrow/milestone-status.route.js';
 import releaseFundsRouter from './routes/escrow/release-funds.route.js';
+import resolveDisputeRouter from './routes/escrow/resolve-dispute.route.js';
 import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.js';
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
@@ -53,9 +55,11 @@ app.use('/api/admin', adminUsersRouter);
 
 // Escrow routes
 app.use('/api/escrow', deployEscrowRouter);
+app.use('/api/escrow', approveMilestoneRouter);
 app.use('/api/escrow', fundEscrowRouter);
 app.use('/api/escrow', milestoneStatusRouter);
 app.use('/api/escrow', releaseFundsRouter);
+app.use('/api/escrow', resolveDisputeRouter);
 app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);

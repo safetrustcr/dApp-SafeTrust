@@ -39,7 +39,7 @@ export const releaseFundsHandler = async (
     }
 
     const result = await trustlessWorkRequest<ReleaseFundsTWResponse>(
-      '/escrow/single-release/v2/release-funds',
+      '/escrow/single-release/release-funds',
       {
         method: 'POST',
         body: { contractId, releaseSigner },

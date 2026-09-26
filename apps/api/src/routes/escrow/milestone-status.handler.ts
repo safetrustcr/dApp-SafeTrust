@@ -11,8 +11,9 @@ type MilestoneStatusRequestBody = {
 };
 
 type ChangeMilestoneStatusTWResponse = {
-  unsignedXdr: string;
-  txHash: string;
+  unsignedXdr?: string;
+  unsignedTransaction?: string;
+  txHash?: string;
 };
 
 type MilestoneStatusResponse = {
@@ -52,24 +53,21 @@ export const milestoneStatusHandler = async (
     }
 
     const result = await trustlessWorkRequest<ChangeMilestoneStatusTWResponse>(
-      '/escrow/single-release/v2/change-milestone-status',
+      '/escrow/single-release/change-milestone-status',
       {
         method: 'POST',
         body: {
           contractId,
           serviceProvider,
-          updates: [
-            {
-              index: resolvedIndex,
-              newStatus: resolvedStatus,
-              ...(newEvidence ? { newEvidence } : {}),
-            },
-          ],
+          milestoneIndex: String(resolvedIndex),
+          newStatus: resolvedStatus,
+          newEvidence: newEvidence ?? '',
         },
       },
     );
 
-    if (!result.unsignedXdr) {
+    const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
+    if (!unsignedXdr) {
       return res.status(502).json({
         error: 'TrustlessWork milestone-status request returned no unsigned transaction.',
         payload: result,
@@ -77,11 +75,14 @@ export const milestoneStatusHandler = async (
     }
 
     return res.status(200).json({
-      unsignedXdr: result.unsignedXdr,
-      txHash: result.txHash,
+      unsignedXdr,
+      txHash: result.txHash ?? '',
       contractId,
       engagementId,
-      status: 'milestone_approved',
+      // A service-provider completion is not tenant approval. The aggregate
+      // escrow moves to milestone_approved only after approve-milestone is
+      // signed by the approver and submitted.
+      status: 'funded',
     });
   } catch (error) {
     if (error instanceof TrustlessWorkRequestError) {

@@ -13,7 +13,12 @@ export type TransactionSubmission = {
   engagementId: string;
   senderAddress: string;
   receiverAddress: string;
-  status?: 'funded' | 'milestone_approved' | 'completed' | 'resolved';
+  amount?: number;
+  action?: 'initialize' | 'fund' | 'mark_milestone_completed' | 'approve_milestone' | 'release_funds' | 'dispute' | 'resolve_dispute';
+  propertyId?: string;
+  milestoneId?: string;
+  approver?: string;
+  releaseSigner?: string;
 };
 
 export type SignAndSubmit = (
