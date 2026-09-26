@@ -28,18 +28,23 @@ const styles = {
   price: { margin: 0, fontWeight: 700, color: '#f97316', fontSize: '0.95rem' } satisfies CSSProperties,
 } as const;
 
+import { Image } from "@/components/ui/image";
+
 const FALLBACK = '/img/room1.png';
 
-/* eslint-disable @next/next/no-img-element */
 export default function HotelDetails({ hotelName = 'Hotel', location = '—', imageUrl, pricePerNight }: HotelDetailsProps) {
   return (
     <div style={styles.card}>
-      <img
-        src={imageUrl ?? FALLBACK}
-        alt={hotelName}
-        style={styles.img}
-        onError={(e) => { const img = e.target as HTMLImageElement; img.onerror = null; img.src = FALLBACK; }}
-      />
+      <div className="relative w-full h-[10rem] overflow-hidden">
+        <Image
+          src={imageUrl ?? FALLBACK}
+          alt={hotelName}
+          fill
+          sizes="(max-width: 768px) 100vw, 50vw"
+          priority
+          className="object-cover"
+        />
+      </div>
       <div style={styles.body}>
         <p style={styles.name}>{hotelName}</p>
         <p style={styles.location}>{location}</p>

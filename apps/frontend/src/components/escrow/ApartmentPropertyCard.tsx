@@ -3,6 +3,8 @@
 import { Bath, BedDouble, MapPin, PawPrint } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 
+import { Image } from "@/components/ui/image";
+
 const FALLBACK_IMAGE = "/img/room1.png";
 
 type ApartmentAddress = {
@@ -130,18 +132,16 @@ export function ApartmentPropertyCard({
 
       <div style={styles.imageGrid}>
         {images.map((src, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={i}
-            src={src}
-            alt={`${name} photo ${i + 1}`}
-            style={styles.img}
-            onError={(e) => {
-              const img = e.target as HTMLImageElement;
-              img.onerror = null;
-              img.src = FALLBACK_IMAGE;
-            }}
-          />
+          <div key={i} className="relative w-full h-[4.6rem] overflow-hidden rounded-[0.2rem]">
+            <Image
+              src={src}
+              alt={`${name} photo ${i + 1}`}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+              priority={i === 0}
+              className="object-cover"
+            />
+          </div>
         ))}
       </div>
 

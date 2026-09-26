@@ -11,6 +11,7 @@ import { PlusIcon, Home, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { GET_ESCROWS } from "@/graphql/queries/escrow-queries";
+import { Image } from "@/components/ui/image";
 
 const FILTER_TABS = ["All", "Pending", "Active", "Completed", "Disputed"] as const;
 
@@ -136,12 +137,12 @@ export default function EscrowPage() {
                         {/* Apartment thumbnail */}
                         <div className="w-9 h-9 rounded-md overflow-hidden bg-muted shrink-0 border border-border">
                           {escrow.apartment?.image_urls?.[0] ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
+                            <Image
                               src={escrow.apartment.image_urls[0]}
                               alt={escrow.apartment.name}
+                              width={36}
+                              height={36}
                               className="w-full h-full object-cover"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">

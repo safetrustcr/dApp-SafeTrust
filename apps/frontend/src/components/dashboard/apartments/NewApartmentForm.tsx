@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Image } from "@/components/ui/image";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { CREATE_APARTMENT, GET_APARTMENTS } from "../../../graphql/queries/apartment-queries";
 
@@ -427,14 +428,12 @@ const ownerAddress = (() => {
                         key={index}
                         className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted border border-border"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <Image
                           src={url}
                           alt={`Preview ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = "none";
-                          }}
+                          fill
+                          sizes="(max-width: 768px) 33vw, 150px"
+                          className="object-cover"
                         />
                       </div>
                     ))}
