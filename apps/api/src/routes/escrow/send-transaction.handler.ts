@@ -8,16 +8,18 @@ import {
 import {
   dbInitializeEscrow,
   dbFundEscrow,
+  dbMarkMilestoneCompleted,
   dbApproveMilestone,
   dbReleaseFunds,
   dbDisputeEscrow,
   dbResolveDispute,
 } from '../../services/escrow-db.js';
-import { hasuraRequest, insertEscrowRecord, updateEscrowStatus } from '../../services/hasura.js';
+import { hasuraRequest, insertEscrowRecord, updateEscrowStatus, updateEscrowStatusByContractId } from '../../services/hasura.js';
 
 type EscrowAction =
   | 'initialize'
   | 'fund'
+  | 'mark_milestone_completed'
   | 'approve_milestone'
   | 'release_funds'
   | 'dispute'
@@ -53,6 +55,7 @@ type SendTransactionTWResponse = {
 const VALID_ACTIONS: EscrowAction[] = [
   'initialize',
   'fund',
+  'mark_milestone_completed',
   'approve_milestone',
   'release_funds',
   'dispute',
@@ -62,6 +65,7 @@ const VALID_ACTIONS: EscrowAction[] = [
 const REQUIRED_FIELDS: Record<EscrowAction, (keyof SendTransactionBody)[]> = {
   initialize: ['engagementId', 'senderAddress', 'receiverAddress', 'amount'],
   fund: ['amount'],
+  mark_milestone_completed: ['milestoneId'],
   approve_milestone: ['milestoneId', 'approver'],
   release_funds: ['releaseSigner'],
   dispute: [],
@@ -201,7 +205,7 @@ export const sendTransactionHandler = async (
     try {
       switch (action) {
         case 'initialize': {
-          const effectiveReleaser = releaser || process.env.NEXT_PUBLIC_PLATFORM_ADDRESS || process.env.PLATFORM_STELLAR_ADDRESS || senderAddress!;
+          const effectiveReleaser = releaser || process.env.PLATFORM_STELLAR_ADDRESS || senderAddress!;
           await dbInitializeEscrow({
             contractId: resolvedContractId,
             engagementId: engagementId!,
@@ -227,7 +231,7 @@ export const sendTransactionHandler = async (
               senderAddress: senderAddress!,
               receiverAddress: receiverAddress!,
               amount: amount!,
-              status: 'funded',
+              status: 'created',
             });
             insertedId = record.insert_escrows_one.id;
           }
@@ -235,18 +239,26 @@ export const sendTransactionHandler = async (
         }
         case 'fund':
           await dbFundEscrow(resolvedContractId, amount!);
+          await updateEscrowStatusByContractId(resolvedContractId, 'funded');
+          break;
+        case 'mark_milestone_completed':
+          await dbMarkMilestoneCompleted(resolvedContractId, milestoneId!);
           break;
         case 'approve_milestone':
           await dbApproveMilestone(resolvedContractId, milestoneId!, approver!);
+          await updateEscrowStatusByContractId(resolvedContractId, 'milestone_approved');
           break;
         case 'release_funds':
           await dbReleaseFunds(resolvedContractId, releaseSigner!);
+          await updateEscrowStatusByContractId(resolvedContractId, 'completed');
           break;
         case 'dispute':
           await dbDisputeEscrow(resolvedContractId);
+          await updateEscrowStatusByContractId(resolvedContractId, 'disputed');
           break;
         case 'resolve_dispute':
           await dbResolveDispute(resolvedContractId);
+          await updateEscrowStatusByContractId(resolvedContractId, 'resolved');
           break;
       }
     } catch (error) {

@@ -6,6 +6,7 @@ import { GET_ESCROW_BY_ANY_ID } from '@/graphql/queries/escrow-queries';
 import type { EscrowStatus } from '@/components/dashboard/EscrowStatusBadge';
 import { truncateStellarAddress } from '@/lib/utils';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
+import { postEscrowApi } from '@/lib/api/escrow';
 import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { useState, useCallback, useEffect, type CSSProperties, ReactNode } from 'react';
 import { useEscrowAction } from '@/hooks/use-escrow-action';
@@ -47,6 +48,7 @@ type TrustlessWorkEscrowRecord = {
   marker?: string | null;
   releaser?: string | null;
   resolver?: string | null;
+  milestones?: Array<{ milestoneId?: string | null; status?: string | null }>;
 };
 
 type EscrowRecord = {
@@ -863,7 +865,7 @@ function ReleasedView({ escrow }: { escrow?: EscrowRecord | null }) {
   );
 }
 
-type EscrowAction = 'fund' | 'milestone' | 'release' | 'resolve';
+type EscrowAction = 'fund' | 'milestone' | 'approve' | 'release' | 'resolve';
 
 function EscrowActionButton({
   action,
@@ -883,6 +885,7 @@ function EscrowActionButton({
   const buttonConfig: Record<EscrowAction, { label: string; color: string; hoverColor: string }> = {
     fund: { label: 'Fund Escrow', color: '#f97316', hoverColor: '#ea580c' },
     milestone: { label: 'Mark Completed', color: '#22c55e', hoverColor: '#16a34a' },
+    approve: { label: 'Approve Milestone', color: '#0ea5e9', hoverColor: '#0284c7' },
     release: { label: 'Release Funds', color: '#6366f1', hoverColor: '#4f46e5' },
     resolve: { label: 'Resolve Dispute', color: '#dc2626', hoverColor: '#b91c1c' },
   };
@@ -894,6 +897,7 @@ function EscrowActionButton({
       <p style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', color: '#374151' }}>
         {action === 'fund' && 'Deposit funds into the escrow contract to secure the transaction.'}
         {action === 'milestone' && 'Mark the milestone as completed to proceed with fund release.'}
+        {action === 'approve' && 'Approve the completed milestone to authorize release of the deposit.'}
         {action === 'release' && 'Release the escrowed funds to the service provider.'}
         {action === 'resolve' && 'Split the deposit between the tenant (approver) and the owner (receiver) to close the dispute.'}
       </p>
@@ -1025,9 +1029,11 @@ export default function EscrowDetailPage({
   const canMarkMilestone = status === 'funded';
   const canRelease = status === 'milestone_approved';
   const canResolve = status === 'disputed';
+  const checkInMilestone = trustlessWorkEscrow?.milestones?.find((milestone) => milestone.milestoneId === 'check_in');
 
   const showFundButton = canFund && isApprover;
-  const showMilestoneButton = canMarkMilestone && isMarker;
+  const showMilestoneButton = canMarkMilestone && isMarker && checkInMilestone?.status === 'pending';
+  const showApproveButton = canMarkMilestone && isApprover && checkInMilestone?.status === 'completed';
   const showReleaseButton = canRelease && isReleaseSigner;
   const showResolveButton = canResolve && isResolver;
 
@@ -1055,12 +1061,12 @@ export default function EscrowDetailPage({
         engagementId: escrow.engagement_id,
       },
       sendTransactionBody: {
+        action: 'fund',
         contractId: escrow.contract_id,
         engagementId: escrow.engagement_id,
         senderAddress: address,
         receiverAddress: escrow.receiver_address,
         amount: escrow.amount,
-        status: 'funded',
       },
     });
     if (result) await refetch();
@@ -1083,12 +1089,40 @@ export default function EscrowDetailPage({
         newStatus: 'completed',
       },
       sendTransactionBody: {
+        action: 'mark_milestone_completed',
         contractId: escrow.contract_id,
         engagementId: escrow.engagement_id,
         senderAddress: escrow.sender_address,
         receiverAddress: escrow.receiver_address,
-        amount: escrow.amount,
-        status: 'milestone_approved',
+        milestoneId: 'check_in',
+      },
+    });
+    if (result) await refetch();
+  }, [escrow, address, execute, refetch]);
+
+  const handleApproveMilestone = useCallback(async () => {
+    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
+      setErrorMessages(['Missing required escrow data for milestone approval.']);
+      return;
+    }
+
+    setErrorMessages([]);
+    const result = await execute({
+      apiRoute: '/api/escrow/approve-milestone',
+      apiBody: {
+        contractId: escrow.contract_id,
+        approver: address,
+        engagementId: escrow.engagement_id,
+        milestoneIndex: 0,
+      },
+      sendTransactionBody: {
+        action: 'approve_milestone',
+        contractId: escrow.contract_id,
+        engagementId: escrow.engagement_id,
+        senderAddress: escrow.sender_address,
+        receiverAddress: escrow.receiver_address,
+        milestoneId: 'check_in',
+        approver: address,
       },
     });
     if (result) await refetch();
@@ -1109,12 +1143,12 @@ export default function EscrowDetailPage({
         engagementId: escrow.engagement_id,
       },
       sendTransactionBody: {
+        action: 'release_funds',
         contractId: escrow.contract_id,
         engagementId: escrow.engagement_id,
         senderAddress: escrow.sender_address,
         receiverAddress: escrow.receiver_address,
-        amount: escrow.amount,
-        status: 'completed',
+        releaseSigner: address,
       },
     });
     if (result) await refetch();
@@ -1136,24 +1170,15 @@ export default function EscrowDetailPage({
     setErrorMessages([]);
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      const response = await fetch(`${baseUrl}/api/escrow/resolve-dispute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractId: escrow.contract_id,
-          releaseSigner: address,
-          engagementId: escrow.engagement_id,
-          approverFunds,
-          receiverFunds,
-        }),
+      const payload = await postEscrowApi<{ unsignedXdr?: string }>('/api/escrow/resolve-dispute', {
+        contractId: escrow.contract_id,
+        engagementId: escrow.engagement_id,
+        disputeResolver: address,
+        distributions: [
+          { address: escrow.sender_address, amount: approverFunds },
+          { address: escrow.receiver_address, amount: receiverFunds },
+        ],
       });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        setErrorMessages(getErrorMessages(payload, 'Failed to build resolve-dispute transaction.'));
-        return;
-      }
 
       const unsignedXdr = payload.unsignedXdr as string | undefined;
       if (!unsignedXdr) {
@@ -1163,11 +1188,11 @@ export default function EscrowDetailPage({
 
       setLoadingMessage('Awaiting wallet signature...');
       await signAndSubmit(unsignedXdr, {
+        action: 'resolve_dispute',
         contractId: escrow.contract_id,
         engagementId: escrow.engagement_id,
         senderAddress: escrow.sender_address,
         receiverAddress: escrow.receiver_address,
-        status: 'resolved',
       });
 
       setErrorMessages([]);
@@ -1312,6 +1337,16 @@ export default function EscrowDetailPage({
                 isLoading={actioning}
                 loadingMessage={phaseMessage}
                 onClick={handleMarkCompleted}
+              />
+            )}
+
+            {showApproveButton && (
+              <EscrowActionButton
+                action="approve"
+                status={status}
+                isLoading={actioning}
+                loadingMessage={phaseMessage}
+                onClick={handleApproveMilestone}
               />
             )}
 

@@ -26,7 +26,7 @@ export const deployEscrowHandler = async (
   const { apartmentId, senderAddress, receiverAddress, amount, engagementId } =
     req.body;
 
-  if (!apartmentId || !senderAddress || !receiverAddress || !amount) {
+  if (!apartmentId || !senderAddress || !receiverAddress || !Number.isFinite(amount) || amount <= 0) {
     res.status(400).json({
       error: 'Missing required fields: apartmentId, senderAddress, receiverAddress, amount',
     });
@@ -54,14 +54,14 @@ export const deployEscrowHandler = async (
   }
   // ── End idempotency check ──────────────────────────────────────────────
 
-  const platformAddress =
-    process.env.PLATFORM_STELLAR_ADDRESS ??
-    process.env.NEXT_PUBLIC_PLATFORM_ADDRESS;
-
-  const usdcIssuer =
-    process.env.USDC_TRUSTLINE_ADDRESS ??
-    process.env.NEXT_PUBLIC_USDC_ADDRESS ??
-    'GBBD47IF6LWK7P7MDEVSCWR2JQTMZ35MIFUQ5IQSQ9CQBZ8JMXKDPE';
+  const platformAddress = process.env.PLATFORM_STELLAR_ADDRESS;
+  const usdcIssuer = process.env.USDC_TRUSTLINE_ADDRESS;
+  if (!platformAddress || !usdcIssuer) {
+    res.status(500).json({
+      error: 'Missing PLATFORM_STELLAR_ADDRESS or USDC_TRUSTLINE_ADDRESS server configuration.',
+    });
+    return;
+  }
 
   try {
     const twData = await trustlessWorkRequest<{
@@ -74,8 +74,10 @@ export const deployEscrowHandler = async (
       body: {
         engagementId: resolvedEngagementId,
         title: `SafeTrust Rental — ${apartmentId}`,
+        description: `Security deposit for apartment ${apartmentId}`,
         signer: senderAddress,
         amount,
+        platformFee: 0,
         roles: {
           approver: senderAddress,
           serviceProvider: receiverAddress,
@@ -84,12 +86,10 @@ export const deployEscrowHandler = async (
           releaseSigner: senderAddress,
           disputeResolver: platformAddress,
         },
-        payment: {
-          asset: {
-            code: 'USDC',
-            issuer: usdcIssuer,
-          },
-          amount: String(amount),
+        milestones: [{ description: 'Rental security deposit' }],
+        trustline: {
+          symbol: 'USDC',
+          address: usdcIssuer,
         },
       },
     });

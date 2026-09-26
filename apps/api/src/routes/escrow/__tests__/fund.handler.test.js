@@ -36,7 +36,7 @@ describe('fundEscrowHandler', () => {
     expect(res._body.error).toContain('signer');
   });
 
-  it('calls TrustlessWork /escrow/single-release/v2/fund with correct body', async () => {
+  it('calls the documented TrustlessWork funding endpoint with correct body', async () => {
     vi.mocked(trustlessWorkRequest).mockResolvedValueOnce({
       unsignedXdr: 'FUND_XDR_001',
       txHash: 'hash-123',
@@ -49,7 +49,7 @@ describe('fundEscrowHandler', () => {
     );
 
     expect(trustlessWorkRequest).toHaveBeenCalledWith(
-      '/escrow/single-release/v2/fund',
+      '/escrow/single-release/fund-escrow',
       {
         method: 'POST',
         body: { contractId: 'CAZT001', signer: 'GSIGNER', amount: 950 },
