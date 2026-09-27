@@ -14,7 +14,14 @@ import {
   dbDisputeEscrow,
   dbResolveDispute,
 } from '../../services/escrow-db.js';
-import { hasuraRequest, insertEscrowRecord, updateEscrowStatus, updateEscrowStatusByContractId } from '../../services/hasura.js';
+import {
+  hasuraRequest,
+  insertEscrowRecord,
+  updateEscrowStatus,
+  isEscrowTransitionError,
+  isEscrowChangedError,
+  HasuraRequestError,
+} from '../../services/hasura.js';
 
 type EscrowAction =
   | 'initialize'
@@ -75,6 +82,23 @@ const REQUIRED_FIELDS: Record<EscrowAction, (keyof SendTransactionBody)[]> = {
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
+const parseTransitionError = (error: unknown): { from?: string; to?: string } => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const match = message.match(/invalid\s+escrow\s+transition\s+([^\s]+)\s*->\s*([^\s]+)/i);
+  if (match) {
+    return { from: match[1], to: match[2] };
+  }
+
+  const details = error instanceof HasuraRequestError ? error.details ?? [] : [];
+  const detailMessage = details.find((detail) => detail.message.toLowerCase().includes('invalid escrow transition'))?.message ?? '';
+  const detailMatch = detailMessage.match(/invalid\s+escrow\s+transition\s+([^\s]+)\s*->\s*([^\s]+)/i);
+  if (detailMatch) {
+    return { from: detailMatch[1], to: detailMatch[2] };
+  }
+
+  return {};
+};
+
 export const sendTransactionHandler = async (
   req: Request<{}, Record<string, unknown> | { error: string; messages?: string[]; payload?: unknown }, SendTransactionBody>,
   res: Response<Record<string, unknown> | { error: string; messages?: string[]; payload?: unknown }>
@@ -127,8 +151,8 @@ export const sendTransactionHandler = async (
 
       const updateResult = await updateEscrowStatus(engagementId, resolvedStatus);
       if (updateResult.update_escrows.affected_rows === 0) {
-        return res.status(404).json({
-          error: `No escrow record found for engagementId: ${engagementId}`,
+        return res.status(409).json({
+          error: 'Escrow changed. Refresh and retry',
         });
       }
 
@@ -238,30 +262,40 @@ export const sendTransactionHandler = async (
           break;
         }
         case 'fund':
-          await dbFundEscrow(resolvedContractId, amount!);
-          await updateEscrowStatusByContractId(resolvedContractId, 'funded');
+          await dbFundEscrow(resolvedContractId, amount!, engagementId, extractTransactionHash(result));
           break;
         case 'mark_milestone_completed':
-          await dbMarkMilestoneCompleted(resolvedContractId, milestoneId!);
+          await dbMarkMilestoneCompleted(resolvedContractId, milestoneId!, engagementId, extractTransactionHash(result));
           break;
         case 'approve_milestone':
-          await dbApproveMilestone(resolvedContractId, milestoneId!, approver!);
-          await updateEscrowStatusByContractId(resolvedContractId, 'milestone_approved');
+          await dbApproveMilestone(resolvedContractId, milestoneId!, approver!, engagementId, extractTransactionHash(result));
           break;
         case 'release_funds':
-          await dbReleaseFunds(resolvedContractId, releaseSigner!);
-          await updateEscrowStatusByContractId(resolvedContractId, 'completed');
+          await dbReleaseFunds(resolvedContractId, releaseSigner!, engagementId, extractTransactionHash(result));
           break;
         case 'dispute':
-          await dbDisputeEscrow(resolvedContractId);
-          await updateEscrowStatusByContractId(resolvedContractId, 'disputed');
+          await dbDisputeEscrow(resolvedContractId, engagementId, extractTransactionHash(result));
           break;
         case 'resolve_dispute':
-          await dbResolveDispute(resolvedContractId);
-          await updateEscrowStatusByContractId(resolvedContractId, 'resolved');
+          await dbResolveDispute(resolvedContractId, engagementId, extractTransactionHash(result));
           break;
       }
     } catch (error) {
+      if (isEscrowTransitionError(error)) {
+        const { from, to } = parseTransitionError(error);
+        return res.status(409).json({
+          error: `invalid escrow transition ${from ?? 'unknown'} -> ${to ?? 'unknown'}`,
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
+        });
+      }
+
+      if (isEscrowChangedError(error)) {
+        return res.status(409).json({
+          error: 'Escrow changed. Refresh and retry',
+        });
+      }
+
       const message = getErrorMessages(error, 'Database synchronization failed.');
       return res.status(500).json({
         error: 'Transaction confirmed on-chain, but database synchronization failed.',
