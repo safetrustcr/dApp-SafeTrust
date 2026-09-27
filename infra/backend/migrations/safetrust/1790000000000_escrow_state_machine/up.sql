@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS public.escrow_milestone_status_transitions (
 
 INSERT INTO public.escrow_milestone_status_transitions (from_status, to_status) VALUES
   ('pending', 'completed'),
-  ('completed', 'approved')
+  ('completed', 'approved'),
+  ('approved', 'released')
 ON CONFLICT (from_status, to_status) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.enforce_escrow_status_transition()
