@@ -34,7 +34,7 @@ export function isEscrowChangedError(error: unknown): boolean {
 
   return (
     error instanceof HasuraRequestError &&
-    error.details?.some((detail) => detail.message?.toLowerCase().includes('affected_rows') || detail.message?.toLowerCase().includes('escrow changed'))
+    (error.details?.some((detail) => detail.message?.toLowerCase().includes('affected_rows') || detail.message?.toLowerCase().includes('escrow changed')) ?? false)
   );
 }
 
