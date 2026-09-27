@@ -21,6 +21,7 @@ type InsertEscrowResult = {
 type UpdateResult = {
   update_trustlessWorkEscrows?: { affected_rows: number; returning: { id: string }[] };
   update_escrows?: { affected_rows: number; returning: { id: string }[] };
+  update_escrowMilestones?: { affected_rows: number; returning: { id: string }[] };
   insert_escrow_transactions_one?: { id: string };
 };
 
@@ -179,7 +180,7 @@ export async function dbFundEscrow(
     },
   );
 
-  assertAffectedRows('fund', result.update_trustless_work_escrows?.affected_rows ?? 0);
+  assertAffectedRows('fund', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
   assertAffectedRows('fund', result.update_escrows?.affected_rows ?? 0);
   if (!result.insert_escrow_transactions_one) {
     throw new Error('Escrow changed. Refresh and retry');
@@ -322,7 +323,7 @@ export async function dbApproveMilestone(
       },
     );
 
-    assertAffectedRows('approve_milestone', result.update_trustless_work_escrows?.affected_rows ?? 0);
+    assertAffectedRows('approve_milestone', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
     assertAffectedRows('approve_milestone', result.update_escrows?.affected_rows ?? 0);
     if (!result.insert_escrow_transactions_one) {
       throw new Error('Escrow changed. Refresh and retry');
@@ -384,7 +385,7 @@ export async function dbReleaseFunds(
   if ((result.update_escrowMilestones?.affected_rows ?? 0) === 0) {
     throw new Error(`No approved milestones found for contractId: ${contractId}`);
   }
-  assertAffectedRows('release_funds', result.update_trustless_work_escrows?.affected_rows ?? 0);
+  assertAffectedRows('release_funds', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
   assertAffectedRows('release_funds', result.update_escrows?.affected_rows ?? 0);
   if (!result.insert_escrow_transactions_one) {
     throw new Error('Escrow changed. Refresh and retry');
@@ -422,7 +423,7 @@ export async function dbDisputeEscrow(
     },
   );
 
-  assertAffectedRows('dispute', result.update_trustless_work_escrows?.affected_rows ?? 0);
+  assertAffectedRows('dispute', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
   assertAffectedRows('dispute', result.update_escrows?.affected_rows ?? 0);
   if (!result.insert_escrow_transactions_one) {
     throw new Error('Escrow changed. Refresh and retry');
@@ -460,7 +461,7 @@ export async function dbResolveDispute(
     },
   );
 
-  assertAffectedRows('resolve_dispute', result.update_trustless_work_escrows?.affected_rows ?? 0);
+  assertAffectedRows('resolve_dispute', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
   assertAffectedRows('resolve_dispute', result.update_escrows?.affected_rows ?? 0);
   if (!result.insert_escrow_transactions_one) {
     throw new Error('Escrow changed. Refresh and retry');

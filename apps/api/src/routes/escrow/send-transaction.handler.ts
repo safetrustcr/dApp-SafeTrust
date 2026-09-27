@@ -22,6 +22,7 @@ import {
   isEscrowChangedError,
   HasuraRequestError,
 } from '../../services/hasura.js';
+import { confirmTransactionWithRetry } from '../../services/stellar-confirm.js';
 
 type EscrowAction =
   | 'initialize'
@@ -149,6 +150,30 @@ export const sendTransactionHandler = async (
         });
       }
 
+      const txHash = extractTransactionHash(twResult);
+      if (txHash) {
+        const ledgerConfirmation = await confirmTransactionWithRetry(txHash, { maxAttempts: 5, intervalMs: 2000 });
+        if (ledgerConfirmation === 'failed') {
+          return res.status(202).json({
+            status: 'confirming',
+            message: 'Stellar rejected the submitted transaction, so no escrow status change was applied.',
+            contractId,
+            transactionHash: txHash,
+            ledgerStatus: 'failed',
+          });
+        }
+
+        if (ledgerConfirmation !== 'success') {
+          return res.status(202).json({
+            status: 'confirming',
+            message: 'Transaction accepted by Trustless Work; waiting for Stellar confirmation.',
+            contractId,
+            transactionHash: txHash,
+            ledgerStatus: 'unknown',
+          });
+        }
+      }
+
       const updateResult = await updateEscrowStatus(engagementId, resolvedStatus);
       if (updateResult.update_escrows.affected_rows === 0) {
         return res.status(409).json({
@@ -223,6 +248,31 @@ export const sendTransactionHandler = async (
       return res.status(502).json({ error: messages[0], messages, payload: result });
     }
 
+    const txHash = extractTransactionHash(result);
+    if (txHash) {
+      const ledgerConfirmation = await confirmTransactionWithRetry(txHash, { maxAttempts: 5, intervalMs: 2000 });
+
+      if (ledgerConfirmation === 'failed') {
+        return res.status(202).json({
+          status: 'confirming',
+          message: 'Stellar rejected the submitted transaction, so no escrow status change was applied.',
+          contractId,
+          transactionHash: txHash,
+          ledgerStatus: 'failed',
+        });
+      }
+
+      if (ledgerConfirmation !== 'success') {
+        return res.status(202).json({
+          status: 'confirming',
+          message: 'Transaction accepted by Trustless Work; waiting for Stellar confirmation.',
+          contractId,
+          transactionHash: txHash,
+          ledgerStatus: 'unknown',
+        });
+      }
+    }
+
     const resolvedContractId = (result.contractId as string | undefined) ?? contractId;
     let insertedId: string | undefined;
 
@@ -261,24 +311,36 @@ export const sendTransactionHandler = async (
           }
           break;
         }
-        case 'fund':
-          await dbFundEscrow(resolvedContractId, amount!, engagementId, extractTransactionHash(result));
+        case 'fund': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbFundEscrow(resolvedContractId, amount!, engagementId, txHash);
           break;
-        case 'mark_milestone_completed':
-          await dbMarkMilestoneCompleted(resolvedContractId, milestoneId!, engagementId, extractTransactionHash(result));
+        }
+        case 'mark_milestone_completed': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbMarkMilestoneCompleted(resolvedContractId, milestoneId!, engagementId, txHash);
           break;
-        case 'approve_milestone':
-          await dbApproveMilestone(resolvedContractId, milestoneId!, approver!, engagementId, extractTransactionHash(result));
+        }
+        case 'approve_milestone': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbApproveMilestone(resolvedContractId, milestoneId!, approver!, engagementId, txHash);
           break;
-        case 'release_funds':
-          await dbReleaseFunds(resolvedContractId, releaseSigner!, engagementId, extractTransactionHash(result));
+        }
+        case 'release_funds': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbReleaseFunds(resolvedContractId, releaseSigner!, engagementId, txHash);
           break;
-        case 'dispute':
-          await dbDisputeEscrow(resolvedContractId, engagementId, extractTransactionHash(result));
+        }
+        case 'dispute': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbDisputeEscrow(resolvedContractId, engagementId, txHash);
           break;
-        case 'resolve_dispute':
-          await dbResolveDispute(resolvedContractId, engagementId, extractTransactionHash(result));
+        }
+        case 'resolve_dispute': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbResolveDispute(resolvedContractId, engagementId, txHash);
           break;
+        }
       }
     } catch (error) {
       if (isEscrowTransitionError(error)) {

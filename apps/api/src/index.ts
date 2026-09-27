@@ -17,6 +17,7 @@ import statusStreamRouter from './routes/escrow/status-stream.route.js';
 import messagesRouter from './routes/messages/send.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
+import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
@@ -46,6 +47,8 @@ app.use(tenantMiddleware);
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+app.use('/reconciliation', reconciliationRouter);
 
 // Auth routes
 app.use('/api/auth', authRouter);
