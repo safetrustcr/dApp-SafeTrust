@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.escrow_status_transitions (
 
 INSERT INTO public.escrow_status_transitions (from_status, to_status) VALUES
   ('created', 'funded'),
+  ('pending_signature', 'funded'),
   ('funded', 'milestone_approved'),
   ('milestone_approved', 'completed'),
   ('funded', 'disputed'),
