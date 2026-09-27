@@ -26,6 +26,21 @@ git pull upstream consolidation-pattern
 pnpm install
 ```
 
+## Get Firebase service account
+
+1. Open Firebase Console → Project settings → Service accounts.
+2. Click Generate new private key.
+3. Download the JSON file and copy the values for `project_id`, `client_email`, and `private_key`.
+4. Add them to your local environment for the API:
+
+```bash
+FIREBASE_PROJECT_ID=replace-with-project-id
+FIREBASE_CLIENT_EMAIL=replace-with-service-account-email
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nreplace-with-your-private-key\n-----END PRIVATE KEY-----\n"
+```
+
+> Keep the `\n` escapes exactly as shown above so dotenv preserves the private key format. Do not start the value with `#`.
+
 ## Start infrastructure
 
 ```bash

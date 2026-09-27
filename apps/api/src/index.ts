@@ -43,8 +43,8 @@ app.use(express.json());
 app.use(tenantMiddleware);
 
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', firebase: 'configured' });
 });
 
 // Auth routes
