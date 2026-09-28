@@ -52,9 +52,12 @@ a valid API key and a user-controlled funded wallet.
 
 1. **Configure the Trustless Work secret.** The current local API environment
    has an empty `TRUSTLESS_WORK_API_KEY`, so a live request must fail safely.
-2. **Resolve Hasura metadata inconsistency.** On the developer machine run:
-   `cd infra/backend && hasura metadata ic list --endpoint http://localhost:8080 --admin-secret "$HASURA_GRAPHQL_ADMIN_SECRET"`.
-   Fix every listed object before relying on production permissions.
+2. **Resolve Hasura metadata inconsistency.** [RESOLVED in #441] Hasura metadata
+   is consistent on a fresh local stack (`make infra-reset`). Out-of-scope tenant
+   objects were removed from the safetrust metadata build, trigger/action
+   environment variables (`HASURA_EVENT_SECRET`, `WEBHOOK_ADMIN_SECRET`) were
+   configured in `.env.example` and `docker-compose.yml`, and `make metadata-check`
+   now runs in CI to prevent regressions.
 3. **Unify the two persistence projections.** `escrows` drives the apartment
    payment UI while `trustless_work_escrows` plus `escrow_milestones` drives the
    lifecycle state. Define one canonical escrow record and synchronize the

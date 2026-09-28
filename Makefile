@@ -1,12 +1,16 @@
-.PHONY: infra infra-reset dev full stop test lint build help
+.PHONY: infra infra-reset dev full stop test lint build help metadata-check
 
-## infra : Start Docker infra (both tenants)
+## infra : Start Docker infra (safetrust tenant)
 infra:
-	cd infra/backend && bin/start safetrust hotel_industry
+	cd infra/backend && bin/start safetrust
 
 ## infra-reset : Tear down volumes and restart infra
 infra-reset:
-	cd infra/backend && docker compose down -v && bin/start safetrust hotel_industry
+	cd infra/backend && docker compose down -v && bin/start safetrust
+
+## metadata-check : Verify Hasura metadata consistency
+metadata-check:
+	cd infra/backend && bin/metadata-check
 
 ## stop : Stop Docker infra
 stop:

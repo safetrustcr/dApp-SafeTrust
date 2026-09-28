@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+# ─────────────────────────────────────────────────────────────────────────────
+# metadata-check
+# Verifies Hasura metadata consistency and fails CI/local execution if
+# any metadata object (table, relationship, permission, trigger) is inconsistent.
+# ─────────────────────────────────────────────────────────────────────────────
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INFRA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+HASURA_ENDPOINT="${HASURA_ENDPOINT:-http://localhost:8080}"
+HASURA_ADMIN_SECRET="${HASURA_GRAPHQL_ADMIN_SECRET:-${HASURA_ADMIN_SECRET:-myadminsecretkey}}"
+
+echo "🔍 Checking Hasura metadata consistency..."
+echo "   Endpoint: $HASURA_ENDPOINT"
+
+out="$(hasura metadata ic list --project "$INFRA_DIR" --endpoint "$HASURA_ENDPOINT" --admin-secret "$HASURA_ADMIN_SECRET" --skip-update-check 2>&1)"
+
+if ! grep -q "metadata is consistent" <<<"$out"; then
+  echo "$out"
+  echo "❌ Hasura metadata is inconsistent" >&2
+  exit 1
+fi
+
+echo "$out"
+echo "✅ Hasura metadata is consistent"

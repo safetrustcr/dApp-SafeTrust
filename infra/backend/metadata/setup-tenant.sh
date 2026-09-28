@@ -17,7 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Defaults
 ADMIN_SECRET="${HASURA_GRAPHQL_ADMIN_SECRET:-myadminsecretkey}"
 ENDPOINT="http://localhost:8080"
-TENANT=""
+TENANTS=()
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -43,18 +43,17 @@ while [[ $# -gt 0 ]]; do
       exit 1
       ;;
     *)
-      TENANT="$1"
+      TENANTS+=("$1")
       shift
       ;;
   esac
 done
 
-if [[ -z "$TENANT" ]]; then
-  echo "Usage: ./setup-tenant.sh <tenant_name> [--admin-secret SECRET] [--endpoint URL]"
+if [[ ${#TENANTS[@]} -eq 0 ]]; then
+  echo "Usage: ./setup-tenant.sh <tenant_name>... [--admin-secret SECRET] [--endpoint URL]"
   echo "Example: ./setup-tenant.sh safetrust --endpoint http://localhost:8080"
   exit 1
 fi
-
 
 if [[ -z "$ADMIN_SECRET" ]]; then
   echo "Error: admin secret is required (use --admin-secret or HASURA_GRAPHQL_ADMIN_SECRET)"
@@ -64,25 +63,27 @@ fi
 echo ""
 echo "════════════════════════════════════════"
 echo "  SafeTrust Tenant Setup"
-echo "  Tenant:   $TENANT"
+echo "  Tenants:  ${TENANTS[*]}"
 echo "  Endpoint: $ENDPOINT"
 echo "════════════════════════════════════════"
 echo ""
 
-# Step 1 — Build metadata
-echo "▶ Step 1/2 — Building metadata for: $TENANT"
-bash "$SCRIPT_DIR/build-metadata.sh" "$TENANT"
-echo "✅ Build complete"
-echo ""
+for TENANT in "${TENANTS[@]}"; do
+  # Step 1 — Build metadata
+  echo "▶ Step 1/2 — Building metadata for: $TENANT"
+  bash "$SCRIPT_DIR/build-metadata.sh" "$TENANT"
+  echo "✅ Build complete for $TENANT"
+  echo ""
 
-# Step 2 — Deploy tenant
-echo "▶ Step 2/2 — Deploying tenant: $TENANT"
-bash "$SCRIPT_DIR/deploy-tenant.sh" "$TENANT" \
-  --admin-secret "$ADMIN_SECRET" \
-  --endpoint "$ENDPOINT"
-echo "✅ Deploy complete"
-echo ""
+  # Step 2 — Deploy tenant
+  echo "▶ Step 2/2 — Deploying tenant: $TENANT"
+  bash "$SCRIPT_DIR/deploy-tenant.sh" "$TENANT" \
+    --admin-secret "$ADMIN_SECRET" \
+    --endpoint "$ENDPOINT"
+  echo "✅ Deploy complete for $TENANT"
+  echo ""
 
-echo "════════════════════════════════════════"
-echo "  ✅ $TENANT is ready"
-echo "════════════════════════════════════════"
+  echo "════════════════════════════════════════"
+  echo "  ✅ $TENANT is ready"
+  echo "════════════════════════════════════════"
+done
