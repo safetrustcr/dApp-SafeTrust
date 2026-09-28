@@ -18,6 +18,21 @@ interface SyncUserBody {
  * token supplies the identity; this endpoint deliberately assigns only the
  * baseline guest role. Elevated roles are seeded or changed by an administrator.
  */
+const isFirebaseConfigError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+
+  return (
+    code === 'app/invalid-credential' ||
+    code === 'app/no-app' ||
+    code === 'auth/configuration-not-found' ||
+    code === 'auth/invalid-credential' ||
+    /credential|configuration|service account|private key|project id/i.test(message)
+  );
+};
+
 export const syncUserHandler = async (
   req: Request<unknown, unknown, SyncUserBody>,
   res: Response,
@@ -51,6 +66,10 @@ export const syncUserHandler = async (
     console.log(`[sync-user] ✅ user synced — uid: ${decodedToken.uid}`);
     return res.status(200).json({ success: true, user });
   } catch (error: unknown) {
+    if (isFirebaseConfigError(error)) {
+      return res.status(503).json({ code: 'AUTH_NOT_CONFIGURED', error: 'Firebase Admin is not configured' });
+    }
+
     const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
     if (typeof code === 'string' && code.startsWith('auth/')) {
       return res.status(401).json({ error: 'Invalid or expired Firebase token' });
