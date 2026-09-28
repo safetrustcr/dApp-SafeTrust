@@ -20,8 +20,11 @@ import {
   updateEscrowStatus,
   isEscrowTransitionError,
   isEscrowChangedError,
+  isUniqueViolation,
   HasuraRequestError,
 } from '../../services/hasura.js';
+import { InvalidTransitionError, ConcurrentTransitionError } from '../../domain/escrow-state.js';
+import { conflictBody, guardEscrowAction } from './transition-guard.js';
 import { confirmTransactionWithRetry } from '../../services/stellar-confirm.js';
 
 type EscrowAction =
@@ -222,6 +225,13 @@ export const sendTransactionHandler = async (
       }
     }
 
+    // Reject invalid transitions BEFORE submitting anything to Trustless Work
+    // or the ledger — a wrong-state action must change nothing on-chain.
+    if (action !== 'initialize') {
+      const conflict = await guardEscrowAction(res, action, contractId);
+      if (conflict) return conflict;
+    }
+
     let result: SendTransactionTWResponse & Record<string, unknown>;
     try {
       result = await trustlessWorkRequest<SendTransactionTWResponse & Record<string, unknown>>(
@@ -297,6 +307,17 @@ export const sendTransactionHandler = async (
           );
           if (existing.escrows.length > 0) {
             insertedId = existing.escrows[0].id;
+            // Normalize deploy's pending_signature -> created so every later
+            // transition can rely on `created` as fund's only `from` status.
+            await hasuraRequest(
+              `mutation NormalizeEscrowCreated($contractId: String!) {
+                update_escrows(
+                  where: { contract_id: { _eq: $contractId }, status: { _eq: "pending_signature" } }
+                  _set: { status: "created" }
+                ) { affected_rows }
+              }`,
+              { contractId: resolvedContractId },
+            );
           } else {
             const record = await insertEscrowRecord({
               contractId: resolvedContractId,
@@ -343,6 +364,16 @@ export const sendTransactionHandler = async (
         }
       }
     } catch (error) {
+      if (error instanceof InvalidTransitionError || error instanceof ConcurrentTransitionError) {
+        return res.status(409).json(conflictBody(error));
+      }
+
+      if (isUniqueViolation(error)) {
+        // Duplicate transition / replayed tx hash: the whole mutation document
+        // rolled back atomically, so nothing changed.
+        return res.status(409).json({ error: 'Escrow changed. Refresh and retry' });
+      }
+
       if (isEscrowTransitionError(error)) {
         const { from, to } = parseTransitionError(error);
         return res.status(409).json({
@@ -387,6 +418,14 @@ export const sendTransactionHandler = async (
         messages: error.messages,
         payload: error.payload,
       });
+    }
+
+    if (error instanceof InvalidTransitionError || error instanceof ConcurrentTransitionError) {
+      return res.status(409).json(conflictBody(error));
+    }
+
+    if (isUniqueViolation(error)) {
+      return res.status(409).json({ error: 'Escrow changed. Refresh and retry' });
     }
 
     const messages = getErrorMessages(error, 'Failed to send transaction.');

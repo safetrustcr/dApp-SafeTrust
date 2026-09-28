@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
+import { guardEscrowAction, sendConflict } from './transition-guard.js';
 
 type MilestoneStatusRequestBody = {
   contractId?: string;
@@ -52,6 +53,9 @@ export const milestoneStatusHandler = async (
       });
     }
 
+    const conflict = await guardEscrowAction(res, 'mark_milestone_completed', contractId);
+    if (conflict) return conflict;
+
     const result = await trustlessWorkRequest<ChangeMilestoneStatusTWResponse>(
       '/escrow/single-release/change-milestone-status',
       {
@@ -85,6 +89,9 @@ export const milestoneStatusHandler = async (
       status: 'funded',
     });
   } catch (error) {
+    const conflict = sendConflict(res, error);
+    if (conflict) return conflict;
+
     if (error instanceof TrustlessWorkRequestError) {
       return res.status(error.statusCode).json({
         error: error.message,

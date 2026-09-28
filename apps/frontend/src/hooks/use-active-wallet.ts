@@ -98,27 +98,10 @@ export function useActiveWallet(): ActiveWallet {
   // ✅ E2E provider called unconditionally; IS_E2E gates whether it is actually used
   const e2e = useE2EWallet();
 
-  // Short-circuit to the e2e provider when the flag is set.
-  // This path is only reachable in test environments — see IS_E2E guard above.
-  if (IS_E2E) {
-    return {
-      address: e2e.address,
-      walletType: 'freighter', // presented as 'freighter' so existing UI guards pass
-      isReady: Boolean(e2e.address),
-      signAndSubmit: e2e.signAndSubmit as SignAndSubmit,
-    };
-  }
-
   const isFreighterReady = Boolean(freighter?.address);
   const isPollarReady = Boolean(pollar?.address);
 
-  const activeAddress = freighter?.address ?? pollar?.address ?? null;
-  const activeWalletType: WalletType = isFreighterReady
-    ? 'freighter'
-    : isPollarReady
-      ? 'pollar'
-      : null;
-
+  // ✅ useCallback must run before any early return (rules-of-hooks).
   const signAndSubmit = useCallback(
     async (unsignedXDR: string, submission: TransactionSubmission): Promise<void> => {
       if (isFreighterReady && freighter?.signAndSubmit) {
@@ -131,6 +114,24 @@ export function useActiveWallet(): ActiveWallet {
     },
     [isFreighterReady, isPollarReady, freighter, pollar],
   );
+
+  // Short-circuit to the e2e provider when the flag is set.
+  // This path is only reachable in test environments — see IS_E2E guard above.
+  if (IS_E2E) {
+    return {
+      address: e2e.address,
+      walletType: 'freighter', // presented as 'freighter' so existing UI guards pass
+      isReady: Boolean(e2e.address),
+      signAndSubmit: e2e.signAndSubmit as SignAndSubmit,
+    };
+  }
+
+  const activeAddress = freighter?.address ?? pollar?.address ?? null;
+  const activeWalletType: WalletType = isFreighterReady
+    ? 'freighter'
+    : isPollarReady
+      ? 'pollar'
+      : null;
 
   return {
     address: activeAddress,
