@@ -19,8 +19,16 @@ export class EscrowApiError extends Error {
 /**
  * Sends an escrow command to the SafeTrust API with a freshly verified Firebase
  * ID token. The browser never receives the Trustless Work secret key.
+ *
+ * When `idempotencyKey` is supplied it is forwarded as the `Idempotency-Key`
+ * header, letting the API replay a completed response instead of re-running the
+ * action (and re-calling Trustless Work) after a retry.
  */
-export async function postEscrowApi<T>(path: string, body: unknown): Promise<T> {
+export async function postEscrowApi<T>(
+  path: string,
+  body: unknown,
+  idempotencyKey?: string,
+): Promise<T> {
   const user = auth.currentUser;
   if (!user) {
     throw new EscrowApiError('Sign in before performing an escrow action.', 401, null);
@@ -32,6 +40,7 @@ export async function postEscrowApi<T>(path: string, body: unknown): Promise<T> 
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
     },
     body: JSON.stringify(body),
   });

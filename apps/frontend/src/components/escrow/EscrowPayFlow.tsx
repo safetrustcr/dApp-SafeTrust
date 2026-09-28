@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
@@ -38,6 +38,10 @@ export function EscrowPayFlow({
   const [signing, setSigning] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [deployState, setDeployState] = useState<DeployResponse | null>(null);
+  // One Idempotency-Key per HTTP phase, generated when the PAY action starts and
+  // reused if the action is retried (the deploy and submit routes are different,
+  // so they need distinct keys).
+  const actionKeysRef = useRef<{ build: string; submit: string } | null>(null);
 
   const hasOwnerWallet = STELLAR_ADDRESS_RE.test(ownerAddress);
   const canPay = isReady && hasOwnerWallet;
@@ -57,13 +61,21 @@ export function EscrowPayFlow({
     setDeploying(true);
     setDeployState(null);
     setErrorMessages([]);
+    if (!actionKeysRef.current) {
+      actionKeysRef.current = { build: crypto.randomUUID(), submit: crypto.randomUUID() };
+    }
+    const actionKeys = actionKeysRef.current;
     try {
-      const payload = await postEscrowApi<DeployResponse>('/api/escrow/deploy', {
-        apartmentId,
-        senderAddress: address,
-        receiverAddress: ownerAddress,
-        amount,
-      });
+      const payload = await postEscrowApi<DeployResponse>(
+        '/api/escrow/deploy',
+        {
+          apartmentId,
+          senderAddress: address,
+          receiverAddress: ownerAddress,
+          amount,
+        },
+        actionKeys.build,
+      );
       setDeployState(payload);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to deploy escrow.'));
@@ -77,15 +89,20 @@ export function EscrowPayFlow({
     setSigning(true);
     setErrorMessages([]);
     try {
-      await signAndSubmit(deployState.unsignedXDR, {
-        action: 'initialize',
-        contractId: deployState.contractId,
-        engagementId: deployState.engagementId,
-        propertyId: apartmentId,
-        senderAddress: address,
-        receiverAddress: ownerAddress,
-        amount,
-      });
+      await signAndSubmit(
+        deployState.unsignedXDR,
+        {
+          action: 'initialize',
+          contractId: deployState.contractId,
+          engagementId: deployState.engagementId,
+          propertyId: apartmentId,
+          senderAddress: address,
+          receiverAddress: ownerAddress,
+          amount,
+        },
+        actionKeysRef.current?.submit,
+      );
+      actionKeysRef.current = null;
       router.push(`/apartment/${apartmentId}/escrow/${deployState.engagementId}`);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to sign escrow.'));

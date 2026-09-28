@@ -1,0 +1,3 @@
+table:
+  name: api_idempotency_keys
+  schema: public

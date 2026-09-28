@@ -75,6 +75,8 @@ export type TransactionSubmission = {
 export type SignAndSubmit = (
   unsignedXDR: string,
   submission: TransactionSubmission,
+  /** Forwarded as the Idempotency-Key header when the wallet submits via our API. */
+  idempotencyKey?: string,
 ) => Promise<void>;
 
 export type ActiveWallet = {
@@ -98,6 +100,17 @@ export function useActiveWallet(): ActiveWallet {
   // ✅ E2E provider called unconditionally; IS_E2E gates whether it is actually used
   const e2e = useE2EWallet();
 
+  // Short-circuit to the e2e provider when the flag is set.
+  // This path is only reachable in test environments — see IS_E2E guard above.
+  if (IS_E2E) {
+    return {
+      address: e2e.address,
+      walletType: 'freighter', // presented as 'freighter' so existing UI guards pass
+      isReady: Boolean(e2e.address),
+      signAndSubmit: e2e.signAndSubmit as SignAndSubmit,
+    };
+  }
+
   const isFreighterReady = Boolean(freighter?.address);
   const isPollarReady = Boolean(pollar?.address);
 
@@ -109,9 +122,13 @@ export function useActiveWallet(): ActiveWallet {
       : null;
 
   const signAndSubmit = useCallback(
-    async (unsignedXDR: string, submission: TransactionSubmission): Promise<void> => {
+    async (
+      unsignedXDR: string,
+      submission: TransactionSubmission,
+      idempotencyKey?: string,
+    ): Promise<void> => {
       if (isFreighterReady && freighter?.signAndSubmit) {
-        await freighter.signAndSubmit(unsignedXDR, submission);
+        await freighter.signAndSubmit(unsignedXDR, submission, idempotencyKey);
       } else if (isPollarReady && pollar?.signAndSubmit) {
         await pollar.signAndSubmit(unsignedXDR, submission);
       } else {
@@ -120,17 +137,6 @@ export function useActiveWallet(): ActiveWallet {
     },
     [isFreighterReady, isPollarReady, freighter, pollar],
   );
-
-  // Short-circuit to the e2e provider when the flag is set.
-  // This path is only reachable in test environments — see IS_E2E guard above.
-  if (IS_E2E) {
-    return {
-      address: e2e.address,
-      walletType: 'freighter', // presented as 'freighter' so existing UI guards pass
-      isReady: Boolean(e2e.address),
-      signAndSubmit: e2e.signAndSubmit as SignAndSubmit,
-    };
-  }
 
   return {
     address: activeAddress,

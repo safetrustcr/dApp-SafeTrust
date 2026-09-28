@@ -8,7 +8,7 @@ import { truncateStellarAddress } from '@/lib/utils';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { postEscrowApi } from '@/lib/api/escrow';
 import { useActiveWallet } from '@/hooks/use-active-wallet';
-import { useState, useCallback, useEffect, type CSSProperties, ReactNode } from 'react';
+import { useState, useCallback, useEffect, useRef, type CSSProperties, ReactNode } from 'react';
 import { useEscrowAction } from '@/hooks/use-escrow-action';
 import { useEscrowStream } from '@/hooks/use-escrow-stream';
 import Image from '@/components/ui/image';
@@ -947,6 +947,8 @@ export default function EscrowDetailPage({
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [approverFunds, setApproverFunds] = useState(0);
   const [receiverFunds, setReceiverFunds] = useState(0);
+  // Submit-phase Idempotency-Key for the resolve-dispute flow, reused on retries.
+  const resolveSubmitKeyRef = useRef<string | null>(null);
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.escrowId);
 
@@ -1067,6 +1069,7 @@ export default function EscrowDetailPage({
         receiverAddress: escrow.receiver_address,
         amount: escrow.amount,
       },
+      onConflict: refetch,
     });
     if (result) await refetch();
   }, [escrow, address, execute, refetch]);
@@ -1095,6 +1098,7 @@ export default function EscrowDetailPage({
         receiverAddress: escrow.receiver_address,
         milestoneId: 'check_in',
       },
+      onConflict: refetch,
     });
     if (result) await refetch();
   }, [escrow, address, execute, refetch]);
@@ -1123,6 +1127,7 @@ export default function EscrowDetailPage({
         milestoneId: 'check_in',
         approver: address,
       },
+      onConflict: refetch,
     });
     if (result) await refetch();
   }, [escrow, address, execute, refetch]);
@@ -1149,6 +1154,7 @@ export default function EscrowDetailPage({
         receiverAddress: escrow.receiver_address,
         releaseSigner: address,
       },
+      onConflict: refetch,
     });
     if (result) await refetch();
   }, [escrow, address, execute, refetch]);
@@ -1186,13 +1192,20 @@ export default function EscrowDetailPage({
       }
 
       setLoadingMessage('Awaiting wallet signature...');
-      await signAndSubmit(unsignedXdr, {
-        action: 'resolve_dispute',
-        contractId: escrow.contract_id,
-        engagementId: escrow.engagement_id,
-        senderAddress: escrow.sender_address,
-        receiverAddress: escrow.receiver_address,
-      });
+      const submitKey = resolveSubmitKeyRef.current ?? crypto.randomUUID();
+      resolveSubmitKeyRef.current = submitKey;
+      await signAndSubmit(
+        unsignedXdr,
+        {
+          action: 'resolve_dispute',
+          contractId: escrow.contract_id,
+          engagementId: escrow.engagement_id,
+          senderAddress: escrow.sender_address,
+          receiverAddress: escrow.receiver_address,
+        },
+        submitKey,
+      );
+      resolveSubmitKeyRef.current = null;
 
       setErrorMessages([]);
     } catch (err) {

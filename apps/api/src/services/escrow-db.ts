@@ -1,4 +1,9 @@
 import { hasuraRequest } from './hasura.js';
+import {
+  assertTransition,
+  ConcurrentTransitionError,
+  transitionSources,
+} from '../domain/escrow-state.js';
 
 type InitializeParams = {
   contractId: string;
@@ -56,9 +61,19 @@ async function resolveEscrowId(contractId: string): Promise<string> {
   return data.trustlessWorkEscrows[0].id;
 }
 
-function assertAffectedRows(name: string, affectedRows: number): void {
+/**
+ * A conditional update returning zero rows means somebody else already moved the
+ * escrow (or it was never in the expected state). Surface it as a conflict so the
+ * caller can answer 409 instead of silently double-writing.
+ */
+function assertTransitionApplied(
+  affectedRows: number,
+  from: string,
+  to: string,
+  contractId: string,
+): void {
   if (affectedRows === 0) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError(from, to, contractId);
   }
 }
 
@@ -147,24 +162,33 @@ export async function dbInitializeEscrow(params: InitializeParams): Promise<void
   );
 }
 
+/**
+ * `created -> funded`.
+ *
+ * Both escrow projections and the audit row are written by a single Hasura
+ * mutation, so a failure in any root field rolls the whole transition back:
+ * the tables can never disagree about whether the escrow is funded.
+ */
 export async function dbFundEscrow(
   contractId: string,
   amount: number,
   engagementId?: string,
   txHash?: string,
 ): Promise<void> {
+  assertTransition('created', 'funded');
+
   const result = await hasuraRequest<UpdateResult>(
     `mutation FundEscrow($contractId: String!, $amount: numeric!, $log: escrow_transactions_insert_input!) {
-      update_trustless_work_escrows(
-        where: { contractId: { _eq: $contractId } }
-        _set: { status: "funded", balance: $amount }
+      update_escrows(
+        where: { contract_id: { _eq: $contractId }, status: { _eq: "created" } }
+        _set: { status: "funded" }
       ) {
         affected_rows
         returning { id }
       }
-      update_escrows(
-        where: { contract_id: { _eq: $contractId } }
-        _set: { status: "funded" }
+      update_trustlessWorkEscrows(
+        where: { contractId: { _eq: $contractId }, status: { _eq: "created" } }
+        _set: { status: "funded", balance: $amount }
       ) {
         affected_rows
         returning { id }
@@ -180,13 +204,24 @@ export async function dbFundEscrow(
     },
   );
 
-  assertAffectedRows('fund', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
-  assertAffectedRows('fund', result.update_escrows?.affected_rows ?? 0);
+  assertTransitionApplied(result.update_escrows?.affected_rows ?? 0, 'created', 'funded', contractId);
+  assertTransitionApplied(
+    result.update_trustlessWorkEscrows?.affected_rows ?? 0,
+    'created',
+    'funded',
+    contractId,
+  );
   if (!result.insert_escrow_transactions_one) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError('created', 'funded', contractId);
   }
 }
 
+/**
+ * Milestone `pending -> completed`.
+ *
+ * The milestone transition is guarded by its own `status` condition; the audit
+ * row ships in the same mutation so the two never drift apart.
+ */
 export async function dbMarkMilestoneCompleted(
   contractId: string,
   milestoneId: string,
@@ -218,12 +253,27 @@ export async function dbMarkMilestoneCompleted(
     },
   );
 
-  assertAffectedRows('mark_milestone_completed', result.update_escrowMilestones?.affected_rows ?? 0);
+  assertTransitionApplied(
+    result.update_escrowMilestones?.affected_rows ?? 0,
+    'pending',
+    'completed',
+    contractId,
+  );
   if (!result.insert_escrow_transactions_one) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError('pending', 'completed', contractId);
   }
 }
 
+/**
+ * Milestone `completed -> approved`, and — once every milestone is approved —
+ * the escrow `funded -> milestone_approved` projection.
+ *
+ * The escrow transition depends on an aggregate count, so it is a second
+ * mutation document. That document still carries both escrow projections in a
+ * single request, keeping them atomic. It deliberately does not add a second
+ * `approve_milestone` audit row: `ux_escrow_transactions_engagement_action`
+ * allows only one row per (engagement_id, action).
+ */
 export async function dbApproveMilestone(
   contractId: string,
   milestoneId: string,
@@ -269,10 +319,12 @@ export async function dbApproveMilestone(
     },
   );
 
-  assertAffectedRows('approve_milestone', milestoneResult.update_escrowMilestones?.affected_rows ?? 0);
-  if (!milestoneResult.update_escrowMilestones?.returning.length) {
-    throw new Error(`Milestone not found: ${milestoneId} for contractId: ${contractId}`);
-  }
+  assertTransitionApplied(
+    milestoneResult.update_escrowMilestones?.affected_rows ?? 0,
+    'completed',
+    'approved',
+    contractId,
+  );
 
   type MilestoneCountsResult = {
     total: { aggregate: { count: number } };
@@ -297,46 +349,56 @@ export async function dbApproveMilestone(
   const approved = counts.approved.aggregate.count;
 
   if (approved >= total) {
+    assertTransition('funded', 'milestone_approved');
+
     const result = await hasuraRequest<UpdateResult>(
-      `mutation ApproveEscrow($contractId: String!, $log: escrow_transactions_insert_input!) {
-        update_trustless_work_escrows(
-          where: { contractId: { _eq: $contractId } }
-          _set: { status: "milestone_approved" }
-        ) {
-          affected_rows
-          returning { id }
-        }
+      `mutation ApproveEscrow($contractId: String!) {
         update_escrows(
-          where: { contract_id: { _eq: $contractId } }
+          where: { contract_id: { _eq: $contractId }, status: { _eq: "funded" } }
           _set: { status: "milestone_approved" }
         ) {
           affected_rows
           returning { id }
         }
-        insert_escrow_transactions_one(object: $log) {
-          id
+        update_trustlessWorkEscrows(
+          where: { contractId: { _eq: $contractId }, status: { _eq: "funded" } }
+          _set: { status: "milestone_approved" }
+        ) {
+          affected_rows
+          returning { id }
         }
       }`,
-      {
-        contractId,
-        log: buildAuditLog('approve_milestone', 'funded', 'milestone_approved', contractId, engagementId, txHash),
-      },
+      { contractId },
     );
 
-    assertAffectedRows('approve_milestone', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
-    assertAffectedRows('approve_milestone', result.update_escrows?.affected_rows ?? 0);
-    if (!result.insert_escrow_transactions_one) {
-      throw new Error('Escrow changed. Refresh and retry');
-    }
+    assertTransitionApplied(
+      result.update_escrows?.affected_rows ?? 0,
+      'funded',
+      'milestone_approved',
+      contractId,
+    );
+    assertTransitionApplied(
+      result.update_trustlessWorkEscrows?.affected_rows ?? 0,
+      'funded',
+      'milestone_approved',
+      contractId,
+    );
   }
 }
 
+/**
+ * `milestone_approved -> completed` (release funds).
+ *
+ * Milestone release, both escrow projections and the audit row are one Hasura
+ * mutation, so the lifecycle tables and `escrows` move together.
+ */
 export async function dbReleaseFunds(
   contractId: string,
   releaseSigner: string,
   engagementId?: string,
   txHash?: string,
 ): Promise<void> {
+  assertTransition('milestone_approved', 'completed');
   const escrowId = await resolveEscrowId(contractId);
 
   const result = await hasuraRequest<UpdateResult>(
@@ -355,16 +417,16 @@ export async function dbReleaseFunds(
         affected_rows
         returning { id }
       }
-      update_trustless_work_escrows(
-        where: { contractId: { _eq: $contractId } }
-        _set: { status: "completed", balance: 0 }
+      update_escrows(
+        where: { contract_id: { _eq: $contractId }, status: { _eq: "milestone_approved" } }
+        _set: { status: "completed" }
       ) {
         affected_rows
         returning { id }
       }
-      update_escrows(
-        where: { contract_id: { _eq: $contractId } }
-        _set: { status: "completed" }
+      update_trustlessWorkEscrows(
+        where: { contractId: { _eq: $contractId }, status: { _eq: "milestone_approved" } }
+        _set: { status: "completed", balance: 0 }
       ) {
         affected_rows
         returning { id }
@@ -382,32 +444,52 @@ export async function dbReleaseFunds(
     },
   );
 
-  if ((result.update_escrowMilestones?.affected_rows ?? 0) === 0) {
-    throw new Error(`No approved milestones found for contractId: ${contractId}`);
-  }
-  assertAffectedRows('release_funds', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
-  assertAffectedRows('release_funds', result.update_escrows?.affected_rows ?? 0);
+  assertTransitionApplied(
+    result.update_escrowMilestones?.affected_rows ?? 0,
+    'approved',
+    'released',
+    contractId,
+  );
+  assertTransitionApplied(
+    result.update_escrows?.affected_rows ?? 0,
+    'milestone_approved',
+    'completed',
+    contractId,
+  );
+  assertTransitionApplied(
+    result.update_trustlessWorkEscrows?.affected_rows ?? 0,
+    'milestone_approved',
+    'completed',
+    contractId,
+  );
   if (!result.insert_escrow_transactions_one) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError('milestone_approved', 'completed', contractId);
   }
 }
 
+/**
+ * `funded|milestone_approved -> disputed`.
+ *
+ * `disputed` has two legal predecessors, so the conditional update matches the
+ * whole source set instead of a single `from`.
+ */
 export async function dbDisputeEscrow(
   contractId: string,
   engagementId?: string,
   txHash?: string,
 ): Promise<void> {
+  const sources = transitionSources('disputed');
   const result = await hasuraRequest<UpdateResult>(
-    `mutation DisputeEscrow($contractId: String!, $log: escrow_transactions_insert_input!) {
-      update_trustless_work_escrows(
-        where: { contractId: { _eq: $contractId } }
+    `mutation DisputeEscrow($contractId: String!, $sources: [String!]!, $log: escrow_transactions_insert_input!) {
+      update_escrows(
+        where: { contract_id: { _eq: $contractId }, status: { _in: $sources } }
         _set: { status: "disputed" }
       ) {
         affected_rows
         returning { id }
       }
-      update_escrows(
-        where: { contract_id: { _eq: $contractId } }
+      update_trustlessWorkEscrows(
+        where: { contractId: { _eq: $contractId }, status: { _in: $sources } }
         _set: { status: "disputed" }
       ) {
         affected_rows
@@ -419,34 +501,47 @@ export async function dbDisputeEscrow(
     }`,
     {
       contractId,
-      log: buildAuditLog('dispute', 'funded', 'disputed', contractId, engagementId, txHash),
+      sources,
+      log: buildAuditLog('dispute', sources.join('|'), 'disputed', contractId, engagementId, txHash),
     },
   );
 
-  assertAffectedRows('dispute', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
-  assertAffectedRows('dispute', result.update_escrows?.affected_rows ?? 0);
+  assertTransitionApplied(
+    result.update_escrows?.affected_rows ?? 0,
+    sources.join('|'),
+    'disputed',
+    contractId,
+  );
+  assertTransitionApplied(
+    result.update_trustlessWorkEscrows?.affected_rows ?? 0,
+    sources.join('|'),
+    'disputed',
+    contractId,
+  );
   if (!result.insert_escrow_transactions_one) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError(sources.join('|'), 'disputed', contractId);
   }
 }
 
+/** `disputed -> resolved`. */
 export async function dbResolveDispute(
   contractId: string,
   engagementId?: string,
   txHash?: string,
 ): Promise<void> {
+  assertTransition('disputed', 'resolved');
   const result = await hasuraRequest<UpdateResult>(
     `mutation ResolveDispute($contractId: String!, $log: escrow_transactions_insert_input!) {
-      update_trustless_work_escrows(
-        where: { contractId: { _eq: $contractId } }
-        _set: { status: "resolved", balance: 0 }
+      update_escrows(
+        where: { contract_id: { _eq: $contractId }, status: { _eq: "disputed" } }
+        _set: { status: "resolved" }
       ) {
         affected_rows
         returning { id }
       }
-      update_escrows(
-        where: { contract_id: { _eq: $contractId } }
-        _set: { status: "resolved" }
+      update_trustlessWorkEscrows(
+        where: { contractId: { _eq: $contractId }, status: { _eq: "disputed" } }
+        _set: { status: "resolved", balance: 0 }
       ) {
         affected_rows
         returning { id }
@@ -461,9 +556,14 @@ export async function dbResolveDispute(
     },
   );
 
-  assertAffectedRows('resolve_dispute', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
-  assertAffectedRows('resolve_dispute', result.update_escrows?.affected_rows ?? 0);
+  assertTransitionApplied(result.update_escrows?.affected_rows ?? 0, 'disputed', 'resolved', contractId);
+  assertTransitionApplied(
+    result.update_trustlessWorkEscrows?.affected_rows ?? 0,
+    'disputed',
+    'resolved',
+    contractId,
+  );
   if (!result.insert_escrow_transactions_one) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError('disputed', 'resolved', contractId);
   }
 }

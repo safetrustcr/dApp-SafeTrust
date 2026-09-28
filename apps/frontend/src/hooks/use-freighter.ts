@@ -42,17 +42,21 @@ export function useFreighter(): FreighterWallet {
   }, []);
 
   const signAndSubmit: SignAndSubmit | null = address
-    ? async (xdr, submission): Promise<void> => {
+    ? async (xdr, submission, idempotencyKey): Promise<void> => {
         try {
           // @ts-expect-error — window.freighterApi
           const api = window.freighterApi;
           const { signedTransaction } = await api.signTransaction(xdr, {
             networkPassphrase: process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'Test SDF Network ; September 2015',
           });
-          await postEscrowApi('/api/escrow/send-transaction', {
-            signedXdr: signedTransaction,
-            ...submission,
-          });
+          await postEscrowApi(
+            '/api/escrow/send-transaction',
+            {
+              signedXdr: signedTransaction,
+              ...submission,
+            },
+            idempotencyKey,
+          );
         } catch (err) {
           throw new Error(`Freighter signing failed: ${String(err)}`);
         }
