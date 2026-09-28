@@ -1,32 +1,58 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
+
+const getMissingFirebaseConfig = (): string[] => {
+  const missing: string[] = [];
+
+  if (!process.env.FIREBASE_PROJECT_ID) {
+    missing.push('FIREBASE_PROJECT_ID');
+  }
+
+  if (!process.env.FIREBASE_CLIENT_EMAIL) {
+    missing.push('FIREBASE_CLIENT_EMAIL');
+  }
+
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY ?? '';
+  if (!privateKey.includes('BEGIN PRIVATE KEY')) {
+    missing.push('FIREBASE_PRIVATE_KEY');
+  }
+
+  return missing;
+};
 
 /**
  * Initialises the Firebase Admin SDK once — safe to call multiple times.
  *
- * Uses explicit credentials when FIREBASE_CLIENT_EMAIL is present (local dev,
- * CI). Falls back to Application Default Credentials in GCP environments
- * (Cloud Run / GKE) where the service account is attached to the instance.
- *
- * Call this once at server startup in index.ts before any route handler
- * invokes getAuth().verifyIdToken().
+ * Uses service account credentials in local/dev environments. Falls back to
+ * Application Default Credentials only when GOOGLE_APPLICATION_CREDENTIALS and
+ * FIREBASE_PROJECT_ID are both set. Otherwise the API exits during startup so
+ * misconfiguration fails fast instead of surfacing as a generic user error.
  */
 export function initFirebaseAdmin(): void {
-  if (getApps().length > 0) return; // already initialised — idempotent
+  if (getApps().length > 0) return;
 
-  const projectId   = process.env.FIREBASE_PROJECT_ID;
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.FIREBASE_PROJECT_ID) {
+    initializeApp({
+      credential: applicationDefault(),
+      projectId: process.env.FIREBASE_PROJECT_ID,
+    });
+    console.log('[firebase-admin] ✅ initialised with Application Default Credentials');
+    return;
+  }
+
+  const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  // Replace escaped newlines — private keys are stored as single-line strings
-  // in .env files but Firebase Admin expects actual newline characters.
-  const privateKey  = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-  if (projectId && clientEmail && privateKey) {
+  if (projectId && clientEmail && privateKey?.includes('BEGIN PRIVATE KEY')) {
     initializeApp({
       credential: cert({ projectId, clientEmail, privateKey }),
     });
     console.log('[firebase-admin] ✅ initialised with service account credentials');
-  } else {
-    // Application Default Credentials — works automatically in GCP
-    initializeApp();
-    console.log('[firebase-admin] ✅ initialised with Application Default Credentials');
+    return;
   }
+
+  const missing = getMissingFirebaseConfig();
+  throw new Error(
+    `Firebase Admin is not configured.\nMissing: ${missing.join(', ')}\nGet them from Firebase Console → Project settings → Service accounts → Generate new private key.\nOr set GOOGLE_APPLICATION_CREDENTIALS to the JSON key path.`,
+  );
 }
