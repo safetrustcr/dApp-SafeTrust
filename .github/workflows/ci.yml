@@ -1,0 +1,53 @@
+name: CI Check
+
+on:
+  pull_request:
+    branches:
+      - consolidation-pattern
+  push:
+    branches:
+      - consolidation-pattern
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: NEXT_TELEMETRY_DISABLED=1 pnpm --filter @safetrust/web build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: "placeholder_firebase_api_key"
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "placeholder.firebaseapp.com"
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "placeholder_project_id"
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "placeholder.firebasestorage.app"
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:placeholder"
+          NEXT_PUBLIC_HASURA_GRAPHQL_URL: "http://localhost:8080/v1/graphql"
+          NEXT_PUBLIC_HASURA_ADMIN_SECRET: "placeholder_admin_secret"
+          HASURA_GRAPHQL_URL: "http://localhost:8080/v1/graphql"
+          HASURA_ADMIN_SECRET: "placeholder_admin_secret"
+          NEXT_PUBLIC_USE_HOTEL_MOCKS: "true"
+          NEXT_PUBLIC_BACKEND_URL: "http://localhost:3002"
+          NEXT_PUBLIC_API_URL: "http://localhost:3000"
+          TRUSTLESS_WORK_API_URL: "http://localhost:3000"
+          TRUSTLESS_WORK_API_KEY: "placeholder_tw_key"
+          NEXT_PUBLIC_POLLAR_PUBLISHABLE_KEY: "placeholder_pollar_key"
+          NEXT_PUBLIC_E2E_WALLET: "false"
