@@ -19,11 +19,26 @@ type InsertEscrowResult = {
 };
 
 type UpdateResult = {
-  update_trustlessWorkEscrows: { returning: { id: string }[] };
+  update_trustlessWorkEscrows?: { affected_rows: number; returning: { id: string }[] };
+  update_escrows?: { affected_rows: number; returning: { id: string }[] };
+  update_escrowMilestones?: { affected_rows: number; returning: { id: string }[] };
+  insert_escrow_transactions_one?: { id: string };
 };
 
 type MilestoneUpdateResult = {
-  update_escrowMilestones: { returning: { id: string }[] };
+  update_escrowMilestones?: { affected_rows: number; returning: { id: string }[] };
+};
+
+type TransitionAuditInput = {
+  engagement_id?: string | null;
+  contract_id?: string | null;
+  from_status: string;
+  to_status: string;
+  action: string;
+  tx_hash?: string | null;
+  source: 'submit' | 'reconciler' | 'admin';
+  actor_uid?: string | null;
+  created_at?: string;
 };
 
 async function resolveEscrowId(contractId: string): Promise<string> {
@@ -39,6 +54,34 @@ async function resolveEscrowId(contractId: string): Promise<string> {
     throw new Error(`Escrow not found for contractId: ${contractId}`);
   }
   return data.trustlessWorkEscrows[0].id;
+}
+
+function assertAffectedRows(name: string, affectedRows: number): void {
+  if (affectedRows === 0) {
+    throw new Error('Escrow changed. Refresh and retry');
+  }
+}
+
+function buildAuditLog(
+  action: string,
+  fromStatus: string,
+  toStatus: string,
+  contractId: string,
+  engagementId?: string,
+  txHash?: string,
+  source: 'submit' | 'reconciler' | 'admin' = 'submit',
+): TransitionAuditInput {
+  return {
+    engagement_id: engagementId ?? null,
+    contract_id: contractId,
+    from_status: fromStatus,
+    to_status: toStatus,
+    action,
+    tx_hash: txHash ?? null,
+    source,
+    actor_uid: null,
+    created_at: new Date().toISOString(),
+  };
 }
 
 export async function dbInitializeEscrow(params: InitializeParams): Promise<void> {
@@ -104,32 +147,55 @@ export async function dbInitializeEscrow(params: InitializeParams): Promise<void
   );
 }
 
-export async function dbFundEscrow(contractId: string, amount: number): Promise<void> {
+export async function dbFundEscrow(
+  contractId: string,
+  amount: number,
+  engagementId?: string,
+  txHash?: string,
+): Promise<void> {
   const result = await hasuraRequest<UpdateResult>(
-    `mutation FundEscrow($contractId: String!, $amount: numeric!) {
-      update_trustlessWorkEscrows(
+    `mutation FundEscrow($contractId: String!, $amount: numeric!, $log: escrow_transactions_insert_input!) {
+      update_trustless_work_escrows(
         where: { contractId: { _eq: $contractId } }
-        _set: { status: "funded" }
-        _inc: { balance: $amount }
+        _set: { status: "funded", balance: $amount }
       ) {
+        affected_rows
         returning { id }
       }
+      update_escrows(
+        where: { contract_id: { _eq: $contractId } }
+        _set: { status: "funded" }
+      ) {
+        affected_rows
+        returning { id }
+      }
+      insert_escrow_transactions_one(object: $log) {
+        id
+      }
     }`,
-    { contractId, amount },
+    {
+      contractId,
+      amount,
+      log: buildAuditLog('fund', 'created', 'funded', contractId, engagementId, txHash),
+    },
   );
 
-  if (result.update_trustlessWorkEscrows.returning.length === 0) {
-    throw new Error(`Escrow not found for contractId: ${contractId}`);
+  assertAffectedRows('fund', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
+  assertAffectedRows('fund', result.update_escrows?.affected_rows ?? 0);
+  if (!result.insert_escrow_transactions_one) {
+    throw new Error('Escrow changed. Refresh and retry');
   }
 }
 
 export async function dbMarkMilestoneCompleted(
   contractId: string,
   milestoneId: string,
+  engagementId?: string,
+  txHash?: string,
 ): Promise<void> {
   const escrowId = await resolveEscrowId(contractId);
-  const result = await hasuraRequest<MilestoneUpdateResult>(
-    `mutation CompleteMilestone($escrowId: uuid!, $milestoneId: String!) {
+  const result = await hasuraRequest<MilestoneUpdateResult & UpdateResult>(
+    `mutation CompleteMilestone($escrowId: uuid!, $milestoneId: String!, $log: escrow_transactions_insert_input!) {
       update_escrowMilestones(
         where: {
           escrowId: { _eq: $escrowId }
@@ -137,13 +203,24 @@ export async function dbMarkMilestoneCompleted(
           status: { _eq: "pending" }
         }
         _set: { status: "completed" }
-      ) { returning { id } }
+      ) {
+        affected_rows
+        returning { id }
+      }
+      insert_escrow_transactions_one(object: $log) {
+        id
+      }
     }`,
-    { escrowId, milestoneId },
+    {
+      escrowId,
+      milestoneId,
+      log: buildAuditLog('mark_milestone_completed', 'pending', 'completed', contractId, engagementId, txHash),
+    },
   );
 
-  if (result.update_escrowMilestones.returning.length === 0) {
-    throw new Error(`Milestone is not pending: ${milestoneId} for contractId: ${contractId}`);
+  assertAffectedRows('mark_milestone_completed', result.update_escrowMilestones?.affected_rows ?? 0);
+  if (!result.insert_escrow_transactions_one) {
+    throw new Error('Escrow changed. Refresh and retry');
   }
 }
 
@@ -151,6 +228,8 @@ export async function dbApproveMilestone(
   contractId: string,
   milestoneId: string,
   approver: string,
+  engagementId?: string,
+  txHash?: string,
 ): Promise<void> {
   const escrowId = await resolveEscrowId(contractId);
 
@@ -160,6 +239,7 @@ export async function dbApproveMilestone(
       $milestoneId: String!
       $approver: String!
       $approvedAt: timestamptz!
+      $log: escrow_transactions_insert_input!
     ) {
       update_escrowMilestones(
         where: {
@@ -173,13 +253,24 @@ export async function dbApproveMilestone(
           approvedAt: $approvedAt
         }
       ) {
+        affected_rows
         returning { id }
       }
+      insert_escrow_transactions_one(object: $log) {
+        id
+      }
     }`,
-    { escrowId, milestoneId, approver, approvedAt: new Date().toISOString() },
+    {
+      escrowId,
+      milestoneId,
+      approver,
+      approvedAt: new Date().toISOString(),
+      log: buildAuditLog('approve_milestone', 'completed', 'approved', contractId, engagementId, txHash),
+    },
   );
 
-  if (milestoneResult.update_escrowMilestones.returning.length === 0) {
+  assertAffectedRows('approve_milestone', milestoneResult.update_escrowMilestones?.affected_rows ?? 0);
+  if (!milestoneResult.update_escrowMilestones?.returning.length) {
     throw new Error(`Milestone not found: ${milestoneId} for contractId: ${contractId}`);
   }
 
@@ -207,48 +298,49 @@ export async function dbApproveMilestone(
 
   if (approved >= total) {
     const result = await hasuraRequest<UpdateResult>(
-      `mutation ApproveEscrow($escrowId: uuid!) {
-        update_trustlessWorkEscrows(
-          where: { id: { _eq: $escrowId }, status: { _eq: "funded" } }
+      `mutation ApproveEscrow($contractId: String!, $log: escrow_transactions_insert_input!) {
+        update_trustless_work_escrows(
+          where: { contractId: { _eq: $contractId } }
           _set: { status: "milestone_approved" }
         ) {
+          affected_rows
           returning { id }
         }
+        update_escrows(
+          where: { contract_id: { _eq: $contractId } }
+          _set: { status: "milestone_approved" }
+        ) {
+          affected_rows
+          returning { id }
+        }
+        insert_escrow_transactions_one(object: $log) {
+          id
+        }
       }`,
-      { escrowId },
+      {
+        contractId,
+        log: buildAuditLog('approve_milestone', 'funded', 'milestone_approved', contractId, engagementId, txHash),
+      },
     );
 
-    if (result.update_trustlessWorkEscrows.returning.length === 0) {
-      throw new Error(`Escrow not found or not in funded state for contractId: ${contractId}`);
+    assertAffectedRows('approve_milestone', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
+    assertAffectedRows('approve_milestone', result.update_escrows?.affected_rows ?? 0);
+    if (!result.insert_escrow_transactions_one) {
+      throw new Error('Escrow changed. Refresh and retry');
     }
   }
 }
 
-export async function dbReleaseFunds(contractId: string, releaseSigner: string): Promise<void> {
+export async function dbReleaseFunds(
+  contractId: string,
+  releaseSigner: string,
+  engagementId?: string,
+  txHash?: string,
+): Promise<void> {
   const escrowId = await resolveEscrowId(contractId);
 
-  const escrowResult = await hasuraRequest<UpdateResult>(
-    `mutation ReleaseFunds($escrowId: uuid!) {
-      update_trustlessWorkEscrows(
-        where: { id: { _eq: $escrowId } }
-        _set: { status: "completed", balance: 0 }
-      ) {
-        returning { id }
-      }
-    }`,
-    { escrowId },
-  );
-
-  if (escrowResult.update_trustlessWorkEscrows.returning.length === 0) {
-    throw new Error(`Escrow not found for contractId: ${contractId}`);
-  }
-
-  const milestoneResult = await hasuraRequest<MilestoneUpdateResult>(
-    `mutation ReleaseMilestones(
-      $escrowId: uuid!
-      $releaseSigner: String!
-      $releasedAt: timestamptz!
-    ) {
+  const result = await hasuraRequest<UpdateResult>(
+    `mutation ReleaseFunds($escrowId: uuid!, $contractId: String!, $releaseSigner: String!, $releasedAt: timestamptz!, $log: escrow_transactions_insert_input!) {
       update_escrowMilestones(
         where: {
           escrowId: { _eq: $escrowId }
@@ -260,49 +352,118 @@ export async function dbReleaseFunds(contractId: string, releaseSigner: string):
           releasedAt: $releasedAt
         }
       ) {
+        affected_rows
         returning { id }
       }
+      update_trustless_work_escrows(
+        where: { contractId: { _eq: $contractId } }
+        _set: { status: "completed", balance: 0 }
+      ) {
+        affected_rows
+        returning { id }
+      }
+      update_escrows(
+        where: { contract_id: { _eq: $contractId } }
+        _set: { status: "completed" }
+      ) {
+        affected_rows
+        returning { id }
+      }
+      insert_escrow_transactions_one(object: $log) {
+        id
+      }
     }`,
-    { escrowId, releaseSigner, releasedAt: new Date().toISOString() },
+    {
+      escrowId,
+      contractId,
+      releaseSigner,
+      releasedAt: new Date().toISOString(),
+      log: buildAuditLog('release_funds', 'milestone_approved', 'completed', contractId, engagementId, txHash),
+    },
   );
 
-  if (milestoneResult.update_escrowMilestones.returning.length === 0) {
+  if ((result.update_escrowMilestones?.affected_rows ?? 0) === 0) {
     throw new Error(`No approved milestones found for contractId: ${contractId}`);
+  }
+  assertAffectedRows('release_funds', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
+  assertAffectedRows('release_funds', result.update_escrows?.affected_rows ?? 0);
+  if (!result.insert_escrow_transactions_one) {
+    throw new Error('Escrow changed. Refresh and retry');
   }
 }
 
-export async function dbDisputeEscrow(contractId: string): Promise<void> {
+export async function dbDisputeEscrow(
+  contractId: string,
+  engagementId?: string,
+  txHash?: string,
+): Promise<void> {
   const result = await hasuraRequest<UpdateResult>(
-    `mutation DisputeEscrow($contractId: String!) {
-      update_trustlessWorkEscrows(
+    `mutation DisputeEscrow($contractId: String!, $log: escrow_transactions_insert_input!) {
+      update_trustless_work_escrows(
         where: { contractId: { _eq: $contractId } }
         _set: { status: "disputed" }
       ) {
+        affected_rows
         returning { id }
       }
+      update_escrows(
+        where: { contract_id: { _eq: $contractId } }
+        _set: { status: "disputed" }
+      ) {
+        affected_rows
+        returning { id }
+      }
+      insert_escrow_transactions_one(object: $log) {
+        id
+      }
     }`,
-    { contractId },
+    {
+      contractId,
+      log: buildAuditLog('dispute', 'funded', 'disputed', contractId, engagementId, txHash),
+    },
   );
 
-  if (result.update_trustlessWorkEscrows.returning.length === 0) {
-    throw new Error(`Escrow not found for contractId: ${contractId}`);
+  assertAffectedRows('dispute', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
+  assertAffectedRows('dispute', result.update_escrows?.affected_rows ?? 0);
+  if (!result.insert_escrow_transactions_one) {
+    throw new Error('Escrow changed. Refresh and retry');
   }
 }
 
-export async function dbResolveDispute(contractId: string): Promise<void> {
+export async function dbResolveDispute(
+  contractId: string,
+  engagementId?: string,
+  txHash?: string,
+): Promise<void> {
   const result = await hasuraRequest<UpdateResult>(
-    `mutation ResolveDispute($contractId: String!) {
-      update_trustlessWorkEscrows(
+    `mutation ResolveDispute($contractId: String!, $log: escrow_transactions_insert_input!) {
+      update_trustless_work_escrows(
         where: { contractId: { _eq: $contractId } }
         _set: { status: "resolved", balance: 0 }
       ) {
+        affected_rows
         returning { id }
       }
+      update_escrows(
+        where: { contract_id: { _eq: $contractId } }
+        _set: { status: "resolved" }
+      ) {
+        affected_rows
+        returning { id }
+      }
+      insert_escrow_transactions_one(object: $log) {
+        id
+      }
     }`,
-    { contractId },
+    {
+      contractId,
+      log: buildAuditLog('resolve_dispute', 'disputed', 'resolved', contractId, engagementId, txHash),
+    },
   );
 
-  if (result.update_trustlessWorkEscrows.returning.length === 0) {
-    throw new Error(`Escrow not found for contractId: ${contractId}`);
+  assertAffectedRows('resolve_dispute', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
+  assertAffectedRows('resolve_dispute', result.update_escrows?.affected_rows ?? 0);
+  if (!result.insert_escrow_transactions_one) {
+    throw new Error('Escrow changed. Refresh and retry');
   }
 }
