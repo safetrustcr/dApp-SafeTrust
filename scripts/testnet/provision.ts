@@ -570,6 +570,11 @@ async function main(): Promise<void> {
   assertTestnetConfiguration();
 
   if (!checkMode) {
+    const missing = ['USDC_TRUSTLINE_ADDRESS', 'HASURA_GRAPHQL_URL', 'HASURA_ADMIN_SECRET']
+      .filter((key) => !process.env[key]?.trim());
+    if (missing.length > 0) {
+      throw new Error(`Missing required env vars: ${missing.join(', ')}`);
+    }
     const server = new Horizon.Server(process.env.STELLAR_HORIZON_URL ?? defaultHorizonUrl);
     const guestSecret = process.env.E2E_GUEST_SECRET!;
     const hostSecret = process.env.E2E_HOST_SECRET!;
