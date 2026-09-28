@@ -22,7 +22,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
@@ -45,6 +45,12 @@ jobs:
         run: pnpm --filter @safetrust/web build
 
       - name: Client secret scan
+        if: github.event_name == 'push'
         env:
           TRUSTLESS_WORK_API_KEY: ${{ secrets.TRUSTLESS_WORK_API_KEY }}
+          REQUIRE_BUNDLE_KEY: "true"
+        run: bash scripts/check-client-secrets.sh
+
+      - name: Client source scan (bundle key unavailable to pull requests)
+        if: github.event_name == 'pull_request'
         run: bash scripts/check-client-secrets.sh
