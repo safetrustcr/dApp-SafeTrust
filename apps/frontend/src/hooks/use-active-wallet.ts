@@ -126,13 +126,6 @@ export function useActiveWallet(): ActiveWallet {
     };
   }
 
-  const activeAddress = freighter?.address ?? pollar?.address ?? null;
-  const activeWalletType: WalletType = isFreighterReady
-    ? 'freighter'
-    : isPollarReady
-      ? 'pollar'
-      : null;
-
   return {
     address: activeAddress,
     walletType: activeWalletType,
