@@ -24,8 +24,8 @@ jobs:
 
       - name: Install Hasura CLI
         run: |
-          curl -L https://github.com/hasura/graphql-engine/releases/latest/download/cli-hasura-linux-amd64 -o /usr/local/bin/hasura
-          chmod +x /usr/local/bin/hasura
+          sudo curl -fL https://github.com/hasura/graphql-engine/releases/latest/download/cli-hasura-linux-amd64 -o /usr/local/bin/hasura
+          sudo chmod +x /usr/local/bin/hasura
           hasura version --skip-update-check
 
       - name: Install yq
