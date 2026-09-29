@@ -101,7 +101,13 @@ export function useActiveWallet(): ActiveWallet {
   const isFreighterReady = Boolean(freighter?.address);
   const isPollarReady = Boolean(pollar?.address);
 
-  // ✅ useCallback must run before any early return (rules-of-hooks).
+  const activeAddress = freighter?.address ?? pollar?.address ?? null;
+  const activeWalletType: WalletType = isFreighterReady
+    ? 'freighter'
+    : isPollarReady
+      ? 'pollar'
+      : null;
+
   const signAndSubmit = useCallback(
     async (unsignedXDR: string, submission: TransactionSubmission): Promise<void> => {
       if (isFreighterReady && freighter?.signAndSubmit) {
@@ -125,13 +131,6 @@ export function useActiveWallet(): ActiveWallet {
       signAndSubmit: e2e.signAndSubmit as SignAndSubmit,
     };
   }
-
-  const activeAddress = freighter?.address ?? pollar?.address ?? null;
-  const activeWalletType: WalletType = isFreighterReady
-    ? 'freighter'
-    : isPollarReady
-      ? 'pollar'
-      : null;
 
   return {
     address: activeAddress,
