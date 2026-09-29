@@ -2,9 +2,9 @@ name: Infra & Metadata Consistency Check
 
 on:
   push:
-    branches: [main]
+    branches: [main, consolidation-pattern]
   pull_request:
-    branches: [main]
+    branches: [main, consolidation-pattern]
 
 jobs:
   metadata-check:
@@ -34,6 +34,7 @@ jobs:
           sed -i 's/HASURA_GRAPHQL_ADMIN_SECRET=replace-with-a-local-admin-secret/HASURA_GRAPHQL_ADMIN_SECRET=myadminsecretkey/' infra/backend/.env
           sed -i 's/HASURA_EVENT_SECRET=replace-with-a-local-event-secret/HASURA_EVENT_SECRET=myhasuraeventsecret/' infra/backend/.env
           sed -i 's/WEBHOOK_ADMIN_SECRET=replace-with-a-local-webhook-admin-secret/WEBHOOK_ADMIN_SECRET=mywebhookadminsecret/' infra/backend/.env
+          sed -i 's/RECONCILIATION_SECRET=replace-with-a-random-cron-secret/RECONCILIATION_SECRET=myreconciliationsecret/' infra/backend/.env
 
       - name: Start SafeTrust backend infrastructure
         run: |

@@ -1,10 +1,47 @@
 const HASURA_URL = process.env.HASURA_GRAPHQL_URL ?? 'http://localhost:8080/v1/graphql';
 
+type HasuraGraphQLError = {
+  message: string;
+  extensions?: {
+    code?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
 export class HasuraRequestError extends Error {
-  constructor(message: string, readonly details?: unknown) {
+  constructor(message: string, readonly details?: HasuraGraphQLError[]) {
     super(message);
     this.name = 'HasuraRequestError';
   }
+}
+
+export function isEscrowTransitionError(error: unknown): boolean {
+  if (!(error instanceof HasuraRequestError)) {
+    return false;
+  }
+
+  const messages = error.details?.map((detail) => detail.message ?? '').join(' ') ?? error.message;
+  const codes = error.details?.map((detail) => detail.extensions?.code).filter(Boolean) ?? [];
+
+  return codes.includes('check_violation') || messages.toLowerCase().includes('invalid escrow transition');
+}
+
+export function isEscrowChangedError(error: unknown): boolean {
+  if (error instanceof Error && error.message === 'Escrow changed. Refresh and retry') {
+    return true;
+  }
+
+  if (!(error instanceof HasuraRequestError)) {
+    return false;
+  }
+
+  const detailMessage = error.details?.some((detail) => {
+    const message = detail.message?.toLowerCase() ?? '';
+    return message.includes('affected_rows') || message.includes('escrow changed');
+  });
+
+  return Boolean(detailMessage);
 }
 
 /**
@@ -31,14 +68,14 @@ export async function hasuraRequest<T>(
   });
 
   const text = await response.text();
-  let json: { data?: T; errors?: { message: string }[] };
+  let json: { data?: T; errors?: HasuraGraphQLError[] };
   try {
-    json = (text ? JSON.parse(text) : {}) as { data?: T; errors?: { message: string }[] };
+    json = (text ? JSON.parse(text) : {}) as { data?: T; errors?: HasuraGraphQLError[] };
   } catch {
     if (!response.ok) {
       throw new HasuraRequestError(`Hasura request failed with status ${response.status} (non-JSON response)`);
     }
-    json = {} as { data?: T; errors?: { message: string }[] };
+    json = {} as { data?: T; errors?: HasuraGraphQLError[] };
   }
 
   if (!response.ok) {

@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { auth } from "@/lib/firebase";
+import { Image } from "@/components/ui/image";
 
 interface Apartment {
   id: string;
@@ -150,8 +151,7 @@ export default function GuestDashboard() {
 
           {/* Logo */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/img/logo.png" alt="SafeTrust" className="h-8 w-8" />
+            <Image src="/img/logo.png" alt="SafeTrust" width={32} height={32} priority className="h-8 w-8" />
             <span className="font-bold text-lg text-gray-900">SafeTrust</span>
           </div>
 
@@ -333,15 +333,12 @@ export default function GuestDashboard() {
                     onClick={() => router.push(`/apartment/${apt.id}`)}
                   >
                     <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={getImage(apt, idx)}
                         alt={apt.name}
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length];
-                        }}
+                        fill
+                        sizes="72px"
+                        className="object-cover"
                       />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -371,14 +368,13 @@ export default function GuestDashboard() {
 
                   {/* Hero image */}
                   <div className="relative aspect-[16/9] overflow-hidden rounded-2xl bg-gray-100 shadow-md">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src={getImage(featured)}
                       alt={featured.name}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = FALLBACK_IMAGES[0];
-                      }}
+                      fill
+                      sizes="(max-width: 1280px) 100vw, 66vw"
+                      priority
+                      className="object-cover"
                     />
                     <span className="absolute bottom-4 left-4 flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase text-white shadow">
                       🔥 Promoted
@@ -448,14 +444,12 @@ export default function GuestDashboard() {
                       key={i}
                       className="relative aspect-[4/3] overflow-hidden rounded-xl bg-gray-100 shadow-sm"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={src}
                         alt={`${featured.name} ${i + 2}`}
-                        className="h-full w-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = FALLBACK_IMAGES[i];
-                        }}
+                        fill
+                        sizes="(max-width: 768px) 33vw, 20vw"
+                        className="object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
                       />
                     </div>
                   ))}

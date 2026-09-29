@@ -1,0 +1,103 @@
+name: E2E Golden-Path (testnet)
+
+# Run nightly on the default branch and on manual dispatch only.
+# Never triggered on every PR — testnet is slow and occasionally flaky.
+on:
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC every night
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to run E2E against
+        required: false
+        default: consolidation-pattern
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Playwright golden-path (testnet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: apps/frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start API server
+        run: pnpm --filter @safetrust/api dev &
+        env:
+          DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+          HASURA_GRAPHQL_URL: ${{ secrets.E2E_HASURA_GRAPHQL_URL }}
+          HASURA_ADMIN_SECRET: ${{ secrets.E2E_HASURA_ADMIN_SECRET }}
+          TRUSTLESS_WORK_API_KEY: ${{ secrets.TRUSTLESS_WORK_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.E2E_FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Start web app
+        run: pnpm --filter @safetrust/web dev &
+        env:
+          NEXT_PUBLIC_E2E_WALLET: "true"
+          NEXT_PUBLIC_HASURA_URL: ${{ secrets.E2E_HASURA_GRAPHQL_URL }}
+          NEXT_PUBLIC_FIREBASE_CONFIG: ${{ secrets.E2E_FIREBASE_CONFIG }}
+
+      - name: Wait for servers to be ready
+        run: |
+          echo "Waiting for API (port 3000)…"
+          timeout 60 bash -c 'until curl -sf http://localhost:3000/health; do sleep 2; done'
+          echo "Waiting for web (port 3001)…"
+          timeout 60 bash -c 'until curl -sf http://localhost:3001; do sleep 2; done'
+
+      - name: Run E2E golden-path test
+        working-directory: apps/frontend
+        run: pnpm test:e2e
+        env:
+          # Testnet keypairs — stored as repo secrets, never in code
+          E2E_GUEST_SECRET: ${{ secrets.E2E_GUEST_SECRET }}
+          E2E_HOST_SECRET: ${{ secrets.E2E_HOST_SECRET }}
+          E2E_PLATFORM_SECRET: ${{ secrets.E2E_PLATFORM_SECRET }}
+          E2E_GUEST_EMAIL: ${{ secrets.E2E_GUEST_EMAIL }}
+          E2E_HOST_EMAIL: ${{ secrets.E2E_HOST_EMAIL }}
+          E2E_HOST_PASSWORD: ${{ secrets.E2E_HOST_PASSWORD }}
+          E2E_APARTMENT_ID: ${{ secrets.E2E_APARTMENT_ID }}
+          E2E_APARTMENT_NAME: ${{ secrets.E2E_APARTMENT_NAME }}
+          TRUSTLESS_WORK_API_KEY: ${{ secrets.TRUSTLESS_WORK_API_KEY }}
+          PLAYWRIGHT_BASE_URL: "http://localhost:3001"
+          API_URL: "http://localhost:3000"
+          # Reconciliation secret for idempotency checks
+          RECONCILIATION_SECRET: ${{ secrets.E2E_RECONCILIATION_SECRET }}
+
+      # Always upload the Playwright trace and HTML report so failures can be
+      # diagnosed without re-running the test (testnet state changes).
+      - name: Upload Playwright trace
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trace-${{ github.run_id }}
+          path: apps/frontend/test-results/
+          retention-days: 7
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: apps/frontend/playwright-report/
+          retention-days: 7

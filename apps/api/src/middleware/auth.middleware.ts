@@ -17,6 +17,21 @@ export interface AuthenticatedRequest extends Request {
  * DB by the promote-to-host handler or the tenant middleware downstream.
  * The default 'guest' ensures every authenticated request has a typed role.
  */
+const isFirebaseConfigError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : '';
+  const message = 'message' in error ? String((error as { message?: unknown }).message ?? '') : '';
+
+  return (
+    code === 'app/invalid-credential' ||
+    code === 'app/no-app' ||
+    code === 'auth/configuration-not-found' ||
+    code === 'auth/invalid-credential' ||
+    /credential|configuration|service account|private key|project id/i.test(message)
+  );
+};
+
 export const authenticateFirebase: RequestHandler = async (
   req: Request,
   res: Response,
@@ -39,7 +54,12 @@ export const authenticateFirebase: RequestHandler = async (
       role: 'guest', // resolved from DB by downstream middleware/handlers
     };
     next();
-  } catch {
+  } catch (error: unknown) {
+    if (isFirebaseConfigError(error)) {
+      res.status(503).json({ code: 'AUTH_NOT_CONFIGURED', error: 'Firebase Admin is not configured' });
+      return;
+    }
+
     res.status(401).json({ error: 'Invalid or expired Firebase token' });
   }
 };

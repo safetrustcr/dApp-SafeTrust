@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- Init SQL for tenant: hotel_industry
--- Generated: 2026-08-27T23:40:19Z
--- Source:    infra/hasura/migrations/hotel_industry/*/up.sql
+-- Generated: 2026-09-29T00:07:49Z
+-- Source:    infra/backend/migrations/hotel_industry/*/up.sql
 -- DO NOT EDIT — regenerate with: bin/generate-init-sql
 -- ════════════════════════════════════════════════════════════════════════════
 
