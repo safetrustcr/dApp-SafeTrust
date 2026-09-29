@@ -45,6 +45,18 @@ export function isEscrowChangedError(error: unknown): boolean {
 }
 
 /**
+ * True when Hasura reported a Postgres unique_violation — on the escrow paths
+ * this means a duplicate transition or a replayed transaction hash raced past
+ * the conditional updates, so the whole mutation rolled back atomically.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof HasuraRequestError)) {
+    return false;
+  }
+  return Boolean(error.details?.some((detail) => detail.extensions?.code === 'unique_violation'));
+}
+
+/**
  * Executes a GraphQL operation against Hasura with the admin secret.
  * Server-side only — the admin secret must never reach the browser.
  */
