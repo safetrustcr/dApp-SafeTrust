@@ -13,6 +13,7 @@ import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 
 import { getStubApartmentById } from "@/lib/stub-apartments";
+import { MessageHostButton } from "./MessageHostButton";
 
 const styles = {
   page: {
@@ -169,12 +170,15 @@ export default function ApartmentDetailPage({
             </p>
           </div>
 
-          <Link
-            href={`/apartment/${params.id}/escrow/create`}
-            style={styles.button}
-          >
-            BOOK
-          </Link>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
+            <Link
+              href={`/apartment/${params.id}/escrow/create`}
+              style={styles.button}
+            >
+              BOOK
+            </Link>
+            <MessageHostButton apartmentId={params.id} hostId={apartment.owner.id} />
+          </div>
         </div>
 
         <div
