@@ -15,7 +15,13 @@ vi.mock('../../../services/trustlesswork.js', () => ({
 }));
 
 import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
+import { assertEscrowActionAllowed } from '../../../services/escrow-db.js';
+import { InvalidTransitionError } from '../../../domain/escrow-state.js';
 import { mockReq, mockRes } from './helpers.js';
+
+vi.mock('../../../services/escrow-db.js', () => ({
+  assertEscrowActionAllowed: vi.fn(async () => {}),
+}));
 
 describe('milestoneStatusHandler', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -70,5 +76,30 @@ describe('milestoneStatusHandler', () => {
       engagementId: 'eng-1',
       status: 'funded',
     });
+  });
+
+  it('returns 409 and skips Trustless Work when the escrow is not in a fundable state', async () => {
+    vi.mocked(assertEscrowActionAllowed).mockRejectedValueOnce(
+      new InvalidTransitionError('completed', undefined, 'mark_milestone_completed (expected: funded)'),
+    );
+
+    const res = mockRes();
+    await milestoneStatusHandler(
+      mockReq({
+        contractId: 'CAZT001',
+        milestoneIndex: 0,
+        newStatus: 'completed',
+        serviceProvider: 'GOWNER111',
+        engagementId: 'eng-1',
+      }),
+      res,
+    );
+
+    expect(res._status).toBe(409);
+    expect(res._body).toMatchObject({
+      error: 'escrow status completed does not allow mark_milestone_completed (expected: funded)',
+      from: 'completed',
+    });
+    expect(trustlessWorkRequest).not.toHaveBeenCalled();
   });
 });
