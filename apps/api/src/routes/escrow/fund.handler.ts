@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
+import { guardEscrowAction, sendConflict } from './transition-guard.js';
 
 type FundRequestBody = {
   contractId?: string;
@@ -40,6 +41,9 @@ export const fundEscrowHandler = async (
       });
     }
 
+    const conflict = await guardEscrowAction(res, 'fund', contractId);
+    if (conflict) return conflict;
+
     const result = await trustlessWorkRequest<FundEscrowTWResponse>(
       '/escrow/single-release/fund-escrow',
       {
@@ -63,6 +67,9 @@ export const fundEscrowHandler = async (
       engagementId,
     });
   } catch (error) {
+    const conflict = sendConflict(res, error);
+    if (conflict) return conflict;
+
     if (error instanceof TrustlessWorkRequestError) {
       return res.status(error.statusCode).json({
         error: error.message,
