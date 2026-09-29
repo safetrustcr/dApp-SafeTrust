@@ -23,6 +23,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.1.0
       axios:
         specifier: ^1.18.0
         version: 1.19.0

@@ -3,33 +3,24 @@ import { releaseFundsHandler } from '../release-funds.handler.js';
 
 vi.mock('../../../services/trustlesswork.js', () => ({
   trustlessWorkRequest: vi.fn(),
-  TrustlessWorkRequestError: class extends Error {
-    constructor(message, statusCode, messages, payload) {
-      super(message);
-      this.statusCode = statusCode;
-      this.messages = messages;
-      this.payload = payload;
-    }
-  },
-  getErrorMessages: vi.fn((err, fallback) => [err?.message || fallback]),
 }));
 
 import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
-import { mockReq, mockRes } from './helpers.js';
+import { mockReq, mockRes, mockNext } from './helpers.js';
 
 describe('releaseFundsHandler', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('returns 400 when contractId is missing', async () => {
     const res = mockRes();
-    await releaseFundsHandler(mockReq({ releaseSigner: 'GRELEASER' }), res);
+    await releaseFundsHandler(mockReq({ releaseSigner: 'GRELEASER' }), res, mockNext());
     expect(res._status).toBe(400);
     expect(res._body.error).toContain('contractId');
   });
 
   it('returns 400 when releaseSigner is missing', async () => {
     const res = mockRes();
-    await releaseFundsHandler(mockReq({ contractId: 'CAZT001' }), res);
+    await releaseFundsHandler(mockReq({ contractId: 'CAZT001' }), res, mockNext());
     expect(res._status).toBe(400);
     expect(res._body.error).toContain('releaseSigner');
   });
@@ -44,6 +35,7 @@ describe('releaseFundsHandler', () => {
     await releaseFundsHandler(
       mockReq({ contractId: 'CAZT001', releaseSigner: 'GRELEASER', engagementId: 'eng-1' }),
       res,
+      mockNext(),
     );
 
     expect(trustlessWorkRequest).toHaveBeenCalledWith(

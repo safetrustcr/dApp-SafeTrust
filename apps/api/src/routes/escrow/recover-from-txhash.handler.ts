@@ -1,6 +1,8 @@
-import { Request, Response } from 'express';
-import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
+import type { Request, Response } from 'express';
+import { trustlessWorkRequest } from '../../services/trustlesswork.js';
 import { updateEscrowStatusByContractId } from '../../services/hasura.js';
+import { ApiError } from '../../http/api-error.js';
+import { asyncHandler } from '../../http/async-handler.js';
 
 type RecoverAction =
   | 'initialize'
@@ -60,79 +62,54 @@ type RecoverResponse = {
   status: string;
 };
 
-export const recoverFromTxhashHandler = async (
-  req: Request<{}, RecoverResponse | { error: string; messages?: string[]; payload?: unknown }, RecoverRequestBody>,
-  res: Response<RecoverResponse | { error: string; messages?: string[]; payload?: unknown }>
-): Promise<Response> => {
-  try {
-    const { txHash, action, contractId } = req.body || {};
+export const recoverFromTxhashHandler = asyncHandler(async (
+  req: Request<{}, RecoverResponse | { error: string }, RecoverRequestBody>,
+  res: Response<RecoverResponse | { error: string }>,
+) => {
+  const { txHash, action, contractId } = req.body || {};
 
-    if (!txHash) {
-      return res.status(400).json({ error: 'Missing required field: txHash' });
-    }
-    if (!action) {
-      return res.status(400).json({ error: 'Missing required field: action' });
-    }
-    if (!VALID_ACTIONS.includes(action)) {
-      return res.status(400).json({
-        error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`,
-      });
-    }
-    if (!contractId) {
-      return res.status(400).json({ error: 'Missing required field: contractId' });
-    }
-
-    const missing = REQUIRED_FIELDS[action].filter((field) => {
-      const value = req.body[field];
-      if (value == null) return true;
-      if (field === 'amount') return typeof value !== 'number' || !Number.isFinite(value) || value <= 0;
-      return typeof value !== 'string' || value.trim().length === 0;
-    });
-    if (missing.length > 0) {
-      return res.status(400).json({
-        error: `${action} action requires: contractId, ${missing.join(', ')}`,
-      });
-    }
-
-    try {
-      await trustlessWorkRequest('/indexer/update-from-txHash', {
-        method: 'POST',
-        body: { txHash },
-      });
-    } catch (error) {
-      console.error('[recover-from-txhash] TW indexer call failed:', error);
-      if (error instanceof TrustlessWorkRequestError) {
-        return res.status(error.statusCode).json({
-          error: error.message,
-          messages: error.messages,
-          payload: error.payload,
-        });
-      }
-      const messages = getErrorMessages(error, 'Failed to verify transaction with the indexer.');
-      return res.status(502).json({ error: messages[0], messages });
-    }
-
-    const status = ACTION_STATUS[action];
-    const result = await updateEscrowStatusByContractId(contractId, status);
-
-    if (result.update_escrows.affected_rows === 0) {
-      return res.status(404).json({
-        error: `No escrow record found for contractId: ${contractId}`,
-      });
-    }
-
-    return res.status(200).json({ recovered: true, action, contractId, txHash, status });
-  } catch (error) {
-    if (error instanceof TrustlessWorkRequestError) {
-      return res.status(error.statusCode).json({
-        error: error.message,
-        messages: error.messages,
-        payload: error.payload,
-      });
-    }
-
-    return res.status(500).json({
-      error: getErrorMessages(error, 'Recovery DB update failed.')[0],
+  if (!txHash) {
+    return res.status(400).json({ error: 'Missing required field: txHash' });
+  }
+  if (!action) {
+    return res.status(400).json({ error: 'Missing required field: action' });
+  }
+  if (!VALID_ACTIONS.includes(action)) {
+    return res.status(400).json({
+      error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`,
     });
   }
-};
+  if (!contractId) {
+    return res.status(400).json({ error: 'Missing required field: contractId' });
+  }
+
+  const missing = REQUIRED_FIELDS[action].filter((field) => {
+    const value = req.body[field];
+    if (value == null) return true;
+    if (field === 'amount') return typeof value !== 'number' || !Number.isFinite(value) || value <= 0;
+    return typeof value !== 'string' || value.trim().length === 0;
+  });
+  if (missing.length > 0) {
+    return res.status(400).json({
+      error: `${action} action requires: contractId, ${missing.join(', ')}`,
+    });
+  }
+
+  // Verify the transaction exists on-chain via TW indexer — throws TrustlessWorkRequestError
+  // which errorMiddleware maps to TRUSTLESS_WORK_* codes automatically
+  await trustlessWorkRequest('/indexer/update-from-txHash', {
+    method: 'POST',
+    body: { txHash },
+  });
+
+  const status = ACTION_STATUS[action];
+  const result = await updateEscrowStatusByContractId(contractId, status);
+
+  if (result.update_escrows.affected_rows === 0) {
+    return res.status(404).json({
+      error: `No escrow record found for contractId: ${contractId}`,
+    });
+  }
+
+  return res.status(200).json({ recovered: true, action, contractId, txHash, status });
+});

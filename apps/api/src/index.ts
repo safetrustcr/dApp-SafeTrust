@@ -20,6 +20,7 @@ import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
+import { requestId, notFound, errorMiddleware } from './http/error-middleware.js';
 
 initFirebaseAdmin();
 
@@ -42,6 +43,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(tenantMiddleware);
+app.use(requestId); // attach X-Request-Id before all routes
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -70,8 +72,8 @@ app.use('/api/escrow', statusStreamRouter);
 // Messages routes (router registered when available)
 app.use('/api/messages', messagesRouter);
 
-// Messages routes
-app.use('/api/messages', messagesRouter);
+app.use(notFound);        // after all routes
+app.use(errorMiddleware); // last
 
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);
