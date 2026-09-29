@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { TrustlessWorkRequestError, getErrorMessages, trustlessWorkRequest } from '../../services/trustlesswork.js';
+import { guardEscrowAction, sendConflict } from './transition-guard.js';
 
 type ApproveMilestoneBody = {
   contractId?: string;
@@ -21,6 +22,9 @@ export async function approveMilestoneHandler(
       return res.status(400).json({ error: 'milestoneIndex must be a non-negative integer.' });
     }
 
+    const conflict = await guardEscrowAction(res, 'approve_milestone', contractId);
+    if (conflict) return conflict;
+
     const result = await trustlessWorkRequest<{ unsignedXdr?: string; unsignedTransaction?: string; txHash?: string }>(
       '/escrow/single-release/approve-milestone',
       {
@@ -34,6 +38,9 @@ export async function approveMilestoneHandler(
     }
     return res.status(200).json({ unsignedXdr, txHash: result.txHash ?? '', contractId, engagementId });
   } catch (error) {
+    const conflict = sendConflict(res, error);
+    if (conflict) return conflict;
+
     if (error instanceof TrustlessWorkRequestError) {
       return res.status(error.statusCode).json({ error: error.message, messages: error.messages, payload: error.payload });
     }
