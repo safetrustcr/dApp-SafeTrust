@@ -1,5 +1,4 @@
 {
-  "root": true,
   "extends": ["next/core-web-vitals"],
   "settings": {
     "next": {
@@ -8,7 +7,6 @@
   },
   "rules": {
     "@next/next/no-html-link-for-pages": "off",
-    "@next/next/no-img-element": "error",
     "no-restricted-imports": [
       "error",
       {
@@ -20,12 +18,5 @@
         ]
       }
     ]
-  },
-  "ignorePatterns": [
-    "node_modules/",
-    ".next/",
-    "dist/",
-    "apps/frontend/.next/",
-    "packages/graphql/src/generated/"
-  ]
+  }
 }

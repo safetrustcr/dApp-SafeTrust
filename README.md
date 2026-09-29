@@ -37,7 +37,7 @@ Tenant finds property → PAY → Freighter signs XDR → funds locked on-chain
 ```
 Stellar Blockchain (TrustlessWork API)
 │ signed XDR
-services/webhook (Node + Express, port 3002)
+apps/api (Node + Express, port 3002)
 │ SQL
 infra/backend (Hasura GraphQL, port 8080)
 │ GraphQL
