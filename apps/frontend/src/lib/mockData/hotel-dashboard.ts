@@ -1,7 +1,7 @@
 export type HotelRoom = {
   room_id: string;
   room_number: string;
-  status: boolean | null;
+  is_available: boolean;
   price_night: number;
   capacity: number;
   room_type: { name: string } | null;
@@ -36,7 +36,7 @@ export const MOCK_HOTEL_ROOMS: HotelRoom[] = [
   {
     room_id: "r-101",
     room_number: "101",
-    status: true,
+    is_available: true,
     price_night: 120,
     capacity: 2,
     room_type: { name: "Deluxe" },
@@ -44,7 +44,7 @@ export const MOCK_HOTEL_ROOMS: HotelRoom[] = [
   {
     room_id: "r-102",
     room_number: "102",
-    status: false,
+    is_available: false,
     price_night: 80,
     capacity: 2,
     room_type: { name: "Standard" },
@@ -52,7 +52,7 @@ export const MOCK_HOTEL_ROOMS: HotelRoom[] = [
   {
     room_id: "r-201",
     room_number: "201",
-    status: true,
+    is_available: true,
     price_night: 250,
     capacity: 4,
     room_type: { name: "Suite" },
@@ -60,7 +60,7 @@ export const MOCK_HOTEL_ROOMS: HotelRoom[] = [
   {
     room_id: "r-202",
     room_number: "202",
-    status: true,
+    is_available: true,
     price_night: 95,
     capacity: 2,
     room_type: { name: "Standard" },
@@ -68,7 +68,7 @@ export const MOCK_HOTEL_ROOMS: HotelRoom[] = [
   {
     room_id: "r-301",
     room_number: "301",
-    status: false,
+    is_available: false,
     price_night: 180,
     capacity: 3,
     room_type: { name: "Deluxe" },

@@ -1,0 +1,56 @@
+table:
+  name: users
+  schema: hotel_industry
+configuration:
+  custom_root_fields:
+    select: hotel_users
+    select_by_pk: hotel_users_by_pk
+    select_aggregate: hotel_users_aggregate
+    insert: insert_hotel_users
+    insert_one: insert_hotel_users_one
+    update: update_hotel_users
+    update_by_pk: update_hotel_users_by_pk
+    delete: delete_hotel_users
+    delete_by_pk: delete_hotel_users_by_pk
+array_relationships:
+  - name: hotels
+    using:
+      foreign_key_constraint_on:
+        table:
+          name: hotels
+          schema: hotel_industry
+        columns:
+          - owner_user_id
+  - name: wallets
+    using:
+      foreign_key_constraint_on:
+        table:
+          name: users_wallets
+          schema: hotel_industry
+        columns:
+          - user_id
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - email
+        - first_name
+        - last_name
+        - phone_number
+        - role
+        - created_at
+        - updated_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - email
+        - first_name
+        - last_name
+        - phone_number
+        - role
+        - created_at
+        - updated_at
+      filter: {}

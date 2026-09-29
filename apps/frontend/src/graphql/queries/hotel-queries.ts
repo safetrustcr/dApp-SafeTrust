@@ -2,13 +2,16 @@ import { gql } from "@apollo/client";
 
 // Aligned to hotel_industry SQL from issue #293 (not the prose typos in #294).
 // room_types.name (not type_name); escrow amount via reservation.total_amount.
+// hotel_escrow_transactions (not escrow_transactions) — the hotel_industry
+// source's root field is prefixed to avoid colliding with the safetrust
+// source's own escrow_transactions table. See docs/architecture/multi-tenant.md.
 
 export const GET_HOTEL_ROOMS = gql`
   query GetHotelRooms {
     rooms(order_by: { room_number: asc }) {
       room_id
       room_number
-      status
+      is_available
       price_night
       capacity
       room_type {
@@ -41,7 +44,7 @@ export const GET_ACTIVE_RESERVATIONS = gql`
 
 export const GET_HOTEL_ESCROW_TRANSACTIONS = gql`
   query GetHotelEscrowTransactions {
-    escrow_transactions(order_by: { created_at: desc }, limit: 10) {
+    hotel_escrow_transactions(order_by: { created_at: desc }, limit: 10) {
       id
       contract_id
       escrow_status

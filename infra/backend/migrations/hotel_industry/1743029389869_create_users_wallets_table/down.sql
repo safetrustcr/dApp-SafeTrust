@@ -1,6 +1,3 @@
--- Drop indexes
-DROP INDEX IF EXISTS idx_users_wallets_user_id;
-DROP INDEX IF EXISTS idx_users_wallets_is_primary;
-
--- Drop users_wallets table
-DROP TABLE IF EXISTS users_wallets;
+DROP INDEX IF EXISTS hotel_industry.idx_users_wallets_is_primary;
+DROP INDEX IF EXISTS hotel_industry.idx_users_wallets_user_id;
+DROP TABLE IF EXISTS hotel_industry.users_wallets;
