@@ -15,6 +15,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
       - name: Install Hasura CLI
         run: |
           curl -L https://github.com/hasura/graphql-engine/releases/latest/download/cli-hasura-linux-amd64 -o /usr/local/bin/hasura
@@ -35,6 +42,7 @@ jobs:
           sed -i 's/HASURA_EVENT_SECRET=replace-with-a-local-event-secret/HASURA_EVENT_SECRET=myhasuraeventsecret/' infra/backend/.env
           sed -i 's/WEBHOOK_ADMIN_SECRET=replace-with-a-local-webhook-admin-secret/WEBHOOK_ADMIN_SECRET=mywebhookadminsecret/' infra/backend/.env
           sed -i 's/RECONCILIATION_SECRET=replace-with-a-random-cron-secret/RECONCILIATION_SECRET=myreconciliationsecret/' infra/backend/.env
+          sed -i 's/FIREBASE_SEED_USERS=true/FIREBASE_SEED_USERS=false/' infra/backend/.env
 
       - name: Start SafeTrust backend infrastructure
         run: |

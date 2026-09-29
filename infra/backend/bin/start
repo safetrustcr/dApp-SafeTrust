@@ -150,10 +150,14 @@ if [[ " ${TENANTS[*]} " == *" safetrust "* ]]; then
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
   echo "👤 Provisioning SafeTrust Firebase demo users..."
-  (
-    cd "$REPOSITORY_ROOT"
-    pnpm --filter @safetrust/api exec tsx scripts/seed-firebase-users.ts
-  )
+  if command -v pnpm &> /dev/null; then
+    (
+      cd "$REPOSITORY_ROOT"
+      pnpm --filter @safetrust/api exec tsx scripts/seed-firebase-users.ts || echo "⚠️  Firebase demo user provisioning skipped or failed"
+    )
+  else
+    echo "ℹ️  pnpm not found, skipping Firebase demo user provisioning"
+  fi
 fi
 echo ""
 echo "   💡 If you added a new migration, keep init SQL in sync:"
