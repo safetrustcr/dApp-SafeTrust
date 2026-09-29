@@ -21,11 +21,67 @@ type PendingActionRow = {
 
 type EscrowRow = {
   id: string;
+  apartment_id?: string | null;
+  amount?: string | number | null;
   contract_id?: string | null;
   engagement_id?: string | null;
   status?: string | null;
   trustless_work_escrows?: { status?: string | null }[];
 };
+
+const EVENT_MAP: Record<string, { type: string; text: string }> = {
+  funded: { type: 'escrow_funded', text: 'Deposit locked in escrow.' },
+  milestone_approved: { type: 'milestone_approved', text: 'A milestone was approved.' },
+  completed: { type: 'escrow_completed', text: 'Escrow completed.' },
+  disputed: { type: 'escrow_disputed', text: 'A dispute was opened for this escrow.' },
+};
+
+async function publishTransitionEvent(contractId: string, status: string, amount?: string | number | null): Promise<void> {
+  const event = EVENT_MAP[status];
+  if (!event) return;
+
+  const lookup = await hasuraRequest<{ escrows: { id: string; apartment_id: string | null; amount: string | number }[] }>(
+    `query EscrowApartment($contractId: String!) { escrows(where: { contract_id: { _eq: $contractId } }, limit: 1) { id apartment_id amount } }`,
+    { contractId },
+  );
+  const escrow = lookup.escrows[0];
+  const apartmentId = escrow?.apartment_id;
+  if (!apartmentId) return;
+
+  const conversations = await hasuraRequest<{ conversations: { id: string; host_id: string }[] }>(
+    `query ApartmentConversation($apartmentId: uuid!) {
+      conversations(where: { apartment_id: { _eq: $apartmentId } }, limit: 1) { id host_id }
+    }`,
+    { apartmentId },
+  );
+  const conversation = conversations.conversations[0];
+  if (!conversation) return;
+
+  const confirmedAmount = amount ?? escrow?.amount;
+  const amountText = status === 'funded' && confirmedAmount != null
+    ? `Deposit of ${confirmedAmount} USDC is locked in escrow.`
+    : event.text;
+  await hasuraRequest(
+    `mutation PublishEscrowEvent($conversationId: uuid!, $senderId: String!, $body: String!, $eventType: String!, $eventKey: String!) {
+      insert_messages_one(object: {
+        conversation_id: $conversationId
+        sender_id: $senderId
+        body: $body
+        is_automated: true
+        event_type: $eventType
+        event_key: $eventKey
+        tenant_id: "safetrust"
+      }, on_conflict: { constraint: messages_event_key_key, update_columns: [] }) { id }
+    }`,
+    {
+      conversationId: conversation.id,
+      senderId: conversation.host_id,
+      body: amountText,
+      eventType: event.type,
+      eventKey: `escrow:${escrow.id}:${status}`,
+    },
+  );
+}
 
 const TRANSITION_MAP: Record<string, string> = {
   fund: 'funded',
@@ -77,6 +133,8 @@ async function getEscrowSnapshots(limit = 50): Promise<EscrowRow[]> {
     `query ReconcileEscrows($limit: Int!) {
       escrows(order_by: { created_at: asc }, limit: $limit) {
         id
+        apartment_id
+        amount
         contract_id
         engagement_id
         status
@@ -217,6 +275,7 @@ export async function syncEscrows(): Promise<ReconcileSummary> {
         txHash,
         source: 'reconciler',
       });
+      if (action.contract_id) await publishTransitionEvent(action.contract_id, nextStatus);
       summary.confirmed += 1;
       continue;
     }
@@ -254,6 +313,7 @@ export async function syncEscrows(): Promise<ReconcileSummary> {
         status: targetStatus,
         source: 'reconciler',
       });
+      if (snapshot.contract_id) await publishTransitionEvent(snapshot.contract_id, targetStatus, snapshot.amount);
       summary.corrected += 1;
       continue;
     }
