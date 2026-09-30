@@ -15,6 +15,7 @@ import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.j
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
 import messagesRouter from './routes/messages/send.route.js';
+import conversationsRouter from './routes/messages/conversations.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
@@ -69,9 +70,7 @@ app.use('/api/escrow', statusStreamRouter);
 
 // Messages routes (router registered when available)
 app.use('/api/messages', messagesRouter);
-
-// Messages routes
-app.use('/api/messages', messagesRouter);
+app.use('/api/messages', conversationsRouter);
 
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);
