@@ -1,6 +1,12 @@
 import { hasuraRequest } from './hasura.js';
 import { confirmTransaction } from './stellar-confirm.js';
 import { mapTrustlessWorkStatus } from '../lib/trustless-work-status.js';
+import {
+  prepareEscrowLifecycleMessage,
+  lifecycleMessageInput,
+  messageMutationFields,
+  messageMutationVariable,
+} from './conversation-events.js';
 
 export type ReconcileSummary = {
   confirmed: number;
@@ -29,69 +35,75 @@ type EscrowRow = {
   trustless_work_escrows?: { status?: string | null }[];
 };
 
-const EVENT_MAP: Record<string, { type: string; text: string }> = {
-  funded: { type: 'escrow_funded', text: 'Deposit locked in escrow.' },
-  milestone_approved: { type: 'milestone_approved', text: 'A milestone was approved.' },
-  completed: { type: 'escrow_completed', text: 'Escrow completed.' },
-  disputed: { type: 'escrow_disputed', text: 'A dispute was opened for this escrow.' },
-};
-
-async function publishTransitionEvent(contractId: string, status: string, amount?: string | number | null): Promise<void> {
-  const event = EVENT_MAP[status];
-  if (!event) return;
-
-  const lookup = await hasuraRequest<{ escrows: { id: string; apartment_id: string | null; amount: string | number }[] }>(
-    `query EscrowApartment($contractId: String!) { escrows(where: { contract_id: { _eq: $contractId } }, limit: 1) { id apartment_id amount } }`,
-    { contractId },
-  );
-  const escrow = lookup.escrows[0];
-  const apartmentId = escrow?.apartment_id;
-  if (!apartmentId) return;
-
-  const conversations = await hasuraRequest<{ conversations: { id: string; host_id: string }[] }>(
-    `query ApartmentConversation($apartmentId: uuid!) {
-      conversations(where: { apartment_id: { _eq: $apartmentId } }, limit: 1) { id host_id }
-    }`,
-    { apartmentId },
-  );
-  const conversation = conversations.conversations[0];
-  if (!conversation) return;
-
-  const confirmedAmount = amount ?? escrow?.amount;
-  const amountText = status === 'funded' && confirmedAmount != null
-    ? `Deposit of ${confirmedAmount} USDC is locked in escrow.`
-    : event.text;
-  await hasuraRequest(
-    `mutation PublishEscrowEvent($conversationId: uuid!, $senderId: String!, $body: String!, $eventType: String!, $eventKey: String!) {
-      insert_messages_one(object: {
-        conversation_id: $conversationId
-        sender_id: $senderId
-        body: $body
-        is_automated: true
-        event_type: $eventType
-        event_key: $eventKey
-        tenant_id: "safetrust"
-      }, on_conflict: { constraint: messages_event_key_key, update_columns: [] }) { id }
-    }`,
-    {
-      conversationId: conversation.id,
-      senderId: conversation.host_id,
-      body: amountText,
-      eventType: event.type,
-      eventKey: `escrow:${escrow.id}:${status}`,
-    },
-  );
-}
-
 const TRANSITION_MAP: Record<string, string> = {
   fund: 'funded',
   initialize: 'created',
-  mark_milestone_completed: 'completed',
+  mark_milestone_completed: 'funded',
   approve_milestone: 'milestone_approved',
   release_funds: 'completed',
   dispute: 'disputed',
   resolve_dispute: 'resolved',
 };
+
+async function syncMilestoneCompletion(action: PendingActionRow, txHash: string): Promise<void> {
+  const contractId = action.contract_id?.trim();
+  if (!contractId) return;
+
+  const escrowIds = await hasuraRequest<{ trustlessWorkEscrows: { id: string }[] }>(
+    `query MilestoneEscrowId($contractId: String!) {
+      trustlessWorkEscrows(where: { contractId: { _eq: $contractId } }, limit: 1) { id }
+    }`,
+    { contractId },
+  );
+  const escrowId = escrowIds.trustlessWorkEscrows[0]?.id;
+  if (!escrowId) return;
+
+  const milestones = await hasuraRequest<{ escrowMilestones: { id: string; status: string }[] }>(
+    `query ReconcileCheckInMilestone($escrowId: uuid!) {
+      escrowMilestones(where: { escrowId: { _eq: $escrowId }, milestoneId: { _eq: "check_in" } }, limit: 1) { id status }
+    }`,
+    { escrowId },
+  );
+  const milestone = milestones.escrowMilestones[0];
+  if (!milestone || milestone.status !== 'pending') return;
+
+  const event = await prepareEscrowLifecycleMessage({
+    contractId,
+    action: 'mark_milestone_completed',
+    fromStatus: milestone.status,
+    toStatus: 'completed',
+    txHash,
+  });
+  const data = await hasuraRequest<{
+    update_escrowMilestones: { affected_rows: number };
+    insert_escrow_transactions_one: { id: string } | null;
+  }>(
+    `mutation ReconcileMilestoneCompletion($escrowId: uuid!, $log: escrow_transactions_insert_input!${event ? `, ${messageMutationVariable()}` : ''}) {
+      update_escrowMilestones(
+        where: { id: { _eq: $escrowId }, status: { _eq: "pending" } }
+        _set: { status: "completed" }
+      ) { affected_rows }
+      insert_escrow_transactions_one(object: $log) { id }
+      ${event ? messageMutationFields() : ''}
+    }`,
+    {
+      escrowId: milestone.id,
+      log: {
+        engagement_id: action.engagement_id ?? null,
+        contract_id: contractId,
+        from_status: 'pending',
+        to_status: 'completed',
+        action: 'reconciler_mark_milestone_completed',
+        tx_hash: null,
+        source: 'reconciler',
+      },
+      ...(event ? { message: lifecycleMessageInput(event.conversationId, event.event) } : {}),
+    },
+  );
+  if (!data.update_escrowMilestones.affected_rows) {
+    throw new Error('Milestone changed. Refresh and retry');
+  }
+}
 
 const STATUS_RANK: Record<string, number> = {
   created: 0,
@@ -186,8 +198,12 @@ async function applyEscrowStatusTransition(params: {
   contractId?: string | null;
   engagementId?: string | null;
   action: string;
+  eventAction?: string;
   status: string;
+  amount?: string | number | null;
   txHash?: string | null;
+  logTxHash?: string | null;
+  currentStatus?: string;
   source: 'submit' | 'reconciler' | 'admin';
 }): Promise<void> {
   const contractId = params.contractId?.trim();
@@ -196,6 +212,16 @@ async function applyEscrowStatusTransition(params: {
   }
 
   const currentStatus = await getCurrentEscrowStatus(contractId, params.engagementId);
+  const fromStatus = params.currentStatus ?? currentStatus;
+  const lifecycleMessage = await prepareEscrowLifecycleMessage({
+    contractId,
+    action: params.eventAction ?? params.action,
+    fromStatus,
+    toStatus: params.status,
+    txHash: params.txHash,
+    amount: params.amount,
+    asset: 'USDC',
+  });
 
   const mutation = `mutation ApplyEscrowTransition(
     $contractId: String!
@@ -205,6 +231,7 @@ async function applyEscrowStatusTransition(params: {
     $fromStatus: String!
     $txHash: String
     $engagementId: String
+    ${lifecycleMessage ? messageMutationVariable() : ''}
   ) {
     update_escrows(
       where: { contract_id: { _eq: $contractId } }
@@ -229,6 +256,7 @@ async function applyEscrowStatusTransition(params: {
     }) {
       id
     }
+    ${lifecycleMessage ? messageMutationFields() : ''}
   }`;
 
   await hasuraRequest(mutation, {
@@ -236,9 +264,12 @@ async function applyEscrowStatusTransition(params: {
     status: params.status,
     source: params.source,
     action: params.action,
-    fromStatus: currentStatus,
-    txHash: params.txHash ?? null,
+    fromStatus,
+    txHash: params.logTxHash === undefined ? params.txHash ?? null : params.logTxHash,
     engagementId: params.engagementId ?? null,
+    ...(lifecycleMessage
+      ? { message: lifecycleMessageInput(lifecycleMessage.conversationId, lifecycleMessage.event) }
+      : {}),
   });
 }
 
@@ -266,16 +297,27 @@ export async function syncEscrows(): Promise<ReconcileSummary> {
 
     const status = await confirmTransaction(txHash);
     if (status === 'success') {
+      if (action.action === 'mark_milestone_completed') {
+        await syncMilestoneCompletion(action, txHash);
+        summary.confirmed += 1;
+        continue;
+      }
       const nextStatus = TRANSITION_MAP[action.action] ?? 'funded';
+      const currentStatus = await getCurrentEscrowStatus(action.contract_id, action.engagement_id);
+      if (currentStatus === nextStatus) {
+        summary.confirmed += 1;
+        continue;
+      }
       await applyEscrowStatusTransition({
         contractId: action.contract_id,
         engagementId: action.engagement_id,
-        action: action.action,
+        action: `reconciler_${action.action}`,
+        eventAction: action.action,
         status: nextStatus,
         txHash,
+        logTxHash: null,
         source: 'reconciler',
       });
-      if (action.contract_id) await publishTransitionEvent(action.contract_id, nextStatus);
       summary.confirmed += 1;
       continue;
     }
@@ -309,11 +351,13 @@ export async function syncEscrows(): Promise<ReconcileSummary> {
       await applyEscrowStatusTransition({
         contractId: snapshot.contract_id,
         engagementId: snapshot.engagement_id,
-        action: 'reconciler_sync',
+        action: `reconciler_${targetStatus}`,
+        eventAction: 'reconciler_sync',
         status: targetStatus,
+        amount: snapshot.amount,
+        currentStatus,
         source: 'reconciler',
       });
-      if (snapshot.contract_id) await publishTransitionEvent(snapshot.contract_id, targetStatus, snapshot.amount);
       summary.corrected += 1;
       continue;
     }

@@ -26,6 +26,7 @@ import {
 import { InvalidTransitionError, ConcurrentTransitionError } from '../../domain/escrow-state.js';
 import { conflictBody, guardEscrowAction } from './transition-guard.js';
 import { confirmTransactionWithRetry } from '../../services/stellar-confirm.js';
+import { buildLifecycleEvent, lifecycleMessageInput, messageMutationFields, messageMutationVariable } from '../../services/conversation-events.js';
 
 type EscrowAction =
   | 'initialize'
@@ -290,7 +291,7 @@ export const sendTransactionHandler = async (
       switch (action) {
         case 'initialize': {
           const effectiveReleaser = releaser || process.env.PLATFORM_STELLAR_ADDRESS || senderAddress!;
-          await dbInitializeEscrow({
+          const conversation = await dbInitializeEscrow({
             contractId: resolvedContractId,
             engagementId: engagementId!,
             apartmentId: propId!,
@@ -309,14 +310,29 @@ export const sendTransactionHandler = async (
             insertedId = existing.escrows[0].id;
             // Normalize deploy's pending_signature -> created so every later
             // transition can rely on `created` as fund's only `from` status.
+            const createdEvent = conversation
+              ? buildLifecycleEvent({
+                  contractId: resolvedContractId,
+                  action: 'initialize',
+                  toStatus: 'created',
+                  apartmentName: conversation.apartmentName,
+                  txHash: extractTransactionHash(result),
+                })
+              : null;
             await hasuraRequest(
-              `mutation NormalizeEscrowCreated($contractId: String!) {
+              `mutation NormalizeEscrowCreated($contractId: String!${createdEvent ? `, ${messageMutationVariable()}` : ''}) {
                 update_escrows(
                   where: { contract_id: { _eq: $contractId }, status: { _eq: "pending_signature" } }
                   _set: { status: "created" }
                 ) { affected_rows }
+                ${createdEvent ? messageMutationFields() : ''}
               }`,
-              { contractId: resolvedContractId },
+              {
+                contractId: resolvedContractId,
+                ...(createdEvent && conversation
+                  ? { message: lifecycleMessageInput(conversation.conversationId, createdEvent) }
+                  : {}),
+              },
             );
           } else {
             const record = await insertEscrowRecord({
