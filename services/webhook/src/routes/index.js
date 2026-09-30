@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateFirebase } = require('../middleware/auth');
 const authRoutes = require('./auth');
+const walletAuthRoutes = require('./wallet-auth');
 
 // Escrow lifecycle webhooks — TrustlessWork is the caller, not a Firebase user.
 const initializeEscrowRoute = require('./escrows/initialize.route');
@@ -22,7 +23,10 @@ router.use(releaseFundsRoute);
 router.use(disputeRoute);
 router.use(resolveDisputeRoute);
 
-// 3. Protected routes — authenticateFirebase runs before every route below
+// 3. Public wallet auth routes — must stay before the Firebase middleware
+router.use('/api/auth', walletAuthRoutes.router);
+
+// 4. Protected routes — authenticateFirebase runs before every route below
 router.use('/api/auth', authenticateFirebase, authRoutes);
 
 module.exports = router;

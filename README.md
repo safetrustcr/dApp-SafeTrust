@@ -124,7 +124,34 @@ NEXT_PUBLIC_HASURA_WS_URL=ws://localhost:8080/v1/graphql
 
 # Backend webhook (auth sync)
 NEXT_PUBLIC_BACKEND_URL=http://localhost:3000
+
+# SEP-10 wallet auth metadata
+NEXT_PUBLIC_SEP10_HOME_DOMAIN=safetrust.app
+NEXT_PUBLIC_SEP10_WEB_AUTH_DOMAIN=api.safetrust.app
+NEXT_PUBLIC_STELLAR_SIGNING_KEY=GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
+
+### Wallet authentication (SEP-10)
+
+SafeTrust now supports real Stellar wallet login using the standard SEP-10 Web Authentication flow.
+
+1. The frontend requests a challenge from `POST /api/auth/wallet/challenge`.
+2. The wallet signs the challenge transaction using the user's Stellar key.
+3. The frontend submits the signed XDR to `POST /api/auth/wallet/verify`.
+4. The backend verifies the signer, consumes the one-time challenge, and returns a Firebase custom token.
+5. The frontend exchanges that token with Firebase via `signInWithCustomToken()` to create the same session as email/password login.
+
+The backend requires these values:
+
+```bash
+SEP10_SIGNING_SECRET=ed25519:...
+SEP10_HOME_DOMAIN=safetrust.app
+SEP10_WEB_AUTH_DOMAIN=api.safetrust.app
+SEP10_TIMEOUT_SECONDS=300
+STELLAR_NETWORK=testnet
+```
+
+The public Stellar metadata is served at `/.well-known/stellar.toml` and includes the signing key and web auth endpoint.
 
 ---
 
