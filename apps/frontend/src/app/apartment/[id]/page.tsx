@@ -214,12 +214,30 @@ export default function ApartmentDetailPage({
             </p>
           </div>
 
-          <Link
-            href={`/apartment/${params.id}/escrow/create`}
-            style={styles.button}
-          >
-            BOOK
-          </Link>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Link
+              href={`/apartment/${params.id}/escrow/create`}
+              style={styles.button}
+            >
+              BOOK
+            </Link>
+            {shouldShowMessageButton && (
+              <button
+                onClick={handleMessageHost}
+                disabled={isMessaging}
+                style={{
+                  ...styles.button,
+                  backgroundColor: "#ffffff",
+                  color: "#f97316",
+                  border: "2px solid #f97316",
+                  opacity: isMessaging ? 0.5 : 1,
+                  cursor: isMessaging ? "not-allowed" : "pointer",
+                }}
+              >
+                {isMessaging ? "Loading..." : "Message host"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div
