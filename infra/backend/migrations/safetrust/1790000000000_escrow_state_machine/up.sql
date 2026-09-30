@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS public.escrow_status_transitions (
 
 INSERT INTO public.escrow_status_transitions (from_status, to_status) VALUES
   ('created', 'funded'),
-  ('pending_signature', 'funded'),
   ('funded', 'milestone_approved'),
   ('milestone_approved', 'completed'),
   ('funded', 'disputed'),
@@ -22,8 +21,7 @@ CREATE TABLE IF NOT EXISTS public.escrow_milestone_status_transitions (
 
 INSERT INTO public.escrow_milestone_status_transitions (from_status, to_status) VALUES
   ('pending', 'completed'),
-  ('completed', 'approved'),
-  ('approved', 'released')
+  ('completed', 'approved')
 ON CONFLICT (from_status, to_status) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.enforce_escrow_status_transition()
@@ -120,8 +118,16 @@ CREATE TABLE IF NOT EXISTS public.escrow_transactions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_tx_transition
-  ON public.escrow_transactions (tx_hash, action, to_status)
+CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_engagement
+  ON public.escrow_transactions (engagement_id)
+  WHERE engagement_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_engagement_action
+  ON public.escrow_transactions (engagement_id, action)
+  WHERE engagement_id IS NOT NULL AND action IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_tx_hash
+  ON public.escrow_transactions (tx_hash)
   WHERE tx_hash IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_escrow_transactions_engagement_id

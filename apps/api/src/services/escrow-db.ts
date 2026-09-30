@@ -1,4 +1,9 @@
 import { hasuraRequest } from './hasura.js';
+import {
+  ConcurrentTransitionError,
+  assertActionTransition,
+  type EscrowActionName,
+} from '../domain/escrow-state.js';
 
 type InitializeParams = {
   contractId: string;
@@ -21,6 +26,7 @@ type InsertEscrowResult = {
 type UpdateResult = {
   update_trustlessWorkEscrows?: { affected_rows: number; returning: { id: string }[] };
   update_escrows?: { affected_rows: number; returning: { id: string }[] };
+  update_escrowMilestones?: { affected_rows: number; returning: { id: string }[] };
   insert_escrow_transactions_one?: { id: string };
 };
 
@@ -55,10 +61,41 @@ async function resolveEscrowId(contractId: string): Promise<string> {
   return data.trustlessWorkEscrows[0].id;
 }
 
-function assertAffectedRows(name: string, affectedRows: number): void {
+function assertAffectedRows(name: string, affectedRows: number, from?: string, to?: string): void {
   if (affectedRows === 0) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError(from, to);
   }
+}
+
+/**
+ * Reads the current escrows.status for a contract, or null when no escrows
+ * row exists yet (e.g. seed-only trustless_work_escrows flows).
+ */
+export async function getEscrowStatusByContractId(contractId: string): Promise<string | null> {
+  const data = await hasuraRequest<{ escrows: { status: string }[] }>(
+    `query GetEscrowStatusByContractId($contractId: String!) {
+      escrows(where: { contract_id: { _eq: $contractId } }, limit: 1) {
+        status
+      }
+    }`,
+    { contractId },
+  );
+  return data.escrows[0]?.status ?? null;
+}
+
+/**
+ * Pre-validates an escrow action against the current escrows.status so an
+ * invalid transition is rejected with InvalidTransitionError BEFORE any
+ * Trustless Work call. Skips validation when no escrows row exists — the
+ * conditional updates in the db* functions remain the final guard.
+ */
+export async function assertEscrowActionAllowed(
+  action: EscrowActionName,
+  contractId: string,
+): Promise<void> {
+  const currentStatus = await getEscrowStatusByContractId(contractId);
+  if (currentStatus === null) return;
+  assertActionTransition(action, currentStatus);
 }
 
 function buildAuditLog(
@@ -155,14 +192,14 @@ export async function dbFundEscrow(
   const result = await hasuraRequest<UpdateResult>(
     `mutation FundEscrow($contractId: String!, $amount: numeric!, $log: escrow_transactions_insert_input!) {
       update_trustless_work_escrows(
-        where: { contractId: { _eq: $contractId } }
+        where: { contractId: { _eq: $contractId }, status: { _eq: "created" } }
         _set: { status: "funded", balance: $amount }
       ) {
         affected_rows
         returning { id }
       }
       update_escrows(
-        where: { contract_id: { _eq: $contractId } }
+        where: { contract_id: { _eq: $contractId }, status: { _eq: "created" } }
         _set: { status: "funded" }
       ) {
         affected_rows
@@ -179,10 +216,10 @@ export async function dbFundEscrow(
     },
   );
 
-  assertAffectedRows('fund', result.update_trustless_work_escrows?.affected_rows ?? 0);
-  assertAffectedRows('fund', result.update_escrows?.affected_rows ?? 0);
+  assertAffectedRows('fund', result.update_trustlessWorkEscrows?.affected_rows ?? 0, 'created', 'funded');
+  assertAffectedRows('fund', result.update_escrows?.affected_rows ?? 0, 'created', 'funded');
   if (!result.insert_escrow_transactions_one) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError('created', 'funded');
   }
 }
 
@@ -193,6 +230,25 @@ export async function dbMarkMilestoneCompleted(
   txHash?: string,
 ): Promise<void> {
   const escrowId = await resolveEscrowId(contractId);
+
+  // Pre-read: fail before writing when the milestone is not pending — a
+  // 0-row root field would otherwise commit the audit log anyway.
+  const milestoneBefore = await hasuraRequest<{ escrowMilestones: { status: string }[] }>(
+    `query GetMilestoneStatus($escrowId: uuid!, $milestoneId: String!) {
+      escrowMilestones(
+        where: { escrowId: { _eq: $escrowId }, milestoneId: { _eq: $milestoneId } }
+        limit: 1
+      ) { status }
+    }`,
+    { escrowId, milestoneId },
+  );
+  if (milestoneBefore.escrowMilestones.length === 0) {
+    throw new Error(`Milestone not found: ${milestoneId} for contractId: ${contractId}`);
+  }
+  if (milestoneBefore.escrowMilestones[0].status !== 'pending') {
+    throw new ConcurrentTransitionError('pending', 'completed');
+  }
+
   const result = await hasuraRequest<MilestoneUpdateResult & UpdateResult>(
     `mutation CompleteMilestone($escrowId: uuid!, $milestoneId: String!, $log: escrow_transactions_insert_input!) {
       update_escrowMilestones(
@@ -217,9 +273,9 @@ export async function dbMarkMilestoneCompleted(
     },
   );
 
-  assertAffectedRows('mark_milestone_completed', result.update_escrowMilestones?.affected_rows ?? 0);
+  assertAffectedRows('mark_milestone_completed', result.update_escrowMilestones?.affected_rows ?? 0, 'pending', 'completed');
   if (!result.insert_escrow_transactions_one) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError('pending', 'completed');
   }
 }
 
@@ -232,10 +288,35 @@ export async function dbApproveMilestone(
 ): Promise<void> {
   const escrowId = await resolveEscrowId(contractId);
 
-  const milestoneResult = await hasuraRequest<MilestoneUpdateResult>(
+  // Pre-read: a wrong-state milestone must fail BEFORE any write, because a
+  // Hasura mutation commits even when a root field matches 0 rows.
+  const milestoneBefore = await hasuraRequest<{ escrowMilestones: { status: string }[] }>(
+    `query GetMilestoneStatus($escrowId: uuid!, $milestoneId: String!) {
+      escrowMilestones(
+        where: { escrowId: { _eq: $escrowId }, milestoneId: { _eq: $milestoneId } }
+        limit: 1
+      ) { status }
+    }`,
+    { escrowId, milestoneId },
+  );
+  if (milestoneBefore.escrowMilestones.length === 0) {
+    throw new Error(`Milestone not found: ${milestoneId} for contractId: ${contractId}`);
+  }
+  if (milestoneBefore.escrowMilestones[0].status !== 'completed') {
+    throw new ConcurrentTransitionError('completed', 'approved');
+  }
+
+  // Single mutation document: milestone approved + escrow flip + audit log run
+  // in one Postgres transaction, so an error in any of them changes nothing.
+  // The escrow flip is conditional on `funded` (the only valid `from` status),
+  // which also serializes concurrent approvals — the loser matches 0 rows.
+  // NOTE: the app only ever creates the single `check_in` milestone, so the
+  // milestone and escrow transitions are approved together here.
+  const result = await hasuraRequest<MilestoneUpdateResult & UpdateResult>(
     `mutation ApproveMilestone(
       $escrowId: uuid!
       $milestoneId: String!
+      $contractId: String!
       $approver: String!
       $approvedAt: timestamptz!
       $log: escrow_transactions_insert_input!
@@ -255,6 +336,20 @@ export async function dbApproveMilestone(
         affected_rows
         returning { id }
       }
+      update_trustless_work_escrows(
+        where: { contractId: { _eq: $contractId }, status: { _eq: "funded" } }
+        _set: { status: "milestone_approved" }
+      ) {
+        affected_rows
+        returning { id }
+      }
+      update_escrows(
+        where: { contract_id: { _eq: $contractId }, status: { _eq: "funded" } }
+        _set: { status: "milestone_approved" }
+      ) {
+        affected_rows
+        returning { id }
+      }
       insert_escrow_transactions_one(object: $log) {
         id
       }
@@ -262,71 +357,18 @@ export async function dbApproveMilestone(
     {
       escrowId,
       milestoneId,
+      contractId,
       approver,
       approvedAt: new Date().toISOString(),
-      log: buildAuditLog('approve_milestone', 'completed', 'approved', contractId, engagementId, txHash),
+      log: buildAuditLog('approve_milestone', 'funded', 'milestone_approved', contractId, engagementId, txHash),
     },
   );
 
-  assertAffectedRows('approve_milestone', milestoneResult.update_escrowMilestones?.affected_rows ?? 0);
-  if (!milestoneResult.update_escrowMilestones?.returning.length) {
-    throw new Error(`Milestone not found: ${milestoneId} for contractId: ${contractId}`);
-  }
-
-  type MilestoneCountsResult = {
-    total: { aggregate: { count: number } };
-    approved: { aggregate: { count: number } };
-  };
-
-  const counts = await hasuraRequest<MilestoneCountsResult>(
-    `query MilestoneCounts($escrowId: uuid!) {
-      total: escrowMilestones_aggregate(where: { escrowId: { _eq: $escrowId } }) {
-        aggregate { count }
-      }
-      approved: escrowMilestones_aggregate(
-        where: { escrowId: { _eq: $escrowId }, status: { _eq: "approved" } }
-      ) {
-        aggregate { count }
-      }
-    }`,
-    { escrowId },
-  );
-
-  const total = counts.total.aggregate.count;
-  const approved = counts.approved.aggregate.count;
-
-  if (approved >= total) {
-    const result = await hasuraRequest<UpdateResult>(
-      `mutation ApproveEscrow($contractId: String!, $log: escrow_transactions_insert_input!) {
-        update_trustless_work_escrows(
-          where: { contractId: { _eq: $contractId } }
-          _set: { status: "milestone_approved" }
-        ) {
-          affected_rows
-          returning { id }
-        }
-        update_escrows(
-          where: { contract_id: { _eq: $contractId } }
-          _set: { status: "milestone_approved" }
-        ) {
-          affected_rows
-          returning { id }
-        }
-        insert_escrow_transactions_one(object: $log) {
-          id
-        }
-      }`,
-      {
-        contractId,
-        log: buildAuditLog('approve_milestone', 'funded', 'milestone_approved', contractId, engagementId, txHash),
-      },
-    );
-
-    assertAffectedRows('approve_milestone', result.update_trustless_work_escrows?.affected_rows ?? 0);
-    assertAffectedRows('approve_milestone', result.update_escrows?.affected_rows ?? 0);
-    if (!result.insert_escrow_transactions_one) {
-      throw new Error('Escrow changed. Refresh and retry');
-    }
+  assertAffectedRows('approve_milestone', result.update_escrowMilestones?.affected_rows ?? 0, 'completed', 'approved');
+  assertAffectedRows('approve_milestone', result.update_trustlessWorkEscrows?.affected_rows ?? 0, 'funded', 'milestone_approved');
+  assertAffectedRows('approve_milestone', result.update_escrows?.affected_rows ?? 0, 'funded', 'milestone_approved');
+  if (!result.insert_escrow_transactions_one) {
+    throw new ConcurrentTransitionError('funded', 'milestone_approved');
   }
 }
 
@@ -337,6 +379,22 @@ export async function dbReleaseFunds(
   txHash?: string,
 ): Promise<void> {
   const escrowId = await resolveEscrowId(contractId);
+
+  // Pre-read: no approved milestone means the release is in the wrong state —
+  // fail before writing anything (a 0-row root field would still commit).
+  const approvedMilestones = await hasuraRequest<{
+    escrowMilestones_aggregate: { aggregate: { count: number } };
+  }>(
+    `query CountApprovedMilestones($escrowId: uuid!) {
+      escrowMilestones_aggregate(
+        where: { escrowId: { _eq: $escrowId }, status: { _eq: "approved" } }
+      ) { aggregate { count } }
+    }`,
+    { escrowId },
+  );
+  if ((approvedMilestones.escrowMilestones_aggregate.aggregate.count ?? 0) === 0) {
+    throw new ConcurrentTransitionError('milestone_approved', 'completed');
+  }
 
   const result = await hasuraRequest<UpdateResult>(
     `mutation ReleaseFunds($escrowId: uuid!, $contractId: String!, $releaseSigner: String!, $releasedAt: timestamptz!, $log: escrow_transactions_insert_input!) {
@@ -355,14 +413,14 @@ export async function dbReleaseFunds(
         returning { id }
       }
       update_trustless_work_escrows(
-        where: { contractId: { _eq: $contractId } }
+        where: { contractId: { _eq: $contractId }, status: { _eq: "milestone_approved" } }
         _set: { status: "completed", balance: 0 }
       ) {
         affected_rows
         returning { id }
       }
       update_escrows(
-        where: { contract_id: { _eq: $contractId } }
+        where: { contract_id: { _eq: $contractId }, status: { _eq: "milestone_approved" } }
         _set: { status: "completed" }
       ) {
         affected_rows
@@ -381,8 +439,11 @@ export async function dbReleaseFunds(
     },
   );
 
-  if ((result.update_escrowMilestones?.affected_rows ?? 0) === 0) {
-    throw new Error(`No approved milestones found for contractId: ${contractId}`);
+  assertAffectedRows('release_funds', result.update_trustlessWorkEscrows?.affected_rows ?? 0, 'milestone_approved', 'completed');
+  assertAffectedRows('release_funds', result.update_escrows?.affected_rows ?? 0, 'milestone_approved', 'completed');
+  assertAffectedRows('release_funds', result.update_escrowMilestones?.affected_rows ?? 0, 'approved', 'released');
+  if (!result.insert_escrow_transactions_one) {
+    throw new ConcurrentTransitionError('milestone_approved', 'completed');
   }
   assertAffectedRows('release_funds', result.update_trustless_work_escrows?.affected_rows ?? 0);
   assertAffectedRows('release_funds', result.update_escrows?.affected_rows ?? 0);
@@ -399,14 +460,14 @@ export async function dbDisputeEscrow(
   const result = await hasuraRequest<UpdateResult>(
     `mutation DisputeEscrow($contractId: String!, $log: escrow_transactions_insert_input!) {
       update_trustless_work_escrows(
-        where: { contractId: { _eq: $contractId } }
+        where: { contractId: { _eq: $contractId }, status: { _in: ["funded", "milestone_approved"] } }
         _set: { status: "disputed" }
       ) {
         affected_rows
         returning { id }
       }
       update_escrows(
-        where: { contract_id: { _eq: $contractId } }
+        where: { contract_id: { _eq: $contractId }, status: { _in: ["funded", "milestone_approved"] } }
         _set: { status: "disputed" }
       ) {
         affected_rows
@@ -422,10 +483,10 @@ export async function dbDisputeEscrow(
     },
   );
 
-  assertAffectedRows('dispute', result.update_trustless_work_escrows?.affected_rows ?? 0);
-  assertAffectedRows('dispute', result.update_escrows?.affected_rows ?? 0);
+  assertAffectedRows('dispute', result.update_trustlessWorkEscrows?.affected_rows ?? 0, 'funded|milestone_approved', 'disputed');
+  assertAffectedRows('dispute', result.update_escrows?.affected_rows ?? 0, 'funded|milestone_approved', 'disputed');
   if (!result.insert_escrow_transactions_one) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError('funded|milestone_approved', 'disputed');
   }
 }
 
@@ -437,14 +498,14 @@ export async function dbResolveDispute(
   const result = await hasuraRequest<UpdateResult>(
     `mutation ResolveDispute($contractId: String!, $log: escrow_transactions_insert_input!) {
       update_trustless_work_escrows(
-        where: { contractId: { _eq: $contractId } }
+        where: { contractId: { _eq: $contractId }, status: { _eq: "disputed" } }
         _set: { status: "resolved", balance: 0 }
       ) {
         affected_rows
         returning { id }
       }
       update_escrows(
-        where: { contract_id: { _eq: $contractId } }
+        where: { contract_id: { _eq: $contractId }, status: { _eq: "disputed" } }
         _set: { status: "resolved" }
       ) {
         affected_rows
@@ -460,9 +521,9 @@ export async function dbResolveDispute(
     },
   );
 
-  assertAffectedRows('resolve_dispute', result.update_trustless_work_escrows?.affected_rows ?? 0);
-  assertAffectedRows('resolve_dispute', result.update_escrows?.affected_rows ?? 0);
+  assertAffectedRows('resolve_dispute', result.update_trustlessWorkEscrows?.affected_rows ?? 0, 'disputed', 'resolved');
+  assertAffectedRows('resolve_dispute', result.update_escrows?.affected_rows ?? 0, 'disputed', 'resolved');
   if (!result.insert_escrow_transactions_one) {
-    throw new Error('Escrow changed. Refresh and retry');
+    throw new ConcurrentTransitionError('disputed', 'resolved');
   }
 }

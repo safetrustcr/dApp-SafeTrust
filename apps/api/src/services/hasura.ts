@@ -32,10 +32,28 @@ export function isEscrowChangedError(error: unknown): boolean {
     return true;
   }
 
-  return (
-    error instanceof HasuraRequestError &&
-    (error.details?.some((detail) => detail.message?.toLowerCase().includes('affected_rows') || detail.message?.toLowerCase().includes('escrow changed')) ?? false)
-  );
+  if (!(error instanceof HasuraRequestError)) {
+    return false;
+  }
+
+  const detailMessage = error.details?.some((detail) => {
+    const message = detail.message?.toLowerCase() ?? '';
+    return message.includes('affected_rows') || message.includes('escrow changed');
+  });
+
+  return Boolean(detailMessage);
+}
+
+/**
+ * True when Hasura reported a Postgres unique_violation — on the escrow paths
+ * this means a duplicate transition or a replayed transaction hash raced past
+ * the conditional updates, so the whole mutation rolled back atomically.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof HasuraRequestError)) {
+    return false;
+  }
+  return Boolean(error.details?.some((detail) => detail.extensions?.code === 'unique_violation'));
 }
 
 /**

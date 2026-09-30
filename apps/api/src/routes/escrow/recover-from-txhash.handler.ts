@@ -35,7 +35,9 @@ const VALID_ACTIONS: RecoverAction[] = [
 ];
 
 const ACTION_STATUS: Record<RecoverAction, string> = {
-  initialize: 'pending_signature',
+  // initialize completed on-chain → the escrow is live and awaiting funding
+  // (deploy's pending_signature is normalized to created).
+  initialize: 'created',
   fund: 'funded',
   approve_milestone: 'funded',
   release_funds: 'completed',
