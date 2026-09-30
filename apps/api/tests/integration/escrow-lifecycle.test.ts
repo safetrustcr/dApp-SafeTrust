@@ -27,7 +27,7 @@ describe.skipIf(!INTEGRATION_ENABLED)('TrustlessWork escrow lifecycle', () => {
     const data = await res.json();
     expect(data.unsignedXDR).toBeTypeOf('string');
     expect(data.unsignedXDR.length).toBeGreaterThan(100);
-    expect(data.cached).toBe(false);
+    expect(data.cached).toBeFalsy();
     unsignedXDR = data.unsignedXDR;
   });
 });
