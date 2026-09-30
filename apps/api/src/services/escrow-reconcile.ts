@@ -27,11 +27,10 @@ type PendingActionRow = {
 
 type EscrowRow = {
   id: string;
-  apartment_id?: string | null;
-  amount?: string | number | null;
   contract_id?: string | null;
   engagement_id?: string | null;
   status?: string | null;
+  amount?: string | number | null;
   trustless_work_escrows?: { status?: string | null }[];
 };
 
@@ -104,7 +103,6 @@ async function syncMilestoneCompletion(action: PendingActionRow, txHash: string)
     throw new Error('Milestone changed. Refresh and retry');
   }
 }
-
 const STATUS_RANK: Record<string, number> = {
   created: 0,
   funded: 1,
@@ -145,11 +143,10 @@ async function getEscrowSnapshots(limit = 50): Promise<EscrowRow[]> {
     `query ReconcileEscrows($limit: Int!) {
       escrows(order_by: { created_at: asc }, limit: $limit) {
         id
-        apartment_id
-        amount
         contract_id
         engagement_id
         status
+        amount
         trustless_work_escrows {
           status
         }
