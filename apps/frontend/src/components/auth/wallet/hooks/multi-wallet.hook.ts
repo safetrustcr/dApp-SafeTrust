@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signInWithCustomToken } from "firebase/auth";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
+import { auth } from "@/lib/firebase";
 import { WalletType } from "../components/MainWalletSelectionModal";
 import { useMetaMaskWallet } from "./metamask-wallet.hook";
 import { getWalletKit } from "../constants/wallet-kit.constant";
@@ -85,15 +87,54 @@ export const useMultiWallet = () => {
       setError(null);
 
       const kit = getWalletKit();
-
       kit.setWallet(wallet.id);
 
       const { address } = await kit.getAddress();
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
+
+      const challengeResponse = await fetch(`${backendUrl}/api/auth/wallet/challenge`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ account: address }),
+      });
+
+      if (!challengeResponse.ok) {
+        const payload = await challengeResponse.json().catch(() => ({}));
+        throw new Error(payload.error || "Failed to fetch wallet challenge");
+      }
+
+      const challengeData = await challengeResponse.json();
+      const signedChallenge = await kit.signTransaction(challengeData.transaction, {
+        address,
+        networkPassphrase: challengeData.network_passphrase,
+      });
+
+      const verifyResponse = await fetch(`${backendUrl}/api/auth/wallet/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          transaction: signedChallenge.signedTxXdr || signedChallenge,
+        }),
+      });
+
+      if (!verifyResponse.ok) {
+        const payload = await verifyResponse.json().catch(() => ({}));
+        throw new Error(payload.error || "Wallet verification failed");
+      }
+
+      const { customToken } = await verifyResponse.json();
+      const credential = await signInWithCustomToken(auth, customToken);
+      const idToken = await credential.user.getIdToken();
 
       connectWalletStore(address, wallet.name);
-
+      useGlobalAuthenticationStore.getState().setToken(idToken);
       setIsStellarModalOpen(false);
       setSelectedWalletType(null);
+      router.push("/dashboard/escrow-dashboard");
     } catch (error: any) {
       console.error("Error connecting to Stellar wallet:", error);
       setError(
