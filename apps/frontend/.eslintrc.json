@@ -1,0 +1,22 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "settings": {
+    "next": {
+      "rootDir": "apps/frontend/"
+    }
+  },
+  "rules": {
+    "@next/next/no-html-link-for-pages": "off",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["@trustless-work/*"],
+            "message": "Trustless Work is server-only. Call apps/api via postEscrowApi()."
+          }
+        ]
+      }
+    ]
+  }
+}
