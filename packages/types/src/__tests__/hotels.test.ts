@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateHotelInput } from '../hotels.js';
+import { validateHotelInput } from '../hotels';
 
 describe('validateHotelInput', () => {
   it('passes on valid hotel input with all fields', () => {
