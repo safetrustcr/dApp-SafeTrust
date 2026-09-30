@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- Init SQL for tenant: safetrust
--- Generated: 2026-09-30T09:56:59Z
+-- Generated: 2026-09-28T16:42:21Z
 -- Source:    infra/backend/migrations/safetrust/*/up.sql
 -- DO NOT EDIT — regenerate with: bin/generate-init-sql
 -- ════════════════════════════════════════════════════════════════════════════
@@ -698,48 +698,51 @@ CREATE INDEX IF NOT EXISTS idx_escrow_transactions_action
 CREATE INDEX IF NOT EXISTS idx_escrow_transactions_created_at
   ON public.escrow_transactions (created_at);
 
--- ── Migration: 1790000000001_enable_pgcrypto
+-- ── Migration: 1791000000000_api_idempotency_keys
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Replay store for the Idempotency-Key header on escrow endpoints
+-- (deploy, fund, milestone-status, approve-milestone, release-funds,
+-- send-transaction). One row per (user_id, key); the API writes it with the
+-- Hasura admin secret only — no client role permissions are granted.
 
--- ── Migration: 1790000000002_create_escrow_transactions
-
-CREATE TABLE IF NOT EXISTS public.escrow_transactions (
-  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  engagement_id  TEXT        NOT NULL,
-  contract_id    TEXT,
-  action         TEXT        NOT NULL,
-  from_status    TEXT,
-  to_status      TEXT        NOT NULL,
-  tx_hash        TEXT,
-  source         TEXT        NOT NULL CHECK (source IN ('submit', 'reconciler', 'admin')),
-  actor_uid      TEXT,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  tenant_id      VARCHAR(255) NOT NULL DEFAULT 'safetrust',
-  
-  -- From existing hotel_industry metadata
-  reservation_id TEXT,
-  escrow_status TEXT,
-  signer_address TEXT,
-  transaction_type TEXT,
-  escrow_transaction_type TEXT,
-  http_status_code INT,
-  escrow_payload JSONB,
-  fund_payload JSONB,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS public.api_idempotency_keys (
+  user_id        TEXT        NOT NULL,
+  key            TEXT        NOT NULL,
+  route          TEXT        NOT NULL,
+  status         TEXT        NOT NULL DEFAULT 'in_progress'
+                             CHECK (status IN ('in_progress', 'completed')),
+  response_code  INT,
+  response_body  JSONB,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_escrow_transactions_engagement
-  ON public.escrow_transactions (engagement_id, created_at);
+COMMENT ON TABLE public.api_idempotency_keys IS
+  'Replay store for escrow endpoint Idempotency-Key headers. Admin-secret only.';
 
--- Append-only: audit rows are never edited or deleted
-CREATE OR REPLACE FUNCTION public.escrow_transactions_append_only()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN
-  RAISE EXCEPTION 'escrow_transactions is append-only';
-END;
-$$;
+-- ── Migration: 1791000000001_escrow_transition_hardening
 
-CREATE TRIGGER escrow_transactions_no_update_delete
-  BEFORE UPDATE OR DELETE ON public.escrow_transactions
-  FOR EACH ROW EXECUTE FUNCTION public.escrow_transactions_append_only();
+-- App-level transition enforcement hardening (issue #454).
+-- Data/index changes only — no new triggers.
+
+-- 1. pending_signature -> created.
+--    deploy inserts escrows rows as pending_signature; the send-transaction
+--    initialize action normalizes them to created, so fund can rely on
+--    created as its only valid `from` status.
+INSERT INTO public.escrow_status_transitions (from_status, to_status)
+VALUES ('pending_signature', 'created')
+ON CONFLICT (from_status, to_status) DO NOTHING;
+
+-- 1b. approved -> released (milestones).
+--     dbReleaseFunds moves approved milestones to released; without this edge
+--     the milestone transition trigger rejects every release.
+INSERT INTO public.escrow_milestone_status_transitions (from_status, to_status)
+VALUES ('approved', 'released')
+ON CONFLICT (from_status, to_status) DO NOTHING;
+
+-- 2. Drop the engagement-only unique index on the audit log.
+--    The frontend passes engagementId on every action, so this index would
+--    reject every action after the first (unique violation -> rollback).
+--    (engagement_id, action) remains the duplicate guard: a second identical
+--    transition's log insert fails and rolls the whole mutation back.
+DROP INDEX IF EXISTS public.ux_escrow_transactions_engagement;
