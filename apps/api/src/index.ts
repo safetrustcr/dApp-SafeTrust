@@ -19,6 +19,7 @@ import conversationsRouter from './routes/messages/conversations.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
+import hotelsRouter from './routes/hotels/hotels.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
@@ -67,6 +68,9 @@ app.use('/api/escrow', resolveDisputeRouter);
 app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);
+
+// Hotel routes
+app.use('/api/hotels', hotelsRouter);
 
 // Messages routes (router registered when available)
 app.use('/api/messages', messagesRouter);

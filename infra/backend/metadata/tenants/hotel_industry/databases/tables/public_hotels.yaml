@@ -10,6 +10,9 @@ object_relationships:
           schema: public
         columns:
           - hotel_id
+  - name: owner
+    using:
+      foreign_key_constraint_on: owner_user_id
 select_permissions:
   - role: tenant
     permission:
@@ -22,6 +25,7 @@ select_permissions:
         - coordinates
         - created_at
         - updated_at
+        - owner_user_id
       filter: {}
   - role: landlord
     permission:
@@ -34,4 +38,5 @@ select_permissions:
         - coordinates
         - created_at
         - updated_at
+        - owner_user_id
       filter: {}
