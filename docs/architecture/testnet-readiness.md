@@ -62,10 +62,12 @@ a valid API key and a user-controlled funded wallet.
 4. **Add integration tests.** Use a dedicated funded testnet wallet pair and
    test deploy → sign → submit → fund → milestone → release. Never use a
    production key, a production wallet, or real funds in CI.
-5. **Inbound webhooks are intentionally disabled.** No active metadata caller
-   points to the removed Next.js webhook. If Trustless Work webhooks are later
-   configured, add an `apps/api` endpoint with the provider's documented HMAC
-   signature and replay protection before enabling it.
+5. **Cron reconciliation is implemented and authenticated.** `POST /reconciliation/sync-escrows`
+   is mounted in `apps/api` and protected by `x-reconciliation-secret`, so the
+   Hasura cron can confirm submitted transaction hashes and reconcile forward-only
+   drift without a browser session. Inbound Trustless Work webhooks remain
+   disabled until the provider publishes an HMAC signature and replay-protection
+   contract for the endpoint.
 
 ## Non-blocking library note
 

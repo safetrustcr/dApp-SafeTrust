@@ -11,7 +11,7 @@ import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { useState, useCallback, useEffect, type CSSProperties, ReactNode } from 'react';
 import { useEscrowAction } from '@/hooks/use-escrow-action';
 import { useEscrowStream } from '@/hooks/use-escrow-stream';
-import Image from 'next/image';
+import Image from '@/components/ui/image';
 import {
   Bell,
   ChevronDown,
@@ -472,8 +472,7 @@ function ProductCell({ apartment }: { apartment: InvoiceApartment }) {
   return (
     <div style={styles.productCell}>
       {imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt={apartment.name ?? 'Apartment'} style={styles.productThumbnail} />
+        <Image src={imageUrl} alt={apartment.name ?? 'Apartment'} width={40} height={40} style={styles.productThumbnail} />
       ) : (
         <span aria-hidden="true" style={styles.productThumbnailFallback}>
           <Home size={20} strokeWidth={2} />
@@ -942,7 +941,7 @@ export default function EscrowDetailPage({
   searchParams: { status?: string };
 }) {
   const { address, walletType, isReady, signAndSubmit } = useActiveWallet();
-  const { execute, actioning, phase, actionError } = useEscrowAction();
+  const { execute, actioning, phase, actionError, conflict } = useEscrowAction();
   const [actionLoading, setActionLoading] = useState<EscrowAction | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
@@ -968,6 +967,12 @@ export default function EscrowDetailPage({
       void refetch();
     }
   }, [streamData?.updated_at, refetch]);
+
+  // A 409 from a transition/idempotency conflict means the escrow moved —
+  // refetch so the buttons and status reflect the current state.
+  useEffect(() => {
+    if (conflict) void refetch();
+  }, [conflict, refetch]);
 
   const escrow = data?.escrows?.[0] as EscrowRecord | undefined;
   const trustlessWorkEscrow = data?.trustlessWorkEscrows?.[0] as TrustlessWorkEscrowRecord | undefined;

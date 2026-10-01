@@ -14,7 +14,13 @@ vi.mock('../../../services/trustlesswork.js', () => ({
   getErrorMessages: vi.fn((err, fallback) => [err?.message || fallback]),
 }));
 
+vi.mock('../../../services/escrow-db.js', () => ({
+  assertEscrowActionAllowed: vi.fn(async () => {}),
+}));
+
 import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
+import { assertEscrowActionAllowed } from '../../../services/escrow-db.js';
+import { InvalidTransitionError } from '../../../domain/escrow-state.js';
 import { mockReq, mockRes } from './helpers.js';
 
 describe('fundEscrowHandler', () => {
@@ -62,5 +68,25 @@ describe('fundEscrowHandler', () => {
       contractId: 'CAZT001',
       engagementId: 'e1',
     });
+  });
+
+  it('returns 409 and skips Trustless Work when the transition is invalid', async () => {
+    vi.mocked(assertEscrowActionAllowed).mockRejectedValueOnce(
+      new InvalidTransitionError('completed', 'funded', 'fund'),
+    );
+
+    const res = mockRes();
+    await fundEscrowHandler(
+      mockReq({ contractId: 'CAZT001', signer: 'GSIGNER', amount: 950, engagementId: 'e1' }),
+      res,
+    );
+
+    expect(res._status).toBe(409);
+    expect(res._body).toEqual({
+      error: 'invalid escrow transition completed -> funded',
+      from: 'completed',
+      to: 'funded',
+    });
+    expect(trustlessWorkRequest).not.toHaveBeenCalled();
   });
 });

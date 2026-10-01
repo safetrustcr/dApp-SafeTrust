@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
@@ -38,6 +38,12 @@ export function EscrowPayFlow({
   const [signing, setSigning] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [deployState, setDeployState] = useState<DeployResponse | null>(null);
+  // Synchronous double-click guard — a second click in the same tick is
+  // ignored so Trustless Work is only called once per PAY press.
+  const deployInFlightRef = useRef(false);
+  const signInFlightRef = useRef(false);
+  // Reused across retries of the same deploy attempt; cleared on success.
+  const deployKeyRef = useRef<string | null>(null);
 
   const hasOwnerWallet = STELLAR_ADDRESS_RE.test(ownerAddress);
   const canPay = isReady && hasOwnerWallet;
@@ -54,26 +60,33 @@ export function EscrowPayFlow({
       setErrorMessages(['Connect your Stellar wallet before paying.']);
       return;
     }
+    if (deployInFlightRef.current) return;
+    deployInFlightRef.current = true;
     setDeploying(true);
     setDeployState(null);
     setErrorMessages([]);
     try {
+      deployKeyRef.current = deployKeyRef.current ?? crypto.randomUUID();
       const payload = await postEscrowApi<DeployResponse>('/api/escrow/deploy', {
         apartmentId,
         senderAddress: address,
         receiverAddress: ownerAddress,
         amount,
-      });
+      }, { idempotencyKey: deployKeyRef.current });
+      deployKeyRef.current = null;
       setDeployState(payload);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to deploy escrow.'));
     } finally {
+      deployInFlightRef.current = false;
       setDeploying(false);
     }
   };
 
   const handleSignAndSend = async () => {
     if (!deployState || !address) return;
+    if (signInFlightRef.current) return;
+    signInFlightRef.current = true;
     setSigning(true);
     setErrorMessages([]);
     try {
@@ -90,6 +103,7 @@ export function EscrowPayFlow({
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to sign escrow.'));
     } finally {
+      signInFlightRef.current = false;
       setSigning(false);
     }
   };

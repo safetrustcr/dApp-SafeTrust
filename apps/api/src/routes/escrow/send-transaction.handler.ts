@@ -14,7 +14,18 @@ import {
   dbDisputeEscrow,
   dbResolveDispute,
 } from '../../services/escrow-db.js';
-import { hasuraRequest, insertEscrowRecord, updateEscrowStatus, updateEscrowStatusByContractId } from '../../services/hasura.js';
+import {
+  hasuraRequest,
+  insertEscrowRecord,
+  updateEscrowStatus,
+  isEscrowTransitionError,
+  isEscrowChangedError,
+  isUniqueViolation,
+  HasuraRequestError,
+} from '../../services/hasura.js';
+import { InvalidTransitionError, ConcurrentTransitionError } from '../../domain/escrow-state.js';
+import { conflictBody, guardEscrowAction } from './transition-guard.js';
+import { confirmTransactionWithRetry } from '../../services/stellar-confirm.js';
 
 type EscrowAction =
   | 'initialize'
@@ -75,6 +86,23 @@ const REQUIRED_FIELDS: Record<EscrowAction, (keyof SendTransactionBody)[]> = {
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
+const parseTransitionError = (error: unknown): { from?: string; to?: string } => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const match = message.match(/invalid\s+escrow\s+transition\s+([^\s]+)\s*->\s*([^\s]+)/i);
+  if (match) {
+    return { from: match[1], to: match[2] };
+  }
+
+  const details = error instanceof HasuraRequestError ? error.details ?? [] : [];
+  const detailMessage = details.find((detail) => detail.message.toLowerCase().includes('invalid escrow transition'))?.message ?? '';
+  const detailMatch = detailMessage.match(/invalid\s+escrow\s+transition\s+([^\s]+)\s*->\s*([^\s]+)/i);
+  if (detailMatch) {
+    return { from: detailMatch[1], to: detailMatch[2] };
+  }
+
+  return {};
+};
+
 export const sendTransactionHandler = async (
   req: Request<{}, Record<string, unknown> | { error: string; messages?: string[]; payload?: unknown }, SendTransactionBody>,
   res: Response<Record<string, unknown> | { error: string; messages?: string[]; payload?: unknown }>
@@ -125,10 +153,34 @@ export const sendTransactionHandler = async (
         });
       }
 
+      const txHash = extractTransactionHash(twResult);
+      if (txHash) {
+        const ledgerConfirmation = await confirmTransactionWithRetry(txHash, { maxAttempts: 5, intervalMs: 2000 });
+        if (ledgerConfirmation === 'failed') {
+          return res.status(202).json({
+            status: 'confirming',
+            message: 'Stellar rejected the submitted transaction, so no escrow status change was applied.',
+            contractId,
+            transactionHash: txHash,
+            ledgerStatus: 'failed',
+          });
+        }
+
+        if (ledgerConfirmation !== 'success') {
+          return res.status(202).json({
+            status: 'confirming',
+            message: 'Transaction accepted by Trustless Work; waiting for Stellar confirmation.',
+            contractId,
+            transactionHash: txHash,
+            ledgerStatus: 'unknown',
+          });
+        }
+      }
+
       const updateResult = await updateEscrowStatus(engagementId, resolvedStatus);
       if (updateResult.update_escrows.affected_rows === 0) {
-        return res.status(404).json({
-          error: `No escrow record found for engagementId: ${engagementId}`,
+        return res.status(409).json({
+          error: 'Escrow changed. Refresh and retry',
         });
       }
 
@@ -173,6 +225,13 @@ export const sendTransactionHandler = async (
       }
     }
 
+    // Reject invalid transitions BEFORE submitting anything to Trustless Work
+    // or the ledger — a wrong-state action must change nothing on-chain.
+    if (action !== 'initialize') {
+      const conflict = await guardEscrowAction(res, action, contractId);
+      if (conflict) return conflict;
+    }
+
     let result: SendTransactionTWResponse & Record<string, unknown>;
     try {
       result = await trustlessWorkRequest<SendTransactionTWResponse & Record<string, unknown>>(
@@ -199,6 +258,31 @@ export const sendTransactionHandler = async (
       return res.status(502).json({ error: messages[0], messages, payload: result });
     }
 
+    const txHash = extractTransactionHash(result);
+    if (txHash) {
+      const ledgerConfirmation = await confirmTransactionWithRetry(txHash, { maxAttempts: 5, intervalMs: 2000 });
+
+      if (ledgerConfirmation === 'failed') {
+        return res.status(202).json({
+          status: 'confirming',
+          message: 'Stellar rejected the submitted transaction, so no escrow status change was applied.',
+          contractId,
+          transactionHash: txHash,
+          ledgerStatus: 'failed',
+        });
+      }
+
+      if (ledgerConfirmation !== 'success') {
+        return res.status(202).json({
+          status: 'confirming',
+          message: 'Transaction accepted by Trustless Work; waiting for Stellar confirmation.',
+          contractId,
+          transactionHash: txHash,
+          ledgerStatus: 'unknown',
+        });
+      }
+    }
+
     const resolvedContractId = (result.contractId as string | undefined) ?? contractId;
     let insertedId: string | undefined;
 
@@ -223,6 +307,17 @@ export const sendTransactionHandler = async (
           );
           if (existing.escrows.length > 0) {
             insertedId = existing.escrows[0].id;
+            // Normalize deploy's pending_signature -> created so every later
+            // transition can rely on `created` as fund's only `from` status.
+            await hasuraRequest(
+              `mutation NormalizeEscrowCreated($contractId: String!) {
+                update_escrows(
+                  where: { contract_id: { _eq: $contractId }, status: { _eq: "pending_signature" } }
+                  _set: { status: "created" }
+                ) { affected_rows }
+              }`,
+              { contractId: resolvedContractId },
+            );
           } else {
             const record = await insertEscrowRecord({
               contractId: resolvedContractId,
@@ -237,31 +332,63 @@ export const sendTransactionHandler = async (
           }
           break;
         }
-        case 'fund':
-          await dbFundEscrow(resolvedContractId, amount!);
-          await updateEscrowStatusByContractId(resolvedContractId, 'funded');
+        case 'fund': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbFundEscrow(resolvedContractId, amount!, engagementId, txHash);
           break;
-        case 'mark_milestone_completed':
-          await dbMarkMilestoneCompleted(resolvedContractId, milestoneId!);
+        }
+        case 'mark_milestone_completed': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbMarkMilestoneCompleted(resolvedContractId, milestoneId!, engagementId, txHash);
           break;
-        case 'approve_milestone':
-          await dbApproveMilestone(resolvedContractId, milestoneId!, approver!);
-          await updateEscrowStatusByContractId(resolvedContractId, 'milestone_approved');
+        }
+        case 'approve_milestone': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbApproveMilestone(resolvedContractId, milestoneId!, approver!, engagementId, txHash);
           break;
-        case 'release_funds':
-          await dbReleaseFunds(resolvedContractId, releaseSigner!);
-          await updateEscrowStatusByContractId(resolvedContractId, 'completed');
+        }
+        case 'release_funds': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbReleaseFunds(resolvedContractId, releaseSigner!, engagementId, txHash);
           break;
-        case 'dispute':
-          await dbDisputeEscrow(resolvedContractId);
-          await updateEscrowStatusByContractId(resolvedContractId, 'disputed');
+        }
+        case 'dispute': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbDisputeEscrow(resolvedContractId, engagementId, txHash);
           break;
-        case 'resolve_dispute':
-          await dbResolveDispute(resolvedContractId);
-          await updateEscrowStatusByContractId(resolvedContractId, 'resolved');
+        }
+        case 'resolve_dispute': {
+          const txHash = extractTransactionHash(result) ?? undefined;
+          await dbResolveDispute(resolvedContractId, engagementId, txHash);
           break;
+        }
       }
     } catch (error) {
+      if (error instanceof InvalidTransitionError || error instanceof ConcurrentTransitionError) {
+        return res.status(409).json(conflictBody(error));
+      }
+
+      if (isUniqueViolation(error)) {
+        // Duplicate transition / replayed tx hash: the whole mutation document
+        // rolled back atomically, so nothing changed.
+        return res.status(409).json({ error: 'Escrow changed. Refresh and retry' });
+      }
+
+      if (isEscrowTransitionError(error)) {
+        const { from, to } = parseTransitionError(error);
+        return res.status(409).json({
+          error: `invalid escrow transition ${from ?? 'unknown'} -> ${to ?? 'unknown'}`,
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
+        });
+      }
+
+      if (isEscrowChangedError(error)) {
+        return res.status(409).json({
+          error: 'Escrow changed. Refresh and retry',
+        });
+      }
+
       const message = getErrorMessages(error, 'Database synchronization failed.');
       return res.status(500).json({
         error: 'Transaction confirmed on-chain, but database synchronization failed.',
@@ -291,6 +418,14 @@ export const sendTransactionHandler = async (
         messages: error.messages,
         payload: error.payload,
       });
+    }
+
+    if (error instanceof InvalidTransitionError || error instanceof ConcurrentTransitionError) {
+      return res.status(409).json(conflictBody(error));
+    }
+
+    if (isUniqueViolation(error)) {
+      return res.status(409).json({ error: 'Escrow changed. Refresh and retry' });
     }
 
     const messages = getErrorMessages(error, 'Failed to send transaction.');
