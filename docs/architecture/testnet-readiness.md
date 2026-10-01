@@ -52,7 +52,7 @@ a valid API key and a user-controlled funded wallet.
 
 1. **Configure the Trustless Work secret.** The current local API environment
    has an empty `TRUSTLESS_WORK_API_KEY`, so a live request must fail safely.
-2. **Resolve Hasura metadata inconsistency.** [RESOLVED in #441] Hasura metadata
+2. **Resolve Hasura metadata inconsistency.** [RESOLVED in #441, #493] Hasura metadata
    is consistent on a fresh local stack (`make infra-reset`). Out-of-scope tenant
    objects were removed from the safetrust metadata build, trigger/action
    environment variables (`HASURA_EVENT_SECRET`, `WEBHOOK_ADMIN_SECRET`) were

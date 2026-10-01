@@ -83,17 +83,21 @@ done
 
 echo ""
 
-# ── 4. Apply migrations for each tenant ──────────────────────────────────────
-# Tables are created here — must run before metadata deploy.
-echo "📂 Applying migrations..."
-for TENANT in "${TENANTS[@]}"; do
-  echo "   ▶ Migrating tenant: $TENANT"
-  hasura migrate apply \
-    --endpoint http://localhost:8080 \
-    --admin-secret "$HASURA_ADMIN_SECRET" \
-    --database-name "$TENANT"
-  echo "   ✅ Migrations applied for $TENANT"
-done
+# ── 4. Apply migrations or the guarded fresh-database snapshot ───────────────
+if [[ "${INIT_FAST_PATH:-0}" == "1" ]]; then
+  echo "⚡ Deploying generated init snapshots (fresh database only)..."
+  POSTGRES_PASSWORD="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}" \
+    HASURA_ENDPOINT=http://localhost:8080 HASURA_ADMIN_SECRET="$HASURA_ADMIN_SECRET" \
+    "$SCRIPT_DIR/deploy-init" "${TENANTS[@]}"
+else
+  echo "📂 Applying canonical migrations..."
+  for TENANT in "${TENANTS[@]}"; do
+    echo "   ▶ Migrating tenant: $TENANT"
+    hasura migrate apply --endpoint http://localhost:8080 \
+      --admin-secret "$HASURA_ADMIN_SECRET" --database-name "$TENANT"
+    echo "   ✅ Migrations applied for $TENANT"
+  done
+fi
 
 if [[ "$TRACK_SAFETRUST_TIMINGS" == "true" ]]; then
   TIMING_MIGRATIONS_SAFETRUST=$((SECONDS - TIMER_START))
