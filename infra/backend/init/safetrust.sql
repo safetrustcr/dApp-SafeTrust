@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- Init SQL for tenant: safetrust
--- Generated: 2026-09-29T00:07:49Z
+-- Generated: 2026-10-01T01:12:01Z
 -- Source:    infra/backend/migrations/safetrust/*/up.sql
 -- DO NOT EDIT — regenerate with: bin/generate-init-sql
 -- ════════════════════════════════════════════════════════════════════════════
@@ -561,12 +561,34 @@ CREATE TABLE IF NOT EXISTS public.escrow_status_transitions (
 );
 
 INSERT INTO public.escrow_status_transitions (from_status, to_status) VALUES
+  ('deploying', 'pending_signature'),
+  ('pending_signature', 'created'),
+  ('pending_signature', 'cancelled'),
   ('created', 'funded'),
+  ('created', 'pending_funding'),
+  ('created', 'active'),
+  ('created', 'milestone_approved'),
+  ('created', 'completed'),
+  ('created', 'cancelled'),
+  ('pending_funding', 'funded'),
+  ('pending_funding', 'active'),
+  ('pending_funding', 'completed'),
+  ('pending_funding', 'cancelled'),
+  ('funded', 'active'),
   ('funded', 'milestone_approved'),
-  ('milestone_approved', 'completed'),
+  ('funded', 'completed'),
   ('funded', 'disputed'),
+  ('funded', 'cancelled'),
+  ('active', 'milestone_approved'),
+  ('active', 'completed'),
+  ('active', 'disputed'),
+  ('active', 'cancelled'),
+  ('milestone_approved', 'completed'),
   ('milestone_approved', 'disputed'),
-  ('disputed', 'resolved')
+  ('milestone_approved', 'cancelled'),
+  ('disputed', 'resolved'),
+  ('disputed', 'cancelled'),
+  ('resolved', 'completed')
 ON CONFLICT (from_status, to_status) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.escrow_milestone_status_transitions (
@@ -577,7 +599,12 @@ CREATE TABLE IF NOT EXISTS public.escrow_milestone_status_transitions (
 
 INSERT INTO public.escrow_milestone_status_transitions (from_status, to_status) VALUES
   ('pending', 'completed'),
-  ('completed', 'approved')
+  ('completed', 'approved'),
+  ('approved', 'released'),
+  ('pending', 'cancelled'),
+  ('completed', 'disputed'),
+  ('approved', 'disputed'),
+  ('disputed', 'cancelled')
 ON CONFLICT (from_status, to_status) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.enforce_escrow_status_transition()
@@ -674,14 +701,6 @@ CREATE TABLE IF NOT EXISTS public.escrow_transactions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_engagement
-  ON public.escrow_transactions (engagement_id)
-  WHERE engagement_id IS NOT NULL;
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_engagement_action
-  ON public.escrow_transactions (engagement_id, action)
-  WHERE engagement_id IS NOT NULL AND action IS NOT NULL;
-
 CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_tx_hash
   ON public.escrow_transactions (tx_hash)
   WHERE tx_hash IS NOT NULL;
@@ -697,6 +716,28 @@ CREATE INDEX IF NOT EXISTS idx_escrow_transactions_action
 
 CREATE INDEX IF NOT EXISTS idx_escrow_transactions_created_at
   ON public.escrow_transactions (created_at);
+
+-- ── Migration: 1791000000000_api_idempotency_keys
+
+-- Replay store for the Idempotency-Key header on escrow endpoints
+-- (deploy, fund, milestone-status, approve-milestone, release-funds,
+-- send-transaction). One row per (user_id, key); the API writes it with the
+-- Hasura admin secret only — no client role permissions are granted.
+
+CREATE TABLE IF NOT EXISTS public.api_idempotency_keys (
+  user_id        TEXT        NOT NULL,
+  key            TEXT        NOT NULL,
+  route          TEXT        NOT NULL,
+  status         TEXT        NOT NULL DEFAULT 'in_progress'
+                             CHECK (status IN ('in_progress', 'completed')),
+  response_code  INT,
+  response_body  JSONB,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, key)
+);
+
+COMMENT ON TABLE public.api_idempotency_keys IS
+  'Replay store for escrow endpoint Idempotency-Key headers. Admin-secret only.';
 
 -- ── Migration: 1791000000000_create_escrow_pending_actions
 
@@ -721,3 +762,29 @@ CREATE TABLE IF NOT EXISTS public.escrow_pending_actions (
 CREATE UNIQUE INDEX IF NOT EXISTS escrow_pending_actions_live
   ON public.escrow_pending_actions (engagement_id, action)
   WHERE status IN ('built', 'submitted');
+
+-- ── Migration: 1791000000001_escrow_transition_hardening
+
+-- App-level transition enforcement hardening (issue #454).
+-- Data/index changes only — no new triggers.
+
+-- 1. pending_signature -> created.
+--    deploy inserts escrows rows as pending_signature; the send-transaction
+--    initialize action normalizes them to created, so fund can rely on
+--    created as its only valid `from` status.
+INSERT INTO public.escrow_status_transitions (from_status, to_status)
+VALUES ('pending_signature', 'created')
+ON CONFLICT (from_status, to_status) DO NOTHING;
+
+-- 1b. approved -> released (milestones).
+--     dbReleaseFunds moves approved milestones to released; without this edge
+--     the milestone transition trigger rejects every release.
+INSERT INTO public.escrow_milestone_status_transitions (from_status, to_status)
+VALUES ('approved', 'released')
+ON CONFLICT (from_status, to_status) DO NOTHING;
+
+-- 2. Drop the engagement-only and engagement+action unique indexes on the audit log.
+--    The audit log is a per-transition ledger, so multiple transactions
+--    for the same engagement and repeated reconciler rows must be permitted.
+DROP INDEX IF EXISTS public.ux_escrow_transactions_engagement;
+DROP INDEX IF EXISTS public.ux_escrow_transactions_engagement_action;

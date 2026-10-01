@@ -1,0 +1,7 @@
+# Append-only escrow lifecycle audit log. Written by apps/api with the Hasura
+# admin secret (single mutation documents alongside the status transitions).
+# No client role permissions — end users never touch this table directly.
+table:
+  name: escrow_transactions
+  schema: public
+comment: Escrow lifecycle audit log written by apps/api (admin-secret only).

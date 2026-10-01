@@ -941,7 +941,7 @@ export default function EscrowDetailPage({
   searchParams: { status?: string };
 }) {
   const { address, walletType, isReady, signAndSubmit } = useActiveWallet();
-  const { execute, actioning, phase, actionError } = useEscrowAction();
+  const { execute, actioning, phase, actionError, conflict } = useEscrowAction();
   const [actionLoading, setActionLoading] = useState<EscrowAction | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
@@ -967,6 +967,12 @@ export default function EscrowDetailPage({
       void refetch();
     }
   }, [streamData?.updated_at, refetch]);
+
+  // A 409 from a transition/idempotency conflict means the escrow moved —
+  // refetch so the buttons and status reflect the current state.
+  useEffect(() => {
+    if (conflict) void refetch();
+  }, [conflict, refetch]);
 
   const escrow = data?.escrows?.[0] as EscrowRecord | undefined;
   const trustlessWorkEscrow = data?.trustlessWorkEscrows?.[0] as TrustlessWorkEscrowRecord | undefined;
