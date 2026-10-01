@@ -515,6 +515,11 @@ export async function dbReleaseFunds(
   if (!result.insert_escrow_transactions_one) {
     throw new ConcurrentTransitionError('milestone_approved', 'completed');
   }
+  assertAffectedRows('release_funds', result.update_trustless_work_escrows?.affected_rows ?? 0);
+  assertAffectedRows('release_funds', result.update_escrows?.affected_rows ?? 0);
+  if (!result.insert_escrow_transactions_one) {
+    throw new Error('Escrow changed. Refresh and retry');
+  }
 }
 
 export async function dbDisputeEscrow(
