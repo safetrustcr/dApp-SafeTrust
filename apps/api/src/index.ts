@@ -20,6 +20,7 @@ import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
 import { errorHandler } from './http/error-middleware.js';
+import hotelsRouter from './routes/hotels/hotels.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
@@ -72,6 +73,9 @@ app.use('/api/escrow', statusStreamRouter);
 // Messages routes
 app.use('/api/messages', conversationsRouter);
 app.use('/api/messages', messagesRouter);
+
+// Hotel routes
+app.use('/api/hotels', hotelsRouter);
 
 // Global Problem Details error boundary
 app.use(errorHandler);
