@@ -16,3 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_escrow_transactions_reservation ON hotel_industry
 CREATE INDEX IF NOT EXISTS idx_escrow_transactions_status      ON hotel_industry.escrow_transactions (escrow_status);
 CREATE INDEX IF NOT EXISTS idx_escrow_transactions_type        ON hotel_industry.escrow_transactions (transaction_type);
 CREATE INDEX IF NOT EXISTS idx_escrow_transactions_created_at  ON hotel_industry.escrow_transactions (created_at);
+
+CREATE TRIGGER escrow_transactions_set_updated_at
+  BEFORE UPDATE ON hotel_industry.escrow_transactions
+  FOR EACH ROW EXECUTE FUNCTION hotel_industry.set_updated_at();

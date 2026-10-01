@@ -12,3 +12,7 @@ CREATE TABLE IF NOT EXISTS hotel_industry.users_wallets (
 
 CREATE INDEX IF NOT EXISTS idx_users_wallets_user_id    ON hotel_industry.users_wallets (user_id);
 CREATE INDEX IF NOT EXISTS idx_users_wallets_is_primary ON hotel_industry.users_wallets (is_primary);
+
+CREATE TRIGGER users_wallets_set_updated_at
+  BEFORE UPDATE ON hotel_industry.users_wallets
+  FOR EACH ROW EXECUTE FUNCTION hotel_industry.set_updated_at();

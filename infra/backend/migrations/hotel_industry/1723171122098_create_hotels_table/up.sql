@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS hotel_industry.hotels (
 CREATE INDEX IF NOT EXISTS idx_hotels_owner         ON hotel_industry.hotels (owner_user_id);
 CREATE INDEX IF NOT EXISTS idx_hotels_location_area ON hotel_industry.hotels (location_area);
 CREATE INDEX IF NOT EXISTS idx_hotels_coordinates   ON hotel_industry.hotels USING GIST (coordinates);
+CREATE INDEX IF NOT EXISTS idx_hotels_coordinates_geog ON hotel_industry.hotels USING GIST ((coordinates::geography));
 
 CREATE TRIGGER hotels_set_updated_at
   BEFORE UPDATE ON hotel_industry.hotels

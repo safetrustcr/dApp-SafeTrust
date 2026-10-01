@@ -16,3 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_reservations_wallet_address ON hotel_industry.res
 CREATE INDEX IF NOT EXISTS idx_reservations_room_id        ON hotel_industry.reservations (room_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_status          ON hotel_industry.reservations (reservation_status);
 CREATE INDEX IF NOT EXISTS idx_reservations_dates           ON hotel_industry.reservations (check_in, check_out);
+
+CREATE TRIGGER reservations_set_updated_at
+  BEFORE UPDATE ON hotel_industry.reservations
+  FOR EACH ROW EXECUTE FUNCTION hotel_industry.set_updated_at();

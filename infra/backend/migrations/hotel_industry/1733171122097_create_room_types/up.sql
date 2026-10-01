@@ -7,3 +7,7 @@ CREATE TABLE IF NOT EXISTS hotel_industry.room_types (
 );
 
 CREATE INDEX IF NOT EXISTS idx_room_types_name ON hotel_industry.room_types (name);
+
+CREATE TRIGGER room_types_set_updated_at
+  BEFORE UPDATE ON hotel_industry.room_types
+  FOR EACH ROW EXECUTE FUNCTION hotel_industry.set_updated_at();

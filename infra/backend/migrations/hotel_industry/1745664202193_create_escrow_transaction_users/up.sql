@@ -16,5 +16,9 @@ CREATE INDEX IF NOT EXISTS idx_escrow_transaction_users_transaction_id ON hotel_
 CREATE INDEX IF NOT EXISTS idx_escrow_transaction_users_user_email     ON hotel_industry.escrow_transaction_users (user_email);
 CREATE INDEX IF NOT EXISTS idx_escrow_transaction_users_funding_status ON hotel_industry.escrow_transaction_users (funding_status);
 
+CREATE TRIGGER escrow_transaction_users_set_updated_at
+  BEFORE UPDATE ON hotel_industry.escrow_transaction_users
+  FOR EACH ROW EXECUTE FUNCTION hotel_industry.set_updated_at();
+
 -- Payload sent to TrustlessWork's fund-escrow API, tracked per transaction.
 ALTER TABLE hotel_industry.escrow_transactions ADD COLUMN IF NOT EXISTS fund_payload JSONB;

@@ -27,7 +27,10 @@ select_permissions:
         - is_primary
         - created_at
         - updated_at
-      filter: {}
+      filter:
+        user:
+          firebase_uid:
+            _eq: X-Hasura-User-Id
   - role: landlord
     permission:
       columns:
@@ -38,4 +41,7 @@ select_permissions:
         - is_primary
         - created_at
         - updated_at
-      filter: {}
+      filter:
+        user:
+          firebase_uid:
+            _eq: X-Hasura-User-Id
