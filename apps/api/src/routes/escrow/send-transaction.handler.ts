@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { TransactionBuilder, Networks } from "@stellar/stellar-sdk";
 import { getPendingActionByHash, markPendingActionSubmitted } from '../../services/pending-actions.js';
-import { trustlessWorkRequest } from '../../lib/trustlesswork.js';
+import { trustlessWorkRequest } from '../../services/trustlesswork.js';
 
 export const sendTransactionHandler = async (req: Request, res: Response) => {
   try {

@@ -1,204 +1,146 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('@stellar/stellar-sdk', () => ({
+  Networks: { TESTNET: 'Test SDF Network ; September 2015' },
+  TransactionBuilder: {
+    fromXDR: vi.fn((xdr: string) => {
+      if (xdr === 'INVALID_XDR') {
+        throw new Error('Invalid XDR');
+      }
+      return {
+        hash: () => ({
+          toString: () => 'txhash123',
+        }),
+      };
+    }),
+  },
+}));
+
+vi.mock('../../../services/pending-actions.js', () => ({
+  getPendingActionByHash: vi.fn(),
+  markPendingActionSubmitted: vi.fn(),
+}));
+
 vi.mock('../../../services/trustlesswork.js', () => ({
   trustlessWorkRequest: vi.fn(),
-  extractTransactionHash: vi.fn(
-    (result: { transactionHash?: string; txHash?: string } | undefined) =>
-      result?.transactionHash ?? result?.txHash ?? undefined,
-  ),
-  TrustlessWorkRequestError: class extends Error {
-    statusCode: number;
-    messages?: string[];
-    payload?: unknown;
-    constructor(message: string, statusCode: number, messages?: string[], payload?: unknown) {
-      super(message);
-      this.statusCode = statusCode;
-      this.messages = messages;
-      this.payload = payload;
-    }
-  },
-  getErrorMessages: vi.fn((err: unknown, fallback: string) => [
-    (err as Error)?.message || fallback,
-  ]),
-}));
-
-vi.mock('../../../services/escrow-db.js', () => ({
-  assertEscrowActionAllowed: vi.fn(async () => {}),
-  dbInitializeEscrow: vi.fn(async () => {}),
-  dbFundEscrow: vi.fn(async () => {}),
-  dbMarkMilestoneCompleted: vi.fn(async () => {}),
-  dbApproveMilestone: vi.fn(async () => {}),
-  dbReleaseFunds: vi.fn(async () => {}),
-  dbDisputeEscrow: vi.fn(async () => {}),
-  dbResolveDispute: vi.fn(async () => {}),
-  getEscrowStatusByContractId: vi.fn(async () => 'created'),
-}));
-
-vi.mock('../../../services/stellar-confirm.js', () => ({
-  confirmTransactionWithRetry: vi.fn(async () => 'success'),
 }));
 
 import { sendTransactionHandler } from '../send-transaction.handler.js';
-import {
-  trustlessWorkRequest,
-  extractTransactionHash,
-} from '../../../services/trustlesswork.js';
-import {
-  assertEscrowActionAllowed,
-  dbFundEscrow,
-  dbReleaseFunds,
-} from '../../../services/escrow-db.js';
-import { confirmTransactionWithRetry } from '../../../services/stellar-confirm.js';
-import { InvalidTransitionError, ConcurrentTransitionError } from '../../../domain/escrow-state.js';
-import { HasuraRequestError } from '../../../services/hasura.js';
+import { getPendingActionByHash, markPendingActionSubmitted } from '../../../services/pending-actions.js';
+import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
 import { mockReq, mockRes } from './helpers.js';
 
-const FUND_BODY = {
-  signedXdr: 'SIGNED_XDR',
-  action: 'fund' as const,
-  contractId: 'CA1',
-  engagementId: 'eng-1',
-  amount: 100,
-};
-
-const RELEASE_BODY = {
-  signedXdr: 'SIGNED_XDR',
-  action: 'release_funds' as const,
-  contractId: 'CA1',
-  engagementId: 'eng-1',
-  releaseSigner: 'GRELEASER',
-};
-
-describe('sendTransactionHandler transition guards', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('returns 409 before any Trustless Work call when the transition is invalid', async () => {
-    vi.mocked(assertEscrowActionAllowed).mockImplementation(async () => {
-      throw new InvalidTransitionError('completed', 'funded', 'fund');
-    });
-
-    const res = mockRes();
-    const returned = await sendTransactionHandler(mockReq(FUND_BODY) as never, res as never);
-
-    expect(res._status).toBe(409);
-    expect(res._body).toEqual({
-      error: 'invalid escrow transition completed -> funded',
-      from: 'completed',
-      to: 'funded',
-    });
-    expect(trustlessWorkRequest).not.toHaveBeenCalled();
-    expect(dbFundEscrow).not.toHaveBeenCalled();
-    expect((returned as unknown as typeof res)._status).toBe(409);
+describe('sendTransactionHandler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('submits and persists a valid fund transition', async () => {
-    vi.mocked(assertEscrowActionAllowed).mockResolvedValue(undefined);
-    vi.mocked(trustlessWorkRequest).mockResolvedValue({
-      status: 'SUCCESS',
-      message: 'funded',
-      contractId: 'CA1',
-      transactionHash: 'hash-1',
-    } as never);
-    vi.mocked(extractTransactionHash).mockReturnValue('hash-1');
-    vi.mocked(confirmTransactionWithRetry).mockResolvedValue('success' as never);
-
+  it('rejects missing or invalid signedXdr with 400', async () => {
     const res = mockRes();
-    await sendTransactionHandler(mockReq(FUND_BODY) as never, res as never);
-
-    expect(trustlessWorkRequest).toHaveBeenCalledTimes(1);
-    expect(dbFundEscrow).toHaveBeenCalledWith('CA1', 100, 'eng-1', 'hash-1');
-    expect(res._status).toBe(200);
-    expect(res._body).toMatchObject({ status: 'SUCCESS', contractId: 'CA1' });
-  });
-
-  it('returns 409 when the conditional update loses a concurrent race', async () => {
-    vi.mocked(assertEscrowActionAllowed).mockResolvedValue(undefined);
-    vi.mocked(trustlessWorkRequest).mockResolvedValue({
-      status: 'SUCCESS',
-      message: 'released',
-      contractId: 'CA1',
-      transactionHash: 'hash-2',
-    } as never);
-    vi.mocked(extractTransactionHash).mockReturnValue('hash-2');
-    vi.mocked(dbReleaseFunds).mockImplementation(async () => {
-      throw new ConcurrentTransitionError('milestone_approved', 'completed');
-    });
-
-    const res = mockRes();
-    await sendTransactionHandler(mockReq(RELEASE_BODY) as never, res as never);
-
-    expect(res._status).toBe(409);
-    expect(res._body).toMatchObject({
-      error: 'Escrow changed. Refresh and retry',
-      from: 'milestone_approved',
-      to: 'completed',
-    });
-  });
-
-  it('returns 409 for a unique violation (duplicate transition rolled back atomically)', async () => {
-    vi.mocked(assertEscrowActionAllowed).mockResolvedValue(undefined);
-    vi.mocked(trustlessWorkRequest).mockResolvedValue({
-      status: 'SUCCESS',
-      message: 'funded',
-      contractId: 'CA1',
-      transactionHash: 'hash-3',
-    } as never);
-    vi.mocked(extractTransactionHash).mockReturnValue('hash-3');
-    vi.mocked(dbFundEscrow).mockImplementation(async () => {
-      throw new HasuraRequestError('duplicate key value violates unique constraint', [
-        {
-          message:
-            'duplicate key value violates unique constraint "escrow_transactions_engagement_action_key"',
-          extensions: { code: 'unique_violation' },
-        },
-      ]);
-    });
-
-    const res = mockRes();
-    await sendTransactionHandler(mockReq(FUND_BODY) as never, res as never);
-
-    expect(res._status).toBe(409);
-    expect(res._body).toEqual({ error: 'Escrow changed. Refresh and retry' });
-  });
-
-  it('lets exactly one of two concurrent identical transitions succeed', async () => {
-    vi.mocked(assertEscrowActionAllowed).mockResolvedValue(undefined);
-    vi.mocked(trustlessWorkRequest).mockResolvedValue({
-      status: 'SUCCESS',
-      message: 'released',
-      contractId: 'CA1',
-      transactionHash: 'hash-4',
-    } as never);
-    vi.mocked(extractTransactionHash).mockReturnValue('hash-4');
-
-    let released = false;
-    vi.mocked(dbReleaseFunds).mockImplementation(async () => {
-      if (released) throw new ConcurrentTransitionError('milestone_approved', 'completed');
-      released = true;
-    });
-
-    const resOne = mockRes();
-    const resTwo = mockRes();
-    await Promise.all([
-      sendTransactionHandler(mockReq(RELEASE_BODY) as never, resOne as never),
-      sendTransactionHandler(mockReq(RELEASE_BODY) as never, resTwo as never),
-    ]);
-
-    const statuses = [resOne._status, resTwo._status].sort();
-    expect(statuses).toEqual([200, 409]);
-    const conflict = resOne._status === 409 ? resOne : resTwo;
-    expect(conflict._body).toMatchObject({ error: 'Escrow changed. Refresh and retry' });
-  });
-
-  it('rejects an unknown action with 400 without pre-validating', async () => {
-    const res = mockRes();
-    await sendTransactionHandler(
-      mockReq({ ...FUND_BODY, action: 'self_destruct' }) as never,
-      res as never,
-    );
+    await sendTransactionHandler(mockReq({}) as never, res as never);
 
     expect(res._status).toBe(400);
-    expect(assertEscrowActionAllowed).not.toHaveBeenCalled();
+    expect(res._body).toEqual({ error: 'Missing or invalid signedXdr' });
+  });
+
+  it('returns 500 when XDR parsing fails', async () => {
+    const res = mockRes();
+    await sendTransactionHandler(mockReq({ signedXdr: 'INVALID_XDR' }) as never, res as never);
+
+    expect(res._status).toBe(500);
+    expect(res._body).toEqual({ error: 'Internal server error submitting transaction.' });
+  });
+
+  it('returns 404 when transaction is not in pending actions', async () => {
+    vi.mocked(getPendingActionByHash).mockResolvedValue(null);
+
+    const res = mockRes();
+    await sendTransactionHandler(mockReq({ signedXdr: 'VALID_XDR' }) as never, res as never);
+
+    expect(res._status).toBe(404);
+    expect(res._body).toEqual({ error: 'Unknown transaction. Build it through SafeTrust first.' });
+  });
+
+  it('returns 403 when transaction was built for another user', async () => {
+    vi.mocked(getPendingActionByHash).mockResolvedValue({
+      id: 'p-1',
+      built_for_uid: 'user-a',
+      status: 'built',
+      expires_at: new Date(Date.now() + 60000).toISOString(),
+    } as never);
+
+    const res = mockRes();
+    const req = mockReq({ signedXdr: 'VALID_XDR' });
+    req.user = { uid: 'user-b' };
+
+    await sendTransactionHandler(req as never, res as never);
+
+    expect(res._status).toBe(403);
+    expect(res._body).toEqual({ error: 'This transaction was built for another user.' });
+  });
+
+  it('returns 200 idempotent replay when already submitted', async () => {
+    vi.mocked(getPendingActionByHash).mockResolvedValue({
+      id: 'p-1',
+      built_for_uid: 'uid-1',
+      status: 'submitted',
+      expires_at: new Date(Date.now() + 60000).toISOString(),
+    } as never);
+
+    const res = mockRes();
+    const req = mockReq({ signedXdr: 'VALID_XDR' });
+    req.user = { uid: 'uid-1' };
+
+    await sendTransactionHandler(req as never, res as never);
+
+    expect(res._status).toBe(200);
+    expect(res._body).toEqual({ txHash: 'txhash123', status: 'submitted' });
     expect(trustlessWorkRequest).not.toHaveBeenCalled();
+  });
+
+  it('returns 410 when transaction has expired', async () => {
+    vi.mocked(getPendingActionByHash).mockResolvedValue({
+      id: 'p-1',
+      built_for_uid: 'uid-1',
+      status: 'built',
+      expires_at: new Date(Date.now() - 60000).toISOString(),
+    } as never);
+
+    const res = mockRes();
+    const req = mockReq({ signedXdr: 'VALID_XDR' });
+    req.user = { uid: 'uid-1' };
+
+    await sendTransactionHandler(req as never, res as never);
+
+    expect(res._status).toBe(410);
+    expect(res._body).toEqual({ error: 'Transaction expired. Build it again.' });
+  });
+
+  it('submits valid transaction to Trustless Work and marks action submitted', async () => {
+    vi.mocked(getPendingActionByHash).mockResolvedValue({
+      id: 'p-1',
+      built_for_uid: 'uid-1',
+      status: 'built',
+      expires_at: new Date(Date.now() + 60000).toISOString(),
+    } as never);
+    vi.mocked(trustlessWorkRequest).mockResolvedValue({ status: 'SUCCESS', message: 'ok' });
+
+    const res = mockRes();
+    const req = mockReq({ signedXdr: 'VALID_XDR' });
+    req.user = { uid: 'uid-1' };
+
+    await sendTransactionHandler(req as never, res as never);
+
+    expect(trustlessWorkRequest).toHaveBeenCalledWith('/helper/send-transaction', {
+      method: 'POST',
+      body: { signedXdr: 'VALID_XDR' },
+    });
+    expect(markPendingActionSubmitted).toHaveBeenCalledWith('p-1');
+    expect(res._status).toBe(200);
+    expect(res._body).toEqual({
+      txHash: 'txhash123',
+      status: 'submitted',
+      twResult: { status: 'SUCCESS', message: 'ok' },
+    });
   });
 });
