@@ -23,6 +23,12 @@ importers:
 
   apps/api:
     dependencies:
+      '@safetrust/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.1.0
       axios:
         specifier: ^1.18.0
         version: 1.19.0
@@ -266,6 +272,9 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@20.19.43)(jiti@2.7.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(tsx@4.23.12)(yaml@2.9.0)
 
 packages:
 
