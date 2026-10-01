@@ -14,7 +14,6 @@
     "test:integration": "vitest run tests/integration.test.ts"
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^15.1.0",
     "axios": "^1.20.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

@@ -23,6 +23,21 @@ vi.mock('../../../services/pending-actions.js', () => ({
 
 vi.mock('../../../services/trustlesswork.js', () => ({
   trustlessWorkRequest: vi.fn(),
+  extractTransactionHash: vi.fn(),
+  getErrorMessages: vi.fn((err: unknown, fallback: string) => [
+    (err as Error)?.message || fallback,
+  ]),
+  TrustlessWorkRequestError: class extends Error {
+    statusCode: number;
+    messages?: string[];
+    payload?: unknown;
+    constructor(message: string, statusCode: number, messages?: string[], payload?: unknown) {
+      super(message);
+      this.statusCode = statusCode;
+      this.messages = messages;
+      this.payload = payload;
+    }
+  },
 }));
 
 import { sendTransactionHandler } from '../send-transaction.handler.js';
@@ -48,7 +63,7 @@ describe('sendTransactionHandler', () => {
     await sendTransactionHandler(mockReq({ signedXdr: 'INVALID_XDR' }) as never, res as never);
 
     expect(res._status).toBe(500);
-    expect(res._body).toEqual({ error: 'Internal server error submitting transaction.' });
+    expect(res._body).toEqual({ error: 'Invalid XDR', messages: ['Invalid XDR'] });
   });
 
   it('returns 404 when transaction is not in pending actions', async () => {
