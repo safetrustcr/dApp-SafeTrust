@@ -18,6 +18,7 @@ import messagesRouter from './routes/messages/send.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
+import hotelsRouter from './routes/hotels/hotels.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
 import { requestId, notFound, errorMiddleware } from './http/error-middleware.js';
@@ -69,8 +70,8 @@ app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);
 
-// Messages routes (router registered when available)
-app.use('/api/messages', messagesRouter);
+// Hotel routes
+app.use('/api/hotels', hotelsRouter);
 
 app.use(notFound);        // after all routes
 app.use(errorMiddleware); // last

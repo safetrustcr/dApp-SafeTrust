@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
-import { trustlessWorkRequest } from '../../services/trustlesswork.js';
-import { ApiError } from '../../http/api-error.js';
+import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
+import { guardEscrowAction, sendConflict } from './transition-guard.js';
 import { asyncHandler } from '../../http/async-handler.js';
 
 type FundRequestBody = {
@@ -41,23 +41,48 @@ export const fundEscrowHandler = asyncHandler(async (
     });
   }
 
-  const result = await trustlessWorkRequest<FundEscrowTWResponse>(
-    '/escrow/single-release/fund-escrow',
-    {
-      method: 'POST',
-      body: { contractId, signer, amount },
-    },
-  );
+  try {
+    const conflict = await guardEscrowAction(res, 'fund', contractId);
+    if (conflict) return conflict;
 
-  const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
-  if (!unsignedXdr) {
-    throw new ApiError(502, 'TRUSTLESS_WORK_EMPTY_RESPONSE', 'Unable to build the fund transaction.', { retryable: true });
+    const result = await trustlessWorkRequest<FundEscrowTWResponse>(
+      '/escrow/single-release/fund-escrow',
+      {
+        method: 'POST',
+        body: { contractId, signer, amount },
+      },
+    );
+
+    const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
+    if (!unsignedXdr) {
+      return res.status(502).json({
+        error: 'TrustlessWork fund request returned no unsigned transaction.',
+        payload: result,
+      });
+    }
+
+    return res.status(200).json({
+      unsignedXdr,
+      txHash: result.txHash ?? '',
+      contractId,
+      engagementId,
+    });
+  } catch (error) {
+    const conflict = sendConflict(res, error);
+    if (conflict) return conflict;
+
+    if (error instanceof TrustlessWorkRequestError) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        messages: error.messages,
+        payload: error.payload,
+      });
+    }
+
+    const messages = getErrorMessages(error, 'Failed to build fund transaction.');
+    return res.status(500).json({
+      error: messages[0],
+      messages,
+    });
   }
-
-  return res.status(200).json({
-    unsignedXdr,
-    txHash: result.txHash ?? '',
-    contractId,
-    engagementId,
-  });
 });

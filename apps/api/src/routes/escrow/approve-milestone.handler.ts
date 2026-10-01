@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
-import { trustlessWorkRequest } from '../../services/trustlesswork.js';
-import { ApiError } from '../../http/api-error.js';
+import { TrustlessWorkRequestError, getErrorMessages, trustlessWorkRequest } from '../../services/trustlesswork.js';
+import { guardEscrowAction, sendConflict } from './transition-guard.js';
 import { asyncHandler } from '../../http/async-handler.js';
 
 type ApproveMilestoneBody = {
@@ -23,18 +23,29 @@ export const approveMilestoneHandler = asyncHandler(async (
     return res.status(400).json({ error: 'milestoneIndex must be a non-negative integer.' });
   }
 
-  const result = await trustlessWorkRequest<{ unsignedXdr?: string; unsignedTransaction?: string; txHash?: string }>(
-    '/escrow/single-release/approve-milestone',
-    {
-      method: 'POST',
-      body: { contractId, approver, milestoneIndex: String(milestoneIndex) },
-    },
-  );
+  try {
+    const conflict = await guardEscrowAction(res, 'approve_milestone', contractId);
+    if (conflict) return conflict;
 
-  const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
-  if (!unsignedXdr) {
-    throw new ApiError(502, 'TRUSTLESS_WORK_EMPTY_RESPONSE', 'Unable to build the milestone approval transaction.', { retryable: true });
+    const result = await trustlessWorkRequest<{ unsignedXdr?: string; unsignedTransaction?: string; txHash?: string }>(
+      '/escrow/single-release/approve-milestone',
+      {
+        method: 'POST',
+        body: { contractId, approver, milestoneIndex: String(milestoneIndex) },
+      },
+    );
+    const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
+    if (!unsignedXdr) {
+      return res.status(502).json({ error: 'Trustless Work returned no unsigned transaction.', payload: result });
+    }
+    return res.status(200).json({ unsignedXdr, txHash: result.txHash ?? '', contractId, engagementId });
+  } catch (error) {
+    const conflict = sendConflict(res, error);
+    if (conflict) return conflict;
+
+    if (error instanceof TrustlessWorkRequestError) {
+      return res.status(error.statusCode).json({ error: error.message, messages: error.messages, payload: error.payload });
+    }
+    return res.status(500).json({ error: getErrorMessages(error, 'Failed to build milestone approval transaction.')[0] });
   }
-
-  return res.status(200).json({ unsignedXdr, txHash: result.txHash ?? '', contractId, engagementId });
 });

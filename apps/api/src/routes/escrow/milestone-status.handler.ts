@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
-import { trustlessWorkRequest } from '../../services/trustlesswork.js';
-import { ApiError } from '../../http/api-error.js';
+import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
+import { guardEscrowAction, sendConflict } from './transition-guard.js';
 import { asyncHandler } from '../../http/async-handler.js';
 
 type MilestoneStatusRequestBody = {
@@ -53,33 +53,58 @@ export const milestoneStatusHandler = asyncHandler(async (
     });
   }
 
-  const result = await trustlessWorkRequest<ChangeMilestoneStatusTWResponse>(
-    '/escrow/single-release/change-milestone-status',
-    {
-      method: 'POST',
-      body: {
-        contractId,
-        serviceProvider,
-        milestoneIndex: String(resolvedIndex),
-        newStatus: resolvedStatus,
-        newEvidence: newEvidence ?? '',
+  try {
+    const conflict = await guardEscrowAction(res, 'mark_milestone_completed', contractId);
+    if (conflict) return conflict;
+
+    const result = await trustlessWorkRequest<ChangeMilestoneStatusTWResponse>(
+      '/escrow/single-release/change-milestone-status',
+      {
+        method: 'POST',
+        body: {
+          contractId,
+          serviceProvider,
+          milestoneIndex: String(resolvedIndex),
+          newStatus: resolvedStatus,
+          newEvidence: newEvidence ?? '',
+        },
       },
-    },
-  );
+    );
 
-  const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
-  if (!unsignedXdr) {
-    throw new ApiError(502, 'TRUSTLESS_WORK_EMPTY_RESPONSE', 'Unable to build the milestone status transaction.', { retryable: true });
+    const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
+    if (!unsignedXdr) {
+      return res.status(502).json({
+        error: 'TrustlessWork milestone-status request returned no unsigned transaction.',
+        payload: result,
+      });
+    }
+
+    return res.status(200).json({
+      unsignedXdr,
+      txHash: result.txHash ?? '',
+      contractId,
+      engagementId,
+      // A service-provider completion is not tenant approval. The aggregate
+      // escrow moves to milestone_approved only after approve-milestone is
+      // signed by the approver and submitted.
+      status: 'funded',
+    });
+  } catch (error) {
+    const conflict = sendConflict(res, error);
+    if (conflict) return conflict;
+
+    if (error instanceof TrustlessWorkRequestError) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        messages: error.messages,
+        payload: error.payload,
+      });
+    }
+
+    const messages = getErrorMessages(error, 'Failed to build milestone status transaction.');
+    return res.status(500).json({
+      error: messages[0],
+      messages,
+    });
   }
-
-  return res.status(200).json({
-    unsignedXdr,
-    txHash: result.txHash ?? '',
-    contractId,
-    engagementId,
-    // A service-provider completion is not tenant approval. The aggregate
-    // escrow moves to milestone_approved only after approve-milestone is
-    // signed by the approver and submitted.
-    status: 'funded',
-  });
 });
