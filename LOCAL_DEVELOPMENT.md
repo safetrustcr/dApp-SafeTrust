@@ -208,7 +208,7 @@ All backend infrastructure runs as Docker containers defined in `infra/backend/d
 |---|---|---|---|
 | PostgreSQL | `postgres` | `5433` (host) → `5432` (container) | Primary database (PostGIS 15) |
 | Hasura GraphQL Engine | `graphql-engine` | `8080` | GraphQL API, migrations, console |
-| Webhook service | `safetrust-webhook` | `3000` | Hasura event trigger handler |
+| API (Express) | `safetrust-api` | `3002` | Hasura event trigger handler + write authority (escrow/auth) |
 
 **Hasura Console** is available at [http://localhost:8080/console](http://localhost:8080/console) once containers are running. Use the admin secret defined in `infra/backend/.env` to log in.
 
