@@ -58,3 +58,41 @@ export const GET_HOTEL_ESCROW_TRANSACTIONS = gql`
     }
   }
 `;
+
+export const GET_HOTELS = gql`
+  query GetHotels($limit: Int, $offset: Int, $where: hotels_bool_exp) {
+    hotels(limit: $limit, offset: $offset, where: $where, order_by: { created_at: desc }) {
+      id
+      name
+      address
+      description
+      location_area
+      coordinates
+      created_at
+      updated_at
+      owner_user_id
+    }
+    hotels_aggregate(where: $where) {
+      aggregate {
+        count
+      }
+    }
+  }
+`;
+
+export const GET_HOTEL_BY_ID = gql`
+  query GetHotelById($id: uuid!) {
+    hotels_by_pk(id: $id) {
+      id
+      name
+      address
+      description
+      location_area
+      coordinates
+      created_at
+      updated_at
+      owner_user_id
+    }
+  }
+`;
+
