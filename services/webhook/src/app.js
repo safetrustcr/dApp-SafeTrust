@@ -12,7 +12,8 @@ app.use(cors({
   origin: [
     'http://localhost:3001',  // Next.js frontend dev
     'http://localhost:3000',  // same origin fallback
-  ],
+    process.env.FRONTEND_URL,
+  ].filter(Boolean),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,

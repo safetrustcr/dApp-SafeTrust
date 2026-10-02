@@ -7,9 +7,7 @@ const AUTH_ROUTES = ["/login", "/register"];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const token =
-    request.cookies.get("firebase-token")?.value ||
-    request.cookies.get("auth-token")?.value;
+  const token = request.cookies.get("firebase-token")?.value;
 
   const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
     pathname.startsWith(route)

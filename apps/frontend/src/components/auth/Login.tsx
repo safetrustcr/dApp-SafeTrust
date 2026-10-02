@@ -12,13 +12,13 @@ import Illustration from "@/components/auth/ui/Illustration";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithCustomToken, signInWithEmailAndPassword } from "firebase/auth";
 import { FirebaseError } from "firebase/app";
 import { auth } from "@/lib/firebase";
+import { getWalletKit } from "./wallet/constants/wallet-kit.constant";
 import { useMultiWallet } from "./wallet/hooks/multi-wallet.hook";
 import { MainWalletSelectionModal } from "./wallet/components/MainWalletSelectionModal";
 import { WalletSelectionModal } from "./wallet/components/WalletSelectionModal";
-import { MetaMaskWalletModal } from "./wallet/components/MetaMaskWalletModal";
 import { toast } from "sonner";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -30,18 +30,15 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function LoginPage() {
-  const { address, token } = useGlobalAuthenticationStore();
+  const { token } = useGlobalAuthenticationStore();
   const {
     handleConnect,
     isMainModalOpen,
     isStellarModalOpen,
-    isMetaMaskModalOpen,
     closeMainModal,
     closeStellarModal,
-    closeMetaMaskModal,
     handleWalletTypeSelected,
     handleStellarWalletSelected,
-    handleMetaMaskSelected,
   } = useMultiWallet();
 
   const router = useRouter();
@@ -53,10 +50,93 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if ((address || token) && pathname === "/login") {
+    if (token && pathname === "/login") {
       router.push("/dashboard/escrow-dashboard");
     }
-  }, [address, token, router, pathname]);
+  }, [token, router, pathname]);
+
+  const authenticateStellarWallet = async (
+    address: string,
+    walletName: string
+  ) => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("Server configuration error — please contact support");
+      }
+      const apiBaseUrl = backendUrl.replace(/\/+$/, "");
+
+      const challengeResponse = await fetch(
+        `${apiBaseUrl}/api/auth/wallet/challenge`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address }),
+        }
+      );
+      const challenge: {
+        error?: string;
+        transaction?: string;
+        networkPassphrase?: string;
+      } = await challengeResponse.json();
+
+      if (!challengeResponse.ok) {
+        throw new Error(challenge.error || "Unable to start wallet authentication");
+      }
+      if (!challenge.transaction || !challenge.networkPassphrase) {
+        throw new Error("The server returned an invalid wallet challenge");
+      }
+
+      const { signedTxXdr } = await getWalletKit().signTransaction(
+        challenge.transaction,
+        {
+          address,
+          networkPassphrase: challenge.networkPassphrase,
+        }
+      );
+
+      const verifyResponse = await fetch(
+        `${apiBaseUrl}/api/auth/wallet/verify`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ signedTransaction: signedTxXdr }),
+        }
+      );
+      const verification: { error?: string; customToken?: string } =
+        await verifyResponse.json();
+
+      if (!verifyResponse.ok) {
+        throw new Error(verification.error || "Wallet signature could not be verified");
+      }
+      if (!verification.customToken) {
+        throw new Error("The server did not return a Firebase session");
+      }
+
+      const credential = await signInWithCustomToken(auth, verification.customToken);
+      const idToken = await credential.user.getIdToken();
+      useGlobalAuthenticationStore.getState().setToken(idToken);
+      useGlobalAuthenticationStore.getState().connectWalletStore(address, walletName);
+
+      toast.success("Wallet login successful!", {
+        description: "Redirecting to your dashboard...",
+      });
+      router.push("/dashboard/escrow-dashboard");
+    } catch (cause: unknown) {
+      const message =
+        cause instanceof Error
+          ? cause.message
+          : "Wallet login failed — please try again";
+      setError(message);
+      toast.error(message, { duration: 4000 });
+      throw cause;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,9 +261,10 @@ export default function LoginPage() {
               variant="outline"
               className="w-full bg-black text-white"
               onClick={handleConnect}
+              disabled={isLoading}
             >
               <Wallet className="mr-2 h-4 w-4" />
-              Login with wallet
+              {isLoading ? "Authenticating wallet..." : "Login with wallet"}
             </Button>
           </div>
 
@@ -202,16 +283,14 @@ export default function LoginPage() {
         isOpen={isMainModalOpen}
         onClose={closeMainModal}
         onWalletTypeSelected={handleWalletTypeSelected}
+        stellarOnly
       />
       <WalletSelectionModal
         isOpen={isStellarModalOpen}
         onClose={closeStellarModal}
-        onWalletSelected={handleStellarWalletSelected}
-      />
-      <MetaMaskWalletModal
-        isOpen={isMetaMaskModalOpen}
-        onClose={closeMetaMaskModal}
-        onWalletConnected={handleMetaMaskSelected}
+        onWalletSelected={(wallet) =>
+          handleStellarWalletSelected(wallet, authenticateStellarWallet)
+        }
       />
     </div>
   );

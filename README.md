@@ -122,7 +122,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_HASURA_GRAPHQL_URL=http://localhost:8080/v1/graphql
 NEXT_PUBLIC_HASURA_WS_URL=ws://localhost:8080/v1/graphql
 
-# Backend webhook (auth sync)
+# Backend webhook (auth sync and SEP-10 wallet authentication)
 NEXT_PUBLIC_BACKEND_URL=http://localhost:3000
 ```
 
@@ -147,12 +147,26 @@ FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=           # ends in iam.gserviceaccount.com — not a personal Gmail
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 
+# SEP-10 wallet authentication. Keep the signing seed private and do not commit it.
+SEP10_SIGNING_SEED=               # Stellar secret seed for the SEP-10 server signing account
+SEP10_HOME_DOMAIN=                 # SafeTrust home domain, e.g. safetrust.example
+SEP10_WEB_AUTH_DOMAIN=             # domain serving the wallet-auth endpoint
+STELLAR_NETWORK=TESTNET            # TESTNET or PUBLIC; must match the wallet network
+STELLAR_HORIZON_URL=               # optional; defaults to Horizon for STELLAR_NETWORK
+FRONTEND_URL=http://localhost:3001 # allowed browser origin for the webhook
+
 # Webhook
 HASURA_EVENT_SECRET=dev-event-secret-local
 WEBHOOK_URL=http://safetrust-webhook:3000
 ```
 
 > ⚠️ `FIREBASE_PRIVATE_KEY` must use literal `\n` for newlines. Wrap the value in double quotes exactly as shown above.
+
+The `SEP10_SIGNING_SEED` must belong to a dedicated Stellar server account. Configure
+the home and web-auth domains to match the deployed application and authentication
+endpoint. The public challenge endpoint returns a short-lived SEP-10 transaction;
+the verification endpoint checks its signatures against the account's Horizon
+signers and threshold before issuing a Firebase custom token.
 
 ### Start the backend
 
