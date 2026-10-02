@@ -51,6 +51,16 @@ for TENANT in "${TENANTS[@]}"; do
     exit 1
   fi
 
+  TABLE_COUNT=$(PGPASSWORD="$POSTGRES_PASSWORD" psql \
+    --host="$POSTGRES_HOST" --port="$POSTGRES_PORT" --username="$POSTGRES_USER" \
+    --dbname="$POSTGRES_DB" --tuples-only --no-align \
+    --command="SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema');")
+  if [[ "${TABLE_COUNT//[[:space:]]/}" != "0" ]]; then
+    echo "❌  Refusing init snapshot deployment: database is not empty."
+    echo "    Use the canonical migration path for an existing database."
+    exit 1
+  fi
+
   # Count migration headers — || true prevents set -e aborting on grep exit 1
   MIGRATION_COUNT=$(grep -c "^-- ── Migration:" "$INIT_SQL" || true)
   echo "▶  Deploying $TENANT ($MIGRATION_COUNT migrations)..."
@@ -66,6 +76,12 @@ for TENANT in "${TENANTS[@]}"; do
     --dbname="$POSTGRES_DB" \
     --set=ON_ERROR_STOP=on \
     -f "$INIT_SQL"
+
+  if command -v hasura &>/dev/null && [[ "${HASURA_SKIP_MIGRATION_MARK:-0}" != "1" ]]; then
+    hasura migrate apply --endpoint "${HASURA_ENDPOINT:-http://localhost:8080}" \
+      --admin-secret "${HASURA_ADMIN_SECRET:-myadminsecretkey}" \
+      --database-name "$TENANT" --skip-execution
+  fi
 
   TENANT_ELAPSED=$((SECONDS - TENANT_START))
   echo "✅  $TENANT deployed in ${TENANT_ELAPSED}s"
