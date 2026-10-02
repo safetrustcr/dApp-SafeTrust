@@ -1,0 +1,42 @@
+INSERT INTO public.users (
+    id,
+    email,
+    first_name,
+    last_name,
+    phone_number,
+    country_code,
+    location,
+    last_seen
+)
+VALUES
+    (
+        'demo-tenant-uid-001',
+        'john_s@gmail.com',
+        'John',
+        'Smith',
+        '88001122',
+        '+506',
+        'San José, Costa Rica',
+        NOW()
+    ),
+    (
+        'demo-owner-uid-002',
+        'albertoCasas100@gmail.com',
+        'Alberto',
+        'Casas',
+        '88003344',
+        '+506',
+        'Escazú, Costa Rica',
+        NOW()
+    ),
+    (
+        'demo-admin-uid-003',
+        'admin@safetrust.local',
+        'Ada',
+        'Admin',
+        '88005566',
+        '+506',
+        'San José, Costa Rica',
+        NOW()
+    )
+ON CONFLICT (id) DO NOTHING;

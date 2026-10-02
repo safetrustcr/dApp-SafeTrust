@@ -1,0 +1,2 @@
+*.sh text eol=lf
+bin/start text eol=lf

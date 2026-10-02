@@ -6,6 +6,7 @@ import { getWalletKit } from '../constants/wallet-kit.constant';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Image } from '@/components/ui/image';
 import { 
   X, 
   CheckCircle, 
@@ -24,6 +25,8 @@ interface WalletSelectionModalProps {
 interface WalletInfo extends ISupportedWallet {
   isInstalled: boolean;
 }
+
+
 
 export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
   isOpen,
@@ -211,13 +214,12 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
               {selectedWallet && !selectedWallet.isInstalled ? (
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
-                    <img 
-                      src={selectedWallet.icon} 
+                    <Image 
+                      src={selectedWallet.icon || 'https://stellar.creit.tech/wallet-icons/default.png'} 
                       alt={selectedWallet.name}
-                      className="w-12 h-12 rounded-lg"
-                      onError={(e) => {
-                        e.currentTarget.src = 'https://stellar.creit.tech/wallet-icons/default.png';
-                      }}
+                      width={48}
+                      height={48}
+                      className="w-12 h-12 rounded-lg object-contain"
                     />
                     <div>
                       <h3 className="text-lg font-semibold">{selectedWallet.name}</h3>
@@ -253,9 +255,11 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="text-center">
-                        <img 
+                        <Image 
                           src={getQRCodeUrl(selectedWallet)} 
                           alt={`QR code for ${selectedWallet.name}`}
+                          width={150}
+                          height={150}
                           className="mx-auto mb-3 border rounded-lg"
                         />
                         <p className="text-sm text-gray-600">
@@ -302,13 +306,12 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
                       <CardContent className="!p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <img 
-                              src={wallet.icon} 
+                            <Image 
+                              src={wallet.icon || 'https://stellar.creit.tech/wallet-icons/default.png'} 
                               alt={wallet.name}
-                              className="w-8 h-8 rounded-lg"
-                              onError={(e) => {
-                                e.currentTarget.src = 'https://stellar.creit.tech/wallet-icons/default.png';
-                              }}
+                              width={32}
+                              height={32}
+                              className="w-8 h-8 rounded-lg object-contain"
                             />
                             <div>
                               <h3 className="font-semibold">{wallet.name}</h3>

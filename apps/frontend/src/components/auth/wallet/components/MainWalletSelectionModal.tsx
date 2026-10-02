@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { X } from "lucide-react";
@@ -40,6 +41,7 @@ export const MainWalletSelectionModal: React.FC<
   MainWalletSelectionModalProps
 > = ({ isOpen, onClose, onWalletTypeSelected, stellarOnly = false }) => {
   const [showWalletConnectModal, setShowWalletConnectModal] = useState(false);
+  const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
   if (!isOpen) return null;
 
@@ -50,8 +52,6 @@ export const MainWalletSelectionModal: React.FC<
   const closeWalletConnectModal = () => {
     setShowWalletConnectModal(false);
   };
-
-
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -83,6 +83,10 @@ export const MainWalletSelectionModal: React.FC<
                 }
               };
 
+              const iconSrc = imgErrors[option.id]
+                ? "/img/logo.png"
+                : option.icon;
+
               return (
                 <Card
                   key={option.id}
@@ -92,12 +96,17 @@ export const MainWalletSelectionModal: React.FC<
                   <CardContent className="!p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <img
-                          src={option.icon}
+                        <Image
+                          src={iconSrc}
                           alt={option.name}
-                          className="w-8 h-8 rounded-lg"
-                          onError={(e) => {
-                            e.currentTarget.src = "/img/logo.png";
+                          width={32}
+                          height={32}
+                          className="rounded-lg object-contain"
+                          onError={() => {
+                            setImgErrors((prev) => ({
+                              ...prev,
+                              [option.id]: true,
+                            }));
                           }}
                         />
                         <div>
@@ -121,15 +130,17 @@ export const MainWalletSelectionModal: React.FC<
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b">
               <h2 className="text-xl font-semibold">Connect WalletConnect</h2>
-              <Button variant="ghost" size="sm" onClick={closeWalletConnectModal}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={closeWalletConnectModal}
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
 
             <div className="p-6 space-y-4">
               <WalletConnectURI />
-              
-              
             </div>
           </div>
         </div>

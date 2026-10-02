@@ -74,10 +74,16 @@ export default function RentListingPage() {
           minPrice={minPrice}
           maxPrice={maxPrice}
           onCategoryToggle={(category) =>
-            setSelectedCategories((current) => toggleFilterValue(current, category))
+            setSelectedCategories(
+              (current) =>
+                toggleFilterValue(current as HotelCategory[], category) as HotelCategory[],
+            )
           }
           onLocationToggle={(location) =>
-            setSelectedLocations((current) => toggleFilterValue(current, location))
+            setSelectedLocations(
+              (current) =>
+                toggleFilterValue(current as HotelLocation[], location) as HotelLocation[],
+            )
           }
           onMinPriceChange={setMinPrice}
           onMaxPriceChange={setMaxPrice}

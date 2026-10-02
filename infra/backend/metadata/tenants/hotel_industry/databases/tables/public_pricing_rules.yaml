@@ -1,0 +1,42 @@
+table:
+  name: pricing_rules
+  schema: hotel_industry
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - rule_name
+        - rule_type
+        - currency
+        - base_amount
+        - percentage
+        - min_amount
+        - max_amount
+        - room_type
+        - season
+        - advance_booking_days
+        - priority
+        - is_active
+        - created_at
+        - updated_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - rule_name
+        - rule_type
+        - currency
+        - base_amount
+        - percentage
+        - min_amount
+        - max_amount
+        - room_type
+        - season
+        - advance_booking_days
+        - priority
+        - is_active
+        - created_at
+        - updated_at
+      filter: {}

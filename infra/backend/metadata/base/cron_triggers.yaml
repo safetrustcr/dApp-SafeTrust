@@ -1,0 +1,16 @@
+- name: reconciliation_sync_escrows
+  webhook: "{{WEBHOOK_URL}}/reconciliation/sync-escrows"
+  schedule: "*/2 * * * *"
+  include_in_metadata: true
+  payload: {}
+  headers:
+    - name: x-reconciliation-secret
+      value_from_env: RECONCILIATION_SECRET
+  retry_conf:
+    num_retries: 3
+    timeout_seconds: 60
+    tolerance_seconds: 21600
+    retry_interval_seconds: 10
+  comment: >
+    Confirm submitted Stellar transactions and reconcile escrow drift every
+    2 minutes. The cron request is authenticated with x-reconciliation-secret.

@@ -118,7 +118,11 @@ export const GET_ESCROW_BY_ID = gql`
           email
           phone_number
           country_code
-          user_wallets(where: { is_primary: { _eq: true } }, limit: 1) {
+          user_wallets(
+            where: { is_primary: { _eq: true } }
+            order_by: [{ updated_at: desc }, { id: asc }]
+            limit: 1
+          ) {
             wallet_address
           }
         }
@@ -175,11 +179,49 @@ export const GET_ESCROW_BY_ANY_ID = gql`
           email
           phone_number
           country_code
-          user_wallets(where: { is_primary: { _eq: true } }, limit: 1) {
+          user_wallets(
+            where: { is_primary: { _eq: true } }
+            order_by: [{ updated_at: desc }, { id: asc }]
+            limit: 1
+          ) {
             wallet_address
           }
         }
       }
+    }
+    trustlessWorkEscrows: trustlessWorkEscrows(
+      where: { contractId: { _eq: $contract_id } }
+      limit: 1
+    ) {
+      approver
+      marker
+      releaser
+      resolver
+      milestones {
+        milestoneId
+        status
+      }
+    }
+  }
+`;
+
+export const GET_ESCROW_ANALYTICS = gql`
+  query GetEscrowAnalytics(
+    $start_date: date!
+    $end_date: date!
+    $tenant_id: String!
+  ) {
+    getEscrowAnalyticsByDay(
+      args: {
+        p_start_date: $start_date
+        p_end_date: $end_date
+        p_tenant_id: $tenant_id
+      }
+    ) {
+      day
+      page_views
+      clicks
+      users
     }
   }
 `;
@@ -227,5 +269,3 @@ export const GET_ESCROW_DASHBOARD_STATS = gql`
     }
   }
 `;
-
-

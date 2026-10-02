@@ -43,3 +43,4 @@ coverage/
 
 # Vercel
 .vercel
+mcp/.env

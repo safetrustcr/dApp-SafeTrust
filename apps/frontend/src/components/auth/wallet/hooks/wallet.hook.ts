@@ -9,11 +9,15 @@ import { useState, useCallback } from "react";
 import { useMultiWallet } from "./useMultiWallet";
 import { WalletInfo } from "../types/wallet.types";
 import { signTransaction } from "@stellar/freighter-api";
+import { usePollarWallet } from "@/components/auth/pollar/PollarProvider";
 
 export const useWallet = () => {
   const router = useRouter();
   const { connectWalletStore, disconnectWalletStore, address, name } =
     useGlobalAuthenticationStore();
+  const { address: pollarAddress } = usePollarWallet();
+  const resolvedAddress = address || pollarAddress || "";
+  const resolvedName = address ? name : pollarAddress ? "Pollar" : name;
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -88,7 +92,11 @@ export const useWallet = () => {
   const signXDR = async (unsignedXDR: string, networkPassphrase?: string): Promise<string> => {
     try {
       if (!address) {
-        throw new Error("No wallet connected");
+        throw new Error(
+          pollarAddress
+            ? "Pollar can provision the guest G-address. TrustlessWork XDR signing still uses Freighter until Pollar exposes sign-only XDR."
+            : "No wallet connected",
+        );
       }
 
       const { signedTxXdr } = await signTransaction(unsignedXDR, {
@@ -110,8 +118,8 @@ export const useWallet = () => {
     handleConnect,
     handleDisconnect,
     signXDR,
-    address,
-    name,
+    address: resolvedAddress,
+    name: resolvedName,
     error,
     isModalOpen,
     handleWalletSelected,

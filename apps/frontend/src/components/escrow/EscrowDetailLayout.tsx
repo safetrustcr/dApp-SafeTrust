@@ -29,9 +29,9 @@ export function EscrowDetailLayout({
     <>
       <InvoiceHeader invoiceNumber={invoiceNumber} status={status} paidAt={paidAt} />
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_20rem] max-w-5xl mx-auto">
+      <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(14rem,0.9fr)] max-w-5xl mx-auto">
         <main>{children}</main>
-        <aside className="grid gap-4">
+        <aside className="grid content-start gap-4 pt-4 lg:px-3">
           <NotesPanel notes={notes} defaultNotes={defaultNotes} onNotesChange={onNotesChange} />
           <ProcessStepper status={status} />
         </aside>

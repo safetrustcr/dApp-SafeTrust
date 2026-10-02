@@ -22,49 +22,26 @@
 
 SafeTrust is a decentralized P2P escrow platform for rental transactions. Funds are held in tamper-proof smart contracts on the **Stellar network** via the **[TrustlessWork API](https://docs.trustlesswork.com)** — no intermediaries, full on-chain transparency.
 
-### Use Cases
+**Use cases:** rental deposits, service agreements, P2P property rentals.
 
-- **Rental deposits** — A tenant pays a security deposit. Funds are locked on-chain until the rental period ends; released to the owner on fulfillment or returned on dispute resolution.
-- **Service agreements** — A client and provider agree on milestones. Funds release per milestone as each is approved, with a neutral dispute resolver as backstop.
-- **P2P property rentals** — Owner lists a property; tenant submits a bid; on acceptance, escrow is deployed automatically via Freighter wallet signing.
-
-### Core Flow
+**Core flow:**
 
 ```
-Tenant finds property → clicks PAY → connects Freighter wallet
-→ SafeTrust calls POST /deployer/single-release (TrustlessWork API)
-→ API returns unsigned XDR → Freighter signs it
-→ POST /helper/send-transaction broadcasts to Stellar
-→ funds locked on-chain until release conditions are met
+Tenant finds property → PAY → Freighter signs XDR → funds locked on-chain
+→ released on fulfillment or returned on dispute
 ```
 
 ---
 
 ## Architecture
-
 ```
-┌─────────────────────────────────────────┐
-│         Stellar Blockchain              │
-│       (TrustlessWork API)               │
-└───────────────┬─────────────────────────┘
-                │ signed XDR
-┌───────────────▼─────────────────────────┐
-│    services/webhook  (Node + Express)   │
-│    Firebase Auth sync · escrow deploy   │
-│    Container: safetrust-webhook         │
-└───────────────┬─────────────────────────┘
-                │ SQL
-┌───────────────▼─────────────────────────┐
-│    infra/hasura  (Hasura GraphQL)       │
-│    Auto-generated API · JWT auth        │
-│    Port 8080                            │
-└───────────────┬─────────────────────────┘
-                │ GraphQL
-┌───────────────▼─────────────────────────┐
-│    apps/frontend  (Next.js 14)          │
-│    Apollo Client · Firebase · Freighter │
-│    Port 3001                            │
-└─────────────────────────────────────────┘
+Stellar Blockchain (TrustlessWork API)
+│ signed XDR
+apps/api (Node + Express, port 3002)
+│ SQL
+infra/backend (Hasura GraphQL, port 8080)
+│ GraphQL
+apps/frontend (Next.js 14, port 3001)
 ```
 
 ---
@@ -73,7 +50,7 @@ Tenant finds property → clicks PAY → connects Freighter wallet
 
 ### Prerequisites
 
-| Tool | Version |
+| Tool | Min version |
 |---|---|
 | Docker + Docker Compose | latest |
 | Node.js | ≥ 18 |
@@ -84,167 +61,150 @@ Tenant finds property → clicks PAY → connects Freighter wallet
 npm install -g pnpm hasura-cli
 ```
 
+### Makefile shortcuts
+
+From the repo root, common workflows are also available via `make`:
+
+```bash
+make help   # list targets
+make full   # start Docker infra + api/web dev servers
+make infra  # start Docker infra (both tenants)
+make dev    # start api + web
+make test   # run tests
+make lint   # lint all packages
+make build  # build all packages
+make stop   # stop Docker infra
+```
+
 ### 1. Clone and install
 
 ```bash
 git clone https://github.com/safetrustcr/dApp-SafeTrust.git
 cd dApp-SafeTrust
-pnpm install          # always run from repo root
+pnpm install
 ```
 
-> ⚠️ Never run `pnpm install` from inside a subdirectory — `workspace:*` deps only resolve from the root.
+> ⚠️ Always run `pnpm install` from the **repo root** — `workspace:*` deps only resolve from there.
 
 ---
 
-## Firebase Setup
+### 2. Set up environment variables
 
-SafeTrust uses Firebase for user authentication. You need a Firebase project before running the app.
-
-### Create a Firebase project
-
-1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a new project.
-2. Under **Authentication → Sign-in method**, enable **Email/Password**.
-3. Under **Project Settings → General → Your apps**, register a **Web app** and copy the config values.
-4. Under **Project Settings → Service Accounts**, click **Generate new private key** and download the JSON file. You'll need the `project_id`, `client_email`, and `private_key` fields from it.
-
-### Frontend environment — `apps/frontend/.env.local`
-
+**Step 1 — Frontend:**
 ```bash
-# From Firebase Console → Project Settings → General → Your apps
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
-NEXT_PUBLIC_FIREBASE_APP_ID=
-
-# Hasura GraphQL endpoint
-NEXT_PUBLIC_HASURA_GRAPHQL_URL=http://localhost:8080/v1/graphql
-NEXT_PUBLIC_HASURA_WS_URL=ws://localhost:8080/v1/graphql
-
-# Backend webhook (auth sync and SEP-10 wallet authentication)
-NEXT_PUBLIC_BACKEND_URL=http://localhost:3000
+cp apps/frontend/.env.example apps/frontend/.env.local
 ```
+
+**Step 2 — Hasura / Backend:**
+```bash
+cp infra/backend/.env.example infra/backend/.env.local
+```
+
+Fill in both files before continuing. See the sections below for how to obtain each value.
 
 ---
 
-## Backend Setup (Hasura + Docker)
+### 3. Firebase setup
 
-### Environment — `infra/hasura/.env`
+SafeTrust uses Firebase for authentication.
 
-```bash
-# PostgreSQL
-POSTGRES_PASSWORD=postgrespassword
-
-# Hasura admin secret (choose any string)
-HASURA_GRAPHQL_ADMIN_SECRET=myadminsecretkey
-
-# Firebase JWT verification — replace YOUR_FIREBASE_PROJECT_ID with your actual project ID
-HASURA_GRAPHQL_JWT_SECRET='{"type":"RS256","jwk_url":"https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com","audience":"YOUR_FIREBASE_PROJECT_ID","issuer":"https://securetoken.google.com/YOUR_FIREBASE_PROJECT_ID"}'
-
-# Firebase Admin SDK — from the service account JSON you downloaded
-FIREBASE_PROJECT_ID=
-FIREBASE_CLIENT_EMAIL=           # ends in iam.gserviceaccount.com — not a personal Gmail
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-
-# SEP-10 wallet authentication. Keep the signing seed private and do not commit it.
-SEP10_SIGNING_SEED=               # Stellar secret seed for the SEP-10 server signing account
-SEP10_HOME_DOMAIN=                 # SafeTrust home domain, e.g. safetrust.example
-SEP10_WEB_AUTH_DOMAIN=             # domain serving the wallet-auth endpoint
-STELLAR_NETWORK=TESTNET            # TESTNET or PUBLIC; must match the wallet network
-STELLAR_HORIZON_URL=               # optional; defaults to Horizon for STELLAR_NETWORK
-FRONTEND_URL=http://localhost:3001 # allowed browser origin for the webhook
-
-# Webhook
-HASURA_EVENT_SECRET=dev-event-secret-local
-WEBHOOK_URL=http://safetrust-webhook:3000
-```
-
-> ⚠️ `FIREBASE_PRIVATE_KEY` must use literal `\n` for newlines. Wrap the value in double quotes exactly as shown above.
-
-The `SEP10_SIGNING_SEED` must belong to a dedicated Stellar server account. Configure
-the home and web-auth domains to match the deployed application and authentication
-endpoint. The public challenge endpoint returns a short-lived SEP-10 transaction;
-the verification endpoint checks its signatures against the account's Horizon
-signers and threshold before issuing a Firebase custom token.
-
-### Start the backend
-
-```bash
-cd infra/hasura
-bin/dc_prep
-```
-
-`bin/dc_prep` runs in order: starts containers → waits for Hasura health → applies migrations → reloads metadata → applies seeds. Takes ~30 s on first run.
-
-**Verify it's working:**
-
-```bash
-open http://localhost:8080/console          # Hasura console
-curl http://localhost:3000/health           # webhook: { "status": "ok" }
-```
-
-### Reset the database
-
-```bash
-cd infra/hasura
-docker compose down -v    # removes volumes
-bin/dc_prep               # fresh start
-```
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) → create a project.
+2. **Authentication → Sign-in method** → enable **Email/Password**.
+3. **Project Settings → Your apps** → register a Web app → copy the config values into `apps/frontend/.env.local`.
+4. **Project Settings → Service Accounts** → Generate new private key → copy `project_id`, `client_email`, `private_key` into `infra/backend/.env.local`.
 
 ---
 
-## Run the Frontend
+### 4. TrustlessWork API key
 
-From the **repo root**, in a separate terminal:
+Required for escrow deploy, fund, and release flows.
+
+1. Go to [dapp.trustlesswork.com](https://dapp.trustlesswork.com) → connect **Freighter wallet**.
+2. **Settings → Profile** → fill in the use-case field (required).
+3. **Settings → API Keys** → Request API Key → select **Testnet**.
+4. Copy the key immediately — shown only once.
+
+Add to `apps/frontend/.env.local`:
+```dotenv
+TRUSTLESS_WORK_API_KEY=<your_testnet_key>
+TRUSTLESS_WORK_API_URL=https://dev.api.trustlesswork.com
+```
+
+Full guide: [docs.trustlesswork.com → Request API Key](https://docs.trustlesswork.com/trustless-work/introduction/developer-resources/request-api-key)
+
+---
+
+### 5. Start the backend
+
+```bash
+cd infra/backend
+bin/start
+```
+
+`bin/start` runs in order: starts Docker containers → waits for Hasura health → applies migrations → reloads metadata → applies seeds. Takes ~30 s on first run.
+
+**Reset the database:**
+```bash
+docker compose down -v
+bin/start
+```
+
+### SEP-10 wallet authentication
+
+Wallet login uses the public challenge and verification endpoints served by
+`apps/api`. Configure these values in `infra/backend/.env.local`:
+
+```dotenv
+SEP10_SIGNING_SEED=                 # Dedicated Stellar server-account secret seed
+SEP10_HOME_DOMAIN=                  # SafeTrust home domain
+SEP10_WEB_AUTH_DOMAIN=              # Domain configured for the wallet-auth endpoint
+STELLAR_NETWORK=TESTNET             # TESTNET or PUBLIC; match the wallet network
+STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+FRONTEND_URL=http://localhost:3001
+```
+
+Keep the signing seed private. The API returns a short-lived SEP-10 challenge
+and checks signatures against the account's Horizon signer weights and threshold
+before issuing a Firebase custom token. The frontend backend URL is
+`NEXT_PUBLIC_BACKEND_URL=http://localhost:3002` in `apps/frontend/.env.local`.
+
+---
+
+### 6. Run the frontend
+
+From the **repo root** in a separate terminal:
 
 ```bash
 pnpm run dev
 ```
 
-Turborepo starts `apps/frontend` (port 3001) and `apps/api` (port 3000) in parallel.
+Starts both `apps/frontend` (port 3001) and `apps/api` (port 3002) via Turborepo.
 
-| URL | What you see |
-|---|---|
-| `http://localhost:3001` | Redirects to `/login` |
-| `http://localhost:3001/login` | Login form with wallet options |
-| `http://localhost:3001/register` | Register form |
-| `http://localhost:8080/console` | Hasura console |
+---
 
-### Generate GraphQL types (optional)
+### 7. Generate GraphQL types (optional)
 
-Requires Hasura to be running:
+Requires Hasura running:
 
 ```bash
 pnpm --filter @safetrust/web run codegen
 ```
 
-- Writes typed Apollo hooks to `packages/graphql/generated/index.ts`. Not required for auth flow, but needed for escrow queries.
+Writes typed Apollo hooks to `packages/graphql/generated/index.ts`.
 
 ---
 
-## TrustlessWork Escrow Integration - EaaS
-> ⚠️ **Not an implementation step** — this section describes the TrustlessWork API for reference only.
+## TrustlessWork Escrow Flow
 
-SafeTrust deploys and funds escrow contracts via the [TrustlessWork API](https://docs.trustlesswork.com/trustless-work). All calls require an `x-api-key` header and return an **unsigned XDR transaction** that must be signed by Freighter Wallet before being broadcast to Stellar.
+> Reference only — not an implementation step.
 
-### EaaS flow 
+All TrustlessWork calls return an **unsigned XDR** that Freighter must sign before broadcast.
 
+```bash
+Deploy: POST /deployer/single-release → XDR → sign → POST /helper/send-transaction
+Fund: POST /escrow/single-release/v2/fund → XDR → sign → POST /helper/send-transaction
+Release: POST /escrow/single-release/v2/release-funds → XDR → sign → POST /helper/send-transaction
 ```
-POST /deployer/single-release   → returns unsignedTransaction (XDR)
-           Wallet signs the XDR
-           POST /helper/send-transaction  → broadcasts to Stellar (escrow deployed)
-```
-- [trustlesswork-initialize-escrow](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/initialize-escrow)
-
-```
-POST /escrow/single-release/fund-escrow → returns unsignedTransaction (XDR)
-           Wallet signs the XDR
-           POST /helper/send-transaction  → broadcasts to Stellar (escrow funded)
-```
-- [trustlesswork-fund-escrow](https://docs.trustlesswork.com/trustless-work/api-rest/deploy/fund-escrow)
-
----
 
 Full API reference: [docs.trustlesswork.com](https://docs.trustlesswork.com)
 
@@ -252,39 +212,31 @@ Full API reference: [docs.trustlesswork.com](https://docs.trustlesswork.com)
 
 ## Contributing
 
-Before opening a PR:
-
 1. Run `pnpm run dev` — both apps must start without errors.
-2. `/login` and `/register` must compile clean.
-3. No `console.log` in production paths, no unexplained `any` or `@ts-ignore`.
-4. Link the issue your PR closes.
+2. No `console.log` in production paths, no unexplained `any` or `@ts-ignore`.
+3. Link the issue your PR closes.
 
 **Branch naming:** `feat/<issue-number>-short-description` · `fix/<issue-number>-short-description`
-
-**Stub convention** — if your issue depends on a package another contributor is building, stub it rather than blocking:
-
-```tsx
-// TODO: wire in Batch 2 — @/core/store/data
-const useGlobalAuthenticationStore = () => ({ address: null, setToken: () => {} });
-```
 
 - [Contributing Guide](https://github.com/safetrustcr/Frontend/issues/34)
 - [Git Guidelines](https://github.com/safetrustcr/Frontend/issues/35)
 
+### AI-native development (optional)
+
+`mcp.json` at the repo root connects Cursor and Claude Code to:
+
+- TrustlessWork docs and live escrow tools
+- Stellar Raven — Stellar ecosystem docs + live data
+- `safetrust` — SafeTrust's own MCP server ([`mcp/`](./mcp)): escrow tools, live Hasura
+  queries and architecture context. Build it first with
+  `pnpm --filter @safetrust/mcp build`, then restart the editor.
+
+Cursor picks up `mcp.json` automatically.
+For `stellar-raven`: run `/mcp` → Authenticate → sign in in browser.
+No API keys required for any server.
+
 ---
 
-## Related Repositories
+## License
 
-| Repository | Purpose |
-|---|---|
-| [frontend-SafeTrust](https://github.com/safetrustcr/frontend-SafeTrust) | Full Next.js frontend (source for `apps/frontend` slices) |
-| [backend-SafeTrust](https://github.com/safetrustcr/backend-SafeTrust) | Full Hasura backend (source for migrations and seeds) |
-| [landing-SafeTrust](https://github.com/safetrustcr/landing-SafeTrust) | Marketing landing page |
-
----
-
-<div align="center">
-
-Built with 🔐 by the [SafeTrust](https://github.com/safetrustcr) team · [safetrustcr.vercel.app](https://safetrustcr.vercel.app)
-
-</div>
+© 2026 SafeTrust. Released under the [MIT License](https://opensource.org/license/MIT).

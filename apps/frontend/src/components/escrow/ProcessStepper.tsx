@@ -53,10 +53,8 @@ export function ProcessStepper({ currentStep, status }: ProcessStepperProps) {
   return (
     <div
       style={{
-        border: '1px solid #fed7aa',
-        borderRadius: '1rem',
-        backgroundColor: '#ffffff',
-        padding: '1.25rem',
+        borderTop: '1px solid #d4d4d4',
+        padding: '1.25rem 0 0',
       }}
     >
       <style>{`
@@ -69,7 +67,7 @@ export function ProcessStepper({ currentStep, status }: ProcessStepperProps) {
           .process-stepper-active { animation: none !important; }
         }
       `}</style>
-      <h3 style={{ marginTop: 0, marginBottom: '1.25rem', fontSize: '1rem' }}>Process</h3>
+      <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '0.85rem' }}>Process</h3>
       <div style={{ display: 'grid', gap: '0.25rem' }}>
         {STEPS.map(({ step, title, description, Icon }, index) => {
           const isActive = step === activeStep;
@@ -97,8 +95,8 @@ export function ProcessStepper({ currentStep, status }: ProcessStepperProps) {
                   className={isActive ? 'process-stepper-active' : undefined}
                   style={{
                     ...markerStyle,
-                    width: MARKER_SIZE,
-                    height: MARKER_SIZE,
+                    width: '1.4rem',
+                    height: '1.4rem',
                     borderRadius: '999px',
                     display: 'flex',
                     alignItems: 'center',
@@ -111,9 +109,9 @@ export function ProcessStepper({ currentStep, status }: ProcessStepperProps) {
                   aria-current={isActive ? 'step' : undefined}
                 >
                   {isComplete ? (
-                    <Check size={18} strokeWidth={2.5} aria-hidden />
+                    <Check size={12} strokeWidth={2.5} aria-hidden />
                   ) : (
-                    <Icon size={18} strokeWidth={2} aria-hidden />
+                    <Icon size={12} strokeWidth={2} aria-hidden />
                   )}
                 </div>
                 {!isLast && (
@@ -129,17 +127,18 @@ export function ProcessStepper({ currentStep, status }: ProcessStepperProps) {
               </div>
 
               {/* Step text */}
-              <div style={{ paddingBottom: isLast ? 0 : '0.9rem' }}>
+              <div style={{ paddingBottom: isLast ? 0 : '0.75rem' }}>
                 <p
                   style={{
                     margin: 0,
                     fontWeight: isActive ? 700 : 600,
                     color: isActive ? '#111827' : '#374151',
+                    fontSize: '0.78rem',
                   }}
                 >
                   {title}
                 </p>
-                <p style={{ margin: '0.2rem 0 0', color: '#6b7280', fontSize: '0.8rem' }}>
+                <p style={{ margin: '0.15rem 0 0', color: '#6b7280', fontSize: '0.68rem', lineHeight: 1.35 }}>
                   {description}
                 </p>
               </div>

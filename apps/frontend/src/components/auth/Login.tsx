@@ -51,7 +51,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (token && pathname === "/login") {
-      router.push("/dashboard/escrow-dashboard");
+      router.push("/dashboard");
     }
   }, [token, router, pathname]);
 
@@ -124,7 +124,7 @@ export default function LoginPage() {
       toast.success("Wallet login successful!", {
         description: "Redirecting to your dashboard...",
       });
-      router.push("/dashboard/escrow-dashboard");
+      router.push("/dashboard");
     } catch (cause: unknown) {
       const message =
         cause instanceof Error
@@ -153,7 +153,7 @@ export default function LoginPage() {
       toast.success("Login successful!", {
         description: "Redirecting to your dashboard...",
       });
-      router.push("/dashboard/escrow-dashboard");
+      router.push("/dashboard");
     } catch (err: unknown) {
       if (err instanceof FirebaseError) {
         toast.error(

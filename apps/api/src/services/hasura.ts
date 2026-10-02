@@ -1,0 +1,212 @@
+const HASURA_URL = process.env.HASURA_GRAPHQL_URL ?? 'http://localhost:8080/v1/graphql';
+
+type HasuraGraphQLError = {
+  message: string;
+  extensions?: {
+    code?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
+export class HasuraRequestError extends Error {
+  constructor(message: string, readonly details?: HasuraGraphQLError[]) {
+    super(message);
+    this.name = 'HasuraRequestError';
+  }
+}
+
+export function isEscrowTransitionError(error: unknown): boolean {
+  if (!(error instanceof HasuraRequestError)) {
+    return false;
+  }
+
+  const messages = error.details?.map((detail) => detail.message ?? '').join(' ') ?? error.message;
+  const codes = error.details?.map((detail) => detail.extensions?.code).filter(Boolean) ?? [];
+
+  return codes.includes('check_violation') || messages.toLowerCase().includes('invalid escrow transition');
+}
+
+export function isEscrowChangedError(error: unknown): boolean {
+  if (error instanceof Error && error.message === 'Escrow changed. Refresh and retry') {
+    return true;
+  }
+
+  if (!(error instanceof HasuraRequestError)) {
+    return false;
+  }
+
+  const detailMessage = error.details?.some((detail) => {
+    const message = detail.message?.toLowerCase() ?? '';
+    return message.includes('affected_rows') || message.includes('escrow changed');
+  });
+
+  return Boolean(detailMessage);
+}
+
+/**
+ * True when Hasura reported a Postgres unique_violation — on the escrow paths
+ * this means a duplicate transition or a replayed transaction hash raced past
+ * the conditional updates, so the whole mutation rolled back atomically.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof HasuraRequestError)) {
+    return false;
+  }
+  return Boolean(error.details?.some((detail) => detail.extensions?.code === 'unique_violation'));
+}
+
+/**
+ * Executes a GraphQL operation against Hasura with the admin secret.
+ * Server-side only — the admin secret must never reach the browser.
+ */
+export async function hasuraRequest<T>(
+  query: string,
+  variables: Record<string, unknown> = {},
+): Promise<T> {
+  const adminSecret = process.env.HASURA_ADMIN_SECRET;
+  if (!adminSecret) {
+    throw new HasuraRequestError('Missing required env var: HASURA_ADMIN_SECRET');
+  }
+
+  const response = await fetch(HASURA_URL, {
+    method: 'POST',
+    signal: AbortSignal.timeout(15_000),
+    headers: {
+      'Content-Type': 'application/json',
+      'x-hasura-admin-secret': adminSecret,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  const text = await response.text();
+  let json: { data?: T; errors?: HasuraGraphQLError[] };
+  try {
+    json = (text ? JSON.parse(text) : {}) as { data?: T; errors?: HasuraGraphQLError[] };
+  } catch {
+    if (!response.ok) {
+      throw new HasuraRequestError(`Hasura request failed with status ${response.status} (non-JSON response)`);
+    }
+    json = {} as { data?: T; errors?: HasuraGraphQLError[] };
+  }
+
+  if (!response.ok) {
+    const message =
+      json.errors?.map((e) => e.message).join(', ') ??
+      `Hasura request failed (${response.status})`;
+    throw new HasuraRequestError(message, json.errors);
+  }
+
+  if (json.errors?.length) {
+    throw new HasuraRequestError(json.errors.map((e) => e.message).join(', '), json.errors);
+  }
+
+  if (!json.data) {
+    throw new HasuraRequestError('Hasura response missing data');
+  }
+
+  return json.data;
+}
+
+type InsertEscrowInput = {
+  contractId: string;
+  engagementId: string;
+  propertyId: string;
+  senderAddress: string;
+  receiverAddress: string;
+  amount: number;
+  status: string;
+};
+
+type InsertEscrowResult = {
+  insert_escrows_one: { id: string };
+};
+
+export async function insertEscrowRecord(input: InsertEscrowInput): Promise<InsertEscrowResult> {
+  return hasuraRequest<InsertEscrowResult>(
+    `mutation InsertEscrow(
+      $contract_id: String!
+      $engagement_id: String!
+      $property_id: uuid!
+      $sender_address: String!
+      $receiver_address: String!
+      $amount: numeric!
+      $status: String!
+    ) {
+      insert_escrows_one(object: {
+        contract_id: $contract_id
+        engagement_id: $engagement_id
+        property_id: $property_id
+        sender_address: $sender_address
+        receiver_address: $receiver_address
+        amount: $amount
+        status: $status
+      }) {
+        id
+      }
+    }`,
+    {
+      contract_id: input.contractId,
+      engagement_id: input.engagementId,
+      property_id: input.propertyId,
+      sender_address: input.senderAddress,
+      receiver_address: input.receiverAddress,
+      amount: input.amount,
+      status: input.status,
+    },
+  );
+}
+
+type EscrowAmountLookupResult = {
+  escrows: { amount: number }[];
+};
+
+export async function getEscrowAmountByContractId(contractId: string): Promise<number | null> {
+  const data = await hasuraRequest<EscrowAmountLookupResult>(
+    `query GetEscrowAmount($contract_id: String!) {
+      escrows(where: { contract_id: { _eq: $contract_id } }, limit: 1) {
+        amount
+      }
+    }`,
+    { contract_id: contractId },
+  );
+  return data.escrows[0]?.amount ?? null;
+}
+
+type UpdateEscrowStatusResult = {
+  update_escrows: { affected_rows: number };
+};
+
+export async function updateEscrowStatus(
+  engagementId: string,
+  status: string,
+): Promise<UpdateEscrowStatusResult> {
+  return hasuraRequest<UpdateEscrowStatusResult>(
+    `mutation UpdateEscrowStatus($engagement_id: String!, $status: String!) {
+      update_escrows(
+        where: { engagement_id: { _eq: $engagement_id } }
+        _set: { status: $status }
+      ) {
+        affected_rows
+      }
+    }`,
+    { engagement_id: engagementId, status },
+  );
+}
+
+export async function updateEscrowStatusByContractId(
+  contractId: string,
+  status: string,
+): Promise<UpdateEscrowStatusResult> {
+  return hasuraRequest<UpdateEscrowStatusResult>(
+    `mutation UpdateEscrowStatusByContractId($contract_id: String!, $status: String!) {
+      update_escrows(
+        where: { contract_id: { _eq: $contract_id } }
+        _set: { status: $status }
+      ) {
+        affected_rows
+      }
+    }`,
+    { contract_id: contractId, status },
+  );
+}

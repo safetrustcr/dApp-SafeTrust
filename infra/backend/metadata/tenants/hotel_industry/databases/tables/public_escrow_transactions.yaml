@@ -1,0 +1,48 @@
+table:
+  name: escrow_transactions
+  schema: public
+object_relationships:
+  - name: reservation
+    using:
+      foreign_key_constraint_on: reservation_id
+  - name: users
+    using:
+      foreign_key_constraint_on:
+        table:
+          name: escrow_transaction_users
+          schema: public
+        columns:
+          - escrow_transaction_id
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - reservation_id
+        - contract_id
+        - escrow_status
+        - signer_address
+        - transaction_type
+        - escrow_transaction_type
+        - http_status_code
+        - escrow_payload
+        - fund_payload
+        - created_at
+        - updated_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - reservation_id
+        - contract_id
+        - escrow_status
+        - signer_address
+        - transaction_type
+        - escrow_transaction_type
+        - http_status_code
+        - escrow_payload
+        - fund_payload
+        - created_at
+        - updated_at
+      filter: {}

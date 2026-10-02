@@ -13,8 +13,44 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "test:integration": {
+      "dependsOn": ["^test:integration"],
+      "env": [
+        "TRUSTLESS_WORK_API_KEY",
+        "INTEGRATION_SENDER_ADDRESS",
+        "INTEGRATION_RECEIVER_ADDRESS",
+        "INTEGRATION_APARTMENT_ID",
+        "HASURA_GRAPHQL_URL",
+        "HASURA_ADMIN_SECRET",
+        "API_URL"
+      ],
+      "cache": false
+    },
+    "test:e2e": {
+      "dependsOn": [],
+      "env": [
+        "E2E_GUEST_SECRET",
+        "E2E_HOST_SECRET",
+        "E2E_PLATFORM_SECRET",
+        "E2E_GUEST_EMAIL",
+        "E2E_HOST_EMAIL",
+        "E2E_HOST_PASSWORD",
+        "E2E_APARTMENT_ID",
+        "E2E_APARTMENT_NAME",
+        "E2E_HOST_API_TOKEN",
+        "TRUSTLESS_WORK_API_KEY",
+        "PLAYWRIGHT_BASE_URL",
+        "API_URL",
+        "NEXT_PUBLIC_E2E_WALLET"
+      ],
+      "cache": false
+    },
     "codegen": {
       "cache": false
+    },
+    "@safetrust/mcp#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
     }
   }
 }

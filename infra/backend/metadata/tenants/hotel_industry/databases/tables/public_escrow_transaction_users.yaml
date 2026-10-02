@@ -1,0 +1,36 @@
+table:
+  name: escrow_transaction_users
+  schema: public
+object_relationships:
+  - name: escrow_transaction
+    using:
+      foreign_key_constraint_on: escrow_transaction_id
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - user_email
+        - escrow_transaction_id
+        - role
+        - status
+        - is_primary
+        - funded_at
+        - funding_status
+        - created_at
+        - updated_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - user_email
+        - escrow_transaction_id
+        - role
+        - status
+        - is_primary
+        - funded_at
+        - funding_status
+        - created_at
+        - updated_at
+      filter: {}
