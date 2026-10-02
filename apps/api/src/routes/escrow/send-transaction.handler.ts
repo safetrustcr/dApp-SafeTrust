@@ -344,8 +344,8 @@ export const sendTransactionHandler = async (
       return res.status(403).json({ error: 'This transaction was built for another user.' });
     }
 
-    if (pending.status === 'submitted' || pending.status === 'confirmed') {
-      return res.status(200).json({ txHash, status: pending.status });
+    if (pending.status === "submitted" || pending.status === "confirmed") {
+      return res.status(200).json({ txHash, status: pending.status }); // idempotent replay
     }
 
     if (new Date(pending.expires_at) < new Date()) {
