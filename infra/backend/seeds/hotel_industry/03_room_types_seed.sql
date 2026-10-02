@@ -1,4 +1,4 @@
-INSERT INTO room_types (id, name, description)
+INSERT INTO hotel_industry.room_types (id, name, description)
 VALUES
 (
   'c0000000-0000-0000-0000-000000000001'::uuid,

@@ -6,6 +6,14 @@ vi.mock('../hasura.js', async (importOriginal) => {
   return { ...actual, hasuraRequest: vi.fn() };
 });
 
+vi.mock('../conversation-events.js', () => ({
+  prepareEscrowLifecycleMessage: vi.fn().mockResolvedValue(null),
+  lifecycleMessageInput: vi.fn(),
+  messageMutationFields: vi.fn(),
+  messageMutationVariable: vi.fn(),
+  ensureEscrowConversation: vi.fn(),
+}));
+
 import { hasuraRequest } from '../hasura.js';
 import {
   dbFundEscrow,

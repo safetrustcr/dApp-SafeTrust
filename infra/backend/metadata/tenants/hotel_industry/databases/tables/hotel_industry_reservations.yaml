@@ -1,16 +1,28 @@
 table:
   name: reservations
-  schema: public
+  schema: hotel_industry
+configuration:
+  custom_root_fields:
+    select: reservations
+    select_by_pk: reservations_by_pk
+    select_aggregate: reservations_aggregate
+    insert: insert_reservations
+    insert_one: insert_reservations_one
+    update: update_reservations
+    update_by_pk: update_reservations_by_pk
+    delete: delete_reservations
+    delete_by_pk: delete_reservations_by_pk
 object_relationships:
   - name: room
     using:
       foreign_key_constraint_on: room_id
+array_relationships:
   - name: escrow_transactions
     using:
       foreign_key_constraint_on:
         table:
           name: escrow_transactions
-          schema: public
+          schema: hotel_industry
         columns:
           - reservation_id
 select_permissions:
