@@ -19,7 +19,7 @@ export class ApiError extends Error {
       cause?: unknown;
     } = {},
   ) {
-    super(detail);
+    super(detail, { cause: options.cause });
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
