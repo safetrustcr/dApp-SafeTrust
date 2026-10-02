@@ -27,7 +27,7 @@ export class ApiError extends Error {
     this.retryable = options.retryable;
     this.requestId = options.requestId;
     this.problemDetails = {
-      type: `https://api.safetrust.dev/problems/${code.toLowerCase().replace('_', '-')}`,
+      type: `https://api.safetrust.dev/problems/${code.toLowerCase().replace(/_/g, '-')}`,
       title: this.getTitle(),
       status,
       detail,
