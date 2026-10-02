@@ -1,6 +1,17 @@
 table:
   name: rooms
-  schema: public
+  schema: hotel_industry
+configuration:
+  custom_root_fields:
+    select: rooms
+    select_by_pk: rooms_by_pk
+    select_aggregate: rooms_aggregate
+    insert: insert_rooms
+    insert_one: insert_rooms_one
+    update: update_rooms
+    update_by_pk: update_rooms_by_pk
+    delete: delete_rooms
+    delete_by_pk: delete_rooms_by_pk
 object_relationships:
   - name: hotel
     using:
@@ -8,12 +19,21 @@ object_relationships:
   - name: room_type
     using:
       foreign_key_constraint_on: room_type_id
+array_relationships:
   - name: images
     using:
       foreign_key_constraint_on:
         table:
           name: room_images
-          schema: public
+          schema: hotel_industry
+        columns:
+          - room_id
+  - name: reservations
+    using:
+      foreign_key_constraint_on:
+        table:
+          name: reservations
+          schema: hotel_industry
         columns:
           - room_id
 select_permissions:
@@ -26,7 +46,7 @@ select_permissions:
         - room_type_id
         - price_night
         - capacity
-        - status
+        - is_available
         - created_at
         - updated_at
       filter: {}
@@ -39,7 +59,7 @@ select_permissions:
         - room_type_id
         - price_night
         - capacity
-        - status
+        - is_available
         - created_at
         - updated_at
       filter: {}

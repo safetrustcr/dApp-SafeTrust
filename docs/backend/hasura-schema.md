@@ -37,17 +37,24 @@ schema views and table permissions.
 
 ## hotel_industry source tables
 
+Every hotel table lives in the `hotel_industry` PostgreSQL schema — there is
+no `public.hotels`. See `docs/architecture/multi-tenant.md` for the full
+root-field naming contract (some of these are exposed under a `hotel_`-
+prefixed root field to avoid colliding with safetrust's own `users` and
+`escrow_transactions` tables).
+
 | Table | Description |
 |---|---|
-| `public.hotels` | Hotel properties |
-| `public.rooms` | Rooms within hotels |
-| `public.room_types` | Room category definitions |
-| `public.room_images` | Room photo references |
-| `public.reservations` | Booking records |
-| `public.escrow_transactions` | Escrow records for hotel bookings |
-| `public.escrow_transaction_users` | User associations per escrow |
-| `public.pricing_rules` | Dynamic pricing rules |
-| `public.user_wallets` | Tenant-scoped wallet records |
+| `hotel_industry.users` | Hotel-tenant users — guests, staff, managers |
+| `hotel_industry.hotels` | Hotel properties, owned by a `hotel_industry.users` row |
+| `hotel_industry.rooms` | Rooms within hotels |
+| `hotel_industry.room_types` | Room category definitions |
+| `hotel_industry.room_images` | Room photo references |
+| `hotel_industry.reservations` | Booking records |
+| `hotel_industry.escrow_transactions` | Escrow records for hotel bookings |
+| `hotel_industry.escrow_transaction_users` | User associations per escrow |
+| `hotel_industry.pricing_rules` | Dynamic pricing rules |
+| `hotel_industry.users_wallets` | Tenant-scoped wallet records |
 
 ## Event triggers
 

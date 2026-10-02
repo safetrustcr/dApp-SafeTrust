@@ -104,7 +104,7 @@ export function useHotelDashboardData(): UseHotelDashboardDataReturn {
       (reservationsQuery.data?.reservations as HotelReservation[] | undefined) ??
       [],
     escrows:
-      (escrowsQuery.data?.escrow_transactions as
+      (escrowsQuery.data?.hotel_escrow_transactions as
         | HotelEscrowTransaction[]
         | undefined) ?? [],
     isLoading,
