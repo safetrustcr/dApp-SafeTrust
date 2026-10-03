@@ -8,11 +8,18 @@
 // Data source (when wired):
 //   Apollo query: GET_APARTMENT_BY_ID -> public.apartments (Hasura)
 
+'use client';
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
+import React from "react";
 
 import { getStubApartmentById } from "@/lib/stub-apartments";
+import { useAuthUser } from "@/components/auth/hooks/auth.hook";
+import { startConversation } from "@/lib/api/messages";
+import { toast } from "sonner";
 
 const styles = {
   page: {
@@ -89,10 +96,48 @@ export default function ApartmentDetailPage({
 }: {
   params: { id: string };
 }) {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuthUser();
+  const [isMessaging, setIsMessaging] = React.useState(false);
+
   const apartment = getStubApartmentById(params.id);
   if (!apartment) {
     notFound();
   }
+
+  const isOwner = user && apartment.owner?.id === user.uid;
+
+  const handleMessageHost = async () => {
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.href)}`);
+      return;
+    }
+
+    if (isOwner) {
+      return;
+    }
+
+    setIsMessaging(true);
+
+    try {
+      const response = await startConversation(apartment.id);
+      router.push(`/dashboard/messages/${response.conversationId}`);
+    } catch (error) {
+      console.error('Failed to start conversation:', error);
+      toast.error('Failed to start conversation', {
+        description: 'Please try again',
+        action: {
+          label: 'Retry',
+          onClick: handleMessageHost,
+        },
+      });
+    } finally {
+      setIsMessaging(false);
+    }
+  };
+
+  // Hide button while loading auth or if user owns the listing
+  const shouldShowMessageButton = !authLoading && !isOwner;
 
   return (
     <div style={styles.page}>
@@ -169,12 +214,30 @@ export default function ApartmentDetailPage({
             </p>
           </div>
 
-          <Link
-            href={`/apartment/${params.id}/escrow/create`}
-            style={styles.button}
-          >
-            BOOK
-          </Link>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Link
+              href={`/apartment/${params.id}/escrow/create`}
+              style={styles.button}
+            >
+              BOOK
+            </Link>
+            {shouldShowMessageButton && (
+              <button
+                onClick={handleMessageHost}
+                disabled={isMessaging}
+                style={{
+                  ...styles.button,
+                  backgroundColor: "#ffffff",
+                  color: "#f97316",
+                  border: "2px solid #f97316",
+                  opacity: isMessaging ? 0.5 : 1,
+                  cursor: isMessaging ? "not-allowed" : "pointer",
+                }}
+              >
+                {isMessaging ? "Loading..." : "Message host"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div

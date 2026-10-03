@@ -4,6 +4,35 @@ import {
   assertActionTransition,
   type EscrowActionName,
 } from '../domain/escrow-state.js';
+import {
+  prepareEscrowLifecycleMessage,
+  lifecycleMessageInput,
+  messageMutationFields,
+  messageMutationVariable,
+  ensureEscrowConversation,
+} from './conversation-events.js';
+
+async function prepareLifecycleMessage(params: {
+  contractId: string;
+  action: string;
+  toStatus: string;
+  txHash?: string;
+  amount?: number;
+}): Promise<{ declaration: string; field: string; message: Record<string, unknown> } | null> {
+  const prepared = await prepareEscrowLifecycleMessage(params);
+  if (!prepared) return null;
+  return {
+    declaration: messageMutationVariable(),
+    field: messageMutationFields(),
+    message: lifecycleMessageInput(prepared.conversationId, prepared.event),
+  };
+}
+
+function lifecycleArgs(
+  prepared: Awaited<ReturnType<typeof prepareLifecycleMessage>>,
+): Record<string, unknown> {
+  return prepared ? { message: prepared.message } : {};
+}
 
 type InitializeParams = {
   contractId: string;
@@ -120,7 +149,7 @@ function buildAuditLog(
   };
 }
 
-export async function dbInitializeEscrow(params: InitializeParams): Promise<void> {
+export async function dbInitializeEscrow(params: InitializeParams): Promise<{ conversationId: string; apartmentName: string } | null> {
   const existing = await hasuraRequest<EscrowIdResult>(
     `query GetEscrowByContractId($contractId: String!) {
       trustlessWorkEscrows(where: { contractId: { _eq: $contractId } }) {
@@ -181,6 +210,28 @@ export async function dbInitializeEscrow(params: InitializeParams): Promise<void
       },
     },
   );
+
+  const escrowRecord = await hasuraRequest<{
+    escrows: { id: string }[];
+  }>(
+    `query GetEscrowRecordForConversation($contractId: String!) {
+      escrows(where: { contract_id: { _eq: $contractId } }, limit: 1) { id }
+    }`,
+    { contractId: params.contractId },
+  );
+  const recordId = escrowRecord.escrows[0]?.id;
+  if (!recordId) {
+    console.warn(`[escrow/events] skipped created event: escrow record missing for ${params.contractId}`);
+    return null;
+  }
+  const conversation = await ensureEscrowConversation({
+    apartmentId: params.apartmentId,
+    senderAddress: params.senderAddress,
+    escrowId: recordId,
+  });
+  return conversation
+    ? { conversationId: conversation.id, apartmentName: conversation.apartmentName }
+    : null;
 }
 
 export async function dbFundEscrow(
@@ -189,8 +240,9 @@ export async function dbFundEscrow(
   engagementId?: string,
   txHash?: string,
 ): Promise<void> {
+  const lifecycle = await prepareLifecycleMessage({ contractId, action: 'fund', toStatus: 'funded', txHash, amount });
   const result = await hasuraRequest<UpdateResult>(
-    `mutation FundEscrow($contractId: String!, $amount: numeric!, $log: escrow_transactions_insert_input!) {
+    `mutation FundEscrow($contractId: String!, $amount: numeric!, $log: escrow_transactions_insert_input!${lifecycle ? `, ${lifecycle.declaration}` : ''}) {
       update_trustless_work_escrows(
         where: { contractId: { _eq: $contractId }, status: { _eq: "created" } }
         _set: { status: "funded", balance: $amount }
@@ -208,11 +260,13 @@ export async function dbFundEscrow(
       insert_escrow_transactions_one(object: $log) {
         id
       }
+      ${lifecycle?.field ?? ''}
     }`,
     {
       contractId,
       amount,
       log: buildAuditLog('fund', 'created', 'funded', contractId, engagementId, txHash),
+      ...lifecycleArgs(lifecycle),
     },
   );
 
@@ -230,6 +284,9 @@ export async function dbMarkMilestoneCompleted(
   txHash?: string,
 ): Promise<void> {
   const escrowId = await resolveEscrowId(contractId);
+  const lifecycle = await prepareLifecycleMessage({
+    contractId, action: 'mark_milestone_completed', toStatus: 'funded', txHash,
+  });
 
   // Pre-read: fail before writing when the milestone is not pending — a
   // 0-row root field would otherwise commit the audit log anyway.
@@ -250,7 +307,7 @@ export async function dbMarkMilestoneCompleted(
   }
 
   const result = await hasuraRequest<MilestoneUpdateResult & UpdateResult>(
-    `mutation CompleteMilestone($escrowId: uuid!, $milestoneId: String!, $log: escrow_transactions_insert_input!) {
+    `mutation CompleteMilestone($escrowId: uuid!, $milestoneId: String!, $log: escrow_transactions_insert_input!${lifecycle ? `, ${lifecycle.declaration}` : ''}) {
       update_escrowMilestones(
         where: {
           escrowId: { _eq: $escrowId }
@@ -265,11 +322,13 @@ export async function dbMarkMilestoneCompleted(
       insert_escrow_transactions_one(object: $log) {
         id
       }
+      ${lifecycle?.field ?? ''}
     }`,
     {
       escrowId,
       milestoneId,
       log: buildAuditLog('mark_milestone_completed', 'pending', 'completed', contractId, engagementId, txHash),
+      ...lifecycleArgs(lifecycle),
     },
   );
 
@@ -287,6 +346,9 @@ export async function dbApproveMilestone(
   txHash?: string,
 ): Promise<void> {
   const escrowId = await resolveEscrowId(contractId);
+  const lifecycle = await prepareLifecycleMessage({
+    contractId, action: 'approve_milestone', toStatus: 'milestone_approved', txHash,
+  });
 
   // Pre-read: a wrong-state milestone must fail BEFORE any write, because a
   // Hasura mutation commits even when a root field matches 0 rows.
@@ -306,6 +368,7 @@ export async function dbApproveMilestone(
     throw new ConcurrentTransitionError('completed', 'approved');
   }
 
+
   // Single mutation document: milestone approved + escrow flip + audit log run
   // in one Postgres transaction, so an error in any of them changes nothing.
   // The escrow flip is conditional on `funded` (the only valid `from` status),
@@ -320,6 +383,7 @@ export async function dbApproveMilestone(
       $approver: String!
       $approvedAt: timestamptz!
       $log: escrow_transactions_insert_input!
+      ${lifecycle ? `${lifecycle.declaration},` : ''}
     ) {
       update_escrowMilestones(
         where: {
@@ -353,6 +417,7 @@ export async function dbApproveMilestone(
       insert_escrow_transactions_one(object: $log) {
         id
       }
+      ${lifecycle?.field ?? ''}
     }`,
     {
       escrowId,
@@ -361,6 +426,7 @@ export async function dbApproveMilestone(
       approver,
       approvedAt: new Date().toISOString(),
       log: buildAuditLog('approve_milestone', 'funded', 'milestone_approved', contractId, engagementId, txHash),
+      ...lifecycleArgs(lifecycle),
     },
   );
 
@@ -379,6 +445,9 @@ export async function dbReleaseFunds(
   txHash?: string,
 ): Promise<void> {
   const escrowId = await resolveEscrowId(contractId);
+  const lifecycle = await prepareLifecycleMessage({
+    contractId, action: 'release_funds', toStatus: 'completed', txHash,
+  });
 
   // Pre-read: no approved milestone means the release is in the wrong state —
   // fail before writing anything (a 0-row root field would still commit).
@@ -397,7 +466,7 @@ export async function dbReleaseFunds(
   }
 
   const result = await hasuraRequest<UpdateResult>(
-    `mutation ReleaseFunds($escrowId: uuid!, $contractId: String!, $releaseSigner: String!, $releasedAt: timestamptz!, $log: escrow_transactions_insert_input!) {
+    `mutation ReleaseFunds($escrowId: uuid!, $contractId: String!, $releaseSigner: String!, $releasedAt: timestamptz!, $log: escrow_transactions_insert_input!${lifecycle ? `, ${lifecycle.declaration}` : ''}) {
       update_escrowMilestones(
         where: {
           escrowId: { _eq: $escrowId }
@@ -429,6 +498,7 @@ export async function dbReleaseFunds(
       insert_escrow_transactions_one(object: $log) {
         id
       }
+      ${lifecycle?.field ?? ''}
     }`,
     {
       escrowId,
@@ -436,6 +506,7 @@ export async function dbReleaseFunds(
       releaseSigner,
       releasedAt: new Date().toISOString(),
       log: buildAuditLog('release_funds', 'milestone_approved', 'completed', contractId, engagementId, txHash),
+      ...lifecycleArgs(lifecycle),
     },
   );
 
@@ -452,8 +523,9 @@ export async function dbDisputeEscrow(
   engagementId?: string,
   txHash?: string,
 ): Promise<void> {
+  const lifecycle = await prepareLifecycleMessage({ contractId, action: 'dispute', toStatus: 'disputed', txHash });
   const result = await hasuraRequest<UpdateResult>(
-    `mutation DisputeEscrow($contractId: String!, $log: escrow_transactions_insert_input!) {
+    `mutation DisputeEscrow($contractId: String!, $log: escrow_transactions_insert_input!${lifecycle ? `, ${lifecycle.declaration}` : ''}) {
       update_trustless_work_escrows(
         where: { contractId: { _eq: $contractId }, status: { _in: ["funded", "milestone_approved"] } }
         _set: { status: "disputed" }
@@ -471,10 +543,12 @@ export async function dbDisputeEscrow(
       insert_escrow_transactions_one(object: $log) {
         id
       }
+      ${lifecycle?.field ?? ''}
     }`,
     {
       contractId,
       log: buildAuditLog('dispute', 'funded', 'disputed', contractId, engagementId, txHash),
+      ...lifecycleArgs(lifecycle),
     },
   );
 
@@ -490,8 +564,9 @@ export async function dbResolveDispute(
   engagementId?: string,
   txHash?: string,
 ): Promise<void> {
+  const lifecycle = await prepareLifecycleMessage({ contractId, action: 'resolve_dispute', toStatus: 'resolved', txHash });
   const result = await hasuraRequest<UpdateResult>(
-    `mutation ResolveDispute($contractId: String!, $log: escrow_transactions_insert_input!) {
+    `mutation ResolveDispute($contractId: String!, $log: escrow_transactions_insert_input!${lifecycle ? `, ${lifecycle.declaration}` : ''}) {
       update_trustless_work_escrows(
         where: { contractId: { _eq: $contractId }, status: { _eq: "disputed" } }
         _set: { status: "resolved", balance: 0 }
@@ -509,10 +584,12 @@ export async function dbResolveDispute(
       insert_escrow_transactions_one(object: $log) {
         id
       }
+      ${lifecycle?.field ?? ''}
     }`,
     {
       contractId,
       log: buildAuditLog('resolve_dispute', 'disputed', 'resolved', contractId, engagementId, txHash),
+      ...lifecycleArgs(lifecycle),
     },
   );
 

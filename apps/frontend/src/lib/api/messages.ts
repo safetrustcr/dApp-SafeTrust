@@ -1,8 +1,24 @@
-import { postAuthenticatedApi } from './client';
+import { postAuthenticatedApi, ApiClientError, type ApiRequestOptions } from './client';
+
+export class MessagesApiError extends ApiClientError {
+  constructor(message: string, status: number, payload: unknown) {
+    super(message, status, payload);
+    this.name = 'MessagesApiError';
+  }
+}
+
+export type StartConversationOptions = {
+  /**
+   * Idempotency-Key sent to the API. Callers that may retry the same user
+   * action generate one key per attempt and reuse it; when omitted a fresh
+   * key is generated for the request.
+   */
+  idempotencyKey?: string;
+};
 
 export type StartConversationResponse = {
   conversationId: string;
-  created: boolean;
+  created?: boolean;
 };
 
 export type MessageItem = {
@@ -25,10 +41,12 @@ export type SendMessageResponse = {
  */
 export async function startConversation(
   apartmentId: string,
+  options?: StartConversationOptions,
 ): Promise<StartConversationResponse> {
   return postAuthenticatedApi<StartConversationResponse>(
     '/api/messages/conversations',
     { apartmentId },
+    options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined,
   );
 }
 
@@ -39,11 +57,13 @@ export async function startConversation(
 export async function sendMessage(
   conversationId: string,
   body: string,
+  options?: ApiRequestOptions,
 ): Promise<SendMessageResponse> {
-  return postAuthenticatedApi<SendMessageResponse>('/api/messages/send', {
-    conversationId,
-    body,
-  });
+  return postAuthenticatedApi<SendMessageResponse>(
+    '/api/messages/send',
+    { conversationId, body },
+    options,
+  );
 }
 
 /**

@@ -1,4 +1,4 @@
-INSERT INTO escrow_transactions (
+INSERT INTO hotel_industry.escrow_transactions (
   id, reservation_id, contract_id,
   escrow_status, signer_address,
   transaction_type, escrow_transaction_type

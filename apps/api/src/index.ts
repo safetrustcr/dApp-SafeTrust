@@ -21,6 +21,7 @@ import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
 import { errorHandler } from './http/error-middleware.js';
 import hotelsRouter from './routes/hotels/hotels.route.js';
+import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
@@ -45,6 +46,8 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(tenantMiddleware);
+
+app.use('/api/auth/wallet', walletAuthRouter);
 
 // Health check
 app.get('/health', (_req, res) => {

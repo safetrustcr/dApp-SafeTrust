@@ -1,0 +1,35 @@
+table:
+  name: room_images
+  schema: hotel_industry
+configuration:
+  custom_root_fields:
+    select: room_images
+    select_by_pk: room_images_by_pk
+    select_aggregate: room_images_aggregate
+    insert: insert_room_images
+    insert_one: insert_room_images_one
+    update: update_room_images
+    update_by_pk: update_room_images_by_pk
+    delete: delete_room_images
+    delete_by_pk: delete_room_images_by_pk
+object_relationships:
+  - name: room
+    using:
+      foreign_key_constraint_on: room_id
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - room_id
+        - image_url
+        - uploaded_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - room_id
+        - image_url
+        - uploaded_at
+      filter: {}
