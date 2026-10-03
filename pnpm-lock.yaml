@@ -8,12 +8,24 @@ importers:
 
   .:
     devDependencies:
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.1.0
+      dotenv:
+        specifier: ^16.3.1
+        version: 16.6.1
       eslint:
         specifier: ^8.57.1
         version: 8.57.1
       eslint-config-next:
         specifier: 14.2.x
         version: 14.2.35(eslint@8.57.1)(typescript@5.9.3)
+      firebase-admin:
+        specifier: ^14.3.0
+        version: 14.3.0(@firebase/app-compat@0.2.43)(@firebase/app@0.10.13)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.12
       turbo:
         specifier: ^2.9.14
         version: 2.10.7
@@ -8663,7 +8675,7 @@ snapshots:
   '@graphql-tools/optimize@2.0.0(graphql@16.14.2)':
     dependencies:
       graphql: 16.14.2
-      tslib: 2.6.3
+      tslib: 2.8.1
 
   '@graphql-tools/prisma-loader@8.0.17(@types/node@20.19.43)(bufferutil@4.1.0)(crossws@0.3.5)(graphql@16.14.2)(utf-8-validate@6.0.6)':
     dependencies:
@@ -8698,7 +8710,7 @@ snapshots:
       '@ardatan/relay-compiler': 13.0.2(graphql@16.14.2)
       '@graphql-tools/utils': 11.2.2(graphql@16.14.2)
       graphql: 16.14.2
-      tslib: 2.6.3
+      tslib: 2.8.1
 
   '@graphql-tools/schema@10.0.38(graphql@16.14.2)':
     dependencies:

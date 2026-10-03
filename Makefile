@@ -4,6 +4,10 @@
 infra:
 	cd infra/backend && bin/start safetrust
 
+## testnet : Provision isolated Stellar testnet accounts and linked demo users
+testnet:
+	pnpm testnet:provision
+
 ## infra-reset : Tear down volumes and restart infra
 infra-reset:
 	cd infra/backend && docker compose down -v && bin/start safetrust
