@@ -1,6 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- Init SQL for tenant: safetrust
 -- Generated: 2026-09-29T10:38:25Z
+-- Generated: 2026-09-28T16:42:21Z
 -- Source:    infra/backend/migrations/safetrust/*/up.sql
 -- DO NOT EDIT — regenerate with: bin/generate-init-sql
 -- ════════════════════════════════════════════════════════════════════════════

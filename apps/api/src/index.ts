@@ -18,6 +18,8 @@ import messagesRouter from './routes/messages/send.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
+import hotelsRouter from './routes/hotels/hotels.route.js';
+import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
@@ -43,6 +45,8 @@ app.use(cors({
 app.use(express.json());
 app.use(tenantMiddleware);
 
+app.use('/api/auth/wallet', walletAuthRouter);
+
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', firebase: 'configured' });
@@ -67,8 +71,8 @@ app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);
 
-// Messages routes (router registered when available)
-app.use('/api/messages', messagesRouter);
+// Hotel routes
+app.use('/api/hotels', hotelsRouter);
 
 // Messages routes
 app.use('/api/messages', messagesRouter);

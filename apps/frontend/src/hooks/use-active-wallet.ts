@@ -100,6 +100,12 @@ export function useActiveWallet(): ActiveWallet {
 
   const isFreighterReady = Boolean(freighter?.address);
   const isPollarReady = Boolean(pollar?.address);
+  const activeAddress = freighter?.address ?? pollar?.address ?? null;
+  const activeWalletType: WalletType = isFreighterReady
+    ? 'freighter'
+    : isPollarReady
+      ? 'pollar'
+      : null;
 
   // ✅ useCallback must run before any early return (rules-of-hooks).
   const signAndSubmit = useCallback(

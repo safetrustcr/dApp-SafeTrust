@@ -52,9 +52,7 @@ a valid API key and a user-controlled funded wallet.
 
 1. **Configure the Trustless Work secret.** The current local API environment
    has an empty `TRUSTLESS_WORK_API_KEY`, so a live request must fail safely.
-2. **Resolve Hasura metadata inconsistency.** On the developer machine run:
-   `cd infra/backend && hasura metadata ic list --endpoint http://localhost:8080 --admin-secret "$HASURA_GRAPHQL_ADMIN_SECRET"`.
-   Fix every listed object before relying on production permissions.
+2. **Resolve Hasura metadata inconsistency.** (Resolved) `hasura metadata ic list` reports consistent metadata on a fresh start; unused `reservations` and tracked `escrow_transactions` have been correctly migrated or untracked.
 3. **Unify the two persistence projections.** `escrows` drives the apartment
    payment UI while `trustless_work_escrows` plus `escrow_milestones` drives the
    lifecycle state. Define one canonical escrow record and synchronize the

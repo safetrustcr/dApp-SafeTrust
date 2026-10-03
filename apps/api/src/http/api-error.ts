@@ -20,6 +20,7 @@ export class ApiError extends Error {
     } = {},
   ) {
     super(detail);
+    super(detail, { cause: options.cause });
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
@@ -28,6 +29,7 @@ export class ApiError extends Error {
     this.requestId = options.requestId;
     this.problemDetails = {
       type: `https://api.safetrust.dev/problems/${code.toLowerCase().replace('_', '-')}`,
+      type: `https://api.safetrust.dev/problems/${code.toLowerCase().replace(/_/g, '-')}`,
       title: this.getTitle(),
       status,
       detail,
