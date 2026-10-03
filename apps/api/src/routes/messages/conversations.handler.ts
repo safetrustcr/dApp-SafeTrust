@@ -1,99 +1,90 @@
-import { Response } from 'express';
-import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
-import { executeGraphQL } from '../../lib/hasura.js';
+import type { Response } from 'express';
+import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
+import { ApiError } from '../../http/api-error.js';
+import { asyncHandler } from '../../http/async-handler.js';
+import {
+  getApartment,
+  getConversation,
+  upsertConversation,
+  markConversationRead,
+} from '../../services/messages-db.js';
 
-type StartConversationBody = {
-  apartmentId: string;
-};
+const FORBIDDEN_FIELDS = [
+  'senderId',
+  'isAutomated',
+  'eventType',
+  'eventKey',
+  'sender_id',
+  'is_automated',
+  'event_type',
+  'event_key',
+];
 
-type StartConversationResponse = {
-  conversationId: string;
-};
+export const startConversationHandler = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { apartmentId, ...rest } = req.body ?? {};
 
-export const startConversationHandler = async (
-  req: AuthenticatedRequest & { body: StartConversationBody },
-  res: Response<StartConversationResponse | { error: string }>
-): Promise<Response> => {
-  const { uid } = req.user;
-  const { apartmentId } = req.body;
+    if (FORBIDDEN_FIELDS.some((k) => k in rest)) {
+      throw new ApiError(400, 'FORBIDDEN_FIELD', 'Message metadata is set by the server.');
+    }
 
-  if (!apartmentId) {
-    return res.status(400).json({ error: 'Missing required field: apartmentId' });
-  }
+    if (!apartmentId || typeof apartmentId !== 'string' || !apartmentId.trim()) {
+      throw new ApiError(400, 'INVALID_APARTMENT_ID', 'apartmentId is required.');
+    }
 
-  try {
-    // First, get the apartment owner (host)
-    const apartmentData = await executeGraphQL<{
-      apartments: Array<{ owner_id: string }>;
-    }>(
-      `query GetApartmentOwner($apartmentId: uuid!) {
-        apartments(where: { id: { _eq: $apartmentId }, deleted_at: { _is_null: true } }, limit: 1) {
-          owner_id
-        }
-      }`,
-      { apartmentId }
-    );
-
-    const apartment = apartmentData.apartments[0];
+    const apartment = await getApartment(apartmentId.trim());
     if (!apartment) {
-      return res.status(404).json({ error: 'Apartment not found' });
+      throw new ApiError(404, 'APARTMENT_NOT_FOUND', 'Apartment not found.');
     }
 
-    const hostId = apartment.owner_id;
-
-    // Check if conversation already exists
-    const existingConversation = await executeGraphQL<{
-      conversations: Array<{ id: string }>;
-    }>(
-      `query GetExistingConversation($guestId: String!, $hostId: String!, $apartmentId: uuid!) {
-        conversations(
-          where: {
-            guest_id: { _eq: $guestId }
-            host_id: { _eq: $hostId }
-            apartment_id: { _eq: $apartmentId }
-          }
-          limit: 1
-        ) {
-          id
-        }
-      }`,
-      { guestId: uid, hostId, apartmentId }
-    );
-
-    if (existingConversation.conversations.length > 0) {
-      // Return existing conversation
-      return res.status(200).json({
-        conversationId: existingConversation.conversations[0].id,
-      });
+    if (apartment.owner_id === req.user.uid) {
+      throw new ApiError(
+        400,
+        'CANNOT_MESSAGE_OWN_LISTING',
+        'Cannot message your own listing.',
+      );
     }
 
-    // Create new conversation
-    const newConversation = await executeGraphQL<{
-      insert_conversations_one: { id: string };
-    }>(
-      `mutation CreateConversation($guestId: String!, $hostId: String!, $apartmentId: uuid!) {
-        insert_conversations_one(
-          object: {
-            guest_id: $guestId
-            host_id: $hostId
-            apartment_id: $apartmentId
-            status: "active"
-            tenant_id: "safetrust"
-          }
-        ) {
-          id
-        }
-      }`,
-      { guestId: uid, hostId, apartmentId }
-    );
-
-    console.log(`[messages/conversations] ✅ conversation created — conversationId: ${newConversation.insert_conversations_one.id}`);
-
-    return res.status(201).json({
-      conversationId: newConversation.insert_conversations_one.id,
+    const result = await upsertConversation({
+      apartmentId: apartment.id,
+      hostId: apartment.owner_id,
+      guestId: req.user.uid,
     });
-  } catch (error) {
-    console.error('[messages/conversations] ❌ error:', error);
-    return res.status(500).json({ error: 'Failed to start conversation' });
-  }
-};
+
+    const statusCode = result.created ? 201 : 200;
+    return res.status(statusCode).json(result);
+  },
+);
+
+export const markConversationReadHandler = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const conversationId = req.params.id;
+
+    if (!conversationId || typeof conversationId !== 'string' || !conversationId.trim()) {
+      throw new ApiError(400, 'INVALID_CONVERSATION_ID', 'conversationId is required.');
+    }
+
+    const convo = await getConversation(conversationId.trim());
+    if (!convo) {
+      throw new ApiError(404, 'CONVERSATION_NOT_FOUND', 'Conversation not found.');
+    }
+
+    const role =
+      convo.host_id === req.user.uid
+        ? 'host'
+        : convo.guest_id === req.user.uid
+          ? 'guest'
+          : null;
+
+    if (!role) {
+      throw new ApiError(403, 'NOT_A_PARTICIPANT', 'You are not part of this conversation.');
+    }
+
+    await markConversationRead({
+      conversationId: convo.id,
+      readerRole: role,
+    });
+
+    return res.status(204).send();
+  },
+);

@@ -1,74 +1,60 @@
-import { Response } from 'express';
-import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
-import { hasuraRequest } from '../../services/hasura.js';
+import type { Response } from 'express';
+import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
+import { ApiError } from '../../http/api-error.js';
+import { asyncHandler } from '../../http/async-handler.js';
+import { getConversation, insertManualMessage } from '../../services/messages-db.js';
 
-type SendMessageBody = {
-  conversationId: string;
-  body: string;
-  isAutomated?: boolean;
-  eventType?: string;
-};
+const FORBIDDEN_FIELDS = [
+  'senderId',
+  'isAutomated',
+  'eventType',
+  'eventKey',
+  'sender_id',
+  'is_automated',
+  'event_type',
+  'event_key',
+];
 
-type SendMessageResponse = {
-  messageId: string;
-  conversationId: string;
-  createdAt: string;
-};
+export const sendMessageHandler = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { conversationId, body, ...rest } = req.body ?? {};
 
-export const sendMessageHandler = async (
-  req: AuthenticatedRequest & { body: SendMessageBody },
-  res: Response<SendMessageResponse | { error: string }>
-): Promise<Response> => {
-  const { uid } = req.user;
-  const { conversationId, body, isAutomated = false, eventType } = req.body;
+    if (FORBIDDEN_FIELDS.some((k) => k in rest)) {
+      throw new ApiError(400, 'FORBIDDEN_FIELD', 'Message metadata is set by the server.');
+    }
 
-  if (!conversationId || !body?.trim()) {
-    return res.status(400).json({ error: 'Missing required fields: conversationId, body' });
-  }
+    const text = typeof body === 'string' ? body : '';
+    if (!text.trim() || text.length > 4000) {
+      throw new ApiError(400, 'INVALID_MESSAGE_BODY', 'Message must be 1–4000 characters.');
+    }
 
-  if (body.length > 4000) {
-    return res.status(400).json({ error: 'Message body exceeds 4000 character limit' });
-  }
+    if (!conversationId || typeof conversationId !== 'string' || !conversationId.trim()) {
+      throw new ApiError(404, 'CONVERSATION_NOT_FOUND', 'Conversation not found.');
+    }
 
-  if (eventType && !isAutomated) {
-    return res.status(400).json({ error: 'eventType requires isAutomated: true' });
-  }
+    const convo = await getConversation(conversationId.trim());
+    if (!convo) {
+      throw new ApiError(404, 'CONVERSATION_NOT_FOUND', 'Conversation not found.');
+    }
 
-  try {
-    const data = await hasuraRequest<{
-      insert_messages_one: { id: string; created_at: string };
-    }>(
-      `mutation SendMessage(
-        $conversationId: uuid!
-        $senderId: String!
-        $body: String!
-        $isAutomated: Boolean!
-        $eventType: String
-      ) {
-        insert_messages_one(object: {
-          conversation_id: $conversationId
-          sender_id: $senderId
-          body: $body
-          is_automated: $isAutomated
-          event_type: $eventType
-          tenant_id: "safetrust"
-        }) {
-          id created_at
-        }
-      }`,
-      { conversationId, senderId: uid, body: body.trim(), isAutomated, eventType }
-    );
+    const role =
+      convo.host_id === req.user.uid
+        ? 'host'
+        : convo.guest_id === req.user.uid
+          ? 'guest'
+          : null;
 
-    const message = data.insert_messages_one;
-    console.log(`[messages/send] ✅ message sent — conversationId: ${conversationId}`);
+    if (!role) {
+      throw new ApiError(403, 'NOT_A_PARTICIPANT', 'You are not part of this conversation.');
+    }
 
-    return res.status(201).json({
-      messageId: message.id,
-      conversationId,
-      createdAt: message.created_at,
+    const message = await insertManualMessage({
+      conversationId: convo.id,
+      senderId: req.user.uid,
+      body: text,
+      readerRole: role,
     });
-  } catch (error) {
-    console.error('[messages/send] ❌ error:', error);
-    return res.status(500).json({ error: 'Failed to send message' });
-  }
-};
+
+    return res.status(201).json({ message });
+  },
+);

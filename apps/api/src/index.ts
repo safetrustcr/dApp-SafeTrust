@@ -14,11 +14,12 @@ import resolveDisputeRouter from './routes/escrow/resolve-dispute.route.js';
 import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.js';
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
-import messagesRouter from './routes/messages/send.route.js';
 import conversationsRouter from './routes/messages/conversations.route.js';
+import messagesRouter from './routes/messages/send.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
+import { errorHandler } from './http/error-middleware.js';
 import hotelsRouter from './routes/hotels/hotels.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
@@ -72,12 +73,15 @@ app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);
 
+// Messages routes
+app.use('/api/messages', conversationsRouter);
+app.use('/api/messages', messagesRouter);
+
 // Hotel routes
 app.use('/api/hotels', hotelsRouter);
 
-// Messages routes (router registered when available)
-app.use('/api/messages', messagesRouter);
-app.use('/api/messages', conversationsRouter);
+// Global Problem Details error boundary
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);
