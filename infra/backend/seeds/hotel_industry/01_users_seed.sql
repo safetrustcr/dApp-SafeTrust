@@ -1,5 +1,5 @@
 -- hotel_industry users.id seed
-INSERT INTO users (id, firebase_uid, email, first_name, last_name, phone_number, role)
+INSERT INTO hotel_industry.users (id, firebase_uid, email, first_name, last_name, phone_number, role)
 VALUES
 (
   'b0000000-0000-0000-0000-000000000001',
