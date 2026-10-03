@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { ErrorRequestHandler, RequestHandler } from 'express';
+import type { ErrorRequestHandler, Request, RequestHandler, Response } from 'express';
 import { ApiError } from './api-error.js';
 import { TrustlessWorkRequestError } from '../services/trustlesswork.js';
 import { HasuraRequestError } from '../lib/hasura.js';
@@ -59,7 +59,7 @@ function make(status: number, code: string, detail: string, retryable?: boolean)
 function toProblem(err: unknown): Problem {
   // 1. Our own typed error — detail is already user-safe
   if (err instanceof ApiError) {
-    return make(err.status, err.code, err.detail, err.options.retryable);
+    return make(err.status, err.code, err.detail, err.retryable);
   }
 
   // 2. TrustlessWork upstream error

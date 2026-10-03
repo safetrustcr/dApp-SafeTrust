@@ -1,4 +1,16 @@
 /**
+ * RFC 7807 Problem Details shape
+ */
+type ProblemDetails = {
+  type: string;
+  title: string;
+  status: number;
+  detail: string;
+  retryable?: boolean;
+  requestId?: string;
+};
+
+/**
  * RFC 7807-style ApiError — the single error type all escrow handlers throw.
  *
  * Handlers must never surface raw Error messages, stack traces, upstream
@@ -9,21 +21,47 @@
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
-  readonly detail: string; // must be safe to show a user
-  readonly options: { retryable?: boolean; cause?: unknown };
+  readonly detail: string;
+  readonly retryable?: boolean;
+  readonly requestId?: string;
+  readonly problemDetails: ProblemDetails;
 
   constructor(
     status: number,
     code: string,
     detail: string,
-    options: { retryable?: boolean; cause?: unknown } = {},
+    options: {
+      retryable?: boolean;
+      requestId?: string;
+      cause?: unknown;
+    } = {},
   ) {
-    super(detail);
+    super(detail, { cause: options.cause });
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.detail = detail;
-    this.options = options;
+    this.retryable = options.retryable;
+    this.requestId = options.requestId;
+    this.problemDetails = {
+      type: `https://api.safetrust.dev/problems/${code.toLowerCase().replace(/_/g, '-')}`,
+      title: this.getTitle(),
+      status,
+      detail,
+      ...(this.retryable && { retryable: true }),
+      ...(this.requestId && { requestId: this.requestId }),
+    };
+  }
+
+  private getTitle(): string {
+    const titles: Record<string, string> = {
+      UPSTREAM_FAILURE: 'Upstream service failure',
+      TRUSTLESS_WORK_UNAVAILABLE: 'Trustless Work unavailable',
+      AUTHENTICATION_FAILED: 'Authentication failed',
+      VALIDATION_ERROR: 'Input validation failed',
+      INTERNAL_SERVER_ERROR: 'Internal server error',
+    };
+    return titles[this.code] || 'API error';
   }
 }
 
@@ -31,5 +69,5 @@ export class ApiError extends Error {
  * Convenience factory for 400 validation failures.
  * Keeps handler code concise:  throw validationError('MISSING_CONTRACT_ID', 'contractId is required.')
  */
-export const validationError = (code: string, detail: string): ApiError =>
-  new ApiError(400, code, detail);
+export const validationError = (code: string, detail: string) =>
+  new ApiError(400, code, detail, { retryable: false });

@@ -11,6 +11,7 @@ export const STUB_APARTMENTS = [
       name: "Alberto Casas",
       email: "albertoCasas100@gmail.com",
       phone: "+506 64852179",
+      id: "owner-1",
     },
     description:
       "Beautiful apartment in the heart of San José with modern amenities and stunning views.",
@@ -27,6 +28,7 @@ export const STUB_APARTMENTS = [
       name: "Maria Lopez",
       email: "maria.lopez@example.com",
       phone: "+506 64852180",
+      id: "owner-2",
     },
     description: "Cozy apartment near Los Yoses with great transit access.",
   },

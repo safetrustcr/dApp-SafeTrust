@@ -1,4 +1,4 @@
-INSERT INTO reservations (
+INSERT INTO hotel_industry.reservations (
   id, room_id, wallet_address,
   check_in, check_out, capacity,
   reservation_status, total_amount

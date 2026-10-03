@@ -1,13 +1,28 @@
 table:
   name: hotels
-  schema: public
+  schema: hotel_industry
+configuration:
+  custom_root_fields:
+    select: hotels
+    select_by_pk: hotels_by_pk
+    select_aggregate: hotels_aggregate
+    insert: insert_hotels
+    insert_one: insert_hotels_one
+    update: update_hotels
+    update_by_pk: update_hotels_by_pk
+    delete: delete_hotels
+    delete_by_pk: delete_hotels_by_pk
 object_relationships:
+  - name: owner
+    using:
+      foreign_key_constraint_on: owner_user_id
+array_relationships:
   - name: rooms
     using:
       foreign_key_constraint_on:
         table:
           name: rooms
-          schema: public
+          schema: hotel_industry
         columns:
           - hotel_id
   - name: owner
@@ -18,6 +33,7 @@ select_permissions:
     permission:
       columns:
         - id
+        - owner_user_id
         - name
         - description
         - address
@@ -31,6 +47,7 @@ select_permissions:
     permission:
       columns:
         - id
+        - owner_user_id
         - name
         - description
         - address

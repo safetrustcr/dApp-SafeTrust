@@ -4,6 +4,12 @@ import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { WalletType } from "../components/MainWalletSelectionModal";
 import { useMetaMaskWallet } from "./metamask-wallet.hook";
 import { getWalletKit } from "../constants/wallet-kit.constant";
+import { ISupportedWallet } from "@creit.tech/stellar-wallets-kit";
+
+type WalletAuthenticationHandler = (
+  address: string,
+  walletName: string
+) => Promise<void>;
 
 export const useMultiWallet = () => {
   const router = useRouter();
@@ -80,7 +86,10 @@ export const useMultiWallet = () => {
     }
   };
 
-  const handleStellarWalletSelected = async (wallet: any) => {
+  const handleStellarWalletSelected = async (
+    wallet: ISupportedWallet,
+    authenticate?: WalletAuthenticationHandler
+  ) => {
     try {
       setError(null);
 
@@ -89,15 +98,20 @@ export const useMultiWallet = () => {
       kit.setWallet(wallet.id);
 
       const { address } = await kit.getAddress();
+      if (authenticate) {
+        await authenticate(address, wallet.name);
+      }
 
       connectWalletStore(address, wallet.name);
 
       setIsStellarModalOpen(false);
       setSelectedWalletType(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error connecting to Stellar wallet:", error);
       setError(
-        `Failed to connect to ${wallet.name}: ${error.message || "Unknown error"}`
+        `Failed to connect to ${wallet.name}: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
     }
   };
