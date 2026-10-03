@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { TrustlessWorkRequestError, getErrorMessages, trustlessWorkRequest } from '../../services/trustlesswork.js';
 import { guardEscrowAction, sendConflict } from './transition-guard.js';
+import { asyncHandler } from '../../http/async-handler.js';
 
 type ApproveMilestoneBody = {
   contractId?: string;
@@ -9,19 +10,20 @@ type ApproveMilestoneBody = {
   milestoneIndex?: number;
 };
 
-export async function approveMilestoneHandler(
+export const approveMilestoneHandler = asyncHandler(async (
   req: Request<{}, unknown, ApproveMilestoneBody>,
   res: Response,
-): Promise<Response> {
-  try {
-    const { contractId, engagementId, approver, milestoneIndex = 0 } = req.body ?? {};
-    if (!contractId || !engagementId || !approver) {
-      return res.status(400).json({ error: 'Missing required fields: contractId, engagementId, approver.' });
-    }
-    if (!Number.isInteger(milestoneIndex) || milestoneIndex < 0) {
-      return res.status(400).json({ error: 'milestoneIndex must be a non-negative integer.' });
-    }
+) => {
+  const { contractId, engagementId, approver, milestoneIndex = 0 } = req.body ?? {};
 
+  if (!contractId || !engagementId || !approver) {
+    return res.status(400).json({ error: 'Missing required fields: contractId, engagementId, approver.' });
+  }
+  if (!Number.isInteger(milestoneIndex) || milestoneIndex < 0) {
+    return res.status(400).json({ error: 'milestoneIndex must be a non-negative integer.' });
+  }
+
+  try {
     const conflict = await guardEscrowAction(res, 'approve_milestone', contractId);
     if (conflict) return conflict;
 
@@ -46,4 +48,4 @@ export async function approveMilestoneHandler(
     }
     return res.status(500).json({ error: getErrorMessages(error, 'Failed to build milestone approval transaction.')[0] });
   }
-}
+});

@@ -23,6 +23,7 @@ import hotelsRouter from './routes/hotels/hotels.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
+import { requestId, notFound, errorMiddleware } from './http/error-middleware.js';
 
 initFirebaseAdmin();
 
@@ -45,6 +46,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(tenantMiddleware);
+app.use(requestId); // attach X-Request-Id before all routes
 
 app.use('/api/auth/wallet', walletAuthRouter);
 
@@ -75,9 +77,12 @@ app.use('/api/escrow', statusStreamRouter);
 // Hotel routes
 app.use('/api/hotels', hotelsRouter);
 
-// Messages routes (router registered when available)
+// Messages routes
 app.use('/api/messages', messagesRouter);
 app.use('/api/messages', conversationsRouter);
+
+app.use(notFound);        // after all routes
+app.use(errorMiddleware); // last
 
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);

@@ -3,15 +3,6 @@ import { deployEscrowHandler } from '../deploy.handler.js';
 
 vi.mock('../../../services/trustlesswork.js', () => ({
   trustlessWorkRequest: vi.fn(),
-  TrustlessWorkRequestError: class extends Error {
-    constructor(message, statusCode, messages, payload) {
-      super(message);
-      this.statusCode = statusCode;
-      this.messages = messages;
-      this.payload = payload;
-    }
-  },
-  getErrorMessages: vi.fn((err, fallback) => [err?.message || fallback]),
 }));
 
 vi.mock('../../../services/idempotency.js', () => ({
@@ -24,11 +15,13 @@ vi.mock('../../../services/hasura.js', () => ({
 
 import { checkIdempotency } from '../../../services/idempotency.js';
 import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
-import { mockReq, mockRes } from './helpers.js';
+import { hasuraRequest } from '../../../services/hasura.js';
+import { mockReq, mockRes, mockNext } from './helpers.js';
 
 describe('deployEscrowHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(hasuraRequest).mockResolvedValue({});
     process.env.PLATFORM_STELLAR_ADDRESS = 'GPLATFORM111111111111111111111111111111111111111111111111';
     process.env.NEXT_PUBLIC_PLATFORM_ADDRESS = 'GPLATFORM111111111111111111111111111111111111111111111111';
     process.env.USDC_TRUSTLINE_ADDRESS = 'GBBD47IF6LWK7P7MDEVSCWR2JQTMZ35MIFUQ5IQSQ9CQBZ8JMXKDPE';
@@ -40,6 +33,7 @@ describe('deployEscrowHandler', () => {
     await deployEscrowHandler(
       mockReq({ senderAddress: 'GTENANT', receiverAddress: 'GOWNER', amount: 1200 }),
       res,
+      mockNext(),
     );
     expect(res._status).toBe(400);
   });
@@ -49,6 +43,7 @@ describe('deployEscrowHandler', () => {
     await deployEscrowHandler(
       mockReq({ apartmentId: 'APT001', receiverAddress: 'GOWNER', amount: 1200 }),
       res,
+      mockNext(),
     );
     expect(res._status).toBe(400);
   });
@@ -63,6 +58,7 @@ describe('deployEscrowHandler', () => {
     });
 
     const res = mockRes();
+    const next = mockNext();
     await deployEscrowHandler(
       mockReq({
         apartmentId: 'APT001',
@@ -71,7 +67,11 @@ describe('deployEscrowHandler', () => {
         amount: 1200,
       }),
       res,
+      next,
     );
+
+    // If asyncHandler forwarded an error to next, surface it for easier debugging
+    if (next.error != null) throw next.error;
 
     expect(trustlessWorkRequest).toHaveBeenCalledWith(
       '/deployer/single-release',
