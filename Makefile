@@ -1,8 +1,12 @@
-.PHONY: infra infra-reset dev full stop test lint build help
+.PHONY: infra infra-reset dev full stop test lint build help testnet
 
 ## infra : Start Docker infra (both tenants)
 infra:
 	cd infra/backend && bin/start safetrust hotel_industry
+
+## testnet : Provision isolated Stellar testnet accounts and linked demo users
+testnet:
+	pnpm testnet:provision
 
 ## infra-reset : Tear down volumes and restart infra
 infra-reset:

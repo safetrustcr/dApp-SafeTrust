@@ -13,6 +13,7 @@ interface MainWalletSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onWalletTypeSelected: (walletType: WalletType) => void;
+  stellarOnly?: boolean;
 }
 
 const walletOptions = [
@@ -38,7 +39,7 @@ const walletOptions = [
 
 export const MainWalletSelectionModal: React.FC<
   MainWalletSelectionModalProps
-> = ({ isOpen, onClose, onWalletTypeSelected }) => {
+> = ({ isOpen, onClose, onWalletTypeSelected, stellarOnly = false }) => {
   const [showWalletConnectModal, setShowWalletConnectModal] = useState(false);
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
@@ -66,10 +67,14 @@ export const MainWalletSelectionModal: React.FC<
         <div className="p-6 space-y-4 max-h-[calc(90vh-120px)] overflow-y-auto">
           <div className="space-y-3">
             <p className="text-sm text-gray-600">
-              Choose your preferred wallet
+              {stellarOnly
+                ? "Choose a Stellar wallet to authenticate securely"
+                : "Choose your preferred wallet"}
             </p>
 
-            {walletOptions.map((option) => {
+            {walletOptions
+              .filter((option) => !stellarOnly || option.id === "stellar")
+              .map((option) => {
               const handleClick = () => {
                 if (option.id === "walletconnect") {
                   handleWalletConnectClick();
@@ -115,7 +120,7 @@ export const MainWalletSelectionModal: React.FC<
                   </CardContent>
                 </Card>
               );
-            })}
+              })}
           </div>
         </div>
       </div>

@@ -39,9 +39,6 @@ export const useGlobalAuthenticationStore = create<AuthState>()(
       },
 
       connectWalletStore: (address, name) => {
-        if (typeof document !== "undefined") {
-          document.cookie = `auth-token=mock-wallet-token-${address}; max-age=${7 * 24 * 60 * 60}; path=/; samesite=strict`;
-        }
         set({ address, name, walletType: name, isConnected: true });
       },
 

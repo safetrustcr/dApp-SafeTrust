@@ -149,6 +149,25 @@ docker compose down -v
 bin/start
 ```
 
+### SEP-10 wallet authentication
+
+Wallet login uses the public challenge and verification endpoints served by
+`apps/api`. Configure these values in `infra/backend/.env.local`:
+
+```dotenv
+SEP10_SIGNING_SEED=                 # Dedicated Stellar server-account secret seed
+SEP10_HOME_DOMAIN=                  # SafeTrust home domain
+SEP10_WEB_AUTH_DOMAIN=              # Domain configured for the wallet-auth endpoint
+STELLAR_NETWORK=TESTNET             # TESTNET or PUBLIC; match the wallet network
+STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+FRONTEND_URL=http://localhost:3001
+```
+
+Keep the signing seed private. The API returns a short-lived SEP-10 challenge
+and checks signatures against the account's Horizon signer weights and threshold
+before issuing a Firebase custom token. The frontend backend URL is
+`NEXT_PUBLIC_BACKEND_URL=http://localhost:3002` in `apps/frontend/.env.local`.
+
 ---
 
 ### 6. Run the frontend
