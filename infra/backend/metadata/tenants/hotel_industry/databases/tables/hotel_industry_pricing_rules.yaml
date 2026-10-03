@@ -1,0 +1,53 @@
+table:
+  name: pricing_rules
+  schema: hotel_industry
+configuration:
+  custom_root_fields:
+    select: pricing_rules
+    select_by_pk: pricing_rules_by_pk
+    select_aggregate: pricing_rules_aggregate
+    insert: insert_pricing_rules
+    insert_one: insert_pricing_rules_one
+    update: update_pricing_rules
+    update_by_pk: update_pricing_rules_by_pk
+    delete: delete_pricing_rules
+    delete_by_pk: delete_pricing_rules_by_pk
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - rule_name
+        - rule_type
+        - currency
+        - base_amount
+        - percentage
+        - min_amount
+        - max_amount
+        - room_type
+        - season
+        - advance_booking_days
+        - priority
+        - is_active
+        - created_at
+        - updated_at
+      filter: {}
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - rule_name
+        - rule_type
+        - currency
+        - base_amount
+        - percentage
+        - min_amount
+        - max_amount
+        - room_type
+        - season
+        - advance_booking_days
+        - priority
+        - is_active
+        - created_at
+        - updated_at
+      filter: {}

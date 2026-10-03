@@ -7,13 +7,18 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
+    "testnet:provision": "tsx scripts/testnet/provision.ts",
     "codegen": "turbo run codegen",
     "dev:full": "turbo run dev",
     "dev:mcp": "turbo run dev --filter=@safetrust/mcp"
   },
   "devDependencies": {
+    "@stellar/stellar-sdk": "^15.0.1",
+    "dotenv": "^16.3.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.x",
+    "firebase-admin": "^14.3.0",
+    "tsx": "^4.19.2",
     "turbo": "^2.9.14",
     "typescript": "^5.7.3"
   },

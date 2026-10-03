@@ -19,11 +19,12 @@ import conversationsRouter from './routes/messages/conversations.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
+import hotelsRouter from './routes/hotels/hotels.route.js';
+import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
 initFirebaseAdmin();
-
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -32,8 +33,6 @@ const PORT = process.env.PORT || 3002;
 const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',')
   : ['http://localhost:3001'];
-
-app.use('/api/auth', syncWalletRouter);
 
 app.use(cors({
   origin: allowedOrigins,
@@ -52,7 +51,9 @@ app.get('/health', (_req, res) => {
 app.use('/reconciliation', reconciliationRouter);
 
 // Auth routes
+app.use('/api/auth/wallet', walletAuthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/auth', syncWalletRouter);
 app.use('/api/auth', promoteToHostRouter);
 app.use('/api/auth', activateWalletRouter);
 app.use('/api/admin', adminUsersRouter);
@@ -68,7 +69,10 @@ app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);
 
-// Messages routes (router registered when available)
+// Hotel routes
+app.use('/api/hotels', hotelsRouter);
+
+// Messages routes
 app.use('/api/messages', messagesRouter);
 app.use('/api/messages', conversationsRouter);
 
