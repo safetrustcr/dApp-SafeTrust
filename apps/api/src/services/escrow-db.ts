@@ -368,6 +368,24 @@ export async function dbApproveMilestone(
     throw new ConcurrentTransitionError('completed', 'approved');
   }
 
+  // Pre-read: a wrong-state milestone must fail BEFORE any write, because a
+  // Hasura mutation commits even when a root field matches 0 rows.
+  const milestoneBefore = await hasuraRequest<{ escrowMilestones: { status: string }[] }>(
+    `query GetMilestoneStatus($escrowId: uuid!, $milestoneId: String!) {
+      escrowMilestones(
+        where: { escrowId: { _eq: $escrowId }, milestoneId: { _eq: $milestoneId } }
+        limit: 1
+      ) { status }
+    }`,
+    { escrowId, milestoneId },
+  );
+  if (milestoneBefore.escrowMilestones.length === 0) {
+    throw new Error(`Milestone not found: ${milestoneId} for contractId: ${contractId}`);
+  }
+  if (milestoneBefore.escrowMilestones[0].status !== 'completed') {
+    throw new ConcurrentTransitionError('completed', 'approved');
+  }
+
   // Single mutation document: milestone approved + escrow flip + audit log run
   // in one Postgres transaction, so an error in any of them changes nothing.
   // The escrow flip is conditional on `funded` (the only valid `from` status),
@@ -429,6 +447,77 @@ export async function dbApproveMilestone(
     },
   );
 
+  assertAffectedRows('approve_milestone', milestoneResult.update_escrowMilestones?.affected_rows ?? 0);
+  if (!milestoneResult.update_escrowMilestones?.returning.length) {
+    throw new Error(`Milestone not found: ${milestoneId} for contractId: ${contractId}`);
+  }
+
+  type MilestoneCountsResult = {
+    total: { aggregate: { count: number } };
+    approved: { aggregate: { count: number } };
+  };
+
+  const counts = await hasuraRequest<MilestoneCountsResult>(
+    `query MilestoneCounts($escrowId: uuid!) {
+      total: escrowMilestones_aggregate(where: { escrowId: { _eq: $escrowId } }) {
+        aggregate { count }
+      }
+      update_escrows(
+        where: { contract_id: { _eq: $contractId }, status: { _eq: "funded" } }
+        _set: { status: "milestone_approved" }
+      ) {
+        affected_rows
+        returning { id }
+      }
+      insert_escrow_transactions_one(object: $log) {
+        id
+      }
+    }`,
+    {
+      escrowId,
+      milestoneId,
+      contractId,
+      approver,
+      approvedAt: new Date().toISOString(),
+      log: buildAuditLog('approve_milestone', 'funded', 'milestone_approved', contractId, engagementId, txHash),
+    },
+  );
+
+  const total = counts.total.aggregate.count;
+  const approved = counts.approved.aggregate.count;
+
+  if (approved >= total) {
+    const result = await hasuraRequest<UpdateResult>(
+      `mutation ApproveEscrow($contractId: String!, $log: escrow_transactions_insert_input!) {
+        update_trustless_work_escrows(
+          where: { contractId: { _eq: $contractId } }
+          _set: { status: "milestone_approved" }
+        ) {
+          affected_rows
+          returning { id }
+        }
+        update_escrows(
+          where: { contract_id: { _eq: $contractId } }
+          _set: { status: "milestone_approved" }
+        ) {
+          affected_rows
+          returning { id }
+        }
+        insert_escrow_transactions_one(object: $log) {
+          id
+        }
+      }`,
+      {
+        contractId,
+        log: buildAuditLog('approve_milestone', 'funded', 'milestone_approved', contractId, engagementId, txHash),
+      },
+    );
+
+    assertAffectedRows('approve_milestone', result.update_trustlessWorkEscrows?.affected_rows ?? 0);
+    assertAffectedRows('approve_milestone', result.update_escrows?.affected_rows ?? 0);
+    if (!result.insert_escrow_transactions_one) {
+      throw new Error('Escrow changed. Refresh and retry');
+    }
   assertAffectedRows('approve_milestone', result.update_escrowMilestones?.affected_rows ?? 0, 'completed', 'approved');
   assertAffectedRows('approve_milestone', result.update_trustlessWorkEscrows?.affected_rows ?? 0, 'funded', 'milestone_approved');
   assertAffectedRows('approve_milestone', result.update_escrows?.affected_rows ?? 0, 'funded', 'milestone_approved');

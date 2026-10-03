@@ -72,7 +72,7 @@ app.use('/api/escrow', statusStreamRouter);
 // Hotel routes
 app.use('/api/hotels', hotelsRouter);
 
-// Messages routes
+// Messages routes (router registered when available)
 app.use('/api/messages', messagesRouter);
 app.use('/api/messages', conversationsRouter);
 
