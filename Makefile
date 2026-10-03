@@ -1,4 +1,4 @@
-.PHONY: infra infra-reset dev full stop test lint build help metadata-check
+.PHONY: infra infra-reset testnet dev full stop test lint build help metadata-check
 
 ## infra : Start Docker infra (safetrust tenant)
 infra:

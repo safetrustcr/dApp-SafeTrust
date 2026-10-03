@@ -85,7 +85,7 @@ describe('sendTransactionHandler', () => {
     } as never);
 
     const res = mockRes();
-    const req = mockReq({ signedXdr: 'VALID_XDR' });
+    const req: any = mockReq({ signedXdr: 'VALID_XDR' });
     req.user = { uid: 'user-b' };
 
     await sendTransactionHandler(req as never, res as never);
@@ -103,7 +103,7 @@ describe('sendTransactionHandler', () => {
     } as never);
 
     const res = mockRes();
-    const req = mockReq({ signedXdr: 'VALID_XDR' });
+    const req: any = mockReq({ signedXdr: 'VALID_XDR' });
     req.user = { uid: 'uid-1' };
 
     await sendTransactionHandler(req as never, res as never);
@@ -122,7 +122,7 @@ describe('sendTransactionHandler', () => {
     } as never);
 
     const res = mockRes();
-    const req = mockReq({ signedXdr: 'VALID_XDR' });
+    const req: any = mockReq({ signedXdr: 'VALID_XDR' });
     req.user = { uid: 'uid-1' };
 
     await sendTransactionHandler(req as never, res as never);
@@ -141,7 +141,7 @@ describe('sendTransactionHandler', () => {
     vi.mocked(trustlessWorkRequest).mockResolvedValue({ status: 'SUCCESS', message: 'ok' });
 
     const res = mockRes();
-    const req = mockReq({ signedXdr: 'VALID_XDR' });
+    const req: any = mockReq({ signedXdr: 'VALID_XDR' });
     req.user = { uid: 'uid-1' };
 
     await sendTransactionHandler(req as never, res as never);

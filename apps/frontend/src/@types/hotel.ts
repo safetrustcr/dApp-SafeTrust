@@ -7,6 +7,7 @@ export interface HotelAmenitySummary {
 export interface HotelOwner {
   name: string;
   avatar: string;
+  id?: string;
 }
 
 export interface HotelListing extends HotelAmenitySummary {

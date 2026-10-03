@@ -16,7 +16,14 @@ HASURA_ADMIN_SECRET="${HASURA_GRAPHQL_ADMIN_SECRET:-${HASURA_ADMIN_SECRET:-myadm
 echo "🔍 Checking Hasura metadata consistency..."
 echo "   Endpoint: $HASURA_ENDPOINT"
 
-out="$(hasura metadata ic list --project "$INFRA_DIR" --endpoint "$HASURA_ENDPOINT" --admin-secret "$HASURA_ADMIN_SECRET" --skip-update-check 2>&1)"
+rc=0
+out="$(hasura metadata ic list --project "$INFRA_DIR" --endpoint "$HASURA_ENDPOINT" --admin-secret "$HASURA_ADMIN_SECRET" --skip-update-check 2>&1)" || rc=$?
+
+if [ "$rc" -ne 0 ]; then
+  echo "$out"
+  echo "❌ hasura metadata ic list failed (exit $rc)" >&2
+  exit "$rc"
+fi
 
 if ! grep -q "metadata is consistent" <<<"$out"; then
   echo "$out"

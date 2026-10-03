@@ -10,10 +10,14 @@ jobs:
   metadata-check:
     name: Hasura Metadata Consistency
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
 
@@ -24,7 +28,7 @@ jobs:
 
       - name: Install Hasura CLI
         run: |
-          sudo curl -fL https://github.com/hasura/graphql-engine/releases/latest/download/cli-hasura-linux-amd64 -o /usr/local/bin/hasura
+          sudo curl -fL https://github.com/hasura/graphql-engine/releases/download/v2.47.0/cli-hasura-linux-amd64 -o /usr/local/bin/hasura
           sudo chmod +x /usr/local/bin/hasura
           hasura version --skip-update-check
 
