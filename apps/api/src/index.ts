@@ -23,7 +23,7 @@ import hotelsRouter from './routes/hotels/hotels.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
-import { requestId, notFound, errorMiddleware } from './http/error-middleware.js';
+import { requestIdMiddleware as requestId, errorHandler as errorMiddleware } from './http/error-middleware.js';
 
 initFirebaseAdmin();
 
@@ -81,8 +81,7 @@ app.use('/api/hotels', hotelsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/messages', conversationsRouter);
 
-app.use(notFound);        // after all routes
-app.use(errorMiddleware); // last
+app.use(errorMiddleware);
 
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);

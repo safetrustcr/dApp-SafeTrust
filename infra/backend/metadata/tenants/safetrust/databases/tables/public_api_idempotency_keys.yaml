@@ -4,4 +4,3 @@
 table:
   name: api_idempotency_keys
   schema: public
-comment: Replay store for escrow Idempotency-Key headers (admin-secret only).

@@ -1,14 +1,4 @@
-/**
- * RFC 7807 Problem Details shape
- */
-type ProblemDetails = {
-  type: string;
-  title: string;
-  status: number;
-  detail: string;
-  retryable?: boolean;
-  requestId?: string;
-};
+import { ProblemDetails } from './problem-details';
 
 /**
  * RFC 7807-style ApiError — the single error type all escrow handlers throw.

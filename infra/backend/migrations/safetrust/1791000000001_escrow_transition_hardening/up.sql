@@ -16,9 +16,8 @@ INSERT INTO public.escrow_milestone_status_transitions (from_status, to_status)
 VALUES ('approved', 'released')
 ON CONFLICT (from_status, to_status) DO NOTHING;
 
--- 2. Drop the engagement-only unique index on the audit log.
---    The frontend passes engagementId on every action, so this index would
---    reject every action after the first (unique violation -> rollback).
---    (engagement_id, action) remains the duplicate guard: a second identical
---    transition's log insert fails and rolls the whole mutation back.
+-- 2. Drop the engagement-only and engagement+action unique indexes on the audit log.
+--    The audit log is a per-transition ledger, so multiple transactions
+--    for the same engagement and repeated reconciler rows must be permitted.
 DROP INDEX IF EXISTS public.ux_escrow_transactions_engagement;
+DROP INDEX IF EXISTS public.ux_escrow_transactions_engagement_action;
