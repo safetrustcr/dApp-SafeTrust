@@ -1,5 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { ApiError } from './api-error';
+import { ApiError } from './api-error.js';
 
 /** Express 4 does not forward rejected promises — this does. */
 export function asyncHandler<Req extends Request = Request>(
