@@ -5,12 +5,34 @@ CREATE TABLE IF NOT EXISTS public.escrow_status_transitions (
 );
 
 INSERT INTO public.escrow_status_transitions (from_status, to_status) VALUES
+  ('deploying', 'pending_signature'),
+  ('pending_signature', 'created'),
+  ('pending_signature', 'cancelled'),
   ('created', 'funded'),
+  ('created', 'pending_funding'),
+  ('created', 'active'),
+  ('created', 'milestone_approved'),
+  ('created', 'completed'),
+  ('created', 'cancelled'),
+  ('pending_funding', 'funded'),
+  ('pending_funding', 'active'),
+  ('pending_funding', 'completed'),
+  ('pending_funding', 'cancelled'),
+  ('funded', 'active'),
   ('funded', 'milestone_approved'),
-  ('milestone_approved', 'completed'),
+  ('funded', 'completed'),
   ('funded', 'disputed'),
+  ('funded', 'cancelled'),
+  ('active', 'milestone_approved'),
+  ('active', 'completed'),
+  ('active', 'disputed'),
+  ('active', 'cancelled'),
+  ('milestone_approved', 'completed'),
   ('milestone_approved', 'disputed'),
-  ('disputed', 'resolved')
+  ('milestone_approved', 'cancelled'),
+  ('disputed', 'resolved'),
+  ('disputed', 'cancelled'),
+  ('resolved', 'completed')
 ON CONFLICT (from_status, to_status) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.escrow_milestone_status_transitions (
@@ -21,7 +43,12 @@ CREATE TABLE IF NOT EXISTS public.escrow_milestone_status_transitions (
 
 INSERT INTO public.escrow_milestone_status_transitions (from_status, to_status) VALUES
   ('pending', 'completed'),
-  ('completed', 'approved')
+  ('completed', 'approved'),
+  ('approved', 'released'),
+  ('pending', 'cancelled'),
+  ('completed', 'disputed'),
+  ('approved', 'disputed'),
+  ('disputed', 'cancelled')
 ON CONFLICT (from_status, to_status) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.enforce_escrow_status_transition()
@@ -117,14 +144,6 @@ CREATE TABLE IF NOT EXISTS public.escrow_transactions (
   actor_uid TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_engagement
-  ON public.escrow_transactions (engagement_id)
-  WHERE engagement_id IS NOT NULL;
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_engagement_action
-  ON public.escrow_transactions (engagement_id, action)
-  WHERE engagement_id IS NOT NULL AND action IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_escrow_transactions_tx_hash
   ON public.escrow_transactions (tx_hash)
