@@ -27,7 +27,6 @@ import { requestIdMiddleware as requestId, errorHandler as errorMiddleware } fro
 
 initFirebaseAdmin();
 
-
 const app = express();
 const PORT = process.env.PORT || 3002;
 
@@ -35,8 +34,6 @@ const PORT = process.env.PORT || 3002;
 const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',')
   : ['http://localhost:3001'];
-
-app.use('/api/auth', syncWalletRouter);
 
 app.use(cors({
   origin: allowedOrigins,
@@ -48,8 +45,6 @@ app.use(express.json());
 app.use(tenantMiddleware);
 app.use(requestId); // attach X-Request-Id before all routes
 
-app.use('/api/auth/wallet', walletAuthRouter);
-
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', firebase: 'configured' });
@@ -58,7 +53,9 @@ app.get('/health', (_req, res) => {
 app.use('/reconciliation', reconciliationRouter);
 
 // Auth routes
+app.use('/api/auth/wallet', walletAuthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/auth', syncWalletRouter);
 app.use('/api/auth', promoteToHostRouter);
 app.use('/api/auth', activateWalletRouter);
 app.use('/api/admin', adminUsersRouter);
