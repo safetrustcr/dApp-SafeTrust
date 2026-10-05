@@ -23,9 +23,15 @@ type FundResponse = {
   engagementId: string;
 };
 
+type FundErrorResponse = {
+  error: string;
+  messages?: string[];
+  payload?: unknown;
+};
+
 export const fundEscrowHandler = asyncHandler(async (
-  req: Request<{}, FundResponse | { error: string }, FundRequestBody>,
-  res: Response<FundResponse | { error: string }>,
+  req: Request<{}, FundResponse | FundErrorResponse, FundRequestBody>,
+  res: Response<FundResponse | FundErrorResponse>,
 ) => {
   const { contractId, signer, amount, engagementId } = req.body || {};
 

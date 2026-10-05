@@ -27,9 +27,15 @@ type ReleaseResponse = {
   message?: string;
 };
 
+type ReleaseErrorResponse = {
+  error: string;
+  messages?: string[];
+  payload?: unknown;
+};
+
 export const releaseFundsHandler = asyncHandler(async (
-  req: Request<{}, ReleaseResponse | { error: string }, ReleaseRequestBody>,
-  res: Response<ReleaseResponse | { error: string }>,
+  req: Request<{}, ReleaseResponse | ReleaseErrorResponse, ReleaseRequestBody>,
+  res: Response<ReleaseResponse | ReleaseErrorResponse>,
 ) => {
   const { contractId, releaseSigner, engagementId } = req.body || {};
 
