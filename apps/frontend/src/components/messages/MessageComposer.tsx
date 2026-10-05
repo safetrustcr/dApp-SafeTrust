@@ -3,50 +3,69 @@ import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { useMutation, gql } from '@apollo/client';
-
-const SEND_MESSAGE = gql`
-  mutation SendMessage($conversationId: uuid!, $senderId: String!, $body: String!) {
-    insert_messages_one(object: {
-      conversation_id: $conversationId,
-      sender_id: $senderId,
-      body: $body
-    }) {
-      id
-    }
-  }
-`;
+import { startConversation, sendMessage, markRead } from '@/lib/api/messages';
 
 type MessageComposerProps = {
-  conversationId: string;
-  senderId: string;
-  apartmentId: string;
+  conversationId?: string;
+  senderId?: string;
+  apartmentId?: string;
+  onMessageSent?: (message?: unknown) => void;
+  onConversationCreated?: (conversationId: string) => void;
 };
 
-export function MessageComposer({ conversationId, senderId }: MessageComposerProps) {
+export function MessageComposer({
+  conversationId: initialConversationId,
+  apartmentId,
+  onMessageSent,
+  onConversationCreated,
+}: MessageComposerProps) {
   const [body, setBody] = useState('');
-  const [sendMessage, { loading: isSending }] = useMutation(SEND_MESSAGE);
+  const [isSending, setIsSending] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState(initialConversationId ?? '');
   const { toast } = useToast();
 
   const handleSend = async () => {
-    if (!body.trim() || body.length > 4000) return;
+    const trimmed = body.trim();
+    if (!trimmed || trimmed.length > 4000) return;
 
+    setIsSending(true);
     try {
-      await sendMessage({
-        variables: {
-          conversationId,
-          senderId,
-          body: body.trim(),
-        }
-      });
+      let targetConversationId = activeConversationId || initialConversationId;
+
+      if (!targetConversationId && apartmentId) {
+        const convoResult = await startConversation(apartmentId);
+        targetConversationId = convoResult.conversationId;
+        setActiveConversationId(targetConversationId);
+        onConversationCreated?.(targetConversationId);
+      }
+
+      if (!targetConversationId) {
+        throw new Error('No active conversation');
+      }
+
+      const sendResult = await sendMessage(targetConversationId, trimmed);
       setBody('');
+      onMessageSent?.(sendResult.message);
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not send message. Please try again.",
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Could not send message. Please try again.',
       });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleFocus = async () => {
+    const targetId = activeConversationId || initialConversationId;
+    if (targetId) {
+      try {
+        await markRead(targetId);
+      } catch {
+        // Silently catch focus mark-read errors
+      }
     }
   };
 
@@ -66,15 +85,16 @@ export function MessageComposer({ conversationId, senderId }: MessageComposerPro
         <Textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
           className={`min-h-[60px] max-h-[120px] resize-none ${isOverLimit ? 'border-destructive' : ''}`}
           disabled={isSending}
           maxLength={4000}
         />
-        <Button 
-          size="icon" 
-          onClick={handleSend} 
+        <Button
+          size="icon"
+          onClick={handleSend}
           disabled={!body.trim() || isSending || isOverLimit}
           className="h-10 w-10 shrink-0"
         >

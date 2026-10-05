@@ -1,17 +1,15 @@
 import { auth } from '@/lib/firebase';
+import { postAuthenticatedApi, ApiClientError, API_BASE_URL } from './client';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_BACKEND_URL ??
-  'http://localhost:3002';
+export { API_BASE_URL };
 
-export class EscrowApiError extends Error {
+export class EscrowApiError extends ApiClientError {
   constructor(
     message: string,
-    readonly status: number,
-    readonly payload: unknown,
+    status: number,
+    payload: unknown,
   ) {
-    super(message);
+    super(message, status, payload);
     this.name = 'EscrowApiError';
   }
 }
@@ -39,24 +37,14 @@ export async function postEscrowApi<T>(
     throw new EscrowApiError('Sign in before performing an escrow action.', 401, null);
   }
 
-  const token = await user.getIdToken();
-  const idempotencyKey = options?.idempotencyKey ?? crypto.randomUUID();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      'Idempotency-Key': idempotencyKey,
-    },
-    body: JSON.stringify(body),
-  });
-  const payload: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
-        ? payload.error
-        : `Escrow request failed (${response.status}).`;
-    throw new EscrowApiError(message, response.status, payload);
+  try {
+    return await postAuthenticatedApi<T>(path, body, {
+      idempotencyKey: options?.idempotencyKey ?? crypto.randomUUID(),
+    });
+  } catch (error) {
+    if (error instanceof ApiClientError && !(error instanceof EscrowApiError)) {
+      throw new EscrowApiError(error.message, error.status, error.payload);
+    }
+    throw error;
   }
-  return payload as T;
 }

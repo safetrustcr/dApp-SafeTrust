@@ -1,17 +1,8 @@
-import { auth } from '@/lib/firebase';
+import { postAuthenticatedApi, ApiClientError, type ApiRequestOptions } from './client';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.NEXT_PUBLIC_BACKEND_URL ??
-  'http://localhost:3002';
-
-export class MessagesApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly payload: unknown,
-  ) {
-    super(message);
+export class MessagesApiError extends ApiClientError {
+  constructor(message: string, status: number, payload: unknown) {
+    super(message, status, payload);
     this.name = 'MessagesApiError';
   }
 }
@@ -27,39 +18,59 @@ export type StartConversationOptions = {
 
 export type StartConversationResponse = {
   conversationId: string;
+  created?: boolean;
+};
+
+export type MessageItem = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  is_automated: boolean;
+  event_type?: string | null;
+  created_at: string;
+};
+
+export type SendMessageResponse = {
+  message: MessageItem;
 };
 
 /**
- * Starts a conversation with an apartment host.
- * Sends a POST request to /api/messages/conversations with apartmentId.
+ * Starts or retrieves an existing conversation for an apartment.
+ * The server derives the host from the apartment record and sets the guest to the authenticated user.
  */
 export async function startConversation(
   apartmentId: string,
   options?: StartConversationOptions,
 ): Promise<StartConversationResponse> {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new MessagesApiError('Sign in before messaging a host.', 401, null);
-  }
+  return postAuthenticatedApi<StartConversationResponse>(
+    '/api/messages/conversations',
+    { apartmentId },
+    options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined,
+  );
+}
 
-  const token = await user.getIdToken();
-  const idempotencyKey = options?.idempotencyKey ?? crypto.randomUUID();
-  const response = await fetch(`${API_BASE_URL}/api/messages/conversations`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      'Idempotency-Key': idempotencyKey,
-    },
-    body: JSON.stringify({ apartmentId }),
-  });
-  const payload: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
-        ? payload.error
-        : `Failed to start conversation (${response.status}).`;
-    throw new MessagesApiError(message, response.status, payload);
-  }
-  return payload as StartConversationResponse;
+/**
+ * Sends a message in a conversation.
+ * The server validates participant status, enforces body length, and updates the caller's last read timestamp.
+ */
+export async function sendMessage(
+  conversationId: string,
+  body: string,
+  options?: ApiRequestOptions,
+): Promise<SendMessageResponse> {
+  return postAuthenticatedApi<SendMessageResponse>(
+    '/api/messages/send',
+    { conversationId, body },
+    options,
+  );
+}
+
+/**
+ * Marks a conversation as read for the authenticated participant.
+ */
+export async function markRead(conversationId: string): Promise<void> {
+  return postAuthenticatedApi<void>(
+    `/api/messages/conversations/${encodeURIComponent(conversationId)}/read`,
+  );
 }

@@ -26,9 +26,15 @@ type MilestoneStatusResponse = {
   status: string;
 };
 
+type MilestoneStatusErrorResponse = {
+  error: string;
+  messages?: string[];
+  payload?: unknown;
+};
+
 export const milestoneStatusHandler = asyncHandler(async (
-  req: Request<{}, MilestoneStatusResponse | { error: string }, MilestoneStatusRequestBody>,
-  res: Response<MilestoneStatusResponse | { error: string }>,
+  req: Request<{}, MilestoneStatusResponse | MilestoneStatusErrorResponse, MilestoneStatusRequestBody>,
+  res: Response<MilestoneStatusResponse | MilestoneStatusErrorResponse>,
 ) => {
   const { contractId, serviceProvider, engagementId, milestoneIndex, newStatus, newEvidence } = req.body || {};
 

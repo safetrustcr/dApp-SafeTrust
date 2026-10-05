@@ -27,7 +27,7 @@ import {
   HasuraRequestError,
 } from '../../services/hasura.js';
 import { confirmTransactionWithRetry } from '../../services/stellar-confirm.js';
-import { guardEscrowAction, sendConflict } from './transition-guard.js';
+import { conflictBody, guardEscrowAction, sendConflict } from './transition-guard.js';
 import {
   ConcurrentTransitionError,
   InvalidTransitionError,
@@ -92,6 +92,23 @@ const REQUIRED_FIELDS: Record<EscrowAction, (keyof SendTransactionBody)[]> = {
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
+
+const parseTransitionError = (error: unknown): { from?: string; to?: string } => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const match = message.match(/invalid\s+escrow\s+transition\s+([^\s]+)\s*->\s*([^\s]+)/i);
+  if (match) {
+    return { from: match[1], to: match[2] };
+  }
+
+  const details = error instanceof HasuraRequestError ? error.details ?? [] : [];
+  const detailMessage = details.find((detail) => detail.message.toLowerCase().includes('invalid escrow transition'))?.message ?? '';
+  const detailMatch = detailMessage.match(/invalid\s+escrow\s+transition\s+([^\s]+)\s*->\s*([^\s]+)/i);
+  if (detailMatch) {
+    return { from: detailMatch[1], to: detailMatch[2] };
+  }
+
+  return {};
+};
 
 export const sendTransactionHandler = async (
   req: Request<{}, Record<string, unknown> | { error: string; messages?: string[]; payload?: unknown }, SendTransactionBody>,
@@ -160,8 +177,10 @@ export const sendTransactionHandler = async (
       }
 
       // Pre-validate transition before Trustless Work call
-      const conflict = await guardEscrowAction(res, action as EscrowActionName, contractId);
-      if (conflict) return conflict;
+      if (action !== 'initialize') {
+        const conflict = await guardEscrowAction(res, action as EscrowActionName, contractId);
+        if (conflict) return conflict;
+      }
 
       let result: SendTransactionTWResponse & Record<string, unknown>;
       try {
@@ -241,6 +260,15 @@ export const sendTransactionHandler = async (
             );
             if (existing.escrows.length > 0) {
               insertedId = existing.escrows[0].id;
+              await hasuraRequest(
+                `mutation NormalizeEscrowCreated($contractId: String!) {
+                  update_escrows(
+                    where: { contract_id: { _eq: $contractId }, status: { _eq: "pending_signature" } }
+                    _set: { status: "created" }
+                  ) { affected_rows }
+                }`,
+                { contractId: resolvedContractId },
+              );
             } else {
               const record = await insertEscrowRecord({
                 contractId: resolvedContractId,
@@ -287,15 +315,26 @@ export const sendTransactionHandler = async (
           }
         }
       } catch (error) {
-        if (error instanceof ConcurrentTransitionError) {
+        if (error instanceof InvalidTransitionError || error instanceof ConcurrentTransitionError) {
+          return res.status(409).json(conflictBody(error));
+        }
+
+        if (isUniqueViolation(error)) {
           return res.status(409).json({
             error: 'Escrow changed. Refresh and retry',
-            from: error.from,
-            to: error.to,
           });
         }
 
-        if (isUniqueViolation(error) || isEscrowChangedError(error)) {
+        if (isEscrowTransitionError(error)) {
+          const { from, to } = parseTransitionError(error);
+          return res.status(409).json({
+            error: `invalid escrow transition ${from ?? 'unknown'} -> ${to ?? 'unknown'}`,
+            ...(from ? { from } : {}),
+            ...(to ? { to } : {}),
+          });
+        }
+
+        if (isEscrowChangedError(error)) {
           return res.status(409).json({
             error: 'Escrow changed. Refresh and retry',
           });
@@ -367,6 +406,14 @@ export const sendTransactionHandler = async (
         messages: error.messages,
         payload: error.payload,
       });
+    }
+
+    if (error instanceof InvalidTransitionError || error instanceof ConcurrentTransitionError) {
+      return res.status(409).json(conflictBody(error));
+    }
+
+    if (isUniqueViolation(error)) {
+      return res.status(409).json({ error: 'Escrow changed. Refresh and retry' });
     }
 
     const messages = getErrorMessages(error, 'Failed to send transaction.');

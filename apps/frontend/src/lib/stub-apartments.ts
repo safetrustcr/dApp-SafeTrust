@@ -8,7 +8,6 @@ export const STUB_APARTMENTS = [
     bathrooms: 1,
     petFriendly: true,
     owner: {
-      id: "owner-1",
       name: "Alberto Casas",
       email: "albertoCasas100@gmail.com",
       phone: "+506 64852179",
@@ -26,7 +25,6 @@ export const STUB_APARTMENTS = [
     bathrooms: 1,
     petFriendly: true,
     owner: {
-      id: "owner-2",
       name: "Maria Lopez",
       email: "maria.lopez@example.com",
       phone: "+506 64852180",

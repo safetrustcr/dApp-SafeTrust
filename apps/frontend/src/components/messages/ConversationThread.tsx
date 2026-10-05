@@ -7,6 +7,7 @@ import {
   SUBSCRIBE_CONVERSATION_MESSAGES,
   MARK_MESSAGES_READ,
 } from '@/graphql/queries/messages-queries';
+import { markRead as markReadApi } from '@/lib/api/messages';
 import { MessageBubble } from './MessageBubble';
 import { AutomatedEventMessage } from './AutomatedEventMessage';
 import { MessageComposer } from './MessageComposer';
@@ -59,8 +60,11 @@ export function ConversationThread({
 
   // Mark messages as read when thread opens
   useEffect(() => {
-    if (user?.uid) {
-      markRead({ variables: { conversationId, userId: user.uid } });
+    if (user?.uid && conversationId) {
+      markReadApi(conversationId).catch((err) => {
+        console.error('Failed to mark conversation read via API:', err);
+      });
+      markRead({ variables: { conversationId, userId: user.uid } }).catch(() => {});
     }
   }, [conversationId, user?.uid, markRead]);
 

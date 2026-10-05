@@ -1,4 +1,4 @@
-import { ProblemDetails } from './problem-details';
+import { ProblemDetails } from './problem-details.js';
 
 /**
  * RFC 7807-style ApiError — the single error type all escrow handlers throw.
