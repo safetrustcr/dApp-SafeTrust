@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
 import { guardEscrowAction, sendConflict } from './transition-guard.js';
+import { asyncHandler } from '../../http/async-handler.js';
 
 type MilestoneStatusRequestBody = {
   contractId?: string;
@@ -25,34 +26,34 @@ type MilestoneStatusResponse = {
   status: string;
 };
 
-export const milestoneStatusHandler = async (
-  req: Request<{}, MilestoneStatusResponse | { error: string; messages?: string[]; payload?: unknown }, MilestoneStatusRequestBody>,
-  res: Response<MilestoneStatusResponse | { error: string; messages?: string[]; payload?: unknown }>
-): Promise<Response> => {
+export const milestoneStatusHandler = asyncHandler(async (
+  req: Request<{}, MilestoneStatusResponse | { error: string }, MilestoneStatusRequestBody>,
+  res: Response<MilestoneStatusResponse | { error: string }>,
+) => {
+  const { contractId, serviceProvider, engagementId, milestoneIndex, newStatus, newEvidence } = req.body || {};
+
+  if (!contractId || !serviceProvider || !engagementId) {
+    return res.status(400).json({
+      error: 'Missing required fields: contractId, serviceProvider, engagementId.',
+    });
+  }
+
+  const validStatuses = ['completed'];
+  const resolvedStatus = newStatus ?? 'completed';
+  if (!validStatuses.includes(resolvedStatus)) {
+    return res.status(400).json({
+      error: `Invalid newStatus: must be one of ${validStatuses.join(', ')}.`,
+    });
+  }
+
+  const resolvedIndex = milestoneIndex ?? 0;
+  if (!Number.isInteger(resolvedIndex) || resolvedIndex < 0) {
+    return res.status(400).json({
+      error: 'Invalid milestoneIndex: must be a non-negative integer.',
+    });
+  }
+
   try {
-    const { contractId, serviceProvider, engagementId, milestoneIndex, newStatus, newEvidence } = req.body || {};
-
-    if (!contractId || !serviceProvider || !engagementId) {
-      return res.status(400).json({
-        error: 'Missing required fields: contractId, serviceProvider, engagementId.',
-      });
-    }
-
-    const validStatuses = ['completed'];
-    const resolvedStatus = newStatus ?? 'completed';
-    if (!validStatuses.includes(resolvedStatus)) {
-      return res.status(400).json({
-        error: `Invalid newStatus: must be one of ${validStatuses.join(', ')}.`,
-      });
-    }
-
-    const resolvedIndex = milestoneIndex ?? 0;
-    if (!Number.isInteger(resolvedIndex) || resolvedIndex < 0) {
-      return res.status(400).json({
-        error: 'Invalid milestoneIndex: must be a non-negative integer.',
-      });
-    }
-
     const conflict = await guardEscrowAction(res, 'mark_milestone_completed', contractId);
     if (conflict) return conflict;
 
@@ -106,4 +107,4 @@ export const milestoneStatusHandler = async (
       messages,
     });
   }
-};
+});

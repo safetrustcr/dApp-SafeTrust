@@ -3,15 +3,6 @@ import { fundEscrowHandler } from '../fund.handler.js';
 
 vi.mock('../../../services/trustlesswork.js', () => ({
   trustlessWorkRequest: vi.fn(),
-  TrustlessWorkRequestError: class extends Error {
-    constructor(message, statusCode, messages, payload) {
-      super(message);
-      this.statusCode = statusCode;
-      this.messages = messages;
-      this.payload = payload;
-    }
-  },
-  getErrorMessages: vi.fn((err, fallback) => [err?.message || fallback]),
 }));
 
 vi.mock('../../../services/escrow-db.js', () => ({

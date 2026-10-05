@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
 import { guardEscrowAction, sendConflict } from './transition-guard.js';
+import { asyncHandler } from '../../http/async-handler.js';
 
 type FundRequestBody = {
   contractId?: string;
@@ -22,25 +23,25 @@ type FundResponse = {
   engagementId: string;
 };
 
-export const fundEscrowHandler = async (
-  req: Request<{}, FundResponse | { error: string; messages?: string[]; payload?: unknown }, FundRequestBody>,
-  res: Response<FundResponse | { error: string; messages?: string[]; payload?: unknown }>
-): Promise<Response> => {
+export const fundEscrowHandler = asyncHandler(async (
+  req: Request<{}, FundResponse | { error: string }, FundRequestBody>,
+  res: Response<FundResponse | { error: string }>,
+) => {
+  const { contractId, signer, amount, engagementId } = req.body || {};
+
+  if (!contractId || !signer || typeof amount !== 'number' || !engagementId) {
+    return res.status(400).json({
+      error: 'Missing required fields: contractId, signer, amount, engagementId.',
+    });
+  }
+
+  if (amount <= 0 || !Number.isFinite(amount)) {
+    return res.status(400).json({
+      error: 'Invalid amount: must be a positive number.',
+    });
+  }
+
   try {
-    const { contractId, signer, amount, engagementId } = req.body || {};
-
-    if (!contractId || !signer || typeof amount !== 'number' || !engagementId) {
-      return res.status(400).json({
-        error: 'Missing required fields: contractId, signer, amount, engagementId.',
-      });
-    }
-
-    if (amount <= 0 || !Number.isFinite(amount)) {
-      return res.status(400).json({
-        error: 'Invalid amount: must be a positive number.',
-      });
-    }
-
     const conflict = await guardEscrowAction(res, 'fund', contractId);
     if (conflict) return conflict;
 
@@ -84,4 +85,4 @@ export const fundEscrowHandler = async (
       messages,
     });
   }
-};
+});
