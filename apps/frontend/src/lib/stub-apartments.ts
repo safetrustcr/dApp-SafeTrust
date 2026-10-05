@@ -8,10 +8,11 @@ export const STUB_APARTMENTS = [
     bathrooms: 1,
     petFriendly: true,
     owner: {
+      id: "owner-1",
       name: "Alberto Casas",
       email: "albertoCasas100@gmail.com",
       phone: "+506 64852179",
-      id: "owner-1",
+      id: "demo-owner-uid-002",
     },
     description:
       "Beautiful apartment in the heart of San José with modern amenities and stunning views.",
@@ -25,10 +26,11 @@ export const STUB_APARTMENTS = [
     bathrooms: 1,
     petFriendly: true,
     owner: {
+      id: "owner-2",
       name: "Maria Lopez",
       email: "maria.lopez@example.com",
       phone: "+506 64852180",
-      id: "owner-2",
+      id: "demo-owner-uid-002",
     },
     description: "Cozy apartment near Los Yoses with great transit access.",
   },

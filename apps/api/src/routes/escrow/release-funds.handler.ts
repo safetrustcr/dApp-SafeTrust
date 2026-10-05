@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
 import { guardEscrowAction, sendConflict } from './transition-guard.js';
+import { asyncHandler } from '../../http/async-handler.js';
 
 type ReleaseRequestBody = {
   contractId?: string;
@@ -26,19 +27,19 @@ type ReleaseResponse = {
   message?: string;
 };
 
-export const releaseFundsHandler = async (
-  req: Request<{}, ReleaseResponse | { error: string; messages?: string[]; payload?: unknown }, ReleaseRequestBody>,
-  res: Response<ReleaseResponse | { error: string; messages?: string[]; payload?: unknown }>
-): Promise<Response> => {
+export const releaseFundsHandler = asyncHandler(async (
+  req: Request<{}, ReleaseResponse | { error: string }, ReleaseRequestBody>,
+  res: Response<ReleaseResponse | { error: string }>,
+) => {
+  const { contractId, releaseSigner, engagementId } = req.body || {};
+
+  if (!contractId || !releaseSigner) {
+    return res.status(400).json({
+      error: 'Missing required fields: contractId, releaseSigner.',
+    });
+  }
+
   try {
-    const { contractId, releaseSigner, engagementId } = req.body || {};
-
-    if (!contractId || !releaseSigner) {
-      return res.status(400).json({
-        error: 'Missing required fields: contractId, releaseSigner.',
-      });
-    }
-
     const conflict = await guardEscrowAction(res, 'release_funds', contractId);
     if (conflict) return conflict;
 
@@ -87,4 +88,4 @@ export const releaseFundsHandler = async (
       messages,
     });
   }
-};
+});

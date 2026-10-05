@@ -26,7 +26,7 @@ export function MessageComposer({
 
   const handleSend = async () => {
     const trimmed = body.trim();
-    if (!trimmed) return;
+    if (!trimmed || trimmed.length > 4000) return;
 
     setIsSending(true);
     try {
@@ -76,26 +76,37 @@ export function MessageComposer({
     }
   };
 
+  const isNearLimit = body.length > 3900;
+  const isOverLimit = body.length > 4000;
+
   return (
-    <div className="p-4 border-t mt-auto flex gap-3 items-end bg-background">
-      <Textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        onFocus={handleFocus}
-        onKeyDown={handleKeyDown}
-        placeholder="Type a message..."
-        className="min-h-[60px] max-h-[120px] resize-none"
-        disabled={isSending}
-      />
-      <Button 
-        size="icon" 
-        onClick={handleSend} 
-        disabled={!body.trim() || isSending}
-        className="h-10 w-10 shrink-0"
-      >
-        <Send className="h-4 w-4" />
-        <span className="sr-only">Send</span>
-      </Button>
+    <div className="p-4 border-t flex flex-col gap-2 mt-auto bg-background">
+      <div className="flex gap-3 items-end">
+        <Textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onFocus={handleFocus}
+          onKeyDown={handleKeyDown}
+          placeholder="Type a message..."
+          className={`min-h-[60px] max-h-[120px] resize-none ${isOverLimit ? 'border-destructive' : ''}`}
+          disabled={isSending}
+          maxLength={4000}
+        />
+        <Button
+          size="icon"
+          onClick={handleSend}
+          disabled={!body.trim() || isSending || isOverLimit}
+          className="h-10 w-10 shrink-0"
+        >
+          <Send className="h-4 w-4" />
+          <span className="sr-only">Send</span>
+        </Button>
+      </div>
+      {isNearLimit && (
+        <span className={`text-xs self-end ${isOverLimit ? 'text-destructive' : 'text-muted-foreground'}`}>
+          {body.length} / 4000
+        </span>
+      )}
     </div>
   );
 }

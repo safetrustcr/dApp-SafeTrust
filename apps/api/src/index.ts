@@ -19,14 +19,13 @@ import messagesRouter from './routes/messages/send.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
-import { errorHandler } from './http/error-middleware.js';
+import { requestIdMiddleware, errorHandler } from './http/error-middleware.js';
 import hotelsRouter from './routes/hotels/hotels.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
 initFirebaseAdmin();
-
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -36,8 +35,6 @@ const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',')
   : ['http://localhost:3001'];
 
-app.use('/api/auth', syncWalletRouter);
-
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -46,8 +43,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(tenantMiddleware);
-
-app.use('/api/auth/wallet', walletAuthRouter);
+app.use(requestIdMiddleware); // attach X-Request-Id before all routes
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -57,7 +53,9 @@ app.get('/health', (_req, res) => {
 app.use('/reconciliation', reconciliationRouter);
 
 // Auth routes
+app.use('/api/auth/wallet', walletAuthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/auth', syncWalletRouter);
 app.use('/api/auth', promoteToHostRouter);
 app.use('/api/auth', activateWalletRouter);
 app.use('/api/admin', adminUsersRouter);

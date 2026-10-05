@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
-import { ApiError } from './api-error.js';
 import { randomUUID } from 'node:crypto';
+import { ApiError } from './api-error.js';
 
 /** RFC 7807 Problem Details error formatter */
 export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {

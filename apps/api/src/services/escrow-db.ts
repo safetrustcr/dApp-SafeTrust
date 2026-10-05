@@ -368,7 +368,6 @@ export async function dbApproveMilestone(
     throw new ConcurrentTransitionError('completed', 'approved');
   }
 
-
   // Single mutation document: milestone approved + escrow flip + audit log run
   // in one Postgres transaction, so an error in any of them changes nothing.
   // The escrow flip is conditional on `funded` (the only valid `from` status),
@@ -429,7 +428,6 @@ export async function dbApproveMilestone(
       ...lifecycleArgs(lifecycle),
     },
   );
-
   assertAffectedRows('approve_milestone', result.update_escrowMilestones?.affected_rows ?? 0, 'completed', 'approved');
   assertAffectedRows('approve_milestone', result.update_trustlessWorkEscrows?.affected_rows ?? 0, 'funded', 'milestone_approved');
   assertAffectedRows('approve_milestone', result.update_escrows?.affected_rows ?? 0, 'funded', 'milestone_approved');
