@@ -29,6 +29,7 @@ export interface HotelListing extends HotelAmenitySummary {
   owner: HotelOwner;
   description: string;
   favorite?: boolean;
+  isStub?: boolean;
 }
 
 export type HotelCategory = HotelListing['category'];

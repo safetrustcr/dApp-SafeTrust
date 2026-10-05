@@ -21,6 +21,11 @@ export const startConversationHandler = async (
     return res.status(400).json({ error: 'Missing required field: apartmentId' });
   }
 
+  // Validate apartmentId is a valid UUID string
+  if (typeof apartmentId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(apartmentId)) {
+    return res.status(400).json({ error: 'Invalid apartmentId format: must be a valid UUID' });
+  }
+
   try {
     // First, get the apartment owner (host)
     const apartmentData = await executeGraphQL<{
@@ -41,35 +46,15 @@ export const startConversationHandler = async (
 
     const hostId = apartment.owner_id;
 
-    // Check if conversation already exists
-    const existingConversation = await executeGraphQL<{
-      conversations: Array<{ id: string }>;
-    }>(
-      `query GetExistingConversation($guestId: String!, $hostId: String!, $apartmentId: uuid!) {
-        conversations(
-          where: {
-            guest_id: { _eq: $guestId }
-            host_id: { _eq: $hostId }
-            apartment_id: { _eq: $apartmentId }
-          }
-          limit: 1
-        ) {
-          id
-        }
-      }`,
-      { guestId: uid, hostId, apartmentId }
-    );
-
-    if (existingConversation.conversations.length > 0) {
-      // Return existing conversation
-      return res.status(200).json({
-        conversationId: existingConversation.conversations[0].id,
-      });
+    // Prevent users from messaging themselves
+    if (hostId === uid) {
+      return res.status(409).json({ error: 'Cannot start a conversation with yourself' });
     }
 
-    // Create new conversation
-    const newConversation = await executeGraphQL<{
-      insert_conversations_one: { id: string };
+    // Create new conversation with atomic insert-or-return logic
+    // Using insert with on_conflict to handle race conditions
+    const result = await executeGraphQL<{
+      insert_conversations_one: { id: string } | null;
     }>(
       `mutation CreateConversation($guestId: String!, $hostId: String!, $apartmentId: uuid!) {
         insert_conversations_one(
@@ -80,6 +65,10 @@ export const startConversationHandler = async (
             status: "active"
             tenant_id: "safetrust"
           }
+          on_conflict: {
+            constraint: conversations_guest_id_host_id_apartment_id_key
+            update_columns: []
+          }
         ) {
           id
         }
@@ -87,10 +76,38 @@ export const startConversationHandler = async (
       { guestId: uid, hostId, apartmentId }
     );
 
-    console.log(`[messages/conversations] ✅ conversation created — conversationId: ${newConversation.insert_conversations_one.id}`);
+    // If insert returned null (conflict), the conversation already exists
+    // Query to get the existing conversation
+    if (!result.insert_conversations_one) {
+      const existingConversation = await executeGraphQL<{
+        conversations: Array<{ id: string }>;
+      }>(
+        `query GetExistingConversation($guestId: String!, $hostId: String!, $apartmentId: uuid!) {
+          conversations(
+            where: {
+              guest_id: { _eq: $guestId }
+              host_id: { _eq: $hostId }
+              apartment_id: { _eq: $apartmentId }
+            }
+            limit: 1
+          ) {
+            id
+          }
+        }`,
+        { guestId: uid, hostId, apartmentId }
+      );
+
+      if (existingConversation.conversations.length > 0) {
+        return res.status(200).json({
+          conversationId: existingConversation.conversations[0].id,
+        });
+      }
+    }
+
+    console.log(`[messages/conversations] ✅ conversation created — conversationId: ${result.insert_conversations_one?.id}`);
 
     return res.status(201).json({
-      conversationId: newConversation.insert_conversations_one.id,
+      conversationId: result.insert_conversations_one?.id,
     });
   } catch (error) {
     console.error('[messages/conversations] ❌ error:', error);
