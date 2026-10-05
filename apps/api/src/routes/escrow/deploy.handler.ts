@@ -1,7 +1,9 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { checkIdempotency } from '../../services/idempotency.js';
 import { hasuraRequest } from '../../services/hasura.js';
 import { trustlessWorkRequest } from '../../services/trustlesswork.js';
+import { ApiError } from '../../http/api-error.js';
+import { asyncHandler } from '../../http/async-handler.js';
 
 type DeployRequestBody = {
   apartmentId: string;
@@ -19,12 +21,11 @@ type DeployResponse = {
   cached?: boolean;
 };
 
-export const deployEscrowHandler = async (
+export const deployEscrowHandler = asyncHandler(async (
   req: Request<Record<string, never>, DeployResponse | { error: string }, DeployRequestBody>,
-  res: Response<DeployResponse | { error: string }>
-): Promise<void> => {
-  const { apartmentId, senderAddress, receiverAddress, amount, engagementId } =
-    req.body;
+  res: Response<DeployResponse | { error: string }>,
+) => {
+  const { apartmentId, senderAddress, receiverAddress, amount, engagementId } = req.body;
 
   if (!apartmentId || !senderAddress || !receiverAddress || !Number.isFinite(amount) || amount <= 0) {
     res.status(400).json({
@@ -41,7 +42,7 @@ export const deployEscrowHandler = async (
   if (idempotencyResult.exists) {
     console.log(
       `[escrow/deploy] idempotent hit — engagementId: ${resolvedEngagementId}, ` +
-      `contractId: ${idempotencyResult.result.contract_id}`
+      `contractId: ${idempotencyResult.result.contract_id}`,
     );
     res.status(200).json({
       status: 'CACHED',
@@ -57,86 +58,81 @@ export const deployEscrowHandler = async (
   const platformAddress = process.env.PLATFORM_STELLAR_ADDRESS;
   const usdcIssuer = process.env.USDC_TRUSTLINE_ADDRESS;
   if (!platformAddress || !usdcIssuer) {
-    res.status(500).json({
-      error: 'Missing PLATFORM_STELLAR_ADDRESS or USDC_TRUSTLINE_ADDRESS server configuration.',
-    });
-    return;
+    throw new ApiError(503, 'AUTH_NOT_CONFIGURED', 'Authentication is temporarily unavailable.', { retryable: true });
   }
 
-  try {
-    const twData = await trustlessWorkRequest<{
-      status: string;
-      contractId?: string;
-      unsignedTransaction?: string;
-      message?: string;
-    }>('/deployer/single-release', {
-      method: 'POST',
-      body: {
-        engagementId: resolvedEngagementId,
-        title: `SafeTrust Rental — ${apartmentId}`,
-        description: `Security deposit for apartment ${apartmentId}`,
-        signer: senderAddress,
-        amount,
-        platformFee: 0,
-        roles: {
-          approver: senderAddress,
-          serviceProvider: receiverAddress,
-          receiver: receiverAddress,
-          platformAddress,
-          releaseSigner: senderAddress,
-          disputeResolver: platformAddress,
-        },
-        milestones: [{ description: 'Rental security deposit' }],
-        trustline: {
-          symbol: 'USDC',
-          address: usdcIssuer,
-        },
-      },
-    });
-
-    // Persist pending escrow to DB
-    await hasuraRequest(
-      `mutation InsertEscrow(
-        $contractId: String!
-        $engagementId: String!
-        $apartmentId: uuid!
-        $senderAddress: String!
-        $receiverAddress: String!
-        $amount: numeric!
-        $unsignedXdr: String
-      ) {
-        insert_escrows_one(object: {
-          contract_id: $contractId
-          engagement_id: $engagementId
-          apartment_id: $apartmentId
-          property_id: $apartmentId
-          sender_address: $senderAddress
-          receiver_address: $receiverAddress
-          amount: $amount
-          status: "pending_signature"
-          unsigned_xdr: $unsignedXdr
-          tenant_id: "safetrust"
-        }) { id }
-      }`,
-      {
-        contractId: twData.contractId ?? resolvedEngagementId,
-        engagementId: resolvedEngagementId,
-        apartmentId,
-        senderAddress,
-        receiverAddress,
-        amount,
-        unsignedXdr: twData.unsignedTransaction ?? '',
-      }
-    );
-
-    res.status(200).json({
-      status: twData.status,
-      contractId: twData.contractId,
-      unsignedXDR: twData.unsignedTransaction ?? '',
+  // trustlessWorkRequest throws TrustlessWorkRequestError on failure —
+  // errorMiddleware maps those automatically; no catch needed here.
+  const twData = await trustlessWorkRequest<{
+    status: string;
+    contractId?: string;
+    unsignedTransaction?: string;
+    message?: string;
+  }>('/deployer/single-release', {
+    method: 'POST',
+    body: {
       engagementId: resolvedEngagementId,
-    });
-  } catch (err) {
-    console.error('[escrow/deploy] error:', err);
-    res.status(500).json({ error: String(err) });
-  }
-};
+      title: `SafeTrust Rental — ${apartmentId}`,
+      description: `Security deposit for apartment ${apartmentId}`,
+      signer: senderAddress,
+      amount,
+      platformFee: 0,
+      roles: {
+        approver: senderAddress,
+        serviceProvider: receiverAddress,
+        receiver: receiverAddress,
+        platformAddress,
+        releaseSigner: senderAddress,
+        disputeResolver: platformAddress,
+      },
+      milestones: [{ description: 'Rental security deposit' }],
+      trustline: {
+        symbol: 'USDC',
+        address: usdcIssuer,
+      },
+    },
+  });
+
+  // Persist pending escrow to DB — HasuraRequestError thrown on failure,
+  // errorMiddleware maps it to DATABASE_ERROR automatically.
+  await hasuraRequest(
+    `mutation InsertEscrow(
+      $contractId: String!
+      $engagementId: String!
+      $apartmentId: uuid!
+      $senderAddress: String!
+      $receiverAddress: String!
+      $amount: numeric!
+      $unsignedXdr: String
+    ) {
+      insert_escrows_one(object: {
+        contract_id: $contractId
+        engagement_id: $engagementId
+        apartment_id: $apartmentId
+        property_id: $apartmentId
+        sender_address: $senderAddress
+        receiver_address: $receiverAddress
+        amount: $amount
+        status: "pending_signature"
+        unsigned_xdr: $unsignedXdr
+        tenant_id: "safetrust"
+      }) { id }
+    }`,
+    {
+      contractId: twData.contractId ?? resolvedEngagementId,
+      engagementId: resolvedEngagementId,
+      apartmentId,
+      senderAddress,
+      receiverAddress,
+      amount,
+      unsignedXdr: twData.unsignedTransaction ?? '',
+    },
+  );
+
+  res.status(200).json({
+    status: twData.status,
+    contractId: twData.contractId,
+    unsignedXDR: twData.unsignedTransaction ?? '',
+    engagementId: resolvedEngagementId,
+  });
+});
