@@ -102,12 +102,24 @@ export const startConversationHandler = async (
           conversationId: existingConversation.conversations[0].id,
         });
       }
+
+      // If insert returned null and fallback lookup found no conversation, return error
+      return res.status(500).json({
+        error: 'Failed to start conversation',
+      });
     }
 
-    console.log(`[messages/conversations] ✅ conversation created — conversationId: ${result.insert_conversations_one?.id}`);
+    const conversationId = result.insert_conversations_one?.id;
+    if (!conversationId) {
+      return res.status(500).json({
+        error: 'Failed to start conversation',
+      });
+    }
+
+    console.log(`[messages/conversations] ✅ conversation created — conversationId: ${conversationId}`);
 
     return res.status(201).json({
-      conversationId: result.insert_conversations_one?.id,
+      conversationId,
     });
   } catch (error) {
     console.error('[messages/conversations] ❌ error:', error);
