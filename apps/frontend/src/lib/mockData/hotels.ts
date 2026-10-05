@@ -22,6 +22,7 @@ export const STUB_HOTELS: HotelListing[] = [
     description:
       'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry’s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.',
     favorite: false,
+    isStub: true,
   },
   {
     id: '2',
@@ -44,6 +45,7 @@ export const STUB_HOTELS: HotelListing[] = [
     description:
       'Compact apartment near key routes with bright interiors and fast access to the city center.',
     favorite: false,
+    isStub: true,
   },
   {
     id: '3',
@@ -66,6 +68,7 @@ export const STUB_HOTELS: HotelListing[] = [
     description:
       'Loft-style living with clean finishes, natural light, and walkable access to major amenities.',
     favorite: true,
+    isStub: true,
   },
   {
     id: '4',
@@ -88,6 +91,7 @@ export const STUB_HOTELS: HotelListing[] = [
     description:
       'Larger family-ready floor plan with flexible living space and strong natural ventilation.',
     favorite: false,
+    isStub: true,
   },
   {
     id: '5',
@@ -110,6 +114,7 @@ export const STUB_HOTELS: HotelListing[] = [
     description:
       'Quiet rental with a warm palette, ideal for medium stays and airport-adjacent access.',
     favorite: true,
+    isStub: true,
   },
   {
     id: '6',
@@ -132,6 +137,7 @@ export const STUB_HOTELS: HotelListing[] = [
     description:
       'Balanced shared-living layout with comfortable bedrooms and a practical amenity mix.',
     favorite: false,
+    isStub: true,
   },
 ];
 
