@@ -62,9 +62,7 @@ function decodeUid(token: string): string {
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
-  const token =
-    request.cookies.get('firebase-token')?.value ||
-    request.cookies.get('auth-token')?.value;
+  const token = request.cookies.get("firebase-token")?.value;
 
   const isProtectedRoute = pathname.startsWith('/dashboard');
   const isAuthRoute      = pathname === '/login' || pathname === '/register';

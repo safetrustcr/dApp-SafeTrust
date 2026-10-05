@@ -18,3 +18,15 @@ export function mockRes() {
 
   return res;
 }
+
+/**
+ * Creates a no-op next() that captures any error forwarded to it.
+ * Used when invoking asyncHandler-wrapped handlers in tests.
+ */
+export function mockNext() {
+  const next = (err) => {
+    next.error = err ?? null;
+  };
+  next.error = undefined;
+  return next;
+}

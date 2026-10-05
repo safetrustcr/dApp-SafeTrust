@@ -1,6 +1,13 @@
 import { ProblemDetails } from './problem-details';
 
-/** RFC 7807 Problem Details wrapper with API-specific extensions */
+/**
+ * RFC 7807-style ApiError — the single error type all escrow handlers throw.
+ *
+ * Handlers must never surface raw Error messages, stack traces, upstream
+ * payloads, tokens, or signed XDRs to the browser. They throw ApiError with
+ * a detail string that is safe to show a user, then errorMiddleware serialises
+ * it into a Problem Details response body.
+ */
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -19,7 +26,7 @@ export class ApiError extends Error {
       cause?: unknown;
     } = {},
   ) {
-    super(detail);
+    super(detail, { cause: options.cause });
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
@@ -27,7 +34,7 @@ export class ApiError extends Error {
     this.retryable = options.retryable;
     this.requestId = options.requestId;
     this.problemDetails = {
-      type: `https://api.safetrust.dev/problems/${code.toLowerCase().replace('_', '-')}`,
+      type: `https://api.safetrust.dev/problems/${code.toLowerCase().replace(/_/g, '-')}`,
       title: this.getTitle(),
       status,
       detail,
@@ -48,5 +55,9 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Convenience factory for 400 validation failures.
+ * Keeps handler code concise:  throw validationError('MISSING_CONTRACT_ID', 'contractId is required.')
+ */
 export const validationError = (code: string, detail: string) =>
   new ApiError(400, code, detail, { retryable: false });

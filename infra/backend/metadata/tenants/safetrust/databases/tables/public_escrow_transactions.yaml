@@ -4,4 +4,3 @@
 table:
   name: escrow_transactions
   schema: public
-comment: Escrow lifecycle audit log written by apps/api (admin-secret only).
