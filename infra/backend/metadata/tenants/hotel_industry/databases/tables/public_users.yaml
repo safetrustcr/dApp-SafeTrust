@@ -1,0 +1,30 @@
+table:
+  name: users
+  schema: public
+select_permissions:
+  - role: MANAGER
+    permission:
+      columns:
+        - id
+        - firebase_uid
+      filter:
+        firebase_uid:
+          _eq: X-Hasura-User-Id
+  - role: STAFF
+    permission:
+      columns:
+        - id
+        - firebase_uid
+      filter:
+        firebase_uid:
+          _eq: X-Hasura-User-Id
+  - role: platform_admin
+    permission:
+      columns:
+        - id
+        - firebase_uid
+        - email
+        - first_name
+        - last_name
+        - phone_number
+      filter: {}

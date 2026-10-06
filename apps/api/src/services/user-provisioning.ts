@@ -20,12 +20,12 @@ const UPSERT_USER = `
   ) {
     insert_users_one(
       object: {
-        id: $id, email: $email, first_name: $first_name, last_name: $last_name,
+        id: $id, firebase_uid: $id, email: $email, first_name: $first_name, last_name: $last_name,
         phone_number: $phone_number, country_code: $country_code, location: $location
       }
       on_conflict: {
         constraint: users_email_unique
-        update_columns: [id, first_name, last_name, phone_number, country_code, location, last_seen]
+        update_columns: [id, firebase_uid, first_name, last_name, phone_number, country_code, location, last_seen]
       }
     ) { id email }
   }

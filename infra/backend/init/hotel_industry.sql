@@ -404,3 +404,10 @@ CREATE TRIGGER update_hotel_pricing_rules_updated_at
 -- Add helpful comment
 COMMENT ON TABLE hotel_industry.pricing_rules IS 
 'Pricing rules for Hotel Industry tenant - supports room deposits, booking fees, seasonal rates, and hospitality-specific pricing models';
+
+-- ── Migration: 1791000000000_add_hotel_ownership
+
+ALTER TABLE public.hotels
+    ADD COLUMN owner_id TEXT REFERENCES public.users(id) ON DELETE RESTRICT;
+
+CREATE INDEX idx_hotels_owner_id ON public.hotels(owner_id);

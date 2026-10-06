@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { initFirebaseAdmin } from '../src/lib/firebase-admin.js';
 import { ensureUserRole, syncUserProfile, type SafeTrustRole } from '../src/services/user-provisioning.js';
+import { hasuraClaimsFor } from '../src/services/hasura-claims.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 // scripts/ is nested at apps/api/scripts, so the repository root is three
@@ -82,6 +83,7 @@ async function provisionUser(user: DemoUser, password: string): Promise<'created
     await auth.setCustomUserClaims(user.uid, {
       ...existing.customClaims,
       safetrustRole: user.role,
+      hasura: hasuraClaimsFor(user.uid, user.role),
     });
     return 'updated';
   } catch (error: unknown) {
@@ -108,7 +110,10 @@ async function provisionUser(user: DemoUser, password: string): Promise<'created
     throw error;
   }
 
-  await auth.setCustomUserClaims(user.uid, { safetrustRole: user.role });
+  await auth.setCustomUserClaims(user.uid, {
+    safetrustRole: user.role,
+    hasura: hasuraClaimsFor(user.uid, user.role),
+  });
   return 'created';
 }
 

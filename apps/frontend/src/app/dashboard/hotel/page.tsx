@@ -30,7 +30,7 @@ export default function HotelDashboardPage() {
             <p className="mb-4 text-muted-foreground">{error}</p>
             <Button onClick={refetch} variant="outline">
               <RefreshCw className="mr-2 h-4 w-4" />
-              Try again
+              Retry
             </Button>
           </div>
         </Card>

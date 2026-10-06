@@ -2,6 +2,9 @@ table:
   name: hotels
   schema: public
 object_relationships:
+  - name: owner
+    using:
+      foreign_key_constraint_on: owner_id
   - name: rooms
     using:
       foreign_key_constraint_on:
@@ -11,10 +14,11 @@ object_relationships:
         columns:
           - hotel_id
 select_permissions:
-  - role: tenant
+  - role: MANAGER
     permission:
       columns:
         - id
+        - owner_id
         - name
         - description
         - address
@@ -22,11 +26,31 @@ select_permissions:
         - coordinates
         - created_at
         - updated_at
-      filter: {}
-  - role: landlord
+      filter:
+        owner:
+          firebase_uid:
+            _eq: X-Hasura-User-Id
+  - role: STAFF
     permission:
       columns:
         - id
+        - owner_id
+        - name
+        - description
+        - address
+        - location_area
+        - coordinates
+        - created_at
+        - updated_at
+      filter:
+        owner:
+          firebase_uid:
+            _eq: X-Hasura-User-Id
+  - role: platform_admin
+    permission:
+      columns:
+        - id
+        - owner_id
         - name
         - description
         - address

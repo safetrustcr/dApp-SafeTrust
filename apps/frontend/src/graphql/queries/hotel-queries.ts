@@ -3,6 +3,23 @@ import { gql } from "@apollo/client";
 // Aligned to hotel_industry SQL from issue #293 (not the prose typos in #294).
 // room_types.name (not type_name); escrow amount via reservation.total_amount.
 
+export const GET_MANAGER_HOTELS = gql`
+  query ManagerHotels {
+    hotels(order_by: { name: asc }) {
+      id
+      name
+      address
+      location_area
+      description
+      rooms_aggregate {
+        aggregate {
+          count
+        }
+      }
+    }
+  }
+`;
+
 export const GET_HOTEL_ROOMS = gql`
   query GetHotelRooms {
     rooms(order_by: { room_number: asc }) {

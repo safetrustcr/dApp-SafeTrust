@@ -14,7 +14,7 @@ object_relationships:
         columns:
           - escrow_transaction_id
 select_permissions:
-  - role: tenant
+  - role: MANAGER
     permission:
       columns:
         - id
@@ -29,8 +29,36 @@ select_permissions:
         - fund_payload
         - created_at
         - updated_at
-      filter: {}
-  - role: landlord
+      filter:
+        reservation:
+          room:
+            hotel:
+              owner:
+                firebase_uid:
+                  _eq: X-Hasura-User-Id
+  - role: STAFF
+    permission:
+      columns:
+        - id
+        - reservation_id
+        - contract_id
+        - escrow_status
+        - signer_address
+        - transaction_type
+        - escrow_transaction_type
+        - http_status_code
+        - escrow_payload
+        - fund_payload
+        - created_at
+        - updated_at
+      filter:
+        reservation:
+          room:
+            hotel:
+              owner:
+                firebase_uid:
+                  _eq: X-Hasura-User-Id
+  - role: platform_admin
     permission:
       columns:
         - id

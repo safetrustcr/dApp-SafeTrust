@@ -45,40 +45,36 @@ describe('tenantMiddleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('sets req.tenant to hotel_industry when header is hotel_industry', () => {
+  it('ignores a client-supplied hotel tenant header', () => {
     const req = mockReq({ 'x-tenant-id': 'hotel_industry' });
     const res = mockRes();
     const next = mockNext();
 
     tenantMiddleware(req as Request, res as unknown as Response, next);
 
-    expect((req as Request).tenant).toBe('hotel_industry');
+    expect((req as Request).tenant).toBe('safetrust');
     expect(next).toHaveBeenCalled();
   });
 
-  it('returns 400 for an invalid tenant value', () => {
+  it('ignores invalid client-supplied tenant values', () => {
     const req = mockReq({ 'x-tenant-id': 'invalid_tenant' });
     const res = mockRes();
     const next = mockNext();
 
     tenantMiddleware(req as Request, res as unknown as Response, next);
 
-    expect(res._status).toBe(400);
-    expect(res._body).toMatchObject({
-      error: 'Invalid X-Tenant-ID',
-      received: 'invalid_tenant',
-    });
-    expect(next).not.toHaveBeenCalled();
+    expect((req as Request).tenant).toBe('safetrust');
+    expect(next).toHaveBeenCalled();
   });
 
-  it('returns 400 for empty string tenant value', () => {
+  it('ignores an empty client-supplied tenant value', () => {
     const req = mockReq({ 'x-tenant-id': '' });
     const res = mockRes();
     const next = mockNext();
 
     tenantMiddleware(req as Request, res as unknown as Response, next);
 
-    expect(res._status).toBe(400);
-    expect(next).not.toHaveBeenCalled();
+    expect((req as Request).tenant).toBe('safetrust');
+    expect(next).toHaveBeenCalled();
   });
 });

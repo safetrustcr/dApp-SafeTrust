@@ -746,3 +746,23 @@ ON CONFLICT (from_status, to_status) DO NOTHING;
 --    (engagement_id, action) remains the duplicate guard: a second identical
 --    transition's log insert fails and rolls the whole mutation back.
 DROP INDEX IF EXISTS public.ux_escrow_transactions_engagement;
+
+-- ── Migration: 1791000000002_add_firebase_uid
+
+ALTER TABLE public.users
+  ADD COLUMN firebase_uid TEXT;
+
+UPDATE public.users
+SET firebase_uid = id
+WHERE firebase_uid IS NULL;
+
+CREATE UNIQUE INDEX idx_users_firebase_uid
+  ON public.users(firebase_uid)
+  WHERE firebase_uid IS NOT NULL;
+
+-- ── Migration: 1791000000003_add_hotel_manager_roles
+
+INSERT INTO public.roles (name, description) VALUES
+  ('MANAGER', 'Manages hotels and hotel operations'),
+  ('STAFF', 'Works at a manager-owned hotel')
+ON CONFLICT (name) DO NOTHING;

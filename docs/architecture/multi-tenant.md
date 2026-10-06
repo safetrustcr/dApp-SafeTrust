@@ -10,7 +10,7 @@ names and tenant identifiers, not PostgreSQL schemas. Both use
 
 ```mermaid
 graph TD
-    API["apps/api\nX-Tenant-ID header"]
+    API["apps/api\nverified Firebase identity"]
     Hasura["Hasura GraphQL Engine"]
     ST["Hasura source: safetrust\ncore platform metadata"]
     HI["Hasura source: hotel_industry\nhospitality metadata"]
@@ -18,7 +18,7 @@ graph TD
     Public["PostgreSQL schema: public\nusers · escrows · apartments\nhotels · rooms · reservations"]
     Hotel["PostgreSQL schema: hotel_industry\npricing_rules only"]
 
-    API -->|"X-Tenant-ID selects source"| Hasura
+    API -->|"server-side authorized access"| Hasura
     Hasura --> ST
     Hasura --> HI
     ST --> DB
@@ -27,23 +27,41 @@ graph TD
     DB --> Hotel
 ```
 
-## Tenant middleware
+## Verified identity and tenant resolution
 
-Every request to `apps/api` passes through `tenantMiddleware` which reads
-the `X-Tenant-ID` header and attaches the validated tenant to `req.tenant`:
+The browser sends only its Firebase ID token to Hasura. The browser must never
+send `x-hasura-admin-secret`, and `X-Tenant-ID` is not an authority: API
+middleware ignores it and defaults to `safetrust`. The hotel source is reached
+through the `hotel_industry` GraphQL fields and can be queried only when the
+verified Firebase token contains an API-issued hotel role.
 
-```typescript
-// Valid values
-type Tenant = 'safetrust' | 'hotel_industry';
+Hasura verifies Firebase ID tokens using the configured Firebase JWK endpoint,
+issuer, and audience. The API writes these custom claims under the Firebase
+claim named `hasura`:
 
-// Default when header is absent (backward compatible)
-req.tenant = 'safetrust';
-```
-
-Requests with an invalid tenant value receive:
 ```json
-{ "error": "Invalid X-Tenant-ID", "message": "Must be one of: safetrust, hotel_industry" }
+{
+  "hasura": {
+    "x-hasura-default-role": "MANAGER",
+    "x-hasura-allowed-roles": ["MANAGER"],
+    "x-hasura-user-id": "<Firebase UID>"
+  }
+}
 ```
+
+The API-managed roles map to Hasura roles as follows: SafeTrust `guest` maps to
+`tenant`, SafeTrust `host` maps to `landlord`, SafeTrust `admin` maps to
+`platform_admin`, and hotel role assignments use `MANAGER` or `STAFF`. The
+existing `safetrustRole` Firebase claim is retained for application behavior.
+After a role change, clients must refresh their Firebase ID token to receive
+the updated claims.
+
+`MANAGER` and `STAFF` hotel selections are constrained by Hasura metadata.
+Hotels filter through `owner.firebase_uid = X-Hasura-User-Id`; rooms,
+reservations, and escrow records filter through their hotel relationship.
+`platform_admin` has unfiltered read access. A SafeTrust-only token has no
+hotel role in `x-hasura-allowed-roles`, so adding a tenant header cannot grant
+hotel access.
 
 ## Metadata structure
 
@@ -67,13 +85,13 @@ bin/start safetrust hotel_industry
 Starting only `safetrust` leaves Hasura in an inconsistent metadata state
 for the `hotel_industry` source.
 
-## Handler routing by tenant
+## Server-side routing
 
-```typescript
-// In any handler:
-if (req.tenant === 'hotel_industry') {
-  // query public.hotels and public.reservations through the hotel_industry source
-} else {
-  // query public.apartments and public.escrows through the safetrust source
-}
-```
+API request middleware defaults to `safetrust`; `X-Tenant-ID` is ignored.
+Server-side routes that need hotel data must authenticate the Firebase
+identity and authorize its API-issued hotel role before querying that source.
+
+Configure `FIREBASE_PROJECT_ID` in `infra/backend/.env`; Hasura uses it for
+Firebase token issuer and audience verification. Hotel manager records must
+have `public.hotels.owner_id` referencing the owner's `public.users.id`, with
+`public.users.firebase_uid` set to the Firebase UID.

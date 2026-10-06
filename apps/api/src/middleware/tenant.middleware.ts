@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
-const VALID_TENANTS = ['safetrust', 'hotel_industry'] as const;
-export type Tenant = (typeof VALID_TENANTS)[number];
+export type Tenant = 'safetrust' | 'hotel_industry';
 
 // Extend Express Request globally so req.tenant is typed in all handlers
 declare global {
@@ -13,8 +12,8 @@ declare global {
 }
 
 /**
- * Reads X-Tenant-ID header and attaches validated tenant to req.tenant.
- * Defaults to 'safetrust' when header is absent — backward compatible.
+ * Sets the safe default tenant. A browser-provided X-Tenant-ID is not
+ * authoritative; authenticated tenant selection must come from verified claims.
  *
  * Usage in handlers:
  *   req.tenant === 'safetrust'       → query public.apartments, public.escrows
@@ -25,21 +24,9 @@ declare global {
  */
 export function tenantMiddleware(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): void {
-  const tenantHeader = req.headers['x-tenant-id'] as string | undefined;
-  const tenantId = tenantHeader ?? 'safetrust';
-
-  if (!VALID_TENANTS.includes(tenantId as Tenant)) {
-    res.status(400).json({
-      error: 'Invalid X-Tenant-ID',
-      message: `Must be one of: ${VALID_TENANTS.join(', ')}`,
-      received: tenantId,
-    });
-    return;
-  }
-
-  req.tenant = tenantId as Tenant;
+  req.tenant = 'safetrust';
   next();
 }

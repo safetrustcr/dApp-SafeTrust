@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-const ROLES = ["guest", "host", "admin"] as const;
+const ROLES = ["guest", "host", "admin", "MANAGER", "STAFF"] as const;
 type Role = (typeof ROLES)[number];
 type ManagedUser = { id: string; email: string; first_name?: string | null; last_name?: string | null; location?: string | null; user_roles?: Array<{ role?: { name?: Role | null } | null }> };
 type CreateForm = { firstName: string; lastName: string; email: string; password: string; role: Role };

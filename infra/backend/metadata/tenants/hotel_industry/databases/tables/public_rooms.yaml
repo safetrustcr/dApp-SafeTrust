@@ -17,8 +17,9 @@ object_relationships:
         columns:
           - room_id
 select_permissions:
-  - role: tenant
+  - role: MANAGER
     permission:
+      allow_aggregations: true
       columns:
         - room_id
         - hotel_id
@@ -29,9 +30,32 @@ select_permissions:
         - status
         - created_at
         - updated_at
-      filter: {}
-  - role: landlord
+      filter:
+        hotel:
+          owner:
+            firebase_uid:
+              _eq: X-Hasura-User-Id
+  - role: STAFF
     permission:
+      allow_aggregations: true
+      columns:
+        - room_id
+        - hotel_id
+        - room_number
+        - room_type_id
+        - price_night
+        - capacity
+        - status
+        - created_at
+        - updated_at
+      filter:
+        hotel:
+          owner:
+            firebase_uid:
+              _eq: X-Hasura-User-Id
+  - role: platform_admin
+    permission:
+      allow_aggregations: true
       columns:
         - room_id
         - hotel_id

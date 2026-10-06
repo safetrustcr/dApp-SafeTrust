@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
 import { getAuth } from 'firebase-admin/auth';
+import { setHasuraUserClaims, type AssignableRole } from '../../services/hasura-claims.js';
 
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { hasuraRequest } from '../../services/hasura.js';
 
-const ASSIGNABLE_ROLES = ['guest', 'host', 'admin'] as const;
-type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
+const ASSIGNABLE_ROLES: readonly AssignableRole[] = ['guest', 'host', 'admin', 'MANAGER', 'STAFF'];
 
 type CreateUserBody = {
   email?: string;
@@ -69,7 +69,7 @@ export async function createManagedUserHandler(
     return res.status(400).json({ error: 'Password must contain at least 6 characters' });
   }
   if (!isAssignableRole(role)) {
-    return res.status(400).json({ error: 'Role must be guest, host, or admin' });
+    return res.status(400).json({ error: 'Role must be guest, host, admin, MANAGER, or STAFF' });
   }
 
   let firebaseUid: string | null = null;
@@ -81,7 +81,8 @@ export async function createManagedUserHandler(
       password,
       displayName: displayName || undefined,
     });
-    firebaseUid = firebaseUser.uid;
+    const createdUid = firebaseUser.uid;
+    firebaseUid = createdUid;
 
     const roleId = await roleIdFor(role);
     await hasuraRequest(
@@ -92,6 +93,7 @@ export async function createManagedUserHandler(
       {
         user: {
           id: firebaseUid,
+          firebase_uid: firebaseUid,
           email: normalizedEmail,
           first_name: firstName.trim() || null,
           last_name: lastName.trim() || null,
@@ -101,7 +103,7 @@ export async function createManagedUserHandler(
       },
     );
     databaseUserCreated = true;
-    await getAuth().setCustomUserClaims(firebaseUid, { safetrustRole: role });
+    await setHasuraUserClaims(createdUid, role);
 
     return res.status(201).json({
       user: { id: firebaseUid, email: normalizedEmail, first_name: firstName, last_name: lastName, role },
@@ -131,7 +133,7 @@ export async function changeUserRoleHandler(
   const { role } = req.body;
 
   if (!isAssignableRole(role)) {
-    return res.status(400).json({ error: 'Role must be guest, host, or admin' });
+    return res.status(400).json({ error: 'Role must be guest, host, admin, MANAGER, or STAFF' });
   }
   if (userId === req.user.uid && role !== 'admin') {
     return res.status(400).json({ error: 'Administrators cannot remove their own admin role' });
@@ -176,10 +178,7 @@ export async function changeUserRoleHandler(
       { userId, roleId },
     );
     const firebaseUser = await getAuth().getUser(userId);
-    await getAuth().setCustomUserClaims(userId, {
-      ...firebaseUser.customClaims,
-      safetrustRole: role,
-    });
+    await setHasuraUserClaims(userId, role, firebaseUser.customClaims ?? {});
     return res.json({ userId, role });
   } catch (error) {
     console.error('[admin/users] Failed to change role:', error);

@@ -2,7 +2,7 @@ table:
   name: room_types
   schema: public
 select_permissions:
-  - role: tenant
+  - role: MANAGER
     permission:
       columns:
         - id
@@ -11,7 +11,16 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
-  - role: landlord
+  - role: STAFF
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - created_at
+        - updated_at
+      filter: {}
+  - role: platform_admin
     permission:
       columns:
         - id
