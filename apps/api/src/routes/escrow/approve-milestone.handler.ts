@@ -1,51 +1,31 @@
 import type { Request, Response } from 'express';
-import { TrustlessWorkRequestError, getErrorMessages, trustlessWorkRequest } from '../../services/trustlesswork.js';
-import { guardEscrowAction, sendConflict } from './transition-guard.js';
 import { asyncHandler } from '../../http/async-handler.js';
+import { ApiError } from '../../http/api-error.js';
+import { buildEscrowAction, requireEngagementId } from './build-escrow-action.js';
+import { milestoneIdFor, parseMilestoneIndex } from './milestones.js';
 
-type ApproveMilestoneBody = {
-  contractId?: string;
-  engagementId?: string;
-  approver?: string;
-  milestoneIndex?: number;
-};
+type AuthedRequest = Request & { user?: { uid: string } };
 
-export const approveMilestoneHandler = asyncHandler(async (
-  req: Request<{}, unknown, ApproveMilestoneBody>,
-  res: Response,
-) => {
-  const { contractId, engagementId, approver, milestoneIndex = 0 } = req.body ?? {};
+/**
+ * POST /api/escrow/approve-milestone  { engagementId, milestoneIndex? }
+ * Only the approver (guest) wallet may approve.
+ */
+export const approveMilestoneHandler = asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const uid = req.user?.uid;
+  if (!uid) throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in first.');
+  const engagementId = requireEngagementId(req.body?.engagementId);
+  const milestoneIndex = parseMilestoneIndex(req.body?.milestoneIndex);
 
-  if (!contractId || !engagementId || !approver) {
-    return res.status(400).json({ error: 'Missing required fields: contractId, engagementId, approver.' });
-  }
-  if (!Number.isInteger(milestoneIndex) || milestoneIndex < 0) {
-    return res.status(400).json({ error: 'milestoneIndex must be a non-negative integer.' });
-  }
+  const result = await buildEscrowAction({
+    uid,
+    engagementId,
+    action: 'approve_milestone',
+    request: ({ signer, escrow }) => ({
+      path: '/escrow/single-release/approve-milestone',
+      body: { contractId: escrow.contract_id, approver: signer, milestoneIndex: String(milestoneIndex) },
+      payload: { milestoneIndex, milestoneId: milestoneIdFor(milestoneIndex), approver: signer },
+    }),
+  });
 
-  try {
-    const conflict = await guardEscrowAction(res, 'approve_milestone', contractId);
-    if (conflict) return conflict;
-
-    const result = await trustlessWorkRequest<{ unsignedXdr?: string; unsignedTransaction?: string; txHash?: string }>(
-      '/escrow/single-release/approve-milestone',
-      {
-        method: 'POST',
-        body: { contractId, approver, milestoneIndex: String(milestoneIndex) },
-      },
-    );
-    const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
-    if (!unsignedXdr) {
-      return res.status(502).json({ error: 'Trustless Work returned no unsigned transaction.', payload: result });
-    }
-    return res.status(200).json({ unsignedXdr, txHash: result.txHash ?? '', contractId, engagementId });
-  } catch (error) {
-    const conflict = sendConflict(res, error);
-    if (conflict) return conflict;
-
-    if (error instanceof TrustlessWorkRequestError) {
-      return res.status(error.statusCode).json({ error: error.message, messages: error.messages, payload: error.payload });
-    }
-    return res.status(500).json({ error: getErrorMessages(error, 'Failed to build milestone approval transaction.')[0] });
-  }
+  return res.status(200).json(result);
 });

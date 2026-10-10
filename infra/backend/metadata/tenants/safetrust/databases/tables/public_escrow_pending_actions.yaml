@@ -1,0 +1,6 @@
+# Tracked for apps/api (admin secret) only.
+# No client-role permissions: browsers never read or write pending actions.
+# A participant-only select permission can be added with the reconciliation UI work.
+table:
+  name: escrow_pending_actions
+  schema: public

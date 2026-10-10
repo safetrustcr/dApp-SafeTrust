@@ -1,94 +1,29 @@
 import type { Request, Response } from 'express';
-import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
-import { guardEscrowAction, sendConflict } from './transition-guard.js';
 import { asyncHandler } from '../../http/async-handler.js';
+import { ApiError } from '../../http/api-error.js';
+import { buildEscrowAction, requireEngagementId } from './build-escrow-action.js';
 
-type FundRequestBody = {
-  contractId?: string;
-  signer?: string;
-  amount?: number;
-  engagementId?: string;
-};
+type AuthedRequest = Request & { user?: { uid: string } };
 
-type FundEscrowTWResponse = {
-  unsignedXdr?: string;
-  unsignedTransaction?: string;
-  txHash?: string;
-};
+/**
+ * POST /api/escrow/fund  { engagementId }
+ * Signer (approver) and amount come from the escrow record, never the body.
+ */
+export const fundEscrowHandler = asyncHandler(async (req: AuthedRequest, res: Response) => {
+  const uid = req.user?.uid;
+  if (!uid) throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in first.');
+  const engagementId = requireEngagementId(req.body?.engagementId);
 
-type FundResponse = {
-  unsignedXdr: string;
-  txHash: string;
-  contractId: string;
-  engagementId: string;
-};
+  const result = await buildEscrowAction({
+    uid,
+    engagementId,
+    action: 'fund',
+    request: ({ signer, escrow }) => ({
+      path: '/escrow/single-release/fund-escrow',
+      body: { contractId: escrow.contract_id, signer, amount: Number(escrow.amount) },
+      payload: { amount: Number(escrow.amount) },
+    }),
+  });
 
-type FundErrorResponse = {
-  error: string;
-  messages?: string[];
-  payload?: unknown;
-};
-
-export const fundEscrowHandler = asyncHandler(async (
-  req: Request<{}, FundResponse | FundErrorResponse, FundRequestBody>,
-  res: Response<FundResponse | FundErrorResponse>,
-) => {
-  const { contractId, signer, amount, engagementId } = req.body || {};
-
-  if (!contractId || !signer || typeof amount !== 'number' || !engagementId) {
-    return res.status(400).json({
-      error: 'Missing required fields: contractId, signer, amount, engagementId.',
-    });
-  }
-
-  if (amount <= 0 || !Number.isFinite(amount)) {
-    return res.status(400).json({
-      error: 'Invalid amount: must be a positive number.',
-    });
-  }
-
-  try {
-    const conflict = await guardEscrowAction(res, 'fund', contractId);
-    if (conflict) return conflict;
-
-    const result = await trustlessWorkRequest<FundEscrowTWResponse>(
-      '/escrow/single-release/fund-escrow',
-      {
-        method: 'POST',
-        body: { contractId, signer, amount },
-      },
-    );
-
-    const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
-    if (!unsignedXdr) {
-      return res.status(502).json({
-        error: 'TrustlessWork fund request returned no unsigned transaction.',
-        payload: result,
-      });
-    }
-
-    return res.status(200).json({
-      unsignedXdr,
-      txHash: result.txHash ?? '',
-      contractId,
-      engagementId,
-    });
-  } catch (error) {
-    const conflict = sendConflict(res, error);
-    if (conflict) return conflict;
-
-    if (error instanceof TrustlessWorkRequestError) {
-      return res.status(error.statusCode).json({
-        error: error.message,
-        messages: error.messages,
-        payload: error.payload,
-      });
-    }
-
-    const messages = getErrorMessages(error, 'Failed to build fund transaction.');
-    return res.status(500).json({
-      error: messages[0],
-      messages,
-    });
-  }
+  return res.status(200).json(result);
 });
