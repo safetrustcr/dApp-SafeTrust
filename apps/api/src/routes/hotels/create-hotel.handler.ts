@@ -1,5 +1,5 @@
 import type { Response } from 'express';
-import { validateHotelInput, type HotelInput } from '@safetrust/types';
+import * as types from '@safetrust/types';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import {
   createHotel,
@@ -31,8 +31,8 @@ export async function createHotelHandler(
     }
 
     // Validate input using the shared validator
-    const body: HotelInput = req.body || {};
-    const validation = validateHotelInput(body);
+    const body: types.HotelInput = req.body || {};
+    const validation = types.validateHotelInput(body);
     if (!validation.valid) {
       return res.status(400).json({
         error: validation.message,

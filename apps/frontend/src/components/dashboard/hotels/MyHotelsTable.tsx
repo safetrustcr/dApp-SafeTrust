@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,8 @@ import {
 import { GET_HOTELS } from "@/graphql/queries/hotel-queries";
 import { deleteHotel, HotelApiError } from "@/lib/api/hotels";
 import { formatHotelCoordinates, formatHotelDate } from "@/lib/hotels";
+import { friendlyHotelError, hotelQueryContext } from "@/lib/hotel-access";
+import { useHotelRole } from "@/hooks/use-hotel-role";
 import type { Hotel } from "@safetrust/types";
 
 const ITEMS_PER_PAGE = 10;
@@ -56,6 +59,10 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Hotel role granted in the signed ID token (hotel_manager | admin | null).
+  // Hasura scopes every row by this role; the browser only selects it.
+  const { role, loading: roleLoading } = useHotelRole();
+
   const offset = page * ITEMS_PER_PAGE;
 
   const { data, loading, error, refetch } = useQuery(GET_HOTELS, {
@@ -64,11 +71,18 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
       offset,
     },
     fetchPolicy: "cache-and-network",
-    skip: Boolean(initialHotels),
+    context: role ? hotelQueryContext(role) : undefined,
+    skip: Boolean(initialHotels) || !role,
   });
 
+  const isLoading = !initialHotels && (roleLoading || loading);
+  const noHotelAccess = !initialHotels && !roleLoading && !role;
+  const errorMessage = initialHotels ? null : friendlyHotelError(error);
+
   const rawHotels: Hotel[] = initialHotels ?? data?.hotels ?? [];
-  const totalCount: number = initialHotels ? initialHotels.length : (data?.hotels_aggregate?.aggregate?.count ?? rawHotels.length);
+  const totalCount: number = initialHotels
+    ? initialHotels.length
+    : (data?.hotels_aggregate?.aggregate?.count ?? rawHotels.length);
 
   // Client-side search filtering across Name, Address, Location Area
   const filteredHotels = search.trim()
@@ -83,6 +97,10 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
         );
       })
     : rawHotels;
+
+  const handleRefresh = () => {
+    if (role) void refetch();
+  };
 
   const handleDeleteClick = (hotel: Hotel) => {
     setHotelToDelete(hotel);
@@ -99,7 +117,7 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
       await deleteHotel(hotelToDelete.id);
       toast.success("Hotel deleted successfully");
       setHotelToDelete(null);
-      if (refetch) {
+      if (role) {
         await refetch();
       }
     } catch (err: any) {
@@ -126,225 +144,251 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
             Manage your hotel properties, locations, and rooms
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch && refetch()}
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <Button
-            onClick={() => router.push("/dashboard/hotels/new")}
-            data-testid="new-hotel-btn"
-            className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            New Hotel
-          </Button>
-        </div>
-      </div>
-
-      {/* Search & Stats Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="relative max-w-sm w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search hotels by name, address, area..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(0);
-            }}
-            className="pl-9"
-            data-testid="hotel-search-input"
-          />
-        </div>
-        <p className="text-sm text-muted-foreground whitespace-nowrap">
-          Showing {filteredHotels.length} of {totalCount} hotel{totalCount === 1 ? "" : "s"}
-        </p>
-      </div>
-
-      {/* Error state */}
-      {error && !initialHotels && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-6 text-center text-destructive space-y-2">
-          <p className="font-semibold">Failed to load hotels</p>
-          <p className="text-sm">{error.message}</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-2">
-            Try again
-          </Button>
-        </div>
-      )}
-
-      {/* Loading state */}
-      {loading && !initialHotels && rawHotels.length === 0 && (
-        <div className="space-y-3">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-16 rounded-lg bg-muted animate-pulse" />
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && !error && filteredHotels.length === 0 && (
-        <div className="text-center py-16 border rounded-lg bg-card/50 space-y-4">
-          <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 flex items-center justify-center mx-auto">
-            <Building2 className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-lg text-foreground">
-              {search ? "No hotels matching search" : "No hotels yet"}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-              {search
-                ? "Try searching for a different term or clear the search input."
-                : "Create your first hotel property to start managing rooms, reservations, and escrow."}
-            </p>
-          </div>
-          {!search && (
+        {!noHotelAccess && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isLoading || !role}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
             <Button
               onClick={() => router.push("/dashboard/hotels/new")}
-              className="bg-orange-500 hover:bg-orange-600 text-white"
+              data-testid="new-hotel-btn"
+              className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
             >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Create your first hotel
+              <Plus className="h-4 w-4" />
+              New Hotel
             </Button>
+          </div>
+        )}
+      </div>
+
+      {/* No hotel role in the signed token */}
+      {noHotelAccess && (
+        <div
+          data-testid="hotel-no-access"
+          className="text-center py-16 border rounded-lg bg-card/50 space-y-3"
+        >
+          <div className="w-12 h-12 rounded-full bg-muted text-muted-foreground flex items-center justify-center mx-auto">
+            <ShieldAlert className="h-6 w-6" />
+          </div>
+          <h3 className="font-semibold text-lg text-foreground">Hotel management isn&apos;t enabled</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            Your account doesn&apos;t have hotel manager access. Ask a SafeTrust administrator to enable it,
+            then sign out and back in.
+          </p>
+        </div>
+      )}
+
+      {!noHotelAccess && (
+        <>
+          {/* Search & Stats Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative max-w-sm w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search hotels by name, address, area..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(0);
+                }}
+                className="pl-9"
+                data-testid="hotel-search-input"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground whitespace-nowrap">
+              Showing {filteredHotels.length} of {totalCount} hotel{totalCount === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          {/* Error state — friendly message only; details are logged to the console */}
+          {errorMessage && (
+            <div
+              data-testid="hotel-error"
+              className="rounded-lg border border-destructive/20 bg-destructive/10 p-6 text-center text-destructive space-y-2"
+            >
+              <p className="font-semibold">Failed to load hotels</p>
+              <p className="text-sm">{errorMessage}</p>
+              <Button variant="outline" size="sm" onClick={handleRefresh} className="mt-2">
+                Try again
+              </Button>
+            </div>
           )}
-        </div>
-      )}
 
-      {/* Hotel Table */}
-      {filteredHotels.length > 0 && (
-        <div className="rounded-lg border border-border overflow-hidden bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="w-12">#</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Location Area</TableHead>
-                <TableHead>Coordinates</TableHead>
-                <TableHead>Last Updated</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredHotels.map((hotel, index) => {
-                const coordString = formatHotelCoordinates(hotel);
-                const updatedString = formatHotelDate(hotel.updated_at);
+          {/* Loading state */}
+          {isLoading && rawHotels.length === 0 && (
+            <div className="space-y-3" data-testid="hotel-loading">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-16 rounded-lg bg-muted animate-pulse" />
+              ))}
+            </div>
+          )}
 
-                return (
-                  <TableRow
-                    key={hotel.id}
-                    data-testid={`hotel-row-${hotel.id}`}
-                    className="hover:bg-muted/30 transition-colors"
-                  >
-                    <TableCell className="text-muted-foreground text-sm font-mono">
-                      {offset + index + 1}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium text-foreground">{hotel.name}</div>
-                      {hotel.description && (
-                        <div className="text-xs text-muted-foreground truncate max-w-xs">
-                          {hotel.description}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground max-w-xs">
-                        <MapPin className="h-3.5 w-3.5 text-orange-500 shrink-0" />
-                        <span className="truncate">{hotel.address}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">
-                        {hotel.location_area || hotel.locationArea || "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
-                        {coordString !== "—" && (
-                          <Globe className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                        )}
-                        <span>{coordString}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <span>{updatedString}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          data-testid={`view-hotel-${hotel.id}`}
-                          onClick={() => router.push(`/dashboard/hotels/${hotel.id}`)}
-                          className="h-8 w-8 p-0"
-                          title="View Hotel"
-                        >
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                          <span className="sr-only">View</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          data-testid={`edit-hotel-${hotel.id}`}
-                          onClick={() => router.push(`/dashboard/hotels/${hotel.id}/edit`)}
-                          className="h-8 w-8 p-0"
-                          title="Edit Hotel"
-                        >
-                          <Edit className="h-4 w-4 text-muted-foreground" />
-                          <span className="sr-only">Edit</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          data-testid={`delete-hotel-${hotel.id}`}
-                          onClick={() => handleDeleteClick(hotel)}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          title="Delete Hotel"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Delete</span>
-                        </Button>
-                      </div>
-                    </TableCell>
+          {/* Empty state */}
+          {!isLoading && !errorMessage && filteredHotels.length === 0 && (
+            <div className="text-center py-16 border rounded-lg bg-card/50 space-y-4">
+              <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 flex items-center justify-center mx-auto">
+                <Building2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg text-foreground">
+                  {search ? "No hotels matching search" : "No hotels yet"}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                  {search
+                    ? "Try searching for a different term or clear the search input."
+                    : "Create your first hotel property to start managing rooms, reservations, and escrow."}
+                </p>
+              </div>
+              {!search && (
+                <Button
+                  onClick={() => router.push("/dashboard/hotels/new")}
+                  className="bg-orange-500 hover:bg-orange-600 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Create your first hotel
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Hotel Table */}
+          {filteredHotels.length > 0 && (
+            <div className="rounded-lg border border-border overflow-hidden bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Location Area</TableHead>
+                    <TableHead>Coordinates</TableHead>
+                    <TableHead>Last Updated</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                </TableHeader>
+                <TableBody>
+                  {filteredHotels.map((hotel, index) => {
+                    const coordString = formatHotelCoordinates(hotel);
+                    const updatedString = formatHotelDate(hotel.updated_at);
 
-      {/* Pagination */}
-      {totalCount > ITEMS_PER_PAGE && (
-        <div className="flex items-center justify-between pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-          >
-            Previous
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            Page {page + 1} of {Math.ceil(totalCount / ITEMS_PER_PAGE)}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p) => p + 1)}
-            disabled={(page + 1) * ITEMS_PER_PAGE >= totalCount}
-          >
-            Next
-          </Button>
-        </div>
+                    return (
+                      <TableRow
+                        key={hotel.id}
+                        data-testid={`hotel-row-${hotel.id}`}
+                        className="hover:bg-muted/30 transition-colors"
+                      >
+                        <TableCell className="text-muted-foreground text-sm font-mono">
+                          {offset + index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium text-foreground">{hotel.name}</div>
+                          {hotel.description && (
+                            <div className="text-xs text-muted-foreground truncate max-w-xs">
+                              {hotel.description}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground max-w-xs">
+                            <MapPin className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                            <span className="truncate">{hotel.address}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {hotel.location_area || hotel.locationArea || "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                            {coordString !== "—" && (
+                              <Globe className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                            )}
+                            <span>{coordString}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span>{updatedString}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-testid={`view-hotel-${hotel.id}`}
+                              onClick={() => router.push(`/dashboard/hotels/${hotel.id}`)}
+                              className="h-8 w-8 p-0"
+                              title="View Hotel"
+                            >
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                              <span className="sr-only">View</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-testid={`edit-hotel-${hotel.id}`}
+                              onClick={() => router.push(`/dashboard/hotels/${hotel.id}/edit`)}
+                              className="h-8 w-8 p-0"
+                              title="Edit Hotel"
+                            >
+                              <Edit className="h-4 w-4 text-muted-foreground" />
+                              <span className="sr-only">Edit</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-testid={`delete-hotel-${hotel.id}`}
+                              onClick={() => handleDeleteClick(hotel)}
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Delete Hotel"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalCount > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-between pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Page {page + 1} of {Math.ceil(totalCount / ITEMS_PER_PAGE)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={(page + 1) * ITEMS_PER_PAGE >= totalCount}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete Confirmation Modal with Inline Blocker Support */}

@@ -145,3 +145,27 @@ export async function assertEscrowParticipant(uid: string, engagementId: string)
   }
   return escrow;
 }
+
+
+export async function getEscrowByContractId(contractId: string): Promise<EscrowRecord | null> {
+  const data = await hasuraRequest<{ escrows: EscrowRecord[] }>(
+    `query EscrowByContractForAuthz($contractId: String!) {
+       escrows(where: { contract_id: { _eq: $contractId } }, limit: 1) {
+         id engagement_id contract_id sender_address receiver_address amount status
+       }
+     }`,
+    { contractId },
+  );
+  return data.escrows[0] ?? null;
+}
+
+/** Same rule as assertEscrowParticipant, keyed by the on-chain contract id (C…). */
+export async function assertContractParticipant(uid: string, contractId: string): Promise<EscrowRecord> {
+  const escrow = await getEscrowByContractId(contractId);
+  if (!escrow) throw new EscrowAccessError(404, 'ESCROW_NOT_FOUND', 'Escrow not found.');
+  const wallets = await getUserWallets(uid);
+  if (!isParticipant(wallets, rolesFor(escrow))) {
+    throw new EscrowAccessError(403, 'NOT_A_PARTICIPANT', 'You are not a participant in this escrow.');
+  }
+  return escrow;
+}

@@ -27,8 +27,35 @@ array_relationships:
           schema: hotel_industry
         columns:
           - escrow_transaction_id
+# Scoped through reservation → room → hotel → owner.
 select_permissions:
-  - role: tenant
+  - role: hotel_manager
+    permission:
+      columns:
+        - id
+        - reservation_id
+        - contract_id
+        - escrow_status
+        - signer_address
+        - transaction_type
+        - escrow_transaction_type
+        - http_status_code
+        - escrow_payload
+        - fund_payload
+        - created_at
+        - updated_at
+      filter:
+        reservation:
+          room:
+            hotel:
+              owner:
+                _and:
+                  - firebase_uid:
+                      _eq: X-Hasura-User-Id
+                  - role:
+                      _eq: MANAGER
+      allow_aggregations: true
+  - role: admin
     permission:
       columns:
         - id
@@ -44,19 +71,4 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
-  - role: landlord
-    permission:
-      columns:
-        - id
-        - reservation_id
-        - contract_id
-        - escrow_status
-        - signer_address
-        - transaction_type
-        - escrow_transaction_type
-        - http_status_code
-        - escrow_payload
-        - fund_payload
-        - created_at
-        - updated_at
-      filter: {}
+      allow_aggregations: true

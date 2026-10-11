@@ -29,8 +29,11 @@ array_relationships:
           schema: hotel_industry
         columns:
           - user_id
+# hotel_manager reads only their own profile row. firebase_uid and role stay
+# selectable inside permission filters (Hasura evaluates filters with admin
+# rights), but are not exposed as columns.
 select_permissions:
-  - role: tenant
+  - role: hotel_manager
     permission:
       columns:
         - id
@@ -44,7 +47,7 @@ select_permissions:
       filter:
         firebase_uid:
           _eq: X-Hasura-User-Id
-  - role: landlord
+  - role: admin
     permission:
       columns:
         - id
@@ -55,6 +58,5 @@ select_permissions:
         - role
         - created_at
         - updated_at
-      filter:
-        firebase_uid:
-          _eq: X-Hasura-User-Id
+      filter: {}
+      allow_aggregations: true

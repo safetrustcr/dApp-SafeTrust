@@ -36,8 +36,30 @@ array_relationships:
           schema: hotel_industry
         columns:
           - room_id
+# Scoped through the owning hotel.
 select_permissions:
-  - role: tenant
+  - role: hotel_manager
+    permission:
+      columns:
+        - room_id
+        - hotel_id
+        - room_number
+        - room_type_id
+        - price_night
+        - capacity
+        - is_available
+        - created_at
+        - updated_at
+      filter:
+        hotel:
+          owner:
+            _and:
+              - firebase_uid:
+                  _eq: X-Hasura-User-Id
+              - role:
+                  _eq: MANAGER
+      allow_aggregations: true
+  - role: admin
     permission:
       columns:
         - room_id
@@ -50,16 +72,4 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
-  - role: landlord
-    permission:
-      columns:
-        - room_id
-        - hotel_id
-        - room_number
-        - room_type_id
-        - price_night
-        - capacity
-        - is_available
-        - created_at
-        - updated_at
-      filter: {}
+      allow_aggregations: true

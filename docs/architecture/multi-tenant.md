@@ -59,6 +59,11 @@ Requests with an invalid tenant value receive:
 { "error": "Invalid X-Tenant-ID", "message": "Must be one of: safetrust, hotel_industry" }
 ```
 
+> `X-Tenant-ID` is a **routing hint inside `apps/api` only**. It is not an
+> authorization boundary and Hasura ignores it. Who may read which tenant's
+> rows is decided by Hasura from the signed Firebase ID token — see
+> [Authorization: tenants, roles and claims](#authorization-tenants-roles-and-claims).
+
 ## Metadata structure
 
 ```
@@ -137,3 +142,82 @@ if (req.tenant === 'hotel_industry') {
   // query public.apartments and public.escrows through the safetrust source
 }
 ```
+
+## Authorization: tenants, roles and claims
+
+Hasura runs in JWT mode (`HASURA_GRAPHQL_JWT_SECRET`) and authorizes every
+browser request from the **signed Firebase ID token**. Headers the browser
+can edit — `X-Tenant-ID`, `x-hasura-role` — cannot grant access on their own.
+
+### How a request is authorized
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant F as Firebase Auth
+    participant API as apps/api
+    participant H as Hasura (JWT mode)
+
+    API->>API: role change (sync-user, promote-to-host, hotel manager)
+    API->>F: setCustomUserClaims(uid, hasura claims)
+    B->>F: getIdToken(true)
+    F-->>B: signed ID token with claims
+    B->>H: query + Authorization: Bearer <token> + x-hasura-role: hotel_manager
+    H->>H: verify signature, check x-hasura-role ∈ allowed-roles
+    H->>H: apply the role's row filter with X-Hasura-User-Id
+    H-->>B: only rows that role may see
+```
+
+### Claims
+
+Written only by `apps/api` (`src/services/hasura-claims.ts` →
+`syncHasuraClaims(uid)`, called from `ensureUserRole` and after any role
+change), under the namespace `https://hasura.io/jwt/claims`:
+
+| Claim | Value |
+|---|---|
+| `x-hasura-user-id` | Firebase UID |
+| `x-hasura-allowed-roles` | SafeTrust roles from `public.user_roles` (`guest`, `host`, `admin`) + `hotel_manager` when `hotel_industry.users.role = 'MANAGER'` for that `firebase_uid` |
+| `x-hasura-default-role` | highest of: `admin` > `host` > `guest` > `hotel_manager` |
+
+The browser may choose one granted role with `x-hasura-role` (the hotel
+dashboard sends `hotel_manager` or `admin`); Hasura rejects any role that
+isn't in the token's `x-hasura-allowed-roles`. After a role change the
+browser must call `getIdToken(true)` to receive the new claims.
+
+Backfill all existing users:
+
+```bash
+pnpm --filter @safetrust/api exec tsx scripts/sync-hasura-claims.ts
+```
+
+### hotel_industry permissions
+
+| Hasura role | `hotels` | `rooms` / `reservations` / `hotel_escrow_transactions` |
+|---|---|---|
+| `hotel_manager` | `owner.firebase_uid = X-Hasura-User-Id` **and** `owner.role = MANAGER` | through `hotel` → `owner` with the same rule |
+| `admin` | all rows | all rows |
+| `guest`, `host` (SafeTrust) | no access — root fields not exposed | no access |
+
+All hotel tables are read-only for clients; writes go through `apps/api`.
+
+`STAFF` has no hotel permissions yet: no table links a staff user to a
+hotel. A `hotel_staff` membership table is a follow-up.
+
+### Hotel dashboard mocks
+
+`NEXT_PUBLIC_USE_HOTEL_MOCKS` loads mock data only when it equals `"true"`
+**and** the build is not production. In production the flag is ignored with
+a console warning.
+
+### Verify
+
+```bash
+infra/backend/tests/hotel-permissions.sh
+```
+
+The script creates two throwaway managers with one hotel each, impersonates
+roles through the admin secret, checks manager isolation, cross-manager
+`hotels_by_pk`, scoped aggregates, SafeTrust roles being denied and admin
+visibility, then removes its fixtures. Run it whenever hotel metadata
+permissions change.

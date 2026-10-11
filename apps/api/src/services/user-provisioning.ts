@@ -1,4 +1,5 @@
 import { executeGraphQL } from '../lib/hasura.js';
+import { syncHasuraClaims } from './hasura-claims.js';
 
 export const SAFE_TRUST_ROLES = ['guest', 'host', 'admin'] as const;
 export type SafeTrustRole = (typeof SAFE_TRUST_ROLES)[number];
@@ -71,8 +72,28 @@ export async function syncUserProfile(input: UserProfileInput): Promise<{ id: st
 }
 
 /**
+ * Recomputes the user's Hasura JWT claims from their current roles (SafeTrust
+ * roles + hotel manager). Best-effort: a claims failure is logged and never
+ * blocks registration or role assignment — the next sign-in or the backfill
+ * script (`scripts/sync-hasura-claims.ts`) repairs it.
+ *
+ * The browser must refresh its ID token afterwards (getIdToken(true)).
+ */
+export async function refreshHasuraClaims(userId: string): Promise<void> {
+  try {
+    await syncHasuraClaims(userId);
+  } catch (err) {
+    console.warn(
+      `[user-provisioning] could not sync Hasura claims for ${userId}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+/**
  * Adds a role without removing any existing assignments. That makes seeding
  * idempotent and lets normal registration safely establish only guest access.
+ * Hasura claims are refreshed so the new role is usable in the next ID token.
  */
 export async function ensureUserRole(userId: string, role: SafeTrustRole): Promise<void> {
   const roleData = await executeGraphQL<{ roles: Array<{ id: number }> }>(
@@ -84,4 +105,5 @@ export async function ensureUserRole(userId: string, role: SafeTrustRole): Promi
     throw new Error(`Role '${role}' is not configured. Run the SafeTrust database seeds.`);
   }
   await executeGraphQL(ASSIGN_ROLE, { userId, roleId });
+  await refreshHasuraClaims(userId);
 }

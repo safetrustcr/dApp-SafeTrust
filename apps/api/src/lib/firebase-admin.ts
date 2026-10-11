@@ -1,4 +1,4 @@
-import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
+import * as app from 'firebase-admin/app';
 
 const getMissingFirebaseConfig = (): string[] => {
   const missing: string[] = [];
@@ -28,11 +28,11 @@ const getMissingFirebaseConfig = (): string[] => {
  * misconfiguration fails fast instead of surfacing as a generic user error.
  */
 export function initFirebaseAdmin(): void {
-  if (getApps().length > 0) return;
+  if (app.getApps().length > 0) return;
 
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.FIREBASE_PROJECT_ID) {
-    initializeApp({
-      credential: applicationDefault(),
+    app.initializeApp({
+      credential: app.applicationDefault(),
       projectId: process.env.FIREBASE_PROJECT_ID,
     });
     console.log('[firebase-admin] ✅ initialised with Application Default Credentials');
@@ -44,8 +44,8 @@ export function initFirebaseAdmin(): void {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
   if (projectId && clientEmail && privateKey?.includes('BEGIN PRIVATE KEY')) {
-    initializeApp({
-      credential: cert({ projectId, clientEmail, privateKey }),
+    app.initializeApp({
+      credential: app.cert({ projectId, clientEmail, privateKey }),
     });
     console.log('[firebase-admin] ✅ initialised with service account credentials');
     return;

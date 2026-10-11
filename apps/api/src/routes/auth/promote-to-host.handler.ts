@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { hasuraRequest } from '../../services/hasura.js';
+import { refreshHasuraClaims } from '../../services/user-provisioning.js';
 
 export const promoteToHostHandler = async (
   req: AuthenticatedRequest,
@@ -43,6 +44,9 @@ export const promoteToHostHandler = async (
       }`,
       { userId: uid, roleId: hostRoleId }
     );
+
+    // Step 3: put 'host' into the Hasura claims (best-effort; never fails the promotion)
+    await refreshHasuraClaims(uid);
 
     console.log(`[auth/promote-to-host] ✅ user ${uid} promoted to host (roleId: ${hostRoleId})`);
     return res.status(200).json({ role: 'host', promoted: true });
