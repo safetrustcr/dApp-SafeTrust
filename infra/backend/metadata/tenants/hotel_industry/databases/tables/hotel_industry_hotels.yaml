@@ -25,6 +25,14 @@ array_relationships:
           schema: hotel_industry
         columns:
           - hotel_id
+  - name: staff_memberships
+    using:
+      foreign_key_constraint_on:
+        table:
+          name: hotel_staff_memberships
+          schema: hotel_industry
+        columns:
+          - hotel_id
 # Read-only for clients. Writes go through apps/api (hotel CRUD issue).
 # hotel_manager: only hotels whose owner is the signed-in Firebase user AND a MANAGER.
 # admin: platform administrator, every hotel.
@@ -48,6 +56,27 @@ select_permissions:
                 _eq: X-Hasura-User-Id
             - role:
                 _eq: MANAGER
+      allow_aggregations: true
+  - role: hotel_staff
+    permission:
+      columns:
+        - id
+        - owner_user_id
+        - name
+        - description
+        - address
+        - location_area
+        - coordinates
+        - created_at
+        - updated_at
+      filter:
+        staff_memberships:
+          user:
+            _and:
+              - firebase_uid:
+                  _eq: X-Hasura-User-Id
+              - role:
+                  _eq: STAFF
       allow_aggregations: true
   - role: admin
     permission:

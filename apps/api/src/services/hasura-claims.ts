@@ -8,6 +8,7 @@
  *
  *   SafeTrust roles  (public.user_roles → roles.name)     → guest | host | admin
  *   Hotel manager    (hotel_industry.users.role = MANAGER) → hotel_manager
+ *   Hotel staff      (hotel_industry.users.role = STAFF)   → hotel_staff
  *
  * After changing claims, the client must refresh its ID token
  * (`auth.currentUser.getIdToken(true)`) before the new role takes effect.
@@ -29,9 +30,10 @@ export const SAFETRUST_HASURA_ROLE: Readonly<Record<string, string>> = {
 };
 
 export const HOTEL_MANAGER_ROLE = 'hotel_manager';
+export const HOTEL_STAFF_ROLE = 'hotel_staff';
 
 /** Highest privilege first — the default role is the first one the user holds. */
-const DEFAULT_ROLE_PRIORITY = ['admin', 'host', 'guest', HOTEL_MANAGER_ROLE];
+const DEFAULT_ROLE_PRIORITY = ['admin', 'host', 'guest', HOTEL_MANAGER_ROLE, HOTEL_STAFF_ROLE];
 
 export type HotelUserRole = 'GUEST' | 'STAFF' | 'MANAGER';
 
@@ -53,6 +55,7 @@ export function computeHasuraClaims(
     if (mapped) allowed.add(mapped);
   }
   if (hotelRole === 'MANAGER') allowed.add(HOTEL_MANAGER_ROLE);
+  if (hotelRole === 'STAFF') allowed.add(HOTEL_STAFF_ROLE);
   if (allowed.size === 0) allowed.add(SAFETRUST_HASURA_ROLE.guest);
 
   const allowedRoles = DEFAULT_ROLE_PRIORITY.filter((r) => allowed.has(r)).concat(

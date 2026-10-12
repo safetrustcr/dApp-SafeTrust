@@ -40,7 +40,7 @@ import {
 import { GET_HOTELS } from "@/graphql/queries/hotel-queries";
 import { deleteHotel, HotelApiError } from "@/lib/api/hotels";
 import { formatHotelCoordinates, formatHotelDate } from "@/lib/hotels";
-import { friendlyHotelError, hotelQueryContext } from "@/lib/hotel-access";
+import { canManageHotels, friendlyHotelError, hotelQueryContext } from "@/lib/hotel-access";
 import { useHotelRole } from "@/hooks/use-hotel-role";
 import type { Hotel } from "@safetrust/types";
 
@@ -77,6 +77,7 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
 
   const isLoading = !initialHotels && (roleLoading || loading);
   const noHotelAccess = !initialHotels && !roleLoading && !role;
+  const canManage = canManageHotels(role);
   const errorMessage = initialHotels ? null : friendlyHotelError(error);
 
   const rawHotels: Hotel[] = initialHotels ?? data?.hotels ?? [];
@@ -155,14 +156,16 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
               <RefreshCw className={`h-4 w-4 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
-            <Button
-              onClick={() => router.push("/dashboard/hotels/new")}
-              data-testid="new-hotel-btn"
-              className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              New Hotel
-            </Button>
+            {canManage && (
+              <Button
+                onClick={() => router.push("/dashboard/hotels/new")}
+                data-testid="new-hotel-btn"
+                className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                New Hotel
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -245,7 +248,7 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
                     : "Create your first hotel property to start managing rooms, reservations, and escrow."}
                 </p>
               </div>
-              {!search && (
+              {!search && canManage && (
                 <Button
                   onClick={() => router.push("/dashboard/hotels/new")}
                   className="bg-orange-500 hover:bg-orange-600 text-white"
@@ -332,28 +335,32 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
                               <Eye className="h-4 w-4 text-muted-foreground" />
                               <span className="sr-only">View</span>
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              data-testid={`edit-hotel-${hotel.id}`}
-                              onClick={() => router.push(`/dashboard/hotels/${hotel.id}/edit`)}
-                              className="h-8 w-8 p-0"
-                              title="Edit Hotel"
-                            >
-                              <Edit className="h-4 w-4 text-muted-foreground" />
-                              <span className="sr-only">Edit</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              data-testid={`delete-hotel-${hotel.id}`}
-                              onClick={() => handleDeleteClick(hotel)}
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              title="Delete Hotel"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
+                            {canManage && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  data-testid={`edit-hotel-${hotel.id}`}
+                                  onClick={() => router.push(`/dashboard/hotels/${hotel.id}/edit`)}
+                                  className="h-8 w-8 p-0"
+                                  title="Edit Hotel"
+                                >
+                                  <Edit className="h-4 w-4 text-muted-foreground" />
+                                  <span className="sr-only">Edit</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  data-testid={`delete-hotel-${hotel.id}`}
+                                  onClick={() => handleDeleteClick(hotel)}
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Delete Hotel"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  <span className="sr-only">Delete</span>
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

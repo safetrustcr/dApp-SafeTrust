@@ -19,6 +19,7 @@ SECRET="${HASURA_GRAPHQL_ADMIN_SECRET:-myadminsecretkey}"
 RUN="$(date +%s)$$"
 UID_A="test-mgr-a-$RUN"
 UID_B="test-mgr-b-$RUN"
+UID_STAFF="test-staff-$RUN"
 FAILS=0
 
 gql() { # gql <role|""> <uid|""> <query> [variables-json]
@@ -34,10 +35,10 @@ pass() { echo "  ✅ $1"; }
 fail() { echo "  ❌ $1"; FAILS=$((FAILS + 1)); }
 
 cleanup() {
-  gql "" "" 'mutation ($a: String!, $b: String!) {
+  gql "" "" 'mutation ($a: String!, $b: String!, $staff: String!) {
     delete_hotels(where: { owner: { firebase_uid: { _in: [$a, $b] } } }) { affected_rows }
-    delete_hotel_users(where: { firebase_uid: { _in: [$a, $b] } }) { affected_rows }
-  }' "$(jq -nc --arg a "$UID_A" --arg b "$UID_B" '{a: $a, b: $b}')" >/dev/null || true
+    delete_hotel_users(where: { firebase_uid: { _in: [$a, $b, $staff] } }) { affected_rows }
+  }' "$(jq -nc --arg a "$UID_A" --arg b "$UID_B" --arg staff "$UID_STAFF" '{a: $a, b: $b, staff: $staff}')" >/dev/null || true
 }
 trap cleanup EXIT
 
@@ -53,6 +54,16 @@ if echo "$FIXTURE" | jq -e '.errors' >/dev/null; then echo "$FIXTURE" | jq .; ex
 HOTEL_A=$(echo "$FIXTURE" | jq -r '.data.a.hotels[0].id')
 HOTEL_B=$(echo "$FIXTURE" | jq -r '.data.b.hotels[0].id')
 
+STAFF=$(gql "" "" 'mutation ($uid: String!, $email: String!) {
+  insert_hotel_users_one(object: { firebase_uid: $uid, email: $email, role: "STAFF" }) { id }
+}' "$(jq -nc --arg uid "$UID_STAFF" --arg email "$UID_STAFF@perm.test" '{uid: $uid, email: $email}')")
+if echo "$STAFF" | jq -e '.errors' >/dev/null; then echo "$STAFF" | jq .; exit 1; fi
+STAFF_ID=$(echo "$STAFF" | jq -r '.data.insert_hotel_users_one.id')
+ASSIGN=$(gql "" "" 'mutation ($hotel: uuid!, $user: uuid!) {
+  insert_hotel_staff_memberships_one(object: { hotel_id: $hotel, user_id: $user }) { id }
+}' "$(jq -nc --arg hotel "$HOTEL_A" --arg user "$STAFF_ID" '{hotel: $hotel, user: $user}')")
+if echo "$ASSIGN" | jq -e '.errors' >/dev/null; then echo "$ASSIGN" | jq .; exit 1; fi
+
 echo "▶ Manager isolation"
 IDS_A=$(gql hotel_manager "$UID_A" '{ hotels { id } }' | jq -r '[.data.hotels[].id] | sort | join(",")')
 IDS_B=$(gql hotel_manager "$UID_B" '{ hotels { id } }' | jq -r '[.data.hotels[].id] | sort | join(",")')
@@ -65,6 +76,13 @@ CROSS=$(gql hotel_manager "$UID_B" 'query ($id: uuid!) { hotels_by_pk(id: $id) {
 
 AGG=$(gql hotel_manager "$UID_B" '{ hotels_aggregate { aggregate { count } } }' | jq -r '.data.hotels_aggregate.aggregate.count')
 [[ "$AGG" == "1" ]] && pass "aggregate count is scoped (1)" || fail "manager B aggregate count = $AGG"
+
+echo "▶ Staff membership isolation"
+STAFF_IDS=$(gql hotel_staff "$UID_STAFF" '{ hotels { id } }' | jq -r '[.data.hotels[].id] | sort | join(",")')
+[[ "$STAFF_IDS" == "$HOTEL_A" ]] && pass "staff sees only the assigned hotel" || fail "staff sees: $STAFF_IDS"
+STAFF_CROSS=$(gql hotel_staff "$UID_STAFF" 'query ($id: uuid!) { hotels_by_pk(id: $id) { id } }' \
+  "$(jq -nc --arg id "$HOTEL_B" '{id: $id}')" | jq -r '.data.hotels_by_pk')
+[[ "$STAFF_CROSS" == "null" ]] && pass "staff cannot fetch an unassigned hotel" || fail "staff fetched hotel B"
 
 echo "▶ Roles without hotel permissions"
 for role in guest host; do

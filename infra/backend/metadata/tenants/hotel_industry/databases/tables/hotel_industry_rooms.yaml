@@ -59,6 +59,28 @@ select_permissions:
               - role:
                   _eq: MANAGER
       allow_aggregations: true
+  - role: hotel_staff
+    permission:
+      columns:
+        - room_id
+        - hotel_id
+        - room_number
+        - room_type_id
+        - price_night
+        - capacity
+        - is_available
+        - created_at
+        - updated_at
+      filter:
+        hotel:
+          staff_memberships:
+            user:
+              _and:
+                - firebase_uid:
+                    _eq: X-Hasura-User-Id
+                - role:
+                    _eq: STAFF
+      allow_aggregations: true
   - role: admin
     permission:
       columns:

@@ -27,8 +27,8 @@ describe('computeHasuraClaims', () => {
     expect(claims['x-hasura-default-role']).toBe('host');
   });
 
-  it('STAFF and GUEST hotel users do not get hotel_manager', () => {
-    expect(computeHasuraClaims('u3', ['guest'], 'STAFF')['x-hasura-allowed-roles']).toEqual(['guest']);
+  it('a hotel STAFF user gets read-only hotel_staff in addition to SafeTrust roles', () => {
+    expect(computeHasuraClaims('u3', ['guest'], 'STAFF')['x-hasura-allowed-roles']).toEqual(['guest', 'hotel_staff']);
     expect(computeHasuraClaims('u3', ['guest'], 'GUEST')['x-hasura-allowed-roles']).toEqual(['guest']);
   });
 
@@ -44,6 +44,12 @@ describe('computeHasuraClaims', () => {
     const claims = computeHasuraClaims('u6', [], 'MANAGER');
     expect(claims['x-hasura-allowed-roles']).toEqual(['hotel_manager']);
     expect(claims['x-hasura-default-role']).toBe('hotel_manager');
+  });
+
+  it('a staff member with no SafeTrust role defaults to hotel_staff', () => {
+    const claims = computeHasuraClaims('u7', [], 'STAFF');
+    expect(claims['x-hasura-allowed-roles']).toEqual(['hotel_staff']);
+    expect(claims['x-hasura-default-role']).toBe('hotel_staff');
   });
 });
 

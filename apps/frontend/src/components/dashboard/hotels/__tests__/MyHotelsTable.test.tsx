@@ -24,6 +24,12 @@ vi.mock("@apollo/client", () => ({
   gql: (strings: TemplateStringsArray) => strings.join(""),
 }));
 
+// These interaction tests exercise manager-only controls. Staff access is
+// covered by hotel-access tests and intentionally does not render edit/delete.
+vi.mock("@/hooks/use-hotel-role", () => ({
+  useHotelRole: () => ({ role: "hotel_manager", loading: false }),
+}));
+
 // Mock sonner toast
 vi.mock("sonner", () => ({
   toast: {

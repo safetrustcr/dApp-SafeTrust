@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   HASURA_CLAIMS_NAMESPACE,
   __resetMockWarningForTests,
+  canManageHotels,
   friendlyHotelError,
   hotelQueryContext,
   hotelRoleFromClaims,
@@ -46,6 +47,10 @@ describe("hotelRoleFromClaims", () => {
     expect(hotelRoleFromClaims(claims(["guest", "hotel_manager"]))).toBe("hotel_manager");
   });
 
+  it("hotel_staff when granted without a higher hotel role", () => {
+    expect(hotelRoleFromClaims(claims(["guest", "hotel_staff"]))).toBe("hotel_staff");
+  });
+
   it("no hotel access for SafeTrust-only users", () => {
     expect(hotelRoleFromClaims(claims(["guest", "host"]))).toBeNull();
   });
@@ -60,6 +65,14 @@ describe("hotelRoleFromClaims", () => {
 describe("hotelQueryContext", () => {
   it("requests the role through x-hasura-role", () => {
     expect(hotelQueryContext("hotel_manager")).toEqual({ headers: { "x-hasura-role": "hotel_manager" } });
+  });
+});
+
+describe("canManageHotels", () => {
+  it("keeps hotel staff read-only", () => {
+    expect(canManageHotels("hotel_staff")).toBe(false);
+    expect(canManageHotels("hotel_manager")).toBe(true);
+    expect(canManageHotels("admin")).toBe(true);
   });
 });
 

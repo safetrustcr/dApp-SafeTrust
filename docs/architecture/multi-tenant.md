@@ -177,8 +177,8 @@ change), under the namespace `https://hasura.io/jwt/claims`:
 | Claim | Value |
 |---|---|
 | `x-hasura-user-id` | Firebase UID |
-| `x-hasura-allowed-roles` | SafeTrust roles from `public.user_roles` (`guest`, `host`, `admin`) + `hotel_manager` when `hotel_industry.users.role = 'MANAGER'` for that `firebase_uid` |
-| `x-hasura-default-role` | highest of: `admin` > `host` > `guest` > `hotel_manager` |
+| `x-hasura-allowed-roles` | SafeTrust roles from `public.user_roles` (`guest`, `host`, `admin`) + `hotel_manager` for hotel `MANAGER` users, or `hotel_staff` for hotel `STAFF` users |
+| `x-hasura-default-role` | highest of: `admin` > `host` > `guest` > `hotel_manager` > `hotel_staff` |
 
 The browser may choose one granted role with `x-hasura-role` (the hotel
 dashboard sends `hotel_manager` or `admin`); Hasura rejects any role that
@@ -196,13 +196,15 @@ pnpm --filter @safetrust/api exec tsx scripts/sync-hasura-claims.ts
 | Hasura role | `hotels` | `rooms` / `reservations` / `hotel_escrow_transactions` |
 |---|---|---|
 | `hotel_manager` | `owner.firebase_uid = X-Hasura-User-Id` **and** `owner.role = MANAGER` | through `hotel` → `owner` with the same rule |
+| `hotel_staff` | only hotels assigned through `hotel_staff_memberships` | through the assigned hotel; read-only |
 | `admin` | all rows | all rows |
 | `guest`, `host` (SafeTrust) | no access — root fields not exposed | no access |
 
 All hotel tables are read-only for clients; writes go through `apps/api`.
 
-`STAFF` has no hotel permissions yet: no table links a staff user to a
-hotel. A `hotel_staff` membership table is a follow-up.
+`hotel_staff` is read-only. `hotel_staff_memberships` links each staff user to
+the hotel(s) they may view; all hotel writes remain server-authorized manager
+or administrator actions.
 
 ### Hotel dashboard mocks
 

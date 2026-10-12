@@ -17,6 +17,23 @@ object_relationships:
     using:
       foreign_key_constraint_on: room_id
 select_permissions:
+  - role: hotel_staff
+    permission:
+      columns:
+        - id
+        - room_id
+        - image_url
+        - uploaded_at
+      filter:
+        room:
+          hotel:
+            staff_memberships:
+              user:
+                _and:
+                  - firebase_uid:
+                      _eq: X-Hasura-User-Id
+                  - role:
+                      _eq: STAFF
   - role: tenant
     permission:
       columns:

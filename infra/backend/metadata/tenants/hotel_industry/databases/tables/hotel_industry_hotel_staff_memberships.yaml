@@ -1,0 +1,26 @@
+table:
+  name: hotel_staff_memberships
+  schema: hotel_industry
+configuration:
+  custom_root_fields:
+    select: hotel_staff_memberships
+    select_by_pk: hotel_staff_memberships_by_pk
+    select_aggregate: hotel_staff_memberships_aggregate
+object_relationships:
+  - name: hotel
+    using:
+      foreign_key_constraint_on: hotel_id
+  - name: user
+    using:
+      foreign_key_constraint_on: user_id
+# Membership records are an internal authorization concern. Hotel writes and
+# staff assignment go through apps/api; clients do not query this root field.
+select_permissions:
+  - role: admin
+    permission:
+      columns:
+        - id
+        - hotel_id
+        - user_id
+        - created_at
+      filter: {}

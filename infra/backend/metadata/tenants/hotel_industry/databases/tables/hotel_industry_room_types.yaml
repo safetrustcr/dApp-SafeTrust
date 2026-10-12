@@ -22,6 +22,35 @@ array_relationships:
         columns:
           - room_type_id
 select_permissions:
+  # Room types are shared reference data. They contain no tenant-private
+  # values and must be readable for nested rooms { room_type { name } } queries.
+  - role: hotel_manager
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - created_at
+        - updated_at
+      filter: {}
+  - role: hotel_staff
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - created_at
+        - updated_at
+      filter: {}
+  - role: admin
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - created_at
+        - updated_at
+      filter: {}
   - role: tenant
     permission:
       columns:

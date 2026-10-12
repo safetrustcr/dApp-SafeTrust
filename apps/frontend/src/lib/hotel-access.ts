@@ -10,7 +10,7 @@
 
 export const HASURA_CLAIMS_NAMESPACE = 'https://hasura.io/jwt/claims';
 
-export type HotelHasuraRole = 'admin' | 'hotel_manager';
+export type HotelHasuraRole = 'admin' | 'hotel_manager' | 'hotel_staff';
 
 let warnedProductionMocks = false;
 
@@ -40,7 +40,8 @@ export function __resetMockWarningForTests(): void {
 
 /**
  * Picks the hotel role to request from the token's verified claims:
- * admin (platform) wins over hotel_manager; anything else → no hotel access.
+ * admin (platform) wins over hotel_manager, then hotel_staff; anything else
+ * means no hotel access.
  */
 export function hotelRoleFromClaims(claims: Record<string, unknown> | null | undefined): HotelHasuraRole | null {
   const hasura = claims?.[HASURA_CLAIMS_NAMESPACE] as { 'x-hasura-allowed-roles'?: unknown } | undefined;
@@ -48,7 +49,13 @@ export function hotelRoleFromClaims(claims: Record<string, unknown> | null | und
   if (!Array.isArray(allowed)) return null;
   if (allowed.includes('admin')) return 'admin';
   if (allowed.includes('hotel_manager')) return 'hotel_manager';
+  if (allowed.includes('hotel_staff')) return 'hotel_staff';
   return null;
+}
+
+/** Hotel staff are intentionally read-only. */
+export function canManageHotels(role: HotelHasuraRole | null): boolean {
+  return role === 'admin' || role === 'hotel_manager';
 }
 
 /** Apollo operation context that requests one of the token's granted roles. */
