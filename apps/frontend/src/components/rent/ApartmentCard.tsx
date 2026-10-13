@@ -16,11 +16,14 @@ import { formatListingPrice } from './formatListingPrice';
 interface ApartmentCardProps {
   apartment: HotelListing;
   onClick?: () => void;
+  /** Canonical public.apartments id used by the conversation API. */
+  conversationApartmentId?: string;
 }
 
 export default function ApartmentCard({
   apartment,
   onClick,
+  conversationApartmentId,
 }: ApartmentCardProps) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuthUser();
@@ -43,7 +46,7 @@ export default function ApartmentCard({
     setIsMessaging(true);
 
     try {
-      const response = await startConversation(apartment.id);
+      const response = await startConversation(conversationApartmentId ?? apartment.id);
       router.push(`/dashboard/messages/${response.conversationId}`);
     } catch (error) {
       console.error('Failed to start conversation:', error);
@@ -59,8 +62,9 @@ export default function ApartmentCard({
     }
   };
 
-  // Hide button while loading auth or if user owns the listing or if it's a stub listing
-  const shouldShowMessageButton = !authLoading && !isOwner && !apartment.isStub;
+  // A conversation must always use a public.apartments id. Mock listings may
+  // opt in only when the caller supplies their canonical compatibility id.
+  const shouldShowMessageButton = !authLoading && !isOwner && (!apartment.isStub || Boolean(conversationApartmentId));
 
   return (
     <div className="group w-full overflow-hidden rounded-[16px] border border-[#e7e2dc] bg-white transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">

@@ -115,6 +115,7 @@ export const GET_APARTMENT_BY_ID = gql`
       image_urls
       address
       price
+      warranty_deposit
       owner_id
       owner {
         user_wallets(

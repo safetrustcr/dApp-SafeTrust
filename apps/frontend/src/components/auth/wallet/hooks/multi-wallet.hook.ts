@@ -5,6 +5,7 @@ import { WalletType } from "../components/MainWalletSelectionModal";
 import { useMetaMaskWallet } from "./metamask-wallet.hook";
 import { getWalletKit } from "../constants/wallet-kit.constant";
 import { ISupportedWallet } from "@creit.tech/stellar-wallets-kit";
+import { postAuthenticatedApi } from "@/lib/api/client";
 
 type WalletAuthenticationHandler = (
   address: string,
@@ -102,7 +103,16 @@ export const useMultiWallet = () => {
         await authenticate(address, wallet.name);
       }
 
-      connectWalletStore(address, wallet.name);
+      // A payment is only built for an address that is registered to the
+      // authenticated SafeTrust account.  Do this at connection time instead
+      // of trusting an address sent later by the browser.
+      await postAuthenticatedApi("/api/auth/sync-wallet", {
+        walletAddress: address,
+        chainType: "STELLAR",
+        isPrimary: true,
+        provider: wallet.id,
+      });
+      connectWalletStore(address, wallet.name, wallet.id);
 
       setIsStellarModalOpen(false);
       setSelectedWalletType(null);

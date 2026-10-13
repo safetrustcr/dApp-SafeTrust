@@ -216,7 +216,7 @@ export default function ApartmentDetailPage({
 
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <Link
-              href={`/apartment/${params.id}/escrow/create`}
+              href={`/escrow/${params.id}/escrow/create`}
               style={styles.button}
             >
               BOOK

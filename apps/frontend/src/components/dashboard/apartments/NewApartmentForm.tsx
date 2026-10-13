@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@apollo/client";
 import { toast } from "sonner";
-import { Home, MapPin, DollarSign, Plus, X, ImageIcon } from "lucide-react";
+import { Home, MapPin, DollarSign, Plus, X, ImageIcon, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,6 +71,8 @@ const ownerAddress = (() => {
     new Date().toISOString().split("T")[0]
   );
   const [availableUntil, setAvailableUntil] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [readingImages, setReadingImages] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
 
   // ── Apollo mutation ──────────────────────────────────────────────────────────
@@ -78,7 +80,7 @@ const ownerAddress = (() => {
     refetchQueries: ["GetApartments", "GetAllApartments"],
     onCompleted: () => {
       toast.success("Apartment created successfully!");
-      router.push("/dashboard/apartments");
+      router.push("/guest");
     },
     onError: (error) => {
       toast.error(`Failed to create apartment: ${error.message}`);
@@ -95,6 +97,38 @@ const ownerAddress = (() => {
 
   const removeImageUrl = (index: number) => {
     setImageUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const attachImages = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setReadingImages(true);
+    try {
+      if (files.length + imageUrls.filter(Boolean).length > 8) throw new Error("Choose up to 8 images in total.");
+      const images = await Promise.all(Array.from(files).map(async (file) => {
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) {
+          throw new Error("Use JPEG, PNG, or WebP images up to 10 MB each.");
+        }
+        const bitmap = await createImageBitmap(file);
+        try {
+          const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+          canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+          const context = canvas.getContext("2d");
+          if (!context) throw new Error("Unable to prepare image.");
+          context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          const image = canvas.toDataURL("image/jpeg", 0.8);
+          if (image.length > 700000) throw new Error("Image is too detailed. Please choose a smaller image.");
+          return image;
+        } finally { bitmap.close(); }
+      }));
+      setImageUrls((previous) => [...previous.filter((url) => url.trim()), ...images]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to attach images.");
+    } finally {
+      setReadingImages(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   // ── Submit ───────────────────────────────────────────────────────────────────
@@ -382,7 +416,7 @@ const ownerAddress = (() => {
               <div className="flex items-center justify-between">
                 <Label className="flex items-center gap-2">
                   <ImageIcon className="h-4 w-4 text-orange-400" />
-                  Image URLs
+                  Apartment images
                 </Label>
                 <Button
                   type="button"
@@ -396,12 +430,18 @@ const ownerAddress = (() => {
                 </Button>
               </div>
 
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" aria-label="Attach apartment images" onChange={(event) => void attachImages(event.target.files)} />
+              <Button type="button" variant="outline" disabled={readingImages || loading} onClick={() => fileInputRef.current?.click()} className="gap-2">
+                <Paperclip className="h-4 w-4" />{readingImages ? "Preparing images…" : "Attach images"}
+              </Button>
+              <p className="text-xs text-muted-foreground">Up to 8 JPEG, PNG, or WebP images, 10 MB each. You can also add image URLs.</p>
               <div className="space-y-2">
                 {imageUrls.map((url, index) => (
                   <div key={index} className="flex gap-2">
                     <Input
                       placeholder={`https://example.com/image-${index + 1}.jpg`}
-                      value={url}
+                      value={url.startsWith("data:") ? `Attached image ${index + 1}` : url}
+                      readOnly={url.startsWith("data:")}
                       onChange={(e) => updateImageUrl(index, e.target.value)}
                       className="flex-1 text-sm"
                     />
@@ -454,7 +494,7 @@ const ownerAddress = (() => {
           </Button>
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || readingImages}
             className="bg-orange-500 hover:bg-orange-600 text-white px-8"
           >
             {loading ? "Creating..." : "Create Apartment"}

@@ -119,7 +119,6 @@ export default function LoginPage() {
       const credential = await signInWithCustomToken(auth, verification.customToken);
       const idToken = await credential.user.getIdToken();
       useGlobalAuthenticationStore.getState().setToken(idToken);
-      useGlobalAuthenticationStore.getState().connectWalletStore(address, walletName);
 
       toast.success("Wallet login successful!", {
         description: "Redirecting to your dashboard...",

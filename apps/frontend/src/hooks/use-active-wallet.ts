@@ -5,6 +5,9 @@
 import { useCallback } from 'react';
 import { useFreighter } from '@/hooks/use-freighter'; // adjust import if needed
 import { usePollar } from '@/hooks/use-pollar';       // adjust import if needed
+import { getWalletKit } from '@/components/auth/wallet/constants/wallet-kit.constant';
+import { useGlobalAuthenticationStore } from '@/core/store/data';
+import { postEscrowApi } from '@/lib/api/escrow';
 
 // ---------------------------------------------------------------------------
 // E2E wallet provider (gated — never active in production builds)
@@ -57,7 +60,7 @@ function useE2EWallet() {
   return { address, signAndSubmit };
 }
 
-export type WalletType = 'freighter' | 'pollar' | null;
+export type WalletType = 'stellar-kit' | 'freighter' | 'pollar' | null;
 
 export type TransactionSubmission = {
   contractId: string;
@@ -97,28 +100,57 @@ export function useActiveWallet(): ActiveWallet {
   const pollar = usePollar();
   // ✅ E2E provider called unconditionally; IS_E2E gates whether it is actually used
   const e2e = useE2EWallet();
+  const stellarWalletId = useGlobalAuthenticationStore((state) => state.stellarWalletId);
+  const connectedAddress = useGlobalAuthenticationStore((state) => state.address);
 
   const isFreighterReady = Boolean(freighter?.address);
-  const isPollarReady = Boolean(pollar?.address);
-  const activeAddress = freighter?.address ?? pollar?.address ?? null;
-  const activeWalletType: WalletType = isFreighterReady
-    ? 'freighter'
-    : isPollarReady
-      ? 'pollar'
-      : null;
+  const isKitWalletReady = Boolean(stellarWalletId && connectedAddress);
+  const activeAddress = isKitWalletReady ? connectedAddress : freighter?.address ?? pollar?.address ?? null;
+  const activeWalletType: WalletType = isKitWalletReady
+    ? 'stellar-kit'
+    : isFreighterReady
+      ? 'freighter'
+      : pollar?.address
+        ? 'pollar'
+        : null;
+
+  const signWithKitAndSubmit = useCallback(
+    async (unsignedXDR: string): Promise<void> => {
+      if (!stellarWalletId || !connectedAddress) {
+        throw new Error('Connect a Stellar wallet before signing this escrow transaction.');
+      }
+
+      const kit = getWalletKit();
+      kit.setWallet(stellarWalletId);
+      const { signedTxXdr } = await kit.signTransaction(unsignedXDR, {
+        address: connectedAddress,
+        networkPassphrase: process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'Test SDF Network ; September 2015',
+      });
+
+      // The backend verifies the exact XDR it created, verifies the wallet
+      // signature, and submits it with the Trustless Work secret held server-side.
+      await postEscrowApi('/api/escrow/send-transaction', { signedXdr: signedTxXdr });
+    },
+    [connectedAddress, stellarWalletId],
+  );
 
   // ✅ useCallback must run before any early return (rules-of-hooks).
   const signAndSubmit = useCallback(
     async (unsignedXDR: string, submission: TransactionSubmission): Promise<void> => {
-      if (isFreighterReady && freighter?.signAndSubmit) {
+      if (isKitWalletReady) {
+        await signWithKitAndSubmit(unsignedXDR);
+      } else if (isFreighterReady && freighter?.signAndSubmit) {
         await freighter.signAndSubmit(unsignedXDR, submission);
-      } else if (isPollarReady && pollar?.signAndSubmit) {
-        await pollar.signAndSubmit(unsignedXDR, submission);
+      } else if (pollar?.address) {
+        // Pollar's current browser SDK submits directly and does not expose the
+        // signed XDR.  SafeTrust must submit through its API to validate the
+        // pending action and record lifecycle state, so do not bypass it.
+        throw new Error('Pollar cannot sign SafeTrust escrow transactions yet. Connect a Stellar wallet such as Here Wallet, Freighter, Albedo, or xBull.');
       } else {
         throw new Error('No wallet available to sign transaction');
       }
     },
-    [isFreighterReady, isPollarReady, freighter, pollar],
+    [isKitWalletReady, signWithKitAndSubmit, isFreighterReady, freighter, pollar?.address],
   );
 
   // Short-circuit to the e2e provider when the flag is set.
@@ -135,7 +167,9 @@ export function useActiveWallet(): ActiveWallet {
   return {
     address: activeAddress,
     walletType: activeWalletType,
-    isReady: Boolean(activeAddress),
+    // Pollar may provision a G-address, but its SDK currently cannot return a
+    // signed XDR for SafeTrust's server-verified submission path.
+    isReady: Boolean(activeAddress) && activeWalletType !== 'pollar',
     signAndSubmit,
   };
 }

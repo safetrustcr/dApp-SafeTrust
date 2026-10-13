@@ -16,6 +16,7 @@ import { setPendingContractId } from '../../services/pending-actions.js';
 import {
   dbApproveMilestone,
   dbFundEscrow,
+  dbInitializeEscrow,
   dbMarkMilestoneCompleted,
   dbReleaseFunds,
   dbResolveDispute,
@@ -38,8 +39,15 @@ export async function applySubmittedAction(pending: PendingAction, ctx: SubmitCo
 
   switch (pending.action) {
     case 'initialize':
-      // Existing initialize block goes here (dbInitializeEscrow + escrow record),
-      // using pending.engagement_id, pending.signer_address and p.receiverAddress / p.amount / p.apartmentId.
+      await dbInitializeEscrow({
+        contractId,
+        engagementId: pending.engagement_id,
+        apartmentId: String(p.apartmentId),
+        senderAddress: pending.signer_address,
+        receiverAddress: String(p.receiverAddress),
+        releaser: String(p.releaser),
+        amount: Number(p.amount),
+      });
       break;
     case 'fund':
       await dbFundEscrow(contractId, Number(p.amount));

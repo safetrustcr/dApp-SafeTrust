@@ -9,6 +9,7 @@ import {
 } from '@/components/rent';
 // TODO: replace STUB_HOTELS with GET_ALL_APARTMENTS Hasura query (Batch N)
 import { STUB_HOTELS } from '@/lib/mockData/hotels';
+import { canonicalApartmentRouteId } from '@/lib/stub-apartments';
 import {
   filterRentListings,
   toggleFilterValue,
@@ -17,6 +18,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { BsSortDownAlt } from 'react-icons/bs';
+import { LayoutGrid, Lightbulb } from 'lucide-react';
 
 export default function RentListingPage() {
   const router = useRouter();
@@ -54,7 +56,12 @@ export default function RentListingPage() {
   );
 
   const handleApartmentClick = (apartment: HotelListing) => {
-    router.push(`/hotel/${apartment.id}`);
+    const routeId = canonicalApartmentRouteId(apartment.id);
+    router.push(
+      routeId
+        ? `/escrow/${routeId}/escrow/create`
+        : `/escrow/${encodeURIComponent(apartment.id)}/escrow/create?kind=hotel-room`,
+    );
   };
 
   const locationLabel =
@@ -101,10 +108,26 @@ export default function RentListingPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-[#202020]">
-              <BsSortDownAlt className="h-4 w-4" />
-              <span>Sort by:</span>
-              <span className="font-semibold text-[#ff6a00]">Relevance</span>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-[#202020]">
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/guest/suggestions')}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#e7e2dc] bg-white px-3 py-2 font-medium transition hover:bg-[#fff9f0]"
+              >
+                <Lightbulb className="h-4 w-4 text-[#ff6a00]" /> Suggestions view
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/apartments')}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#e7e2dc] bg-white px-3 py-2 font-medium transition hover:bg-[#fff9f0]"
+              >
+                <LayoutGrid className="h-4 w-4 text-[#ff6a00]" /> Switch to host view
+              </button>
+              <span className="ml-1 inline-flex items-center gap-2">
+                <BsSortDownAlt className="h-4 w-4" />
+                <span>Sort by:</span>
+                <span className="font-semibold text-[#ff6a00]">Relevance</span>
+              </span>
             </div>
           </div>
 
@@ -119,6 +142,7 @@ export default function RentListingPage() {
             <ApartmentGrid
               apartments={filteredApartments}
               onApartmentClick={handleApartmentClick}
+              conversationApartmentId={(apartment) => canonicalApartmentRouteId(apartment.id) ?? undefined}
             />
           </div>
         </main>

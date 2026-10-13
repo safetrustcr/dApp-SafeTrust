@@ -36,6 +36,45 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<WalletInfo | null>(null);
+  const [failedIcons, setFailedIcons] = useState<Record<string, boolean>>({});
+
+  const walletKey = (wallet: WalletInfo) => `${wallet.id}:${wallet.name}`;
+  const isHereWallet = (wallet: WalletInfo) =>
+    /here\s*wallet|herewallet/i.test(`${wallet.id} ${wallet.name}`);
+
+  /**
+   * Wallet Kit supplies third-party icon URLs.  Those URLs can disappear or be
+   * blocked by Next's image optimiser.  A local visual fallback keeps Here
+   * Wallet—and every other supported wallet—recognisable instead of rendering
+   * a broken-image placeholder.
+   */
+  const walletIcon = (wallet: WalletInfo, size: 'small' | 'large') => {
+    const failed = failedIcons[walletKey(wallet)];
+    const dimension = size === 'large' ? 'h-12 w-12 text-lg' : 'h-8 w-8 text-xs';
+    if (!wallet.icon || failed) {
+      const label = isHereWallet(wallet) ? 'H' : wallet.name.slice(0, 1).toUpperCase();
+      return (
+        <span
+          aria-label={`${wallet.name} logo`}
+          className={`${dimension} inline-flex shrink-0 items-center justify-center rounded-lg font-bold text-white ${
+            isHereWallet(wallet) ? 'bg-[#5A5CF6]' : 'bg-slate-600'
+          }`}
+        >
+          {label}
+        </span>
+      );
+    }
+    return (
+      <Image
+        src={wallet.icon}
+        alt={wallet.name}
+        width={size === 'large' ? 48 : 32}
+        height={size === 'large' ? 48 : 32}
+        className={`${dimension} rounded-lg object-contain`}
+        onError={() => setFailedIcons((current) => ({ ...current, [walletKey(wallet)]: true }))}
+      />
+    );
+  };
 
   // Load supported wallets
   const loadWallets = async () => {
@@ -214,13 +253,7 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
               {selectedWallet && !selectedWallet.isInstalled ? (
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
-                    <Image 
-                      src={selectedWallet.icon || 'https://stellar.creit.tech/wallet-icons/default.png'} 
-                      alt={selectedWallet.name}
-                      width={48}
-                      height={48}
-                      className="w-12 h-12 rounded-lg object-contain"
-                    />
+                    {walletIcon(selectedWallet, 'large')}
                     <div>
                       <h3 className="text-lg font-semibold">{selectedWallet.name}</h3>
                       <p className="text-sm text-gray-600">Installation Guide</p>
@@ -306,13 +339,7 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
                       <CardContent className="!p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <Image 
-                              src={wallet.icon || 'https://stellar.creit.tech/wallet-icons/default.png'} 
-                              alt={wallet.name}
-                              width={32}
-                              height={32}
-                              className="w-8 h-8 rounded-lg object-contain"
-                            />
+                            {walletIcon(wallet, 'small')}
                             <div>
                               <h3 className="font-semibold">{wallet.name}</h3>
                               {/* <p className="text-sm text-gray-600">{wallet.type}</p> */}

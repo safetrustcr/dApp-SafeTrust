@@ -150,6 +150,31 @@ function buildAuditLog(
 }
 
 export async function dbInitializeEscrow(params: InitializeParams): Promise<{ conversationId: string; apartmentName: string } | null> {
+  // The deploy step creates the local record before the guest signs.  Only
+  // advance it after Trustless Work accepted that exact signed XDR.
+  const initialized = await hasuraRequest<{
+    update_escrows: { affected_rows: number };
+  }>(
+    `mutation MarkEscrowInitialized($engagementId: String!, $contractId: String!) {
+      update_escrows(
+        where: { engagement_id: { _eq: $engagementId }, status: { _eq: "pending_signature" } }
+        _set: { contract_id: $contractId, status: "created" }
+      ) { affected_rows }
+    }`,
+    { engagementId: params.engagementId, contractId: params.contractId },
+  );
+  if (initialized.update_escrows.affected_rows === 0) {
+    const existingRecord = await hasuraRequest<{ escrows: Array<{ status: string }> }>(
+      `query InitializedEscrow($engagementId: String!) {
+        escrows(where: { engagement_id: { _eq: $engagementId } }, limit: 1) { status }
+      }`,
+      { engagementId: params.engagementId },
+    );
+    if (existingRecord.escrows[0]?.status !== 'created') {
+      throw new ConcurrentTransitionError('pending_signature', 'created');
+    }
+  }
+
   const existing = await hasuraRequest<EscrowIdResult>(
     `query GetEscrowByContractId($contractId: String!) {
       trustlessWorkEscrows(where: { contractId: { _eq: $contractId } }) {

@@ -7,10 +7,12 @@ interface AuthState {
   name: string | null;
   token: string | null;
   walletType: string | null;
+  /** Stellar Wallets Kit identifier.  The display name is not stable enough to re-select a wallet. */
+  stellarWalletId: string | null;
   isConnected: boolean;
   setAddress: (address: string | null) => void;
   setToken: (token: string | null) => void;
-  connectWalletStore: (address: string, name: string) => void;
+  connectWalletStore: (address: string, name: string, stellarWalletId?: string) => void;
   disconnectWalletStore: () => void;
   disconnect: () => void;
 }
@@ -22,6 +24,7 @@ export const useGlobalAuthenticationStore = create<AuthState>()(
       name: null,
       token: null,
       walletType: null,
+      stellarWalletId: null,
       isConnected: false,
 
       setAddress: (address) => set({ address }),
@@ -38,8 +41,14 @@ export const useGlobalAuthenticationStore = create<AuthState>()(
         set({ token });
       },
 
-      connectWalletStore: (address, name) => {
-        set({ address, name, walletType: name, isConnected: true });
+      connectWalletStore: (address, name, stellarWalletId) => {
+        set({
+          address,
+          name,
+          walletType: name,
+          stellarWalletId: stellarWalletId ?? null,
+          isConnected: true,
+        });
       },
 
       disconnectWalletStore: () => {
@@ -52,6 +61,7 @@ export const useGlobalAuthenticationStore = create<AuthState>()(
           name: null,
           token: null,
           walletType: null,
+          stellarWalletId: null,
           isConnected: false,
         });
       },
@@ -66,6 +76,7 @@ export const useGlobalAuthenticationStore = create<AuthState>()(
           name: null,
           token: null,
           walletType: null,
+          stellarWalletId: null,
           isConnected: false,
         });
       },
@@ -77,6 +88,7 @@ export const useGlobalAuthenticationStore = create<AuthState>()(
         name: state.name,
         token: state.token,
         walletType: state.walletType,
+        stellarWalletId: state.stellarWalletId,
         isConnected: state.isConnected,
       }),
     }

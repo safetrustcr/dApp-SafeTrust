@@ -10,6 +10,7 @@ import { useMultiWallet } from "./useMultiWallet";
 import { WalletInfo } from "../types/wallet.types";
 import { signTransaction } from "@stellar/freighter-api";
 import { usePollarWallet } from "@/components/auth/pollar/PollarProvider";
+import { postAuthenticatedApi } from "@/lib/api/client";
 
 export const useWallet = () => {
   const router = useRouter();
@@ -35,7 +36,13 @@ export const useWallet = () => {
       kit.setWallet(option.id);
       const { address } = await kit.getAddress();
       const { name } = option;
-      connectWalletStore(address, name);
+      await postAuthenticatedApi("/api/auth/sync-wallet", {
+        walletAddress: address,
+        chainType: "STELLAR",
+        isPrimary: true,
+        provider: option.id,
+      });
+      connectWalletStore(address, name, option.id);
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error connecting to wallet:", error);

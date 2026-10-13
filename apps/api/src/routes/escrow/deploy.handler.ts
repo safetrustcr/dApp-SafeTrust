@@ -4,13 +4,16 @@ import { hasuraRequest } from '../../services/hasura.js';
 import { trustlessWorkRequest } from '../../services/trustlesswork.js';
 import { ApiError } from '../../http/api-error.js';
 import { asyncHandler } from '../../http/async-handler.js';
+import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
+import { getApartmentEscrowTerms, ApartmentTermsError } from '../../services/apartment-escrow-terms.js';
+import { getUserWallets } from '../../services/escrow-authz.js';
+import { findLiveAction, insertPendingAction } from '../../services/pending-actions.js';
+import { transactionExpiry, transactionHash } from '../../lib/stellar-xdr.js';
 
 type DeployRequestBody = {
-  apartmentId: string;
-  senderAddress: string;
-  receiverAddress: string;
-  amount: number;
-  engagementId?: string;
+  apartmentId?: string;
+  /** The connected wallet chosen by the guest. It must already belong to them. */
+  senderAddress?: string;
 };
 
 type DeployResponse = {
@@ -22,24 +25,59 @@ type DeployResponse = {
 };
 
 export const deployEscrowHandler = asyncHandler(async (
-  req: Request<Record<string, never>, DeployResponse | { error: string }, DeployRequestBody>,
+  req: AuthenticatedRequest & Request<Record<string, never>, DeployResponse | { error: string }, DeployRequestBody>,
   res: Response<DeployResponse | { error: string }>,
 ) => {
-  const { apartmentId, senderAddress, receiverAddress, amount, engagementId } = req.body;
+  const { apartmentId, senderAddress } = req.body;
+  const uid = req.user?.uid;
 
-  if (!apartmentId || !senderAddress || !receiverAddress || !Number.isFinite(amount) || amount <= 0) {
+  if (!apartmentId || !senderAddress) {
     res.status(400).json({
-      error: 'Missing required fields: apartmentId, senderAddress, receiverAddress, amount',
+      error: 'Missing required fields: apartmentId, senderAddress',
     });
     return;
   }
+  if (!uid) {
+    throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in first.');
+  }
 
-  const resolvedEngagementId = engagementId ?? `engagement-${apartmentId}`;
+  const callerWallets = await getUserWallets(uid);
+  if (!callerWallets.includes(senderAddress)) {
+    throw new ApiError(403, 'WALLET_NOT_REGISTERED', 'Connect and register the Stellar wallet that will sign this escrow.');
+  }
+
+  let terms;
+  try {
+    terms = await getApartmentEscrowTerms(apartmentId);
+  } catch (error) {
+    if (error instanceof ApartmentTermsError) {
+      throw new ApiError(error.status, error.code, error.message);
+    }
+    throw error;
+  }
+  if (terms.ownerUserId === uid) {
+    throw new ApiError(409, 'SELF_ESCROW_NOT_ALLOWED', 'You cannot create a rental escrow for your own apartment.');
+  }
+
+  // An apartment can have one active deposit per guest in the MVP. Booking IDs
+  // can replace this deterministic key when the booking domain is introduced.
+  const resolvedEngagementId = `rental:${apartmentId}:${uid}`;
 
   // ── Idempotency check ──────────────────────────────────────────────────
   const idempotencyResult = await checkIdempotency(resolvedEngagementId);
 
   if (idempotencyResult.exists) {
+    const pending = await findLiveAction(resolvedEngagementId, 'initialize');
+    if (pending?.status === 'built') {
+      res.status(200).json({
+        status: 'PENDING_SIGNATURE',
+        engagementId: resolvedEngagementId,
+        contractId: pending.contract_id ?? undefined,
+        unsignedXDR: pending.unsigned_xdr,
+        cached: true,
+      });
+      return;
+    }
     console.log(
       `[escrow/deploy] idempotent hit — engagementId: ${resolvedEngagementId}, ` +
       `contractId: ${idempotencyResult.result.contract_id}`,
@@ -75,12 +113,12 @@ export const deployEscrowHandler = asyncHandler(async (
       title: `SafeTrust Rental — ${apartmentId}`,
       description: `Security deposit for apartment ${apartmentId}`,
       signer: senderAddress,
-      amount,
+      amount: terms.amount,
       platformFee: 0,
       roles: {
         approver: senderAddress,
-        serviceProvider: receiverAddress,
-        receiver: receiverAddress,
+        serviceProvider: terms.receiverAddress,
+        receiver: terms.receiverAddress,
         platformAddress,
         releaseSigner: senderAddress,
         disputeResolver: platformAddress,
@@ -123,16 +161,43 @@ export const deployEscrowHandler = asyncHandler(async (
       engagementId: resolvedEngagementId,
       apartmentId,
       senderAddress,
-      receiverAddress,
-      amount,
+      receiverAddress: terms.receiverAddress,
+      amount: terms.amount,
       unsignedXdr: twData.unsignedTransaction ?? '',
     },
   );
 
+  const unsignedXdr = twData.unsignedTransaction ?? '';
+  let txHash: string;
+  let expiresAt: Date;
+  try {
+    txHash = transactionHash(unsignedXdr);
+    expiresAt = transactionExpiry(unsignedXdr);
+  } catch {
+    throw new ApiError(502, 'TRUSTLESS_WORK_INVALID_XDR', 'The escrow provider returned an unreadable transaction.', { retryable: true });
+  }
+
+  await insertPendingAction({
+    engagement_id: resolvedEngagementId,
+    contract_id: twData.contractId ?? resolvedEngagementId,
+    action: 'initialize',
+    tx_hash: txHash,
+    unsigned_xdr: unsignedXdr,
+    built_for_uid: uid,
+    signer_address: senderAddress,
+    payload: {
+      apartmentId,
+      receiverAddress: terms.receiverAddress,
+      amount: terms.amount,
+      releaser: platformAddress,
+    },
+    expires_at: expiresAt,
+  });
+
   res.status(200).json({
     status: twData.status,
     contractId: twData.contractId,
-    unsignedXDR: twData.unsignedTransaction ?? '',
+    unsignedXDR: unsignedXdr,
     engagementId: resolvedEngagementId,
   });
 });

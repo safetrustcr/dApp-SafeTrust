@@ -1,6 +1,7 @@
 "use client";
 // apps/frontend/src/components/booking/BookingEscrowWrapper.tsx
 import type { CSSProperties } from 'react';
+import Link from 'next/link';
 
 type BookingEscrowWrapperProps = {
   bookingId: string;
@@ -52,12 +53,9 @@ const styles = {
 /**
  * BookingEscrowWrapper — MVP stub.
  *
- * Full implementation tracks hotel booking escrow via TrustlessWork.
- * Wired to apps/api POST /api/escrow/deploy once hotel_industry
- * escrow routes are ported from apps/frontend (issue #308).
- *
- * For now renders booking context and an explicit unavailable state so hotel
- * escrow pages compile and render without exposing a false completion step.
+ * Hotel bookings enter the same orchestrator as apartment bookings. The
+ * server-side hotel-room resolver is intentionally still unavailable, so this
+ * component never claims that a payment was created.
  */
 export function BookingEscrowWrapper({ bookingId }: BookingEscrowWrapperProps) {
   return (
@@ -67,10 +65,13 @@ export function BookingEscrowWrapper({ bookingId }: BookingEscrowWrapperProps) {
         Booking ID: <span style={styles.badge}>{bookingId}</span>
       </p>
       <p style={styles.notice}>
-        Hotel escrow payment is not available yet. Stay on this page until the
-        TrustlessWork single-release flow is enabled in issue #308; no deposit
-        has been submitted or locked.
+        Hotel escrow payment needs a server-side reservation resolver before it
+        can create a Trustless Work transaction. No deposit has been submitted
+        or locked.
       </p>
+      <Link href={`/escrow/${encodeURIComponent(bookingId)}/escrow/create?kind=hotel-room`} style={{ color: '#c2410c', fontWeight: 700 }}>
+        Open secure booking details →
+      </Link>
     </div>
   );
 }

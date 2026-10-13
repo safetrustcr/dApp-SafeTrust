@@ -407,7 +407,7 @@ export default function GuestDashboard() {
                         <button
                           type="button"
                           onClick={() =>
-                            router.push(`/apartment/${featured.id}/escrow/create`)
+                            router.push(`/escrow/${featured.id}/escrow/create`)
                           }
                           className="rounded-lg bg-orange-500 px-10 py-3 text-sm font-bold text-white hover:bg-orange-600 transition-colors shadow-sm"
                         >

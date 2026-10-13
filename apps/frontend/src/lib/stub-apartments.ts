@@ -36,6 +36,21 @@ export const STUB_APARTMENTS = [
 
 export type StubApartment = (typeof STUB_APARTMENTS)[number];
 
+/**
+ * The early rent mock used numeric hotel IDs while the apartment/escrow
+ * domain uses database UUIDs. Keep this short-lived compatibility map so
+ * shared /hotel/:id links and current mock cards reach the canonical route.
+ */
+const LEGACY_HOTEL_APARTMENT_IDS: Readonly<Record<string, string>> = {
+  '1': '550e8400-e29b-41d4-a716-446655440001',
+  '2': '550e8400-e29b-41d4-a716-446655440002',
+};
+
+export function canonicalApartmentRouteId(id: string): string | null {
+  if (getStubApartmentById(id)) return id;
+  return LEGACY_HOTEL_APARTMENT_IDS[id] ?? null;
+}
+
 export function getStubApartmentById(id: string): StubApartment | undefined {
   return STUB_APARTMENTS.find((apartment) => apartment.id === id);
 }

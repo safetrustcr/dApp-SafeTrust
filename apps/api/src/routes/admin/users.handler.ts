@@ -3,6 +3,7 @@ import { getAuth } from 'firebase-admin/auth';
 
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { hasuraRequest } from '../../services/hasura.js';
+import { syncHasuraClaims } from '../../services/hasura-claims.js';
 
 const ASSIGNABLE_ROLES = ['guest', 'host', 'admin'] as const;
 type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
@@ -102,6 +103,7 @@ export async function createManagedUserHandler(
     );
     databaseUserCreated = true;
     await getAuth().setCustomUserClaims(firebaseUid, { safetrustRole: role });
+    await syncHasuraClaims(firebaseUid);
 
     return res.status(201).json({
       user: { id: firebaseUid, email: normalizedEmail, first_name: firstName, last_name: lastName, role },
@@ -177,12 +179,69 @@ export async function changeUserRoleHandler(
     );
     const firebaseUser = await getAuth().getUser(userId);
     await getAuth().setCustomUserClaims(userId, {
-      ...firebaseUser.customClaims,
+      ...(firebaseUser.customClaims ?? {}),
       safetrustRole: role,
     });
+    await syncHasuraClaims(userId);
     return res.json({ userId, role });
   } catch (error) {
     console.error('[admin/users] Failed to change role:', error);
     return res.status(500).json({ error: 'Unable to change user role' });
+  }
+}
+
+/**
+ * Deletes a managed account from both Firebase and SafeTrust.  This is an
+ * administrator-only operation (the router applies requireAdmin) and keeps at
+ * least one administrator available to avoid locking the platform forever.
+ */
+export async function deleteManagedUserHandler(
+  req: AuthenticatedRequest & Request<{ userId: string }>,
+  res: Response,
+): Promise<Response> {
+  const { userId } = req.params;
+  if (userId === req.user.uid) {
+    return res.status(400).json({ error: 'Administrators cannot delete their own account' });
+  }
+
+  try {
+    const existing = await hasuraRequest<{
+      users_by_pk: { id: string; user_roles: Array<{ role: { name: string } | null }> } | null;
+    }>(
+      `query FindManagedUser($userId: String!) {
+        users_by_pk(id: $userId) { id user_roles { role { name } } }
+      }`,
+      { userId },
+    );
+    if (!existing.users_by_pk) return res.status(404).json({ error: 'User not found' });
+
+    const targetIsAdmin = existing.users_by_pk.user_roles.some((assignment) => assignment.role?.name === 'admin');
+    if (targetIsAdmin) {
+      const administrators = await hasuraRequest<{
+        user_roles_aggregate: { aggregate: { count: number } | null };
+      }>(
+        `query CountAdministrators {
+          user_roles_aggregate(where: { role: { name: { _eq: "admin" } } }) { aggregate { count } }
+        }`,
+      );
+      if ((administrators.user_roles_aggregate.aggregate?.count ?? 0) <= 1) {
+        return res.status(400).json({ error: 'At least one administrator must remain assigned' });
+      }
+    }
+
+    // Delete the database identity first; foreign keys remove the role and
+    // wallet records.  If Firebase deletion fails the account remains disabled
+    // from SafeTrust data access rather than retaining platform permissions.
+    await hasuraRequest(
+      `mutation DeleteManagedUser($userId: String!) {
+        delete_users_by_pk(id: $userId) { id }
+      }`,
+      { userId },
+    );
+    await getAuth().deleteUser(userId);
+    return res.status(204).send();
+  } catch (error) {
+    console.error('[admin/users] Failed to delete user:', error);
+    return res.status(500).json({ error: 'Unable to delete user' });
   }
 }
