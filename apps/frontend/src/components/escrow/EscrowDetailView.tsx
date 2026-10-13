@@ -10,6 +10,7 @@ import { postEscrowApi } from '@/lib/api/escrow';
 import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { useState, useCallback, useEffect, type CSSProperties, ReactNode } from 'react';
 import { useEscrowAction } from '@/hooks/use-escrow-action';
+import { useHotelEscrowResource } from '@/hooks/use-hotel-escrow-resource';
 import { useEscrowStream } from '@/hooks/use-escrow-stream';
 import Image from '@/components/ui/image';
 import {
@@ -484,7 +485,7 @@ function ProductCell({ apartment }: { apartment: InvoiceApartment }) {
   );
 }
 
-function PaidStubView({ escrow }: { escrow?: EscrowRecord | null }) {
+function PaidStubView({ escrow, bookingKind }: { escrow?: EscrowRecord | null; bookingKind?: "apartment" | "hotel-room" }) {
   const apartment: InvoiceApartment = escrow?.apartment
     ? { name: escrow.apartment.name ?? 'Apartment', image_urls: escrow.apartment.image_urls }
     : { name: '—', image_urls: [] };
@@ -496,9 +497,9 @@ function PaidStubView({ escrow }: { escrow?: EscrowRecord | null }) {
     ? `${escrow.tenant_wallet.user.first_name ?? ''} ${escrow.tenant_wallet.user.last_name ?? ''}`.trim() || '—'
     : '—';
 
-  const formattedMonthlyPrice = escrow?.apartment?.price != null ? `$${escrow.apartment.price.toLocaleString()}` : '—';
+  const formattedMonthlyPrice = bookingKind === "hotel-room" ? "Included" : escrow?.apartment?.price != null ? `$${escrow.apartment.price.toLocaleString()}` : '—';
   const formattedDeposit = escrow?.amount != null ? `$${escrow.amount.toLocaleString()}` : '—';
-  const formattedTotal = (escrow?.apartment?.price != null && escrow?.amount != null)
+  const formattedTotal = bookingKind === "hotel-room" ? formattedDeposit : (escrow?.apartment?.price != null && escrow?.amount != null)
     ? `$${(escrow.apartment.price + escrow.amount).toLocaleString()}`
     : '—';
   return (
@@ -515,8 +516,8 @@ function PaidStubView({ escrow }: { escrow?: EscrowRecord | null }) {
           <thead style={{ backgroundColor: '#fff7ed' }}>
             <tr>
               <th style={{ textAlign: 'left', padding: '0.9rem' }}>PRODUCT</th>
-              <th style={{ textAlign: 'right', padding: '0.9rem' }}>PRICE / MONTH</th>
-              <th style={{ textAlign: 'right', padding: '0.9rem' }}>DEPOSIT</th>
+              <th style={{ textAlign: 'right', padding: '0.9rem' }}>{bookingKind === "hotel-room" ? "STAY" : "PRICE / MONTH"}</th>
+              <th style={{ textAlign: 'right', padding: '0.9rem' }}>{bookingKind === "hotel-room" ? "PAYMENT" : "DEPOSIT"}</th>
             </tr>
           </thead>
           <tbody>
@@ -936,8 +937,10 @@ function EscrowActionButton({
 
 export default function EscrowDetailView({
   params,
+  bookingKind = "apartment",
 }: {
   params: { id: string; escrowId: string };
+  bookingKind?: "apartment" | "hotel-room";
 }) {
   const { address, walletType, isReady, signAndSubmit } = useActiveWallet();
   const { execute, actioning, phase, actionError, conflict } = useEscrowAction();
@@ -949,13 +952,20 @@ export default function EscrowDetailView({
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.escrowId);
 
-  const { data, loading, error, refetch } = useQuery(GET_ESCROW_BY_ANY_ID, {
+  const apartmentQuery = useQuery(GET_ESCROW_BY_ANY_ID, {
+    skip: bookingKind === "hotel-room",
     variables: {
       id: isUuid ? params.escrowId : null,
       engagement_id: params.escrowId,
       contract_id: params.escrowId,
     },
   });
+
+  const hotelQuery = useHotelEscrowResource<{ escrows: EscrowRecord[]; trustlessWorkEscrows: TrustlessWorkEscrowRecord[] }>(
+    bookingKind === "hotel-room" ? `/api/escrow/hotel-reservations/${encodeURIComponent(params.id)}/escrows/${encodeURIComponent(params.escrowId)}` : null,
+    true,
+  );
+  const { data, loading, error, refetch } = bookingKind === "hotel-room" ? hotelQuery : apartmentQuery;
 
   const contractId =
     data?.escrows?.[0]?.contract_id ?? data?.trustlessWorkEscrows?.[0]?.contract_id ?? null;
@@ -1016,7 +1026,7 @@ export default function EscrowDetailView({
     ? matches(trustlessWorkEscrow.resolver)
     : isReleaseSigner;
 
-  const canFund = status === 'created' || status === 'pending_signature';
+  const canFund = status === 'created';
   const canMarkMilestone = status === 'funded';
   const canRelease = status === 'milestone_approved';
   const canResolve = status === 'disputed';
@@ -1309,8 +1319,8 @@ export default function EscrowDetailView({
 
             <hr style={styles.divider} />
 
-            {view.label === 'pending' && <EscrowPendingView escrow={escrow as any} />}
-            {view.label === 'paid' && <PaidStubView escrow={escrow} />}
+            {view.label === 'pending' && <EscrowPendingView escrow={escrow as any} showDeploy={status === "pending_signature"} bookingKind={bookingKind} />}
+            {view.label === 'paid' && <PaidStubView escrow={escrow} bookingKind={bookingKind} />}
             {view.label === 'blocked' && <BlockedStubView escrow={escrow} />}
             {view.label === 'disputed' && <DisputedView escrow={escrow} />}
             {view.label === 'released' && <ReleasedView escrow={escrow} />}

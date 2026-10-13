@@ -36,6 +36,11 @@ describe('hotels API client', () => {
     vi.unstubAllGlobals();
   });
 
+  it('turns a fetch failure into an actionable API connection error', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(createHotel({ name: 'Hotel', address: 'San José' })).rejects.toMatchObject({ code: 'API_UNREACHABLE', status: 0 });
+  });
+
   it('createHotel sends POST /api/hotels with X-Tenant-ID: hotel_industry and Bearer token', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({

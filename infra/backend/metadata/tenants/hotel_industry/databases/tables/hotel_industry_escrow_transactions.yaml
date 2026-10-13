@@ -82,20 +82,3 @@ select_permissions:
                     - role:
                         _eq: STAFF
       allow_aggregations: true
-  - role: admin
-    permission:
-      columns:
-        - id
-        - reservation_id
-        - contract_id
-        - escrow_status
-        - signer_address
-        - transaction_type
-        - escrow_transaction_type
-        - http_status_code
-        - escrow_payload
-        - fund_payload
-        - created_at
-        - updated_at
-      filter: {}
-      allow_aggregations: true

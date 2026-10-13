@@ -70,11 +70,16 @@ export async function apiRequest<T>(
     Authorization: `Bearer ${token}`,
   };
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new HotelApiError('Cannot reach the SafeTrust API. Start the API server and check the configured API URL.', 0, null, 'API_UNREACHABLE');
+  }
 
   const payload: any = await response.json().catch(() => null);
 
@@ -131,4 +136,9 @@ export async function updateHotel(id: string, input: Partial<HotelInput>): Promi
  */
 export async function deleteHotel(id: string): Promise<{ success: boolean; id: string }> {
   return apiDelete<{ success: boolean; id: string }>(`/api/hotels/${id}`);
+}
+
+export async function getHotelOwnerOptions(): Promise<Array<{ id: string; name: string }>> {
+  const result = await apiRequest<{ owners: Array<{ id: string; name: string }> }>('/api/hotels/owners', 'GET');
+  return result.owners;
 }

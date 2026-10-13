@@ -1,5 +1,5 @@
 import type { Response } from 'express';
-import * as types from '@safetrust/types';
+import { validateHotelInput, type HotelInput } from '@safetrust/types';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import {
   findHotelUserByFirebaseUidOrEmail,
@@ -53,8 +53,8 @@ export async function updateHotelHandler(
     }
 
     // Validate update input using the shared validator
-    const body: types.HotelInput = req.body || {};
-    const validation = types.validateHotelInput(body, { isUpdate: true });
+    const body: HotelInput = req.body || {};
+    const validation = validateHotelInput(body, { isUpdate: true });
     if (!validation.valid) {
       return res.status(400).json({
         error: validation.message,
@@ -64,6 +64,7 @@ export async function updateHotelHandler(
 
     // Prepare update payload with allowed fields only (updated_at is maintained by trigger)
     const updatePayload: UpdateHotelDbInput = {};
+    if (body.image_urls !== undefined) updatePayload.image_urls = body.image_urls;
     if (body.name !== undefined) {
       updatePayload.name = body.name.trim();
     }

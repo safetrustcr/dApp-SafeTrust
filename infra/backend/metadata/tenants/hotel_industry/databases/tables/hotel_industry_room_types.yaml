@@ -42,15 +42,6 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
-  - role: admin
-    permission:
-      columns:
-        - id
-        - name
-        - description
-        - created_at
-        - updated_at
-      filter: {}
   - role: tenant
     permission:
       columns:

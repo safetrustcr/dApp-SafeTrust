@@ -81,17 +81,3 @@ select_permissions:
                 - role:
                     _eq: STAFF
       allow_aggregations: true
-  - role: admin
-    permission:
-      columns:
-        - room_id
-        - hotel_id
-        - room_number
-        - room_type_id
-        - price_night
-        - capacity
-        - is_available
-        - created_at
-        - updated_at
-      filter: {}
-      allow_aggregations: true

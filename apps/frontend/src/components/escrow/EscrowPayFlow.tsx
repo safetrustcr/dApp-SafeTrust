@@ -17,6 +17,8 @@ type EscrowPayFlowProps = {
   /** Stellar G-address of the apartment owner — receiver role in the escrow. */
   ownerAddress: string;
   amount: number;
+  bookingKind?: "apartment" | "hotel-room";
+  expectedSenderAddress?: string;
 };
 
 const STELLAR_ADDRESS_RE = /^G[A-Z2-7]{55}$/;
@@ -27,6 +29,7 @@ type DeployResponse = {
   engagementId: string;
   status: string;
   message?: string;
+  cached?: boolean;
 };
 
 export function EscrowPayFlow({
@@ -34,6 +37,8 @@ export function EscrowPayFlow({
   apartmentName,
   ownerAddress,
   amount,
+  bookingKind = "apartment",
+  expectedSenderAddress,
 }: EscrowPayFlowProps) {
   const router = useRouter();
   const { address, isReady, signAndSubmit } = useActiveWallet();
@@ -58,6 +63,7 @@ export function EscrowPayFlow({
   // Reused across retries of the same deploy attempt; cleared on success.
   const deployKeyRef = useRef<string | null>(null);
 
+  const walletMatchesReservation = !expectedSenderAddress || address === expectedSenderAddress;
   const hasOwnerWallet = STELLAR_ADDRESS_RE.test(ownerAddress);
   const payButtonLabel = useMemo(() => {
     if (deploying) return 'Deploying…';
@@ -71,7 +77,7 @@ export function EscrowPayFlow({
       handleConnect();
       return;
     }
-    if (!hasOwnerWallet) return;
+    if (!hasOwnerWallet || !walletMatchesReservation) return;
     if (deployInFlightRef.current) return;
     deployInFlightRef.current = true;
     setDeploying(true);
@@ -80,10 +86,14 @@ export function EscrowPayFlow({
     try {
       deployKeyRef.current = deployKeyRef.current ?? crypto.randomUUID();
       const payload = await postEscrowApi<DeployResponse>('/api/escrow/deploy', {
-        apartmentId,
+        ...(bookingKind === "hotel-room" ? { reservationId: apartmentId } : { apartmentId }),
         senderAddress: address,
       }, { idempotencyKey: deployKeyRef.current });
       deployKeyRef.current = null;
+      if (payload.cached && !payload.unsignedXDR) {
+        router.push(`/escrow/${apartmentId}/escrow/${encodeURIComponent(payload.engagementId)}${bookingKind === "hotel-room" ? "?kind=hotel-room" : ""}`);
+        return;
+      }
       setDeployState(payload);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to deploy escrow.'));
@@ -125,7 +135,7 @@ export function EscrowPayFlow({
         amount,
         propertyId: apartmentId,
       });
-      router.push(`/escrow/${apartmentId}/escrow/${deployState.engagementId}`);
+      router.push(`/escrow/${apartmentId}/escrow/${encodeURIComponent(deployState.engagementId)}${bookingKind === "hotel-room" ? "?kind=hotel-room" : ""}`);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to sign escrow.'));
     } finally {
@@ -144,7 +154,7 @@ export function EscrowPayFlow({
       <button
         type="button"
         onClick={handlePayClick}
-        disabled={deploying || signing || (isReady && !hasOwnerWallet)}
+        disabled={deploying || signing || (isReady && (!hasOwnerWallet || !walletMatchesReservation))}
         style={{
           ...buttonStyle,
           opacity: deploying || signing ? 0.65 : 1,
@@ -155,6 +165,7 @@ export function EscrowPayFlow({
         {isReady ? payButtonLabel : 'Connect wallet'}
       </button>
 
+      {isReady && !walletMatchesReservation && <p role="alert" className="max-w-60 text-xs text-orange-600">Switch to the wallet used for this reservation.</p>}
       {isReady && address && <p className="text-xs text-muted-foreground" title={address}>Wallet: {truncateStellarAddress(address)}</p>}
       {isReady && !hasOwnerWallet && <p role="status" className="max-w-60 text-xs text-orange-600">Owner wallet not available. Deployment is disabled.</p>}
       {!isReady && (

@@ -16,6 +16,7 @@ vi.mock('../conversation-events.js', () => ({
 
 import { hasuraRequest } from '../hasura.js';
 import {
+  dbInitializeEscrow,
   dbFundEscrow,
   dbMarkMilestoneCompleted,
   dbApproveMilestone,
@@ -297,5 +298,24 @@ describe('assertEscrowActionAllowed', () => {
     await expect(assertEscrowActionAllowed('release_funds', 'CA1')).rejects.toBeInstanceOf(
       InvalidTransitionError,
     );
+  });
+});
+
+
+describe('hotel initialization', () => {
+  it('sets booking metadata and tenant and does not create an apartment conversation', async () => {
+    vi.clearAllMocks();
+    requestMock.mockImplementation(async (query: string) => {
+      if (query.includes('MarkEscrowInitialized')) return { update_escrows: { affected_rows: 1 } };
+      if (query.includes('GetEscrowByContractId')) return { trustlessWorkEscrows: [] };
+      if (query.includes('mutation InitializeEscrow')) return { insert_trustlessWorkEscrows_one: { id: 'tw-hotel' } };
+      return {};
+    });
+    await dbInitializeEscrow({ contractId: 'CHOTEL', engagementId: 'hotel:reservation', senderAddress: 'GGUEST', receiverAddress: 'GHOTEL', releaser: 'GGUEST', amount: 240, tenantId: 'hotel_industry', booking: { id: 'reservation', check_in: '2026-11-01', check_out: '2026-11-03', room: { room_id: 'room', hotel: { id: 'hotel' } } } as never });
+    const initialization = requestMock.mock.calls.find(([query]) => query.includes('mutation InitializeEscrow'));
+    expect(initialization?.[1].object).toMatchObject({ tenantId: 'hotel_industry', bookingId: 'reservation', hotelId: 'hotel', roomId: 'room', releaser: 'GGUEST' });
+    const milestone = requestMock.mock.calls.find(([query]) => query.includes('InitializeMilestone'));
+    expect(milestone?.[1].object.tenantId).toBe('hotel_industry');
+    expect(requestMock.mock.calls.some(([query]) => query.includes('Conversation'))).toBe(false);
   });
 });

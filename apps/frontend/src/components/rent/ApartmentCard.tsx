@@ -3,7 +3,7 @@
 import React from 'react';
 import type { HotelListing } from '@/@types/hotel';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
+import { Image } from '@/components/ui/image';
 import { useRouter } from 'next/navigation';
 import { AiOutlineHeart } from 'react-icons/ai';
 import { FaFireAlt } from 'react-icons/fa';
@@ -64,7 +64,7 @@ export default function ApartmentCard({
 
   // A conversation must always use a public.apartments id. Mock listings may
   // opt in only when the caller supplies their canonical compatibility id.
-  const shouldShowMessageButton = !authLoading && !isOwner && (!apartment.isStub || Boolean(conversationApartmentId));
+  const shouldShowMessageButton = apartment.kind !== "hotel" && !authLoading && !isOwner && (!apartment.isStub || Boolean(conversationApartmentId));
 
   return (
     <div className="group w-full overflow-hidden rounded-[16px] border border-[#e7e2dc] bg-white transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
@@ -81,6 +81,7 @@ export default function ApartmentCard({
             height={280}
             className="h-[170px] w-full object-cover"
           />
+          {apartment.kind && <span className="absolute left-2 top-2 rounded-full bg-white/90 px-3 py-1 text-xs font-medium">{apartment.kind === "hotel" ? "Hotel" : "Apartment"}</span>}
           {apartment.promoted ? (
             <span className="absolute bottom-0 left-0 inline-flex items-center gap-1 rounded-tr-[10px] bg-[#ff6a00] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.02em] text-white">
               <FaFireAlt className="h-3.5 w-3.5" />
@@ -93,9 +94,9 @@ export default function ApartmentCard({
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-end gap-2">
               <span className="text-[30px] font-semibold leading-none text-[#10a156]">
-                {formatListingPrice(apartment.price)}
+                {apartment.priceAvailable === false ? "No rates yet" : formatListingPrice(apartment.price)}
               </span>
-              <span className="pb-1 text-xs text-[#8b8b8b]">Per month</span>
+              <span className="pb-1 text-xs text-[#8b8b8b]">{apartment.priceAvailable === false ? "" : apartment.pricePeriod === "night" ? "From / night" : "Per month"}</span>
             </div>
             <AiOutlineHeart
               className={cn(
@@ -116,12 +117,12 @@ export default function ApartmentCard({
             </p>
           </div>
 
-          <AmenityIcons
+          {apartment.amenitiesKnown !== false && <AmenityIcons
             bedrooms={apartment.bedrooms}
             bathrooms={apartment.bathrooms}
             petFriendly={apartment.petFriendly}
             compact
-          />
+          />}
         </div>
       </button>
 
@@ -134,7 +135,7 @@ export default function ApartmentCard({
           }}
           className="flex-1 rounded-lg bg-[#10a156] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0d8a48]"
         >
-          Book
+          {apartment.kind === "hotel" ? "View hotel" : "Book"}
         </button>
         {shouldShowMessageButton && (
           <button

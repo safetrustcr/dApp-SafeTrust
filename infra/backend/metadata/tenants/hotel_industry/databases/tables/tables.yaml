@@ -9,3 +9,4 @@
 - "!include hotel_industry_users_wallets.yaml"
 - "!include hotel_industry_room_images.yaml"
 - "!include hotel_industry_pricing_rules.yaml"
+- "!include hotel_industry_hotel_images.yaml"

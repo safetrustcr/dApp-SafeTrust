@@ -60,7 +60,7 @@ export const GET_HOTEL_ESCROW_TRANSACTIONS = gql`
 `;
 
 export const GET_HOTELS = gql`
-  query GetHotels($limit: Int, $offset: Int, $where: hotels_bool_exp) {
+  query GetHotels($limit: Int, $offset: Int, $where: hotel_industry_hotels_bool_exp) {
     hotels(limit: $limit, offset: $offset, where: $where, order_by: { created_at: desc }) {
       id
       name
@@ -71,6 +71,7 @@ export const GET_HOTELS = gql`
       created_at
       updated_at
       owner_user_id
+      images(order_by: { position: asc }) { id image_url position }
     }
     hotels_aggregate(where: $where) {
       aggregate {
@@ -91,7 +92,13 @@ export const GET_HOTEL_BY_ID = gql`
       coordinates
       created_at
       updated_at
+      rooms(order_by: { room_number: asc }) {
+        room_id room_number price_night capacity is_available
+        room_type { name }
+        images { id image_url }
+      }
       owner_user_id
+      images(order_by: { position: asc }) { id image_url position }
     }
   }
 `;

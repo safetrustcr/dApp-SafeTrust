@@ -11,6 +11,7 @@
  * status forward only after ledger confirmation, call it here instead of writing
  * status directly.
  */
+import { syncHotelEscrowTransaction } from '../../services/hotel-reservation-escrow.js';
 import type { PendingAction } from '../../services/pending-actions.js';
 import { setPendingContractId } from '../../services/pending-actions.js';
 import {
@@ -32,7 +33,7 @@ export async function applySubmittedAction(pending: PendingAction, ctx: SubmitCo
   const p = pending.payload as Record<string, unknown>;
   const contractId = ctx.contractId;
 
-  if (contractId && !pending.contract_id) {
+  if (contractId && pending.contract_id !== contractId) {
     await setPendingContractId(pending.id, contractId);
   }
   if (!contractId) return; // initialize without a contract id yet: reconciliation picks it up
@@ -42,7 +43,9 @@ export async function applySubmittedAction(pending: PendingAction, ctx: SubmitCo
       await dbInitializeEscrow({
         contractId,
         engagementId: pending.engagement_id,
-        apartmentId: String(p.apartmentId),
+        apartmentId: typeof p.apartmentId === 'string' ? p.apartmentId : undefined,
+        tenantId: typeof p.tenantId === 'string' ? p.tenantId : 'safetrust',
+        booking: p.booking as import('../../services/hotel-reservation-escrow.js').HotelReservation | undefined,
         senderAddress: pending.signer_address,
         receiverAddress: String(p.receiverAddress),
         releaser: String(p.releaser),
@@ -64,5 +67,9 @@ export async function applySubmittedAction(pending: PendingAction, ctx: SubmitCo
     case 'resolve_dispute':
       await dbResolveDispute(contractId);
       break;
+  }
+  if (pending.engagement_id.startsWith('hotel:')) {
+    const status = { initialize: 'created', fund: 'funded', mark_milestone_completed: 'funded', approve_milestone: 'milestone_approved', release_funds: 'completed', resolve_dispute: 'resolved' }[pending.action];
+    await syncHotelEscrowTransaction(pending.engagement_id.slice('hotel:'.length), contractId, pending.signer_address, status);
   }
 }

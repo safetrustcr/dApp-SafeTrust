@@ -12,8 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { validateHotelInput } from "@safetrust/types";
 import type { Hotel, HotelInput } from "@safetrust/types";
-import { createHotel, updateHotel, HotelApiError } from "@/lib/api/hotels";
+import { createHotel, updateHotel, HotelApiError, getHotelOwnerOptions } from "@/lib/api/hotels";
+import { HotelImagePicker } from "./HotelImagePicker";
 import { SchemaConstraintsHint } from "./SchemaConstraintsHint";
+import { useHotelRole } from "@/hooks/use-hotel-role";
+import { hotelQueryContext } from "@/lib/hotel-access";
 import { GET_HOTEL_BY_ID } from "@/graphql/queries/hotel-queries";
 import { extractCoordinates, formatHotelDate } from "@/lib/hotels";
 
@@ -25,8 +28,21 @@ interface HotelFormProps {
 
 export function HotelForm({ mode, hotelId, initialData }: HotelFormProps) {
   const router = useRouter();
+  const { role, loading: roleLoading } = useHotelRole();
 
   // ── Form State ─────────────────────────────────────────────────────────────
+  const [owners, setOwners] = useState<Array<{ id: string; name: string }>>([]);
+  const [ownerUserId, setOwnerUserId] = useState("");
+  const [loadingOwners, setLoadingOwners] = useState(false);
+  useEffect(() => {
+    if (mode !== "create" || role !== "admin") return;
+    let active = true;
+    setLoadingOwners(true);
+    getHotelOwnerOptions().then((result) => { if (active) setOwners(result); }).catch((error) => { if (active) setGeneralError(error.message); }).finally(() => { if (active) setLoadingOwners(false); });
+    return () => { active = false; };
+  }, [mode, role]);
+  const [images, setImages] = useState<string[]>(initialData?.images?.map((image) => image.image_url) ?? []);
+  const [preparingImages, setPreparingImages] = useState(false);
   const [name, setName] = useState(initialData?.name ?? "");
   const [address, setAddress] = useState(initialData?.address ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
@@ -44,13 +60,15 @@ export function HotelForm({ mode, hotelId, initialData }: HotelFormProps) {
   // ── Pre-populate when editing from Apollo if initialData wasn't passed ─────
   const { data: queryData, loading: queryLoading, error: queryError } = useQuery(GET_HOTEL_BY_ID, {
     variables: { id: hotelId },
-    skip: mode !== "edit" || !hotelId || Boolean(initialData),
+    context: role ? hotelQueryContext(role) : undefined,
+    skip: mode !== "edit" || !hotelId || Boolean(initialData) || !role,
     fetchPolicy: "network-only",
   });
 
   useEffect(() => {
     const hotel = initialData || queryData?.hotels_by_pk;
     if (hotel) {
+      setImages(hotel.images?.map((image: { image_url: string }) => image.image_url) ?? []);
       setName(hotel.name ?? "");
       setAddress(hotel.address ?? "");
       setDescription(hotel.description ?? "");
@@ -81,6 +99,7 @@ export function HotelForm({ mode, hotelId, initialData }: HotelFormProps) {
       locationArea: locationArea.trim() === "" ? null : locationArea.trim(),
       latitude: latValue,
       longitude: lngValue,
+      image_urls: images,
     };
 
     const result = validateHotelInput(inputToValidate, { isUpdate: mode === "edit" });
@@ -98,6 +117,11 @@ export function HotelForm({ mode, hotelId, initialData }: HotelFormProps) {
     e.preventDefault();
     setGeneralError(null);
 
+    if (preparingImages || isSubmitting) return;
+    if (mode === "create" && role === "admin" && !ownerUserId) {
+      setFieldErrors({ ownerUserId: "Choose a hotel manager as the owner." });
+      return;
+    }
     if (!validateForm()) {
       return;
     }
@@ -115,6 +139,8 @@ export function HotelForm({ mode, hotelId, initialData }: HotelFormProps) {
         locationArea: locationArea.trim() === "" ? null : locationArea.trim(),
         latitude: latVal,
         longitude: lngVal,
+        image_urls: images,
+        ...(mode === "create" && role === "admin" ? { ownerUserId } : {}),
       };
 
       if (mode === "create") {
@@ -147,7 +173,7 @@ export function HotelForm({ mode, hotelId, initialData }: HotelFormProps) {
     }
   };
 
-  if (mode === "edit" && queryLoading) {
+  if (mode === "edit" && !initialData && (queryLoading || roleLoading)) {
     return (
       <div className="flex flex-col items-center justify-center p-12 space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -224,11 +250,12 @@ export function HotelForm({ mode, hotelId, initialData }: HotelFormProps) {
         <CardHeader>
           <CardTitle className="text-lg font-semibold">Hotel Information</CardTitle>
           <CardDescription>
-            All writes are processed securely through the API. The browser never writes hotel rows directly to Hasura.
+            Add your hotel details and photos.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
+            {mode === "create" && role === "admin" && <div className="space-y-2"><Label htmlFor="hotel-owner">Hotel owner *</Label><select id="hotel-owner" value={ownerUserId} onChange={(event) => setOwnerUserId(event.target.value)} disabled={loadingOwners || isSubmitting} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">{loadingOwners ? "Loading hotel managers…" : "Choose a hotel manager"}</option>{owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name}</option>)}</select>{!loadingOwners && !owners.length && <p className="text-xs text-muted-foreground">Register a hotel manager before assigning this hotel.</p>}{fieldErrors.ownerUserId && <p role="alert" className="text-xs text-destructive">{fieldErrors.ownerUserId}</p>}</div>}
             {/* Hotel Name */}
             <div className="space-y-1.5">
               <Label htmlFor="hotel-name" className="text-sm font-medium">
@@ -416,20 +443,22 @@ export function HotelForm({ mode, hotelId, initialData }: HotelFormProps) {
               )}
             </div>
 
+            <HotelImagePicker images={images} onChange={setImages} onBusyChange={setPreparingImages} disabled={isSubmitting || preparingImages} />
+            {fieldErrors.image_urls && <p role="alert" className="text-sm text-destructive">{fieldErrors.image_urls}</p>}
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/dashboard/hotels")}
-                disabled={isSubmitting}
+                disabled={isSubmitting || preparingImages}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 data-testid="hotel-submit-btn"
-                disabled={isSubmitting}
+                disabled={isSubmitting || preparingImages}
                 className="bg-orange-500 hover:bg-orange-600 text-white min-w-[120px]"
               >
                 {isSubmitting ? (

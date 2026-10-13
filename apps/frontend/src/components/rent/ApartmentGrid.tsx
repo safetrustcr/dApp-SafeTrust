@@ -18,7 +18,7 @@ export default function ApartmentGrid({
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
       {apartments.map((apartment) => (
         <ApartmentCard
-          key={apartment.id}
+          key={`${apartment.kind ?? "apartment"}:${apartment.id}`}
           apartment={apartment}
           onClick={() => onApartmentClick(apartment)}
           conversationApartmentId={conversationApartmentId?.(apartment)}

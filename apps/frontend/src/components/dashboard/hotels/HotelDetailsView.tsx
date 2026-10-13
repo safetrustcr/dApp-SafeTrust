@@ -13,8 +13,11 @@ import {
   Edit,
   Loader2,
 } from "lucide-react";
+import { Image } from "@/components/ui/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useHotelRole } from "@/hooks/use-hotel-role";
+import { hotelQueryContext } from "@/lib/hotel-access";
 import { GET_HOTEL_BY_ID } from "@/graphql/queries/hotel-queries";
 import { formatHotelCoordinates, formatHotelDate } from "@/lib/hotels";
 import type { Hotel } from "@safetrust/types";
@@ -26,16 +29,18 @@ interface HotelDetailsViewProps {
 
 export function HotelDetailsView({ hotelId, initialData }: HotelDetailsViewProps) {
   const router = useRouter();
+  const { role, loading: roleLoading } = useHotelRole();
 
   const { data, loading, error } = useQuery(GET_HOTEL_BY_ID, {
     variables: { id: hotelId },
-    skip: Boolean(initialData),
+    context: role ? hotelQueryContext(role) : undefined,
+    skip: Boolean(initialData) || !role,
     fetchPolicy: "network-only",
   });
 
   const hotel: Hotel | null = initialData || data?.hotels_by_pk;
 
-  if (loading && !hotel) {
+  if ((loading || roleLoading) && !hotel) {
     return (
       <div className="flex flex-col items-center justify-center p-12 space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -107,6 +112,7 @@ export function HotelDetailsView({ hotelId, initialData }: HotelDetailsViewProps
         </Button>
       </div>
 
+      {!!hotel.images?.length && <section aria-label="Hotel photos" className="grid grid-cols-2 gap-3 sm:grid-cols-4">{hotel.images.map((photo, index) => <div key={photo.id ?? index} className="relative aspect-[4/3] overflow-hidden rounded-xl border"><Image src={photo.image_url} alt={`${hotel.name} photo ${index + 1}`} fill sizes="240px" className="object-cover" /></div>)}</section>}
       {/* Main Details Card */}
       <Card>
         <CardHeader>
@@ -184,6 +190,10 @@ export function HotelDetailsView({ hotelId, initialData }: HotelDetailsViewProps
           )}
         </CardContent>
       </Card>
+      <Card><CardHeader><CardTitle>Rooms</CardTitle></CardHeader><CardContent className="space-y-4">
+        {!hotel.rooms?.length && <p className="text-sm text-muted-foreground">This hotel has no rooms yet.</p>}
+        {hotel.rooms?.map((room) => <article key={room.room_id} className="rounded-lg border p-4"><h3 className="font-semibold">Room {room.room_number} · {room.room_type?.name ?? "Room"}</h3><p className="mt-1 text-sm text-muted-foreground">${Number(room.price_night).toLocaleString()} per night · {room.capacity} guests · {room.is_available ? "Available" : "Unavailable"}</p><div className="mt-3 grid grid-cols-3 gap-2">{room.images?.map((photo, index) => <div key={photo.id ?? index} className="relative aspect-[4/3] overflow-hidden rounded-md"><Image src={photo.image_url} alt={`Room ${room.room_number} photo ${index + 1}`} fill sizes="160px" className="object-cover" /></div>)}</div></article>)}
+      </CardContent></Card>
     </div>
   );
 }

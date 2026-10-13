@@ -1,5 +1,7 @@
+import { hotelWriteError } from './hotel-write-error.js';
+import { hasuraRequest } from '../../services/hasura.js';
 import type { Response } from 'express';
-import * as types from '@safetrust/types';
+import { validateHotelInput, type HotelInput } from '@safetrust/types';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import {
   createHotel,
@@ -31,8 +33,8 @@ export async function createHotelHandler(
     }
 
     // Validate input using the shared validator
-    const body: types.HotelInput = req.body || {};
-    const validation = types.validateHotelInput(body);
+    const body: HotelInput = req.body || {};
+    const validation = validateHotelInput(body);
     if (!validation.valid) {
       return res.status(400).json({
         error: validation.message,
@@ -45,10 +47,15 @@ export async function createHotelHandler(
     let ownerUserId: string;
     if (isAdmin && typeof body.ownerUserId === 'string' && body.ownerUserId.trim()) {
       ownerUserId = body.ownerUserId.trim();
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ownerUserId)) return res.status(400).json({ error: 'Choose a registered hotel manager.', errors: { ownerUserId: 'Choose a registered hotel manager.' } });
+      const owner = await hasuraRequest<{ hotel_users_by_pk: { role: string } | null }>(
+        `query HotelOwner($id: uuid!) { hotel_users_by_pk(id: $id) { role } }`, { id: ownerUserId },
+      );
+      if (owner.hotel_users_by_pk?.role !== 'MANAGER') return res.status(400).json({ error: 'Choose a registered hotel manager.', errors: { ownerUserId: 'Choose a registered hotel manager.' } });
     } else if (hotelUser?.id) {
       ownerUserId = hotelUser.id;
     } else if (isAdmin) {
-      ownerUserId = uid;
+      return res.status(400).json({ error: "Choose a hotel manager as the owner.", errors: { ownerUserId: "Choose a hotel manager as the owner." } });
     } else {
       return res.status(403).json({
         error: 'Forbidden',
@@ -65,6 +72,7 @@ export async function createHotelHandler(
       location_area: (body.locationArea ?? body.location_area)?.trim() ?? null,
       coordinates,
       owner_user_id: ownerUserId,
+      image_urls: body.image_urls,
     });
 
     return res.status(201).json({
@@ -75,10 +83,13 @@ export async function createHotelHandler(
       },
     });
   } catch (error) {
-    console.error('[hotels/create] Failed to create hotel:', error);
-    return res.status(500).json({
-      error: 'Internal server error creating hotel',
-      detail: error instanceof Error ? error.message : String(error),
+    const requestId = res.locals?.requestId;
+    console.error(`[hotels/create] request ${requestId ?? 'unknown'} failed:`, error);
+    const failure = hotelWriteError(error);
+    return res.status(failure.status).json({
+      error: failure.message,
+      code: failure.code,
+      ...(requestId ? { requestId } : {}),
     });
   }
 }

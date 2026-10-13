@@ -11,21 +11,18 @@ export interface HotelOwner {
 }
 
 export interface HotelListing extends HotelAmenitySummary {
+  kind?: "apartment" | "hotel";
+  priceAvailable?: boolean;
+  pricePeriod?: "month" | "night";
+  amenitiesKnown?: boolean;
   id: string;
   name: string;
   address: string;
   price: number;
   promoted: boolean;
   images: [string, ...string[]];
-  category: 'Family' | 'Students' | 'Travelers';
-  location:
-    | 'San José'
-    | 'Heredia'
-    | 'Alajuela'
-    | 'Cartago'
-    | 'Puntarenas'
-    | 'Guanacaste'
-    | 'Limón';
+  category: 'Family' | 'Students' | 'Travelers' | 'Uncategorized';
+  location: string;
   owner: HotelOwner;
   description: string;
   favorite?: boolean;

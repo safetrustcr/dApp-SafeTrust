@@ -69,16 +69,3 @@ select_permissions:
       filter:
         firebase_uid:
           _eq: X-Hasura-User-Id
-  - role: admin
-    permission:
-      columns:
-        - id
-        - email
-        - first_name
-        - last_name
-        - phone_number
-        - role
-        - created_at
-        - updated_at
-      filter: {}
-      allow_aggregations: true

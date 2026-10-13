@@ -3,6 +3,17 @@ export interface HotelGeoJSONPoint {
   coordinates: [number, number]; // GeoJSON order: [longitude, latitude]
 }
 
+export interface HotelImage { id?: string; image_url: string; position?: number; }
+export interface HotelRoom {
+  room_id: string;
+  room_number: string;
+  price_night: number;
+  capacity: number;
+  is_available: boolean;
+  room_type?: { name: string } | null;
+  images?: Array<{ id?: string; image_url: string }>;
+}
+
 export interface Hotel {
   id: string;
   name: string;
@@ -16,9 +27,12 @@ export interface Hotel {
   created_at: string;
   updated_at: string;
   owner_user_id: string;
+  images?: HotelImage[];
+  rooms?: HotelRoom[];
 }
 
 export interface HotelInput {
+  image_urls?: string[];
   name?: string;
   address?: string;
   description?: string | null;
@@ -111,6 +125,27 @@ export function validateHotelInput(
 
     if (isNaN(lngNum) || !Number.isFinite(lngNum) || lngNum < -180 || lngNum > 180) {
       errors.longitude = 'Longitude must be between -180 and 180';
+    }
+  }
+
+  if (input.image_urls !== undefined) {
+    if (!Array.isArray(input.image_urls) || input.image_urls.length > 8) {
+      errors.image_urls = 'Choose up to 8 hotel images';
+    } else {
+      const images: string[] = [];
+      for (const image of input.image_urls) {
+        if (typeof image !== 'string' || image.length > 700000) {
+          errors.image_urls = 'Each image must be a valid URL or a prepared attachment';
+          break;
+        }
+        const value = image.trim();
+        let validUrl = false;
+        try { const url = new URL(value); validUrl = ['http:', 'https:'].includes(url.protocol) && value.length <= 2048; } catch {}
+        const attachment = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
+        if (!validUrl && !attachment) { errors.image_urls = 'Use an HTTP image URL or attach a JPEG, PNG, or WebP image'; break; }
+        images.push(value);
+      }
+      if (new Set(images).size !== images.length) errors.image_urls = 'Remove duplicate hotel images';
     }
   }
 

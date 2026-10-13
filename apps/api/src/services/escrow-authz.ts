@@ -8,6 +8,7 @@
  *   releaseSigner   = escrow sender   (guest)
  *   disputeResolver = PLATFORM_STELLAR_ADDRESS (platform; admin role also required at the route)
  */
+import { getHotelUserWallets } from './hotel-reservation-escrow.js';
 import { hasuraRequest } from './hasura.js';
 
 export type EscrowAction =
@@ -40,6 +41,8 @@ export type EscrowRecord = {
   receiver_address: string;
   amount: number | string;
   status: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export class EscrowAccessError extends Error {
@@ -112,7 +115,7 @@ export async function getEscrowByEngagementId(engagementId: string): Promise<Esc
   const data = await hasuraRequest<{ escrows: EscrowRecord[] }>(
     `query EscrowForAuthz($engagementId: String!) {
        escrows(where: { engagement_id: { _eq: $engagementId } }, limit: 1) {
-         id engagement_id contract_id sender_address receiver_address amount status
+         id engagement_id contract_id sender_address receiver_address amount status created_at updated_at
        }
      }`,
     { engagementId },
@@ -131,7 +134,7 @@ export async function authorizeEscrowAction(
   if (!escrow) throw new EscrowAccessError(404, 'ESCROW_NOT_FOUND', 'Escrow not found.');
 
   const roles = rolesFor(escrow);
-  const wallets = await getUserWallets(uid);
+  const wallets = escrow.engagement_id.startsWith('hotel:') && action !== 'resolve_dispute' ? await getHotelUserWallets(uid) : await getUserWallets(uid);
   const signer = resolveSigner(wallets, roles, action);
   return { signer, escrow, roles };
 }
@@ -139,7 +142,7 @@ export async function authorizeEscrowAction(
 export async function assertEscrowParticipant(uid: string, engagementId: string): Promise<EscrowRecord> {
   const escrow = await getEscrowByEngagementId(engagementId);
   if (!escrow) throw new EscrowAccessError(404, 'ESCROW_NOT_FOUND', 'Escrow not found.');
-  const wallets = await getUserWallets(uid);
+  const wallets = escrow.engagement_id.startsWith('hotel:') ? await getHotelUserWallets(uid) : await getUserWallets(uid);
   if (!isParticipant(wallets, rolesFor(escrow))) {
     throw new EscrowAccessError(403, 'NOT_A_PARTICIPANT', 'You are not a participant in this escrow.');
   }
@@ -151,7 +154,7 @@ export async function getEscrowByContractId(contractId: string): Promise<EscrowR
   const data = await hasuraRequest<{ escrows: EscrowRecord[] }>(
     `query EscrowByContractForAuthz($contractId: String!) {
        escrows(where: { contract_id: { _eq: $contractId } }, limit: 1) {
-         id engagement_id contract_id sender_address receiver_address amount status
+         id engagement_id contract_id sender_address receiver_address amount status created_at updated_at
        }
      }`,
     { contractId },
@@ -163,7 +166,7 @@ export async function getEscrowByContractId(contractId: string): Promise<EscrowR
 export async function assertContractParticipant(uid: string, contractId: string): Promise<EscrowRecord> {
   const escrow = await getEscrowByContractId(contractId);
   if (!escrow) throw new EscrowAccessError(404, 'ESCROW_NOT_FOUND', 'Escrow not found.');
-  const wallets = await getUserWallets(uid);
+  const wallets = escrow.engagement_id.startsWith('hotel:') ? await getHotelUserWallets(uid) : await getUserWallets(uid);
   if (!isParticipant(wallets, rolesFor(escrow))) {
     throw new EscrowAccessError(403, 'NOT_A_PARTICIPANT', 'You are not a participant in this escrow.');
   }

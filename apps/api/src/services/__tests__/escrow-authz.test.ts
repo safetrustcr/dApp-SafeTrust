@@ -116,3 +116,20 @@ describe('authorizeEscrowAction (data access)', () => {
     await expect(assertEscrowParticipant('uid-host', 'eng-1')).resolves.toMatchObject({ engagement_id: 'eng-1' });
   });
 });
+
+
+describe('hotel escrow authorization', () => {
+  it('uses the hotel wallet registry and cannot authorize a stranger', async () => {
+    process.env.PLATFORM_STELLAR_ADDRESS = PLATFORM;
+    const queries: string[] = [];
+    vi.mocked(hasuraRequest).mockImplementation(async (query: string) => {
+      queries.push(query);
+      if (query.includes('EscrowForAuthz')) return { escrows: [{ ...escrow, engagement_id: 'hotel:reservation' }] } as never;
+      if (query.includes('HotelCallerWallets')) return { users_wallets: [{ wallet_address: GUEST }] } as never;
+      throw new Error('Wrong wallet registry');
+    });
+    await expect(authorizeEscrowAction('guest', 'hotel:reservation', 'fund')).resolves.toMatchObject({ signer: GUEST });
+    await expect(authorizeEscrowAction('guest', 'hotel:reservation', 'mark_milestone_completed')).rejects.toMatchObject({ status: 403 });
+    expect(queries.some((query) => query.includes('users_wallets(where: { user: { firebase_uid:'))).toBe(true);
+  });
+});

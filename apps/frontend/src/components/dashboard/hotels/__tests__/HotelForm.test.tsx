@@ -31,9 +31,13 @@ vi.mock("sonner", () => ({
   },
 }));
 
+const mockHotelRole = vi.hoisted(() => ({ role: "hotel_manager" }));
+vi.mock("@/hooks/use-hotel-role", () => ({ useHotelRole: () => ({ role: mockHotelRole.role, loading: false }) }));
+
 describe("HotelForm Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHotelRole.role = "hotel_manager";
   });
 
   afterEach(() => {
@@ -57,6 +61,31 @@ describe("HotelForm Component", () => {
     expect(latInput.placeholder).toBe("9.9281");
     expect(lngInput.value).toBe("");
     expect(lngInput.placeholder).toBe("-84.0907");
+  });
+
+  it("lets admins assign a registered hotel manager owner", async () => {
+    mockHotelRole.role = "admin";
+    const ownerId = "550e8400-e29b-41d4-a716-446655440011";
+    vi.spyOn(api, "getHotelOwnerOptions").mockResolvedValue([{ id: ownerId, name: "Owner Manager" }]);
+    const createSpy = vi.spyOn(api, "createHotel").mockResolvedValue({ id: "hotel" } as Hotel);
+    render(<HotelForm mode="create" />);
+    await screen.findByRole("option", { name: "Owner Manager" });
+    fireEvent.change(screen.getByLabelText(/Hotel owner/), { target: { value: ownerId } });
+    fireEvent.change(screen.getByTestId("hotel-name-input"), { target: { value: "Admin Hotel" } });
+    fireEvent.change(screen.getByTestId("hotel-address-input"), { target: { value: "San José" } });
+    fireEvent.click(screen.getByTestId("hotel-submit-btn"));
+    await waitFor(() => expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ ownerUserId: ownerId })));
+  });
+
+  it("submits hotel photo URLs with the hotel details", async () => {
+    const createSpy = vi.spyOn(api, "createHotel").mockResolvedValue({ id: "hotel" } as Hotel);
+    render(<HotelForm mode="create" />);
+    fireEvent.change(screen.getByTestId("hotel-name-input"), { target: { value: "Photo Hotel" } });
+    fireEvent.change(screen.getByTestId("hotel-address-input"), { target: { value: "San José" } });
+    fireEvent.change(screen.getByLabelText("Hotel image URL"), { target: { value: "https://example.com/hotel.jpg" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add URL" }));
+    fireEvent.click(screen.getByTestId("hotel-submit-btn"));
+    await waitFor(() => expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ image_urls: ["https://example.com/hotel.jpg"] })));
   });
 
   it("validates required fields on submit (name and address required)", async () => {
@@ -156,6 +185,7 @@ describe("HotelForm Component", () => {
         locationArea: "Downtown",
         latitude: null,
         longitude: null,
+        image_urls: [],
       });
       expect(mockPush).toHaveBeenCalledWith("/dashboard/hotels");
     });
@@ -196,6 +226,7 @@ describe("HotelForm Component", () => {
         locationArea: null,
         latitude: 9.9281,
         longitude: -84.0907,
+        image_urls: [],
       });
     });
   });
@@ -247,6 +278,7 @@ describe("HotelForm Component", () => {
         locationArea: "Pacific Coast",
         latitude: 10.5678,
         longitude: -85.1234,
+        image_urls: [],
       });
       expect(mockPush).toHaveBeenCalledWith("/dashboard/hotels");
     });

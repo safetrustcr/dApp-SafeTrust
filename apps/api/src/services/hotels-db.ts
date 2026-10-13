@@ -15,9 +15,11 @@ export interface HotelRecord {
   created_at: string;
   updated_at: string;
   owner_user_id: string;
+  images?: Array<{ id: string; image_url: string; position: number }>;
 }
 
 export interface CreateHotelDbInput {
+  image_urls?: string[];
   name: string;
   address: string;
   description?: string | null;
@@ -27,6 +29,7 @@ export interface CreateHotelDbInput {
 }
 
 export interface UpdateHotelDbInput {
+  image_urls?: string[];
   name?: string;
   address?: string;
   description?: string | null;
@@ -90,7 +93,7 @@ export function fromGeoJSONPoint(
  */
 export async function createHotel(input: CreateHotelDbInput): Promise<HotelRecord> {
   const result = await hasuraRequest<{ insert_hotels_one: HotelRecord }>(
-    `mutation CreateHotel($object: hotels_insert_input!) {
+    `mutation CreateHotel($object: hotel_industry_hotels_insert_input!) {
        insert_hotels_one(object: $object) {
          id
          name
@@ -101,6 +104,7 @@ export async function createHotel(input: CreateHotelDbInput): Promise<HotelRecor
          created_at
          updated_at
          owner_user_id
+         images(order_by: { position: asc }) { id image_url position }
        }
      }`,
     {
@@ -111,6 +115,7 @@ export async function createHotel(input: CreateHotelDbInput): Promise<HotelRecor
         location_area: input.location_area ?? null,
         coordinates: input.coordinates ?? null,
         owner_user_id: input.owner_user_id,
+        ...(input.image_urls?.length ? { images: { data: input.image_urls.map((image_url, position) => ({ image_url: image_url.trim(), position })) } } : {}),
       },
     },
   );
@@ -130,8 +135,22 @@ export async function updateHotel(id: string, input: UpdateHotelDbInput): Promis
   if (input.location_area !== undefined) setPayload.location_area = input.location_area;
   if (input.coordinates !== undefined) setPayload.coordinates = input.coordinates;
 
+  if (input.image_urls !== undefined) {
+    // Lock the hotel row before replacing children. Hasura executes this single-source
+    // mutation in one Postgres transaction, so an insert failure rolls everything back.
+    const result = await hasuraRequest<{ hotel: HotelRecord | null }>(
+      `mutation UpdateHotelWithImages($id: uuid!, $set: hotel_industry_hotels_set_input!, $images: [hotel_industry_hotel_images_insert_input!]!) {
+        hotel: update_hotels_by_pk(pk_columns: { id: $id }, _set: $set) { id name address description location_area coordinates created_at updated_at owner_user_id }
+        delete_hotel_images(where: { hotel_id: { _eq: $id } }) { affected_rows }
+        insert_hotel_images(objects: $images) { affected_rows }
+      }`, { id, set: setPayload, images: input.image_urls.map((image_url, position) => ({ hotel_id: id, image_url: image_url.trim(), position })) },
+    );
+    if (!result.hotel) throw new Error('Hotel not found or update returned no rows');
+    return (await getHotelById(id))!;
+  }
+
   const result = await hasuraRequest<{ update_hotels_by_pk: HotelRecord | null }>(
-    `mutation UpdateHotel($id: uuid!, $set: hotels_set_input!) {
+    `mutation UpdateHotel($id: uuid!, $set: hotel_industry_hotels_set_input!) {
        update_hotels_by_pk(pk_columns: { id: $id }, _set: $set) {
          id
          name
@@ -142,6 +161,7 @@ export async function updateHotel(id: string, input: UpdateHotelDbInput): Promis
          created_at
          updated_at
          owner_user_id
+         images(order_by: { position: asc }) { id image_url position }
        }
      }`,
     {
@@ -173,6 +193,7 @@ export async function getHotelById(id: string): Promise<HotelRecord | null> {
          created_at
          updated_at
          owner_user_id
+         images(order_by: { position: asc }) { id image_url position }
        }
      }`,
     { id },
@@ -267,8 +288,8 @@ export async function findHotelUserByFirebaseUidOrEmail(
   }
 
   const result = await hasuraRequest<{ users: HotelIndustryUser[] }>(
-    `query FindHotelUser($where: users_bool_exp!) {
-       users(where: $where, limit: 1) {
+    `query FindHotelUser($where: hotel_industry_users_bool_exp!) {
+       users: hotel_users(where: $where, limit: 1) {
          id
          email
          role

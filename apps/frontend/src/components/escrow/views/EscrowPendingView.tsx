@@ -95,7 +95,7 @@ function ContactPill({ icon: Icon, value }: { icon: typeof Mail; value: string }
 }
 
 // Accept EscrowDetail | undefined — the page may not have data yet
-export function EscrowPendingView({ escrow }: { escrow?: EscrowDetail }) {
+export function EscrowPendingView({ escrow, showDeploy = false, bookingKind = "apartment" }: { escrow?: EscrowDetail; showDeploy?: boolean; bookingKind?: "apartment" | "hotel-room" }) {
   const apartment = escrow?.apartment;
   const owner = apartment?.owner;
   const ownerAddr = escrow?.receiver_address ?? ownerWalletAddress(owner) ?? "";
@@ -111,13 +111,14 @@ export function EscrowPendingView({ escrow }: { escrow?: EscrowDetail }) {
             imageUrls={apartment.image_urls}
             address={apartment.address}
             description={apartment.description}
-            paySlot={
+            paySlot={showDeploy ?
               <EscrowPayFlow
+                bookingKind={bookingKind}
                 apartmentId={apartment.id}
                 apartmentName={apartment.name}
                 ownerAddress={ownerAddr}
                 amount={escrow?.amount ?? 0}
-              />
+              /> : undefined
             }
           />
         ) : (

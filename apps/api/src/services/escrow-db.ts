@@ -37,7 +37,9 @@ function lifecycleArgs(
 type InitializeParams = {
   contractId: string;
   engagementId: string;
-  apartmentId: string;
+  apartmentId?: string;
+  tenantId?: string;
+  booking?: import('./hotel-reservation-escrow.js').HotelReservation;
   senderAddress: string;
   receiverAddress: string;
   releaser: string;
@@ -205,7 +207,14 @@ export async function dbInitializeEscrow(params: InitializeParams): Promise<{ co
           status: 'created',
           amount: params.amount,
           balance: 0,
-          tenantId: 'safetrust',
+          ...(params.booking ? {
+            bookingId: params.booking.id,
+            roomId: params.booking.room?.room_id,
+            hotelId: params.booking.room?.hotel.id,
+            checkInDate: params.booking.check_in,
+            checkOutDate: params.booking.check_out,
+          } : {}),
+          tenantId: params.tenantId ?? 'safetrust',
         },
       },
     );
@@ -231,10 +240,12 @@ export async function dbInitializeEscrow(params: InitializeParams): Promise<{ co
         description: 'Initial check-in milestone',
         amount: params.amount,
         status: 'pending',
-        tenantId: 'safetrust',
+        tenantId: params.tenantId ?? 'safetrust',
       },
     },
   );
+
+  if (!params.apartmentId) return null;
 
   const escrowRecord = await hasuraRequest<{
     escrows: { id: string }[];

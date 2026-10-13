@@ -37,6 +37,8 @@ const mockHotel: Hotel = {
   owner_user_id: "u-view",
 };
 
+vi.mock("@/hooks/use-hotel-role", () => ({ useHotelRole: () => ({ role: "hotel_manager", loading: false }) }));
+
 describe("HotelDetailsView Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();

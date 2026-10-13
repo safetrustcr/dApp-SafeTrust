@@ -79,7 +79,9 @@ export const sendTransactionHandler = asyncHandler(async (req: AuthedRequest, re
     throw err;
   }
 
-  const contractId = pending.contract_id ?? twResult.contractId ?? twResult.escrow?.contractId ?? null;
+  const contractId = pending.action === 'initialize'
+    ? twResult.contractId ?? twResult.escrow?.contractId ?? pending.contract_id
+    : pending.contract_id;
   await applySubmittedAction(pending, { txHash, contractId, twResult });
 
   return res.status(200).json({

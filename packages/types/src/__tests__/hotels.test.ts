@@ -150,3 +150,15 @@ describe('validateHotelInput', () => {
     expect(result.valid).toBe(true);
   });
 });
+
+describe('hotel image validation', () => {
+  it('accepts HTTP URLs and prepared image attachments', () => {
+    expect(validateHotelInput({ name: 'Hotel', address: 'San José', image_urls: ['https://example.com/a.jpg', 'data:image/jpeg;base64,YWJj'] }).valid).toBe(true);
+  });
+  it('rejects duplicate URLs, too many images, and unsafe image schemes', () => {
+    const base = { name: 'Hotel', address: 'San José' };
+    for (const image_urls of [['https://example.com/a.jpg', ' https://example.com/a.jpg '], Array(9).fill('https://example.com/a.jpg'), ['javascript:alert(1)'], ['data:image/svg+xml;base64,YWJj']]) {
+      expect(validateHotelInput({ ...base, image_urls }).errors.image_urls).toBeTruthy();
+    }
+  });
+});

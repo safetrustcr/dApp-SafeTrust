@@ -64,7 +64,7 @@ export async function hasuraRequest<T>(
   query: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {
-  const adminSecret = process.env.HASURA_ADMIN_SECRET;
+  const adminSecret = process.env.HASURA_ADMIN_SECRET ?? process.env.HASURA_GRAPHQL_ADMIN_SECRET;
   if (!adminSecret) {
     throw new HasuraRequestError('Missing required env var: HASURA_ADMIN_SECRET');
   }

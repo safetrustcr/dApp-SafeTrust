@@ -1,10 +1,12 @@
-import 'dotenv/config';
+import './config/env.js';
 import express from 'express';
 import cors from 'cors';
+import { apiCorsOptions } from './http/cors-options.js';
 import { tenantMiddleware } from './middleware/tenant.middleware.js';
 import authRouter from './routes/auth/sync-user.route.js';
 import promoteToHostRouter from './routes/auth/promote-to-host.route.js';
 import activateWalletRouter from './routes/auth/activate-wallet.route.js';
+import hotelReservationEscrowRouter from './routes/escrow/hotel-reservation.route.js';
 import deployEscrowRouter from './routes/escrow/deploy.route.js';
 import approveMilestoneRouter from './routes/escrow/approve-milestone.route.js';
 import fundEscrowRouter from './routes/escrow/fund.route.js';
@@ -20,6 +22,7 @@ import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
 import { requestIdMiddleware, errorHandler } from './http/error-middleware.js';
+import listingsRouter from './routes/listings/listings.route.js';
 import hotelsRouter from './routes/hotels/hotels.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
@@ -30,17 +33,8 @@ initFirebaseAdmin();
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// CORS configuration - restrict to trusted frontend origins
-const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(',')
-  : ['http://localhost:3001'];
-
-app.use(cors({
-  origin: allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-}));
+app.use(cors(apiCorsOptions()));
+app.use("/api/hotels", express.json({ limit: "6mb" }));
 app.use(express.json());
 app.use(tenantMiddleware);
 app.use(requestIdMiddleware); // attach X-Request-Id before all routes
@@ -62,6 +56,7 @@ app.use('/api/admin', adminUsersRouter);
 
 // Escrow routes
 app.use('/api/escrow', deployEscrowRouter);
+app.use('/api/escrow', hotelReservationEscrowRouter);
 app.use('/api/escrow', approveMilestoneRouter);
 app.use('/api/escrow', fundEscrowRouter);
 app.use('/api/escrow', milestoneStatusRouter);
@@ -77,10 +72,20 @@ app.use('/api/messages', messagesRouter);
 
 // Hotel routes
 app.use('/api/hotels', hotelsRouter);
+app.use('/api/listings', listingsRouter);
 
 // Global Problem Details error boundary
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);
+});
+
+server.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`[api] Port ${PORT} is already occupied. Stop the existing API before restarting. Run one dev stack: pnpm dev.`);
+  } else {
+    console.error('[api] Server could not start:', error.message);
+  }
+  process.exitCode = 1;
 });

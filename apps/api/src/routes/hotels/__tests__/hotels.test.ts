@@ -154,11 +154,12 @@ describe('POST /api/hotels (createHotelHandler)', () => {
     mockHasuraRequest.mockResolvedValueOnce({ user_roles: [{ role: { name: 'admin' } }] });
     // 2. findHotelUserByFirebaseUidOrEmail
     mockHasuraRequest.mockResolvedValueOnce({ users: [] });
+    mockHasuraRequest.mockResolvedValueOnce({ hotel_users_by_pk: { role: 'MANAGER' } });
     // 3. insert_hotels_one
     mockHasuraRequest.mockResolvedValueOnce({
       insert_hotels_one: {
         ...MOCK_HOTEL_1,
-        owner_user_id: 'custom-manager-uuid',
+        owner_user_id: '550e8400-e29b-41d4-a716-446655440011',
       },
     });
 
@@ -167,7 +168,7 @@ describe('POST /api/hotels (createHotelHandler)', () => {
       body: {
         name: 'Admin Managed Hotel',
         address: 'Calle 10',
-        ownerUserId: 'custom-manager-uuid',
+        ownerUserId: '550e8400-e29b-41d4-a716-446655440011',
       },
     });
     const res = mockRes();
@@ -175,8 +176,17 @@ describe('POST /api/hotels (createHotelHandler)', () => {
     await createHotelHandler(req, res);
 
     expect(res._status).toBe(201);
-    const insertCall = mockHasuraRequest.mock.calls[2] as any;
-    expect(insertCall[1].object.owner_user_id).toBe('custom-manager-uuid');
+    const insertCall = mockHasuraRequest.mock.calls[3] as any;
+    expect(insertCall[1].object.owner_user_id).toBe('550e8400-e29b-41d4-a716-446655440011');
+  });
+
+  it('requires an admin to choose a hotel owner when no hotel user exists', async () => {
+    mockHasuraRequest.mockResolvedValueOnce({ users: [] });
+    const res = mockRes();
+    await createHotelHandler(mockReq({ role: 'admin', uid: 'firebase-admin-uid', body: { name: 'Hotel', address: 'San José' } }), res);
+    expect(res._status).toBe(400);
+    expect(res._body.errors.ownerUserId).toContain('Choose');
+    expect(mockHasuraRequest).toHaveBeenCalledTimes(1);
   });
 
   it('rejects GUEST users with 403 Forbidden', async () => {

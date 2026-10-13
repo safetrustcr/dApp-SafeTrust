@@ -3,18 +3,31 @@
   "tasks": {
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": [
+        "^build"
+      ]
     },
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "dist/**"
+      ]
     },
     "lint": {},
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "test:integration": {
-      "dependsOn": ["^test:integration"],
+      "dependsOn": [
+        "^test:integration"
+      ],
       "env": [
         "TRUSTLESS_WORK_API_KEY",
         "INTEGRATION_SENDER_ADDRESS",
@@ -49,8 +62,12 @@
       "cache": false
     },
     "@safetrust/mcp#build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     }
   }
 }

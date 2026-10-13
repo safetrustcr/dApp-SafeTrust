@@ -48,11 +48,19 @@ jobs:
           sed -i 's/RECONCILIATION_SECRET=replace-with-a-random-cron-secret/RECONCILIATION_SECRET=myreconciliationsecret/' infra/backend/.env
           sed -i 's/FIREBASE_SEED_USERS=true/FIREBASE_SEED_USERS=false/' infra/backend/.env
 
-      - name: Start SafeTrust backend infrastructure
+      - name: Start SafeTrust and hotel backend infrastructure
         run: |
           cd infra/backend
-          bin/start safetrust
+          bin/start safetrust hotel_industry
 
       - name: Verify Hasura metadata consistency
         run: |
           make metadata-check
+
+      - name: Verify hotel permission isolation
+        run: |
+          cd infra/backend
+          bash tests/hotel-permissions.sh
+
+      - name: Verify hotel photo transactions
+        run: python3 infra/backend/tests/hotel-images.py

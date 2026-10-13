@@ -5,6 +5,8 @@ vi.mock('../../../services/trustlesswork.js', () => ({
   trustlessWorkRequest: vi.fn(),
 }));
 
+vi.mock('../../../services/hotel-reservation-escrow.js', () => ({ getHotelReservationEscrowTerms: vi.fn() }));
+
 vi.mock('../../../services/idempotency.js', () => ({
   checkIdempotency: vi.fn(),
 }));
@@ -26,6 +28,7 @@ vi.mock('../../../lib/stellar-xdr.js', () => ({
   transactionExpiry: vi.fn(),
 }));
 
+import { getHotelReservationEscrowTerms } from '../../../services/hotel-reservation-escrow.js';
 import { checkIdempotency } from '../../../services/idempotency.js';
 import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
 import { hasuraRequest } from '../../../services/hasura.js';
@@ -115,5 +118,39 @@ describe('deployEscrowHandler', () => {
     expect(insertPendingAction).toHaveBeenCalledWith(expect.objectContaining({
       action: 'initialize', built_for_uid: 'guest-uid', signer_address: 'GTENANT111',
     }));
+  });
+});
+
+
+describe('hotel deployment', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(hasuraRequest).mockResolvedValue({});
+    vi.mocked(insertPendingAction).mockResolvedValue({});
+    vi.mocked(transactionHash).mockReturnValue('hotel-hash');
+    vi.mocked(transactionExpiry).mockReturnValue(new Date('2030-01-01T00:00:00Z'));
+    process.env.PLATFORM_STELLAR_ADDRESS = 'GPLATFORM';
+    process.env.USDC_TRUSTLINE_ADDRESS = 'GISSUER';
+  });
+  it('ignores browser amounts and receivers and persists a reservation rather than an apartment', async () => {
+    const reservationId = '550e8400-e29b-41d4-a716-446655440001';
+    vi.mocked(getHotelReservationEscrowTerms).mockResolvedValue({ amount: 240, receiverAddress: 'GHOTEL', engagementId: `hotel:${reservationId}`, reservation: { id: reservationId } });
+    vi.mocked(checkIdempotency).mockResolvedValue({ exists: false });
+    vi.mocked(trustlessWorkRequest).mockResolvedValue({ status: 'SUCCESS', contractId: 'CONTRACT', unsignedTransaction: 'XDR' });
+    const res = mockRes();
+    const next = mockNext();
+    await deployEscrowHandler({ ...mockReq({ reservationId, senderAddress: 'GGUEST', amount: 1, receiverAddress: 'GATTACKER' }), user: { uid: 'guest' } }, res, next);
+    if (next.error) throw next.error;
+    expect(getHotelReservationEscrowTerms).toHaveBeenCalledWith(reservationId, 'guest', 'GGUEST');
+    expect(trustlessWorkRequest).toHaveBeenLastCalledWith('/deployer/single-release', expect.objectContaining({ body: expect.objectContaining({ amount: 240, roles: expect.objectContaining({ receiver: 'GHOTEL' }) }) }));
+    expect(hasuraRequest).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ apartmentId: null, propertyId: reservationId, tenantId: 'hotel_industry', amount: 240 }));
+    expect(insertPendingAction).toHaveBeenLastCalledWith(expect.objectContaining({ engagement_id: `hotel:${reservationId}`, payload: expect.objectContaining({ reservationId, tenantId: 'hotel_industry', releaser: 'GGUEST' }) }));
+  });
+  it('rejects mixed apartment and reservation identifiers before deployment', async () => {
+    vi.mocked(trustlessWorkRequest).mockClear();
+    const res = mockRes();
+    await deployEscrowHandler({ ...mockReq({ reservationId: 'reservation', apartmentId: 'apartment', senderAddress: 'GGUEST' }), user: { uid: 'guest' } }, res, mockNext());
+    expect(res._status).toBe(400);
+    expect(trustlessWorkRequest).not.toHaveBeenCalled();
   });
 });

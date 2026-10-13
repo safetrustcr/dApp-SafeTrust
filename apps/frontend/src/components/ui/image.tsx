@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 const skipOptimization = (src: NextImageProps["src"]) =>
   typeof src === "string" &&
-  (src.startsWith("data:") || src.toLowerCase().endsWith(".svg"));
+  (src.startsWith("data:") || /^https?:\/\//i.test(src) || src.toLowerCase().endsWith(".svg"));
 
 export type ImageProps = NextImageProps & { alt: string };
 

@@ -51,11 +51,10 @@ const styles = {
 } as const;
 
 /**
- * BookingEscrowWrapper — MVP stub.
+ * BookingEscrowWrapper — entry point for a saved hotel reservation.
  *
  * Hotel bookings enter the same orchestrator as apartment bookings. The
- * server-side hotel-room resolver is intentionally still unavailable, so this
- * component never claims that a payment was created.
+ * server verifies the reservation, wallet, amount, and hotel receiver.
  */
 export function BookingEscrowWrapper({ bookingId }: BookingEscrowWrapperProps) {
   return (
@@ -64,11 +63,7 @@ export function BookingEscrowWrapper({ bookingId }: BookingEscrowWrapperProps) {
       <p style={styles.meta}>
         Booking ID: <span style={styles.badge}>{bookingId}</span>
       </p>
-      <p style={styles.notice}>
-        Hotel escrow payment needs a server-side reservation resolver before it
-        can create a Trustless Work transaction. No deposit has been submitted
-        or locked.
-      </p>
+      <p style={styles.notice}>Review the saved reservation, connect its registered Stellar wallet, and sign the hotel escrow deployment.</p>
       <Link href={`/escrow/${encodeURIComponent(bookingId)}/escrow/create?kind=hotel-room`} style={{ color: '#c2410c', fontWeight: 700 }}>
         Open secure booking details →
       </Link>

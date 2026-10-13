@@ -3,13 +3,13 @@
 import type { HotelCategory, HotelListing, HotelLocation } from '@/@types/hotel';
 import {
   ApartmentGrid,
-  BedroomTabs,
   FilterSidebar,
   HotelHeader,
 } from '@/components/rent';
-// TODO: replace STUB_HOTELS with GET_ALL_APARTMENTS Hasura query (Batch N)
-import { STUB_HOTELS } from '@/lib/mockData/hotels';
-import { canonicalApartmentRouteId } from '@/lib/stub-apartments';
+import type { PropertyFilter, PublicRentalProperty } from '@safetrust/types';
+import { useRentalProperties } from '@/hooks/use-rental-properties';
+import { propertyToListing } from '@/lib/rent/property-listing';
+import { HotelListingDialog } from '@/components/rent/HotelListingDialog';
 import {
   filterRentListings,
   toggleFilterValue,
@@ -22,22 +22,20 @@ import { LayoutGrid, Lightbulb } from 'lucide-react';
 
 export default function RentListingPage() {
   const router = useRouter();
-  const [selectedCategories, setSelectedCategories] = useState<HotelCategory[]>([
-    'Family',
-    'Students',
-  ]);
-  const [selectedLocations, setSelectedLocations] = useState<HotelLocation[]>([
-    'San José',
-    'Heredia',
-  ]);
-  const [selectedBedrooms, setSelectedBedrooms] = useState('all');
-  const [sortOption] = useState<SortOption>('relevance');
-  const [minPrice, setMinPrice] = useState(3200);
+  const [propertyKind, setPropertyKind] = useState<PropertyFilter>('both');
+  const [selectedHotel, setSelectedHotel] = useState<PublicRentalProperty | null>(null);
+  const { properties, loading, error, hasMore, loadMore, refetch } = useRentalProperties(propertyKind);
+  const listings = useMemo(() => properties.map(propertyToListing), [properties]);
+  const [selectedCategories, setSelectedCategories] = useState<HotelCategory[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<HotelLocation[]>([]);
+  const selectedBedrooms = 'all';
+  const [sortOption, setSortOption] = useState<SortOption>('relevance');
+  const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(206000);
 
   const filteredApartments = useMemo(
     () =>
-      filterRentListings(STUB_HOTELS, {
+      filterRentListings(listings, {
         selectedCategories,
         selectedLocations,
         selectedBedrooms,
@@ -46,6 +44,7 @@ export default function RentListingPage() {
         maxPrice,
       }),
     [
+      listings,
       maxPrice,
       minPrice,
       selectedBedrooms,
@@ -56,12 +55,11 @@ export default function RentListingPage() {
   );
 
   const handleApartmentClick = (apartment: HotelListing) => {
-    const routeId = canonicalApartmentRouteId(apartment.id);
-    router.push(
-      routeId
-        ? `/escrow/${routeId}/escrow/create`
-        : `/escrow/${encodeURIComponent(apartment.id)}/escrow/create?kind=hotel-room`,
-    );
+    if (apartment.kind === 'hotel') {
+      setSelectedHotel(properties.find((property) => property.kind === 'hotel' && property.id === apartment.id) ?? null);
+      return;
+    }
+    router.push(`/escrow/${apartment.id}/escrow/create`);
   };
 
   const locationLabel =
@@ -73,9 +71,11 @@ export default function RentListingPage() {
   return (
     <div className="min-h-screen bg-white text-[#1c1c1c]">
       <HotelHeader />
+      <HotelListingDialog hotel={selectedHotel} onClose={() => setSelectedHotel(null)} />
 
       <div className="mx-auto flex max-w-[1180px] flex-col lg:flex-row">
         <FilterSidebar
+          showCategories={false}
           selectedCategories={selectedCategories}
           selectedLocations={selectedLocations}
           minPrice={minPrice}
@@ -126,24 +126,25 @@ export default function RentListingPage() {
               <span className="ml-1 inline-flex items-center gap-2">
                 <BsSortDownAlt className="h-4 w-4" />
                 <span>Sort by:</span>
-                <span className="font-semibold text-[#ff6a00]">Relevance</span>
+                <select aria-label="Sort properties" value={sortOption} onChange={(event) => setSortOption(event.target.value as SortOption)} className="bg-white font-semibold text-[#ff6a00]"><option value="relevance">Relevance</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option></select>
               </span>
             </div>
           </div>
 
           <div className="mt-6">
-            <BedroomTabs
-              selected={selectedBedrooms}
-              onSelect={setSelectedBedrooms}
-            />
+            <div aria-label="Property type" className="flex flex-wrap gap-3">{([{ value: 'both', label: 'Both' }, { value: 'apartment', label: 'Apartments' }, { value: 'hotel', label: 'Hotels' }] as const).map(({ value, label }) => <button key={value} type="button" aria-pressed={propertyKind === value} onClick={() => setPropertyKind(value)} className={`rounded-lg border px-5 py-3 text-sm ${propertyKind === value ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 bg-white'}`}>{label}</button>)}</div>
           </div>
 
           <div className="mt-8">
+            {loading && <p role="status" className="mb-4 text-sm text-gray-500">Loading registered properties…</p>}
+            {error && <div role="alert" className="mb-4 rounded-lg border border-orange-200 p-4 text-sm">{error} <button type="button" onClick={refetch} className="ml-2 font-semibold text-orange-600">Retry</button></div>}
+            {!loading && !error && !filteredApartments.length && <p className="text-sm text-gray-500">No registered properties match these filters.</p>}
             <ApartmentGrid
               apartments={filteredApartments}
               onApartmentClick={handleApartmentClick}
-              conversationApartmentId={(apartment) => canonicalApartmentRouteId(apartment.id) ?? undefined}
+              conversationApartmentId={(apartment) => apartment.kind === "apartment" ? apartment.id : undefined}
             />
+            {hasMore && !error && <button type="button" disabled={loading} onClick={loadMore} className="mt-6 rounded-lg border px-5 py-3 text-sm">Load more properties</button>}
           </div>
         </main>
       </div>

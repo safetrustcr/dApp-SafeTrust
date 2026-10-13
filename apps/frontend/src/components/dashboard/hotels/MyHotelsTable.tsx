@@ -37,6 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Image } from "@/components/ui/image";
 import { GET_HOTELS } from "@/graphql/queries/hotel-queries";
 import { deleteHotel, HotelApiError } from "@/lib/api/hotels";
 import { formatHotelCoordinates, formatHotelDate } from "@/lib/hotels";
@@ -290,7 +291,7 @@ export function MyHotelsTable({ initialHotels }: MyHotelsTableProps) {
                           {offset + index + 1}
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium text-foreground">{hotel.name}</div>
+                          <div className="font-medium text-foreground"><span className="flex items-center gap-2">{hotel.images?.[0] && <Image src={hotel.images[0].image_url} alt="" width={40} height={40} className="h-10 w-10 rounded-md object-cover" />}{hotel.name}</span></div>
                           {hotel.description && (
                             <div className="text-xs text-muted-foreground truncate max-w-xs">
                               {hotel.description}

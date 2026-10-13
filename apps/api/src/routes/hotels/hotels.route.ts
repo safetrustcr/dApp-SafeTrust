@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { RequestHandler } from 'express';
 import { authenticateFirebase } from '../../middleware/auth.middleware.js';
+import { hotelOwnerOptionsHandler } from './hotel-owners.handler.js';
 import { createHotelHandler } from './create-hotel.handler.js';
 import { updateHotelHandler } from './update-hotel.handler.js';
 import { deleteHotelHandler } from './delete-hotel.handler.js';
@@ -21,6 +22,7 @@ router.use((req, res, next) => {
   next();
 });
 
+router.get('/owners', hotelOwnerOptionsHandler);
 router.post('/', createHotelHandler as unknown as RequestHandler);
 router.patch('/:id', updateHotelHandler as unknown as RequestHandler);
 router.delete('/:id', deleteHotelHandler as unknown as RequestHandler);

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Image } from "@/components/ui/image";
+import { prepareImageAttachments } from "@/lib/prepare-image-attachments";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { CREATE_APARTMENT, GET_APARTMENTS } from "../../../graphql/queries/apartment-queries";
 
@@ -104,24 +105,7 @@ const ownerAddress = (() => {
     setReadingImages(true);
     try {
       if (files.length + imageUrls.filter(Boolean).length > 8) throw new Error("Choose up to 8 images in total.");
-      const images = await Promise.all(Array.from(files).map(async (file) => {
-        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) {
-          throw new Error("Use JPEG, PNG, or WebP images up to 10 MB each.");
-        }
-        const bitmap = await createImageBitmap(file);
-        try {
-          const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
-          const canvas = document.createElement("canvas");
-          canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-          canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-          const context = canvas.getContext("2d");
-          if (!context) throw new Error("Unable to prepare image.");
-          context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-          const image = canvas.toDataURL("image/jpeg", 0.8);
-          if (image.length > 700000) throw new Error("Image is too detailed. Please choose a smaller image.");
-          return image;
-        } finally { bitmap.close(); }
-      }));
+      const images = await prepareImageAttachments(Array.from(files));
       setImageUrls((previous) => [...previous.filter((url) => url.trim()), ...images]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to attach images.");
