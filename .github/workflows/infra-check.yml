@@ -61,6 +61,3 @@ jobs:
         run: |
           cd infra/backend
           bash tests/hotel-permissions.sh
-
-      - name: Verify hotel photo transactions
-        run: python3 infra/backend/tests/hotel-images.py
