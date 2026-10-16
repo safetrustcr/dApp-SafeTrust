@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Bell } from "lucide-react";
 import { NotificationItem } from "@/components/dashboard/NotificationItem";
+import { BrowserNotificationsCard } from "@/components/settings/BrowserNotificationsCard";
 
 // TODO: replace with real Hasura query once public.notifications table is created
 const MOCK_NOTIFICATIONS = [
@@ -67,6 +68,8 @@ export default function NotificationsPage() {
           </button>
         )}
       </div>
+
+      <BrowserNotificationsCard />
 
       <hr className="border-gray-700" />
 
