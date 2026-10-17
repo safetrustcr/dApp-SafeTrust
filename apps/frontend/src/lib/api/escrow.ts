@@ -52,94 +52,60 @@ export async function postEscrowApi<T>(
 export type RecoverFromTxHashResponse = {
   status?: string;
   escrowStatus?: string;
-  txHash?: string;
+  pending?: boolean;
   [key: string]: unknown;
 };
 
-export type RecoverFromTxHashOptions = {
-  /** Maximum number of attempts when the API replies 202 PENDING. Defaults to 6 */
-  maxAttempts?: number;
-  /** Base delay in ms between retries. Defaults to 1000 */
-  baseDelayMs?: number;
-  /** Maximum delay in ms between retries. Defaults to 16000 */
-  maxDelayMs?: number;
-  /** Optional abort signal to cancel pending retries. */
-  signal?: AbortSignal;
-  /** Optional callback invoked before each retry delay. */
-  onPending?: (attempt: number, payload: RecoverFromTxHashResponse) => void;
-};
+const RECOVER_MAX_ATTEMPTS = 5;
+const RECOVER_BASE_DELAY_MS = 500;
 
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'));
-      return;
-    }
-    const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(new DOMException('Aborted', 'AbortError'));
-    };
-    signal?.addEventListener('abort', onAbort, { once: true });
-  });
-}
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * Recovers an escrow transaction that was signed and submitted but whose
- * result was never persisted (for example, the tab closed).
+ * Recovers an escrow transaction that was signed and submitted but whose result
+ * was never saved. Only the transaction hash is sent: the server derives the
+ * action, escrow, amount and target status from its own pending-action row.
  *
- * The API derives everything from the pending action row and the ledger,
- * so the request body must contain only the transaction hash. When the
- * transaction is not yet on the ledger the API replies 202 PENDING and this
- * helper retries with exponential backoff until it gets a definitive result.
+ * A 202 response means the transaction is not yet on the ledger; this function
+ * retries with exponential backoff and returns the final 202 payload if the
+ * transaction is still pending after the attempts are exhausted.
  */
 export async function recoverEscrowFromTxHash(
-  txHash: string,
-  options?: RecoverFromTxHashOptions,
+  tyHash: string,
+  options?: PostEscrowOptions,
 ): Promise<RecoverFromTxHashResponse> {
-  const maxAttempts = Math.max(1, options?.maxAttempts ?? 6);
-  const baseDelayMs = Math.max(0, options?.baseDelayMs ?? 1000);
-  const maxDelayMs = Math.max(baseDelayMs, options?.maxDelayMs ?? 16000);
-  const signal = options?.signal;
+  const normalizedHash = tyHash.trim();
+  if (!/^[0-9a-f]{64}$/i.test(normalizedHash)) {
+    throw new EscrowApiError('Invalid transaction hash.', 400, null);
+  }
 
-  let lastPendingPayload: RecoverFromTxHashResponse = { txHash };
+  const idempotencyKey = options?.idempotencyKey ?? crypto.randomUUID();
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  let lastPendingResponse: RecoverFromTxHashResponse | null = null;
+
+  for (let attempt = 0; attempt < RECOVER_MAX_ATTEMPTS; attempt += 1) {
     try {
-      const result = await postEscrowApi<{
-        status?: string;
-        escrowStatus?: string;
-        txHash?: string;
-        [key: string]: unknown;
-      }>('/api/escrow/recover-from-txhash', { txHash });
+      const result = await postEscrowApi<RecoverFromTxHashResponse>(
+        '/api/escrow/recover-from-txhash',
+        { txHash: normalizedHash },
+        { idempotencyKey },
+      );
       return result;
     } catch (error) {
-      if (!(error instanceof EscrowApiError) || error.status !== 202) {
-        throw error;
+      if (error instanceof EscrowApiError && error.status === 202) {
+        lastPendingResponse = (error.payload as RecoverFromTxHashResponse | null) ?? {
+          pending: true,
+        };
+        if (attempt < RECOVER_MAX_ATTEMPTS - 1) {
+          await sleep(RECOVER_BASE_DELAY_MS * 2** attempt);
+          continue;
+        }
+        return lastPendingResponse;
       }
-
-      lastPendingPayload =
-        (error.payload as RecoverFromTxHashResponse | null) ?? { txHash };
-      options?.onPending?.(attempt, lastPendingPayload);
-
-      if (attempt >= maxAttempts) {
-        break;
-      }
-
-      const delay = Math.min(maxDelayMs, baseDelayMs * 2** (attempt - 1));
-      await sleep(delay, signal);
+      throw error;
     }
   }
 
-  // Exhausted retries while the transaction is still pending on the ledger.
-  // Surface the last 202 so the caller can decide to keep waiting or the cron
-  // reconciler will pick it up.
-  throw new EscrowApiError(
-    'Transaction is still pending on the ledger.',
-    202,
-    lastPendingPayload,
-  );
+  return lastPendingResponse ?? { pending: true };
 }

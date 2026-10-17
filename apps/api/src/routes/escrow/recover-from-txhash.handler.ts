@@ -1,19 +1,7 @@
-import type { Request, Response } from 'express'; import { findByTxHash, markPendingActionFailed } from '../../services/pending-actions.js';
-import { applySubmittedAction } from '../../services/submitted-effects.js';
-import { confirmTransactionOnLedger } from '../../services/stellar-confirm.js';
-import { updateIndexerFromTxHash } from '../../services/trustlesswork.js';
-import { assertEscrowParticipant } from '../../services/escrow-authz.ts';
-import { getEscrowStatusByEngagementId } from '../../services/hasura.js';
-import { ApiError } from '../../http/api-error.js';
-import { asyncHandler } from '../../http/async-handler.js';
+import type { Request, Response } from 'express'; import { trustlessWorkRequest } from '../../services/trustlesswork(js)'; import { findByTxHash, markPendingActionFailed } from '../../services/pending-actions.js'; import { assertEscrowParticipant } from '../../services/escrow-access.js'; import { applySubmittedAction } from '../../services/submitted-effects.js'; import { confirmStellarTransaction } from '../../services/stellar-confirm.js'; import { ApiError } from '../../http/api-error.js'; import { asyncHandler } from '../../http/async-handler.js'; import { getAuthenticatedUser } from '../../http/auth.js';
 
-const TX_HASH_REGEXP = /^[0-9a-f]{64}$/i;
+const TX_HASH_REGEX = /^[0-9a-f]{64}$/i;
 
-/**
- * Any field other than `txHash` is rejected. The action, escrow,
- * amount and target status all come from the pending action row and the
- * ledger - never from the request body.
- */
 const FORBIDDEN_FIELDS = [
   'action',
   'status',
@@ -28,94 +16,110 @@ const FORBIDDEN_FIELDS = [
   'milestoneId',
   'approver',
   'releaseSigner',
+  'disputer',
+  'resolver',
 ] as const;
 
 type RecoverRequestBody = {
   txHash?: string;
-  [key: string]: unknown };
+  [key: string]: unknown;
+};
 
 type RecoverResponse = {
   recovered: boolean;
+  action: string;
+  contractId: string;
   txHash: string;
   status: string;
 };
 
-export const recoverFromTxhashHandler = asyncHandler(async (
-  req: Request<{}, RecoverResponse | { error: string }, RecoverRequestBody>,
-  res: Response<RecoverResponse | { error: string }>,
-) => {
-  const body = (req.body ?? {}) as RecoverRequestBody;
+type PendingResponse = {
+  status: 'PENDING';
+  txHash: string;
+};
 
-  // Reject any client-supplied field that could influence the transition.
-  for (const field of Object.keys(body)) {
-    if (field !== 'txHash') {
-      throw new ApiError(400, 'FORBIDDEN_FIELD', `Field '${field}' is not allowed on this endpoint.`);
+export const recoverFromTxhashHandler = asyncHandler(async (
+  req: Request<{}, RecoverResponse | PendingResponse | { error: string }, RecoverRequestBody>,
+  res: Response<RecoverResponse | PendingResponse | { error: string }>,
+) => {
+  const body = (req.body || {}) as RecoverRequestBody;
+
+  // 1. Reject any client-supplied transition input.
+  for (const field of FORBIDDEN_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, field)) {
+      throw new ApiError(400, 'FORBIDDEN_FIELD', `Field '${field}' is not allowed; send only txHash`);
     }
   }
 
   const txHash = typeof body.txHash === 'string' ? body.txHash.trim() : '';
-  if (!TX_HASH_REGEXP.test(txHash)) {
-    throw new ApiError(400, 'INVALID_TX_HASH1', 'txHash must be a 64-character hex string.');
+  if (!TX_HASH_REGEX.exec(txHash)) {
+    throw new ApiError(400, 'INVALID_TX_HASH', 'txHash must be 64 hex characters');
   }
 
-  const uid = req.user?.uid;
-  if (!uid) {
-    throw new ApiError(401, 'UNAUTHORIZED', 'Authentication required.');
+  const user = getAuthenticatedUser(req);
+
+  // 2. Load the pending action SafeTrust built for this hash.
+  const pendingAction = await findByTxHash(txHash);
+  if (!pendingAction) {
+    throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash');
   }
 
-  // 1. Look up the pending action the API built for this hash.
-  const pending = await findByTxHash(txHash);
-  if (!pending) {
-    // 404 for unknown hashes so callers can't probe which hashes exist.
-    throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash.');
-  }
-
-  // 2. Authorize: builder or a participant of the escrow. 404 on failure
-  // so callers can't probe which hashes exist.
-  if (pending.built_for_uid !== uid) {
+  // 3. Authorize: built_for_uid OR this escrow's participant. Return 404
+  // (not 403) so callers can't probe which hashes exist.
+  const isBuiltForCaller = pendingAction.built_for_uid === user.uid;
+  if (!isBuiltForCaller) {
     try {
-      await assertEscrowParticipant(pending.engagement_id, uid);
+      await assertEscrowParticipant(pendingAction.contract_id, user.uid);
     } catch {
-      throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash.');
+      throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash');
     }
   }
 
-  // 3. Idempotent: already confirmed - return the current escrow status.
-  if (pending.status === 'confirmed') {
-    const current = await getEscrowStatusByEngagementId(pending.engagement_id);
-    return res.status(200).json({ recovered: true, txHash, status: current });
+  // 4. Idempotent: already confirmed -> return current escrow status.
+  if (pendingAction.status === 'confirmed') {
+    return res.status(200).json({
+      recovered: true,
+      action: pendingAction.action,
+      contractId: pendingAction.contract_id,
+      txHash,
+      status: pendingAction.resulting_status ?? pendingAction.target_status,
+    });
   }
 
-  // 4. Confirm on the ledger.
-  const confirmation = await confirmTransactionOnLedger(txHash);
+  // 5. Confirm on the ledger.
+  const confirmation = await confirmStellarTransaction(txHash);
 
   if (confirmation.status === 'not_found') {
-    // 202 Pending - client retries, cron reconciler picks it up later.
-    return res.status(202).json({ recovered: false, txHash, status: 'PENDING' });
+    // Still pending on the ledger. Client retries; cron reconciler also picks it up.
+    return res.status(202).json({ status: 'PENDING', txHash });
   }
 
   if (confirmation.status === 'failed') {
-    await markPendingActionFailed(pending.id);
-    throw new ApiError(409, 'TRANSACTION_FAILED', 'The transaction failed on the ledger; the escrow was not changed.');
+    await markPendingActionFailed(pendingAction.id);
+    throw new ApiError(409, 'TRANSACTION_FAILED', 'Transaction failed on the ledger');
   }
 
-  // 5. Apply the transition using the existing guarded path. The action,
-  // escrow, amount and target status all come from the pending row.
-  const result = await applySubmittedAction(pending, txHash, {
+  // 6. Apply the guarded transition via the shared effects path.
+  const applied = await applySubmittedAction(pendingAction, txHash, {
     source: 'submit',
-    actorUid: uid,
+    actorUid: user.uid,
   });
 
-  // 6. Best-effort: tell Trustless Work's indexer about the transaction.
+  // 7. Best-effort: tell Trustless Work's indexer about the transaction.
   try {
-    await updateIndexerFromTxHash(txHash);
+    await trustlessWorkRequest('/indexer/update-from-txHash', {
+      method: 'POST',
+      body: { txHash },
+    });
   } catch (err) {
-    console.warn('[recover-from-txhash] indexer update failed', err);
+    console.warn('[indexer/update-from-txHash] failed', { txHash, err });
   }
 
   return res.status(200).json({
     recovered: true,
+    action: pendingAction.action,
+    contractId: pendingAction.contract_id,
     txHash,
-    status: result.status,
+    status: applied.status,
   });
 });
