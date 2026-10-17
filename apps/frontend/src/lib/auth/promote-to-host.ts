@@ -1,3 +1,5 @@
+import { auth } from '@/lib/firebase';
+
 /**
  * Promotes the signed-in user to the 'host' role and invalidates the cached
  * role cookie so the change takes effect on the very next navigation.
@@ -22,6 +24,10 @@ export async function promoteToHost(token: string): Promise<void> {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? 'Failed to switch to host view');
   }
+
+  // The API rewrote the Hasura claims; fetch a fresh ID token so the new
+  // 'host' role is usable in GraphQL immediately.
+  await auth.currentUser?.getIdToken(true).catch(() => undefined);
 
   // Best-effort: if the cookie survives, the user keeps the guest view until
   // the 1h TTL lapses, which is recoverable — the promotion itself is done.

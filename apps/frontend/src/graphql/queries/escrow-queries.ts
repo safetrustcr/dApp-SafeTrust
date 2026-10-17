@@ -118,7 +118,11 @@ export const GET_ESCROW_BY_ID = gql`
           email
           phone_number
           country_code
-          user_wallets(where: { is_primary: { _eq: true } }, limit: 1) {
+          user_wallets(
+            where: { is_primary: { _eq: true } }
+            order_by: [{ updated_at: desc }, { id: asc }]
+            limit: 1
+          ) {
             wallet_address
           }
         }
@@ -175,7 +179,11 @@ export const GET_ESCROW_BY_ANY_ID = gql`
           email
           phone_number
           country_code
-          user_wallets(where: { is_primary: { _eq: true } }, limit: 1) {
+          user_wallets(
+            where: { is_primary: { _eq: true } }
+            order_by: [{ updated_at: desc }, { id: asc }]
+            limit: 1
+          ) {
             wallet_address
           }
         }
@@ -189,6 +197,10 @@ export const GET_ESCROW_BY_ANY_ID = gql`
       marker
       releaser
       resolver
+      milestones {
+        milestoneId
+        status
+      }
     }
   }
 `;
@@ -257,5 +269,3 @@ export const GET_ESCROW_DASHBOARD_STATS = gql`
     }
   }
 `;
-
-

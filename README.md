@@ -37,7 +37,7 @@ Tenant finds property → PAY → Freighter signs XDR → funds locked on-chain
 ```
 Stellar Blockchain (TrustlessWork API)
 │ signed XDR
-services/webhook (Node + Express, port 3002)
+apps/api (Node + Express, port 3002)
 │ SQL
 infra/backend (Hasura GraphQL, port 8080)
 │ GraphQL
@@ -59,6 +59,21 @@ apps/frontend (Next.js 14, port 3001)
 
 ```bash
 npm install -g pnpm hasura-cli
+```
+
+### Makefile shortcuts
+
+From the repo root, common workflows are also available via `make`:
+
+```bash
+make help   # list targets
+make full   # start Docker infra + api/web dev servers
+make infra  # start Docker infra (both tenants)
+make dev    # start api + web
+make test   # run tests
+make lint   # lint all packages
+make build  # build all packages
+make stop   # stop Docker infra
 ```
 
 ### 1. Clone and install
@@ -134,7 +149,6 @@ docker compose down -v
 bin/start
 ```
 
----
 
 ### 6. Run the frontend
 

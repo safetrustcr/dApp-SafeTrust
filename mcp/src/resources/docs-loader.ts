@@ -61,8 +61,7 @@ fulfilment, or returned on dispute.
 |---|---|
 | \`apps/frontend\` | Next.js 14 app — wallet UI, Freighter signing, its own /api routes |
 | \`apps/api\` | Express escrow/auth API (port 3002) — holds the TrustlessWork API key |
-| \`services/webhook\` | Receives TrustlessWork webhooks and updates escrow rows |
-| \`infra/backend\` | Hasura metadata + migrations, multi-tenant (safetrust, hotel_industry) |
+| \`infra/backend\` | Hasura metadata + migrations, multi-tenant (safetrust, hotel_industry); event triggers and actions route webhooks to apps/api |
 | \`packages/graphql\`, \`packages/types\` | Generated GraphQL types and shared TS types |
 | \`mcp\` | This MCP server |
 
@@ -77,7 +76,7 @@ fulfilment, or returned on dispute.
 4. Fund — \`POST ${SAFETRUST_API_URL}/api/escrow/fund\` → another XDR to sign.
 5. Milestone — \`POST /api/escrow/milestone-status\` (serviceProvider marks it done).
 6. Release — \`POST /api/escrow/release-funds\` sends funds to the owner.
-7. Webhooks land in \`services/webhook\` and update escrow status rows.
+7. Hasura event triggers call \`apps/api\` (via \`WEBHOOK_URL\`), which updates escrow status rows.
 
 ## Tables that matter (Hasura at ${HASURA_GRAPHQL_URL})
 

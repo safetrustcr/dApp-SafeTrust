@@ -2,22 +2,33 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { PollarProvider as SdkPollarProvider, usePollar } from "@pollar/react";
+import type { SignAndSubmit } from "@/hooks/use-active-wallet";
 
-type PollarWalletValue = {
-  address?: string;
+export type PollarWalletValue = {
+  address: string | null;
+  signAndSubmit: SignAndSubmit | null;
   configured: boolean;
 };
 
-const PollarWalletContext = createContext<PollarWalletValue>({
+export const PollarWalletContext = createContext<PollarWalletValue>({
+  address: null,
+  signAndSubmit: null,
   configured: false,
 });
 
 function PollarAddressBridge({ children }: { children: ReactNode }) {
-  const { wallet } = usePollar();
+  const { wallet, signAndSubmitTx } = usePollar();
+
+  const signAndSubmit: SignAndSubmit = async (unsignedXdr) => {
+    const result = await signAndSubmitTx(unsignedXdr);
+    if (result.status === 'error') {
+      throw new Error(result.message ?? result.details ?? 'Pollar transaction submission failed.');
+    }
+  };
 
   return (
     <PollarWalletContext.Provider
-      value={{ address: wallet?.address, configured: true }}
+      value={{ address: wallet?.address ?? null, signAndSubmit, configured: true }}
     >
       {children}
     </PollarWalletContext.Provider>
@@ -33,7 +44,7 @@ export function PollarProvider({ children }: { children: ReactNode }) {
 
   if (!apiKey) {
     return (
-      <PollarWalletContext.Provider value={{ configured: false }}>
+      <PollarWalletContext.Provider value={{ address: null, signAndSubmit: null, configured: false }}>
         {children}
       </PollarWalletContext.Provider>
     );

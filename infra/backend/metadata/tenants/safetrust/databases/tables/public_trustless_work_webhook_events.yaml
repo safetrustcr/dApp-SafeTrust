@@ -33,8 +33,9 @@ object_relationships:
           schema: public
         column_mapping:
           contract_id: contract_id
-# This table is an append-only audit log written by services/webhook, which talks
-# to Hasura with the admin secret and therefore bypasses these permissions. End
+# This table is an append-only audit log written by apps/api (the former
+# services/webhook was retired under Compute Resource Consolidation), which
+# talks to Hasura with the admin secret and therefore bypasses these permissions. End
 # user roles get read access only — `signature` is withheld from both because it
 # is the HMAC used to verify inbound webhooks.
 select_permissions:

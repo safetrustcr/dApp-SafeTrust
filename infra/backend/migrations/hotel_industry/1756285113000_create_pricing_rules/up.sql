@@ -1,6 +1,3 @@
--- Create Hotel Industry schema if not exists
-CREATE SCHEMA IF NOT EXISTS hotel_industry;
-
 -- Create Hotel Industry pricing rules table
 CREATE TABLE hotel_industry.pricing_rules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -47,9 +44,9 @@ ON hotel_industry.pricing_rules(advance_booking_days, is_active)
 WHERE is_active = true AND advance_booking_days IS NOT NULL;
 
 -- Auto-update timestamp trigger
-CREATE TRIGGER update_hotel_pricing_rules_updated_at 
+CREATE TRIGGER update_hotel_pricing_rules_updated_at
     BEFORE UPDATE ON hotel_industry.pricing_rules
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    FOR EACH ROW EXECUTE FUNCTION hotel_industry.set_updated_at();
 
 -- Add helpful comment
 COMMENT ON TABLE hotel_industry.pricing_rules IS 

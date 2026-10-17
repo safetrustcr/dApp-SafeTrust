@@ -88,7 +88,7 @@ export function HotelRoomsPanel({ rooms, isLoading }: HotelRoomsPanelProps) {
                     {room.capacity}
                   </p>
                 </div>
-                <RoomStatusBadge available={Boolean(room.status)} />
+                <RoomStatusBadge available={room.is_available} />
               </li>
             ))}
           </ul>

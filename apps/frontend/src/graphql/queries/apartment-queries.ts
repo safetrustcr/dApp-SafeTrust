@@ -115,10 +115,12 @@ export const GET_APARTMENT_BY_ID = gql`
       image_urls
       address
       price
+      warranty_deposit
       owner_id
       owner {
         user_wallets(
           where: { is_primary: { _eq: true }, chain_type: { _eq: "STELLAR" } }
+          order_by: [{ updated_at: desc }, { id: asc }]
           limit: 1
         ) {
           wallet_address
@@ -153,6 +155,7 @@ export const GET_APARTMENT_OWNER = gql`
         country_code
         user_wallets(
           where: { is_primary: { _eq: true }, chain_type: { _eq: "STELLAR" } }
+          order_by: [{ updated_at: desc }, { id: asc }]
           limit: 1
         ) {
           wallet_address
