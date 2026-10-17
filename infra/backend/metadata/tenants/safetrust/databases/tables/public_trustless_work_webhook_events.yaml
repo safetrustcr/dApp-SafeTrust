@@ -1,0 +1,87 @@
+table:
+  name: trustless_work_webhook_events
+  schema: public
+configuration:
+  custom_name: trustlessWorkWebhookEvents
+  column_config:
+    contract_id:
+      custom_name: contractId
+    event_type:
+      custom_name: eventType
+    processed_at:
+      custom_name: processedAt
+    error_message:
+      custom_name: errorMessage
+    retry_count:
+      custom_name: retryCount
+    max_retries:
+      custom_name: maxRetries
+    next_retry_at:
+      custom_name: nextRetryAt
+    created_at:
+      custom_name: createdAt
+    tenant_id:
+      custom_name: tenantId
+object_relationships:
+  # contract_id carries no FK constraint, so this is mapped manually against the
+  # UNIQUE contract_id on trustless_work_escrows.
+  - name: escrow
+    using:
+      manual_configuration:
+        remote_table:
+          name: trustless_work_escrows
+          schema: public
+        column_mapping:
+          contract_id: contract_id
+# This table is an append-only audit log written by apps/api (the former
+# services/webhook was retired under Compute Resource Consolidation), which
+# talks to Hasura with the admin secret and therefore bypasses these permissions. End
+# user roles get read access only — `signature` is withheld from both because it
+# is the HMAC used to verify inbound webhooks.
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - contract_id
+        - event_type
+        - payload
+        - processed
+        - processed_at
+        - error_message
+        - retry_count
+        - max_retries
+        - next_retry_at
+        - created_at
+        - tenant_id
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - escrow:
+              guest_id:
+                _eq: X-Hasura-User-Id
+    comment: Guests can read webhook events of the escrows they are the guest on
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - contract_id
+        - event_type
+        - payload
+        - processed
+        - processed_at
+        - error_message
+        - retry_count
+        - max_retries
+        - next_retry_at
+        - created_at
+        - tenant_id
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - escrow:
+              marker:
+                _eq: X-Hasura-User-Id
+    comment: Hosts can read webhook events of the escrows they marked

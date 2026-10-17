@@ -1,8 +1,0 @@
-- "!include public_users.yaml"
-- "!include public_user_wallets.yaml"
-- "!include public_apartments.yaml"
-- "!include public_escrows.yaml"
-- "!include public_trustless_work_escrows.yaml"
-- "!include public_escrow_milestones.yaml"
-- "!include public_trustless_work_webhook_events.yaml"
-

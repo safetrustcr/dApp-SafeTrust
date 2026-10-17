@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HASURA_ENDPOINT="${HASURA_ENDPOINT:-http://localhost:8080}"
+API_ENDPOINT="${API_ENDPOINT:-http://localhost:3002}"
+HASURA_ADMIN_SECRET="${HASURA_ADMIN_SECRET:-myadminsecretkey}"
+
+curl -fsS "$HASURA_ENDPOINT/healthz" >/dev/null
+curl -fsS "$API_ENDPOINT/health" >/dev/null
+
+for tenant in "$@"; do
+  curl -fsS -X POST "$HASURA_ENDPOINT/v1/metadata" \
+    -H "X-Hasura-Admin-Secret: $HASURA_ADMIN_SECRET" \
+    -H 'Content-Type: application/json' \
+    -d "{\"type\":\"pg_get_source_tables\",\"args\":{\"source\":\"$tenant\"}}" >/dev/null
+done
+
+echo "✅ Hasura, API, and configured tenant metadata checks passed"

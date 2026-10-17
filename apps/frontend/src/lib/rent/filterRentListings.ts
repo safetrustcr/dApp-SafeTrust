@@ -47,11 +47,11 @@ export function filterRentListings(
   });
 
   if (filters.sortOption === 'price-low') {
-    return [...apartments].sort((left, right) => left.price - right.price);
+    return [...apartments].sort((left, right) => Number(left.priceAvailable === false) - Number(right.priceAvailable === false) || left.price - right.price);
   }
 
   if (filters.sortOption === 'price-high') {
-    return [...apartments].sort((left, right) => right.price - left.price);
+    return [...apartments].sort((left, right) => Number(left.priceAvailable === false) - Number(right.priceAvailable === false) || right.price - left.price);
   }
 
   return [...apartments].sort(

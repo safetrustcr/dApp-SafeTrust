@@ -1,0 +1,5 @@
+- function:
+    schema: hotel_industry
+    name: find_nearby_hotels
+  configuration:
+    custom_name: find_nearby_hotels
