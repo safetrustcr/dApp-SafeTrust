@@ -1,65 +1,41 @@
-import type { Request, Response } from 'express';
-import { trustlessWorkRequest } from '../../services/trustlesswork.js';
-import { updateEscrowStatusByContractId } from '../../services/hasura.js';
+import type { Request, Response } from 'express'; import { findByTxHash, markPendingActionFailed } from '../../services/pending-actions.js';
+import { applySubmittedAction } from '../../services/submitted-effects.js';
+import { confirmTransactionOnLedger } from '../../services/stellar-confirm.js';
+import { updateIndexerFromTxHash } from '../../services/trustlesswork.js';
+import { assertEscrowParticipant } from '../../services/escrow-authz.ts';
+import { getEscrowStatusByEngagementId } from '../../services/hasura.js';
 import { ApiError } from '../../http/api-error.js';
 import { asyncHandler } from '../../http/async-handler.js';
 
-type RecoverAction =
-  | 'initialize'
-  | 'fund'
-  | 'approve_milestone'
-  | 'release_funds'
-  | 'dispute'
-  | 'resolve_dispute';
+const TX_HASH_REGEXP = /^[0-9a-f]{64}$/i;
+
+/**
+ * Any field other than `txHash` is rejected. The action, escrow,
+ * amount and target status all come from the pending action row and the
+ * ledger - never from the request body.
+ */
+const FORBIDDEN_FIELDS = [
+  'action',
+  'status',
+  'amount',
+  'contractId',
+  'signer',
+  'engagementId',
+  'apartmentId',
+  'senderAddress',
+  'receiverAddress',
+  'releaser',
+  'milestoneId',
+  'approver',
+  'releaseSigner',
+] as const;
 
 type RecoverRequestBody = {
   txHash?: string;
-  action?: RecoverAction;
-  contractId?: string;
-  engagementId?: string;
-  apartmentId?: string;
-  senderAddress?: string;
-  receiverAddress?: string;
-  releaser?: string;
-  amount?: number;
-  milestoneId?: string;
-  approver?: string;
-  releaseSigner?: string;
-};
-
-const VALID_ACTIONS: RecoverAction[] = [
-  'initialize',
-  'fund',
-  'approve_milestone',
-  'release_funds',
-  'dispute',
-  'resolve_dispute',
-];
-
-const ACTION_STATUS: Record<RecoverAction, string> = {
-  // initialize completed on-chain → the escrow is live and awaiting funding
-  // (deploy's pending_signature is normalized to created).
-  initialize: 'created',
-  fund: 'funded',
-  approve_milestone: 'funded',
-  release_funds: 'completed',
-  dispute: 'disputed',
-  resolve_dispute: 'resolved',
-};
-
-const REQUIRED_FIELDS: Record<RecoverAction, (keyof RecoverRequestBody)[]> = {
-  initialize: ['engagementId', 'apartmentId', 'senderAddress', 'receiverAddress', 'releaser', 'amount'],
-  fund: ['amount'],
-  approve_milestone: ['milestoneId', 'approver'],
-  release_funds: ['releaseSigner'],
-  dispute: [],
-  resolve_dispute: [],
-};
+  [key: string]: unknown };
 
 type RecoverResponse = {
   recovered: boolean;
-  action: RecoverAction;
-  contractId: string;
   txHash: string;
   status: string;
 };
@@ -68,50 +44,78 @@ export const recoverFromTxhashHandler = asyncHandler(async (
   req: Request<{}, RecoverResponse | { error: string }, RecoverRequestBody>,
   res: Response<RecoverResponse | { error: string }>,
 ) => {
-  const { txHash, action, contractId } = req.body || {};
+  const body = (req.body ?? {}) as RecoverRequestBody;
 
-  if (!txHash) {
-    return res.status(400).json({ error: 'Missing required field: txHash' });
-  }
-  if (!action) {
-    return res.status(400).json({ error: 'Missing required field: action' });
-  }
-  if (!VALID_ACTIONS.includes(action)) {
-    return res.status(400).json({
-      error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`,
-    });
-  }
-  if (!contractId) {
-    return res.status(400).json({ error: 'Missing required field: contractId' });
+  // Reject any client-supplied field that could influence the transition.
+  for (const field of Object.keys(body)) {
+    if (field !== 'txHash') {
+      throw new ApiError(400, 'FORBIDDEN_FIELD', `Field '${field}' is not allowed on this endpoint.`);
+    }
   }
 
-  const missing = REQUIRED_FIELDS[action].filter((field) => {
-    const value = req.body[field];
-    if (value == null) return true;
-    if (field === 'amount') return typeof value !== 'number' || !Number.isFinite(value) || value <= 0;
-    return typeof value !== 'string' || value.trim().length === 0;
+  const txHash = typeof body.txHash === 'string' ? body.txHash.trim() : '';
+  if (!TX_HASH_REGEXP.test(txHash)) {
+    throw new ApiError(400, 'INVALID_TX_HASH1', 'txHash must be a 64-character hex string.');
+  }
+
+  const uid = req.user?.uid;
+  if (!uid) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Authentication required.');
+  }
+
+  // 1. Look up the pending action the API built for this hash.
+  const pending = await findByTxHash(txHash);
+  if (!pending) {
+    // 404 for unknown hashes so callers can't probe which hashes exist.
+    throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash.');
+  }
+
+  // 2. Authorize: builder or a participant of the escrow. 404 on failure
+  // so callers can't probe which hashes exist.
+  if (pending.built_for_uid !== uid) {
+    try {
+      await assertEscrowParticipant(pending.engagement_id, uid);
+    } catch {
+      throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash.');
+    }
+  }
+
+  // 3. Idempotent: already confirmed - return the current escrow status.
+  if (pending.status === 'confirmed') {
+    const current = await getEscrowStatusByEngagementId(pending.engagement_id);
+    return res.status(200).json({ recovered: true, txHash, status: current });
+  }
+
+  // 4. Confirm on the ledger.
+  const confirmation = await confirmTransactionOnLedger(txHash);
+
+  if (confirmation.status === 'not_found') {
+    // 202 Pending - client retries, cron reconciler picks it up later.
+    return res.status(202).json({ recovered: false, txHash, status: 'PENDING' });
+  }
+
+  if (confirmation.status === 'failed') {
+    await markPendingActionFailed(pending.id);
+    throw new ApiError(409, 'TRANSACTION_FAILED', 'The transaction failed on the ledger; the escrow was not changed.');
+  }
+
+  // 5. Apply the transition using the existing guarded path. The action,
+  // escrow, amount and target status all come from the pending row.
+  const result = await applySubmittedAction(pending, txHash, {
+    source: 'submit',
+    actorUid: uid,
   });
-  if (missing.length > 0) {
-    return res.status(400).json({
-      error: `${action} action requires: contractId, ${missing.join(', ')}`,
-    });
+
+  // 6. Best-effort: tell Trustless Work's indexer about the transaction.
+  try {
+    await updateIndexerFromTxHash(txHash);
+  } catch (err) {
+    console.warn('[recover-from-txhash] indexer update failed', err);
   }
 
-  // Verify the transaction exists on-chain via TW indexer — throws TrustlessWorkRequestError
-  // which errorMiddleware maps to TRUSTLESS_WORK_* codes automatically
-  await trustlessWorkRequest('/indexer/update-from-txHash', {
-    method: 'POST',
-    body: { txHash },
+  return res.status(200).json({
+    recovered: true,
+    txHash,
+    status: result.status,
   });
-
-  const status = ACTION_STATUS[action];
-  const result = await updateEscrowStatusByContractId(contractId, status);
-
-  if (result.update_escrows.affected_rows === 0) {
-    return res.status(404).json({
-      error: `No escrow record found for contractId: ${contractId}`,
-    });
-  }
-
-  return res.status(200).json({ recovered: true, action, contractId, txHash, status });
 });

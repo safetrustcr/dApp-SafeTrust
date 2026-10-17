@@ -91,6 +91,23 @@ export async function trustlessWorkRequest<T>(
   return data;
 }
 
+/**
+ * Best-effort notification to Trustless Work's indexer that a transaction
+ * hash exists on-chain but was submitted outside of /helper/send-transaction
+ * (e.g. recovered after a browser crash). Trustless Work needs this so its
+ * own index reflects the transaction. Failures are logged by the caller and
+ * must not fail the recovery request.
+ */
+export async function updateIndexerFromTxHash(txHash: string): Promise<void> {
+  await trustlessWorkRequest<Record<string, unknown>>(
+    '/indexer/update-from-txHash',
+    {
+      method: 'POST',
+      body: { txHash },
+    },
+  );
+}
+
 type ErrorLikePayload = {
   error?: unknown;
   message?: unknown;

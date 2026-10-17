@@ -1,4 +1,4 @@
-/**
+/*
  * escrow_pending_actions: every unsigned XDR apps/api builds is recorded here
  * under its transaction hash. A signed XDR is only accepted if its hash matches
  * a row built for the same user — the action, escrow and parameters come from
@@ -26,10 +26,11 @@ export type PendingAction = {
   confirmed_at: string | null;
 };
 
-export type NewPendingAction = Pick<
-  PendingAction,
-  'engagement_id' | 'contract_id' | 'action' | 'tx_hash' | 'unsigned_xdr' | 'built_for_uid' | 'signer_address' | 'payload'
-> & { expires_at: Date };
+export type NewPendingAction = Pick<PendingAction,
+  'engagement_id' | 'contract_id' | 'action' | 'tx_hash' | 'unsigned_xdr' | 'built_for_uid' |
+  'signer_address' | 'payload'
+>
+ & { expires_at: Date };
 
 const FIELDS = `
   id engagement_id contract_id action tx_hash unsigned_xdr built_for_uid
@@ -43,7 +44,7 @@ export function isExpired(row: Pick<PendingAction, 'expires_at'>, now: Date = ne
 /** Moves stale `built` rows to `expired` so the live partial unique index frees up. */
 export async function expireStaleActions(engagementId: string, action: EscrowAction, now = new Date()): Promise<void> {
   await hasuraRequest(
-    `mutation ExpireStalePendingActions($engagementId: String!, $action: String!, $now: timestamptz!) {
+    `mutation ExpireStalePendingActions($engagementId: String!, $action: String!, $now: timestampzt!) {
        update_escrow_pending_actions(
          where: {
            engagement_id: { _eq: $engagementId }
@@ -97,13 +98,16 @@ export async function getPendingActionByHash(txHash: string): Promise<PendingAct
   return data.escrow_pending_actions[0] ?? null;
 }
 
+// Alias for the recovery handler.
+export const findByTxHash = getPendingActionByHash;
+
 /**
  * Atomically claims a built row for submission (built → submitted).
  * Returns false when another request already claimed it.
  */
 export async function claimForSubmission(id: string): Promise<boolean> {
   const data = await hasuraRequest<{ update_escrow_pending_actions: { affected_rows: number } }>(
-    `mutation ClaimPendingAction($id: uuid!, $now: timestamptz!) {
+    `mutation ClaimPendingAction($id: uuid!, $now: timestampzt!) {
        update_escrow_pending_actions(
          where: { id: { _eq: $id }, status: { _eq: "built" } }
          _set: { status: "submitted", submitted_at: $now }
@@ -135,5 +139,31 @@ export async function setPendingContractId(id: string, contractId: string): Prom
        }
      }`,
     { id, contractId },
+  );
+}
+
+/** Marks a pending action as failed (ledger rejected the transaction). */
+export async function markPendingActionFailed(id: string): Promise<void> {
+  await hasuraRequest(
+    `mutation MarkPendingActionFailed($id: uuid!) {
+       update_escrow_pending_actions(
+         where: { id: { _eq: $id }, status: { _neq: "confirmed" } }
+         _set: { status: "failed" }
+       ) { affected_rows }
+     }`,
+    { id },
+  );
+}
+
+/** Marks a pending action as confirmed after the ledger accepted it. */
+export async function markPendingActionConfirmed(id: string, now = new Date()): Promise<void> {
+  await hasuraRequest(
+    `mutation MarkPendingActionConfirmed($id: uuid!, $now: timestamptz!) {
+       update_escrow_pending_actions(
+         where: { id: { _eq: $id }, status: { _neq: "confirmed" } }
+         _set: { status: "confirmed", confirmed_at: $now }
+       ) { affected_rows }
+     }`,
+    { id, now: now.toISOString() },
   );
 }
