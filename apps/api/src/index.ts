@@ -13,6 +13,7 @@ import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.j
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
 import messagesRouter from './routes/messages/send.route.js';
+import notificationDevicesRouter from './routes/notifications/devices.route.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -50,11 +51,8 @@ app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);
 
-// Messages routes (router registered when available)
 app.use('/api/messages', messagesRouter);
-
-// Messages routes
-app.use('/api/messages', messagesRouter);
+app.use('/api/notifications', notificationDevicesRouter);
 
 app.listen(PORT, () => {
   console.log(`[api] Server running on http://localhost:${PORT}`);

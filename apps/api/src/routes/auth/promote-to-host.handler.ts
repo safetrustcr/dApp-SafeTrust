@@ -6,6 +6,10 @@ export const promoteToHostHandler = async (
   req: AuthenticatedRequest,
   res: Response
 ): Promise<Response> => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Missing token' });
+  }
+
   const { uid, email } = req.user;
 
   try {

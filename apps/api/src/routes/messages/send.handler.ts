@@ -19,6 +19,10 @@ export const sendMessageHandler = async (
   req: AuthenticatedRequest & { body: SendMessageBody },
   res: Response<SendMessageResponse | { error: string }>
 ): Promise<Response> => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Missing token' });
+  }
+
   const { uid } = req.user;
   const { conversationId, body, isAutomated = false, eventType } = req.body;
 

@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { getFirebaseAuth } from '../services/firebase-admin.js';
 
 export type AuthenticatedUser = {
   uid: string;
@@ -6,17 +7,10 @@ export type AuthenticatedUser = {
 };
 
 export interface AuthenticatedRequest extends Request {
-  user: AuthenticatedUser;
+  user?: AuthenticatedUser;
 }
 
-/**
- * Extracts the Firebase uid from the Bearer token on the request.
- *
- * TODO(SECURITY): the token signature is not verified — this only decodes the
- * payload, matching the existing sync-user handler. A forged token with a
- * chosen uid can therefore self-assign a role. Verify with firebase-admin
- * (`verifyIdToken`) before this is exposed beyond the host promotion flow.
- */
+/** Verifies the Firebase ID token and attaches its authenticated uid. */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
 
@@ -26,28 +20,24 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 
   const token = authHeader.slice('Bearer '.length).trim();
-
+  let auth;
   try {
-    const segments = token.split('.');
-    if (segments.length !== 3 || !segments[1]) {
-      throw new Error('Malformed token');
-    }
-
-    const payload = JSON.parse(Buffer.from(segments[1], 'base64url').toString()) as {
-      user_id?: string;
-      sub?: string;
-      uid?: string;
-      email?: string;
-    };
-
-    const uid = payload.user_id ?? payload.uid ?? payload.sub;
-    if (!uid) {
-      throw new Error('Token missing uid');
-    }
-
-    (req as AuthenticatedRequest).user = { uid, email: payload.email };
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
+    auth = getFirebaseAuth();
+  } catch (error) {
+    console.error('[auth] Firebase Admin initialization failed:', error);
+    res.status(500).json({ error: 'Authentication service unavailable' });
+    return;
   }
+
+  void auth.verifyIdToken(token).then((decodedToken) => {
+    (req as AuthenticatedRequest).user = {
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+    };
+    next();
+  }).catch(() => {
+    res.status(401).json({ error: 'Invalid token' });
+  });
 }
+
+export const authenticateFirebase = requireAuth;
