@@ -80,3 +80,42 @@ export async function postAuthenticatedApi<T>(
 
   return payload as T;
 }
+
+/**
+ * Sends an authenticated GET HTTP request to apps/api using a fresh Firebase ID token.
+ */
+export async function getAuthenticatedApi<T>(
+  path: string,
+  options?: ApiRequestOptions,
+): Promise<T> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new ApiClientError('Sign in required.', 401, null);
+  }
+
+  const token = await user.getIdToken();
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    Authorization: `Bearer ${token}`,
+    ...(options?.headers ?? {}),
+  };
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const payload: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = parseApiError(response.status, payload);
+    throw new ApiClientError(message, response.status, payload);
+  }
+
+  return payload as T;
+}
+
