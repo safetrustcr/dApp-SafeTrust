@@ -1,4 +1,5 @@
 import { hasuraRequest } from './hasura.js';
+import { notifyUser } from './push-notifications.js';
 
 export type EscrowLifecycleEvent = {
   event_type:
@@ -222,4 +223,104 @@ export function lifecycleMessageInput(
     body: event.body,
     tenant_id: 'safetrust',
   };
+}
+type PushParticipant = { id: string; first_name?: string | null } | null;
+type ConversationPushParticipants = {
+  conversations_by_pk: {
+    host: PushParticipant;
+    guest: PushParticipant;
+  } | null;
+};
+
+function messageThreadPayload(conversationId: string, title: string, body: string, type: string) {
+  return {
+    title,
+    body,
+    url: `/dashboard/messages/${encodeURIComponent(conversationId)}`,
+    tag: `conversation:${conversationId}`,
+    type,
+  };
+}
+
+export async function notifyManualMessageRecipient(
+  conversationId: string,
+  senderId: string,
+): Promise<void> {
+  if (process.env.PUSH_NOTIFICATIONS_ENABLED !== 'true') return;
+
+  try {
+    const data = await hasuraRequest<ConversationPushParticipants>(
+      `query MessagePushParticipants($conversationId: uuid!) {
+        conversations_by_pk(id: $conversationId) {
+          host { id first_name }
+          guest { id first_name }
+        }
+      }`,
+      { conversationId },
+    );
+    const conversation = data.conversations_by_pk;
+    if (!conversation) return;
+
+    const recipient =
+      conversation.host?.id === senderId
+        ? conversation.guest
+        : conversation.guest?.id === senderId
+          ? conversation.host
+          : null;
+    if (!recipient) return;
+
+    const sender =
+      conversation.host?.id === senderId ? conversation.host : conversation.guest;
+    const firstName = sender?.first_name?.trim().split(/\s+/)[0] || 'Someone';
+    void notifyUser(
+      recipient.id,
+      messageThreadPayload(
+        conversationId,
+        'New message',
+        `${firstName} sent you a message`,
+        'message',
+      ),
+    );
+  } catch {
+    console.warn('[push] message recipient lookup failed', { userId: senderId });
+  }
+}
+
+const LIFECYCLE_PUSH_COPY: Record<string, { title: string; body: string }> = {
+  escrow_funded: { title: 'Escrow funded', body: 'Your booking deposit is secured' },
+  milestone_approved: { title: 'Stay approved', body: 'The milestone was approved' },
+  funds_released: { title: 'Funds released', body: 'The escrow was completed' },
+  dispute_opened: { title: 'Dispute opened', body: 'An escrow is under review' },
+  dispute_resolved: { title: 'Dispute resolved', body: 'Open SafeTrust to see the outcome' },
+};
+
+export async function notifyEscrowLifecycleParticipants(
+  conversationId: string,
+  eventType: string,
+): Promise<void> {
+  if (process.env.PUSH_NOTIFICATIONS_ENABLED !== 'true') return;
+
+  const copy = LIFECYCLE_PUSH_COPY[eventType];
+  if (!copy) return;
+
+  try {
+    const data = await hasuraRequest<ConversationPushParticipants>(
+      `query EscrowEventPushParticipants($conversationId: uuid!) {
+        conversations_by_pk(id: $conversationId) {
+          host { id }
+          guest { id }
+        }
+      }`,
+      { conversationId },
+    );
+    const conversation = data.conversations_by_pk;
+    if (!conversation) return;
+
+    const payload = messageThreadPayload(conversationId, copy.title, copy.body, eventType);
+    for (const participant of [conversation.host, conversation.guest]) {
+      if (participant?.id) void notifyUser(participant.id, payload);
+    }
+  } catch {
+    console.warn('[push] escrow participant lookup failed', { conversationId });
+  }
 }
