@@ -26,6 +26,7 @@ import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js'
 import { requestIdMiddleware, errorHandler } from './http/error-middleware.js';
 import listingsRouter from './routes/listings/listings.route.js';
 import hotelsRouter from './routes/hotels/hotels.route.js';
+import hotelReservationsRouter from './routes/hotels/reservations.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
@@ -76,6 +77,7 @@ app.use('/api/notifications', notificationDevicesRouter);
 
 // Hotel routes
 app.use('/api/hotels', hotelsRouter);
+app.use('/api/hotel-reservations', hotelReservationsRouter);
 app.use('/api/listings', listingsRouter);
 
 // Global Problem Details error boundary
