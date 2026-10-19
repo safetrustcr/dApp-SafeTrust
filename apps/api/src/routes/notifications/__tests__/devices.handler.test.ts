@@ -3,11 +3,16 @@ import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../../../middleware/auth.middleware.js';
 
 vi.mock('../../../services/push-devices-db.js', () => ({
+  DeviceUserProfileMissingError: class DeviceUserProfileMissingError extends Error {},
   registerDevice: vi.fn(),
   unregisterDevice: vi.fn(),
 }));
 
-import { registerDevice, unregisterDevice } from '../../../services/push-devices-db.js';
+import {
+  DeviceUserProfileMissingError,
+  registerDevice,
+  unregisterDevice,
+} from '../../../services/push-devices-db.js';
 import { registerDeviceHandler, unregisterDeviceHandler } from '../devices.handler.js';
 
 const mockRegisterDevice = vi.mocked(registerDevice);
@@ -106,6 +111,21 @@ describe('push device handlers', () => {
       '[notifications/devices] userId=verified-user outcome=register-failed',
     );
     expect(logSpy.mock.calls.flat().join(' ')).not.toContain(target);
+    logSpy.mockRestore();
+  });
+
+  it('returns a controlled response when the authenticated user profile is not synced', async () => {
+    const res = mockRes();
+    const logSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    mockRegisterDevice.mockRejectedValueOnce(new DeviceUserProfileMissingError());
+
+    await registerDeviceHandler(mockReq({ fcmTarget: 'opaque-target' }), res);
+
+    expect(res._status).toBe(409);
+    expect(res._body).toEqual({ error: 'USER_PROFILE_NOT_SYNCED' });
+    expect(logSpy).toHaveBeenCalledWith(
+      '[notifications/devices] userId=verified-user outcome=profile-not-synced',
+    );
     logSpy.mockRestore();
   });
 });
