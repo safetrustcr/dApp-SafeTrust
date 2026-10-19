@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../hasura.js', () => ({
+vi.mock('../hasura.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../hasura.js')>(),
   hasuraRequest: vi.fn(),
 }));
 
-import { hasuraRequest } from '../hasura.js';
+import { HasuraRequestError, hasuraRequest } from '../hasura.js';
 import {
   deleteDeviceTargets,
+  DeviceUserProfileMissingError,
   listDeviceTargets,
   registerDevice,
   unregisterDevice,
@@ -19,39 +21,63 @@ beforeEach(() => {
 });
 
 describe('push device persistence', () => {
-  it('upserts ownership and prunes the least-recent devices beyond the ten newest', async () => {
+  it('checks for a synced user and upserts device ownership in one mutation', async () => {
     mockHasuraRequest
-      .mockResolvedValueOnce({ insert_push_devices_one: { id: 'new' } })
-      .mockResolvedValueOnce({ push_devices: [{ id: 'oldest' }, { id: 'older' }] })
-      .mockResolvedValueOnce({ delete_push_devices: { affected_rows: 2 } });
+      .mockResolvedValueOnce({ users: [{ id: 'user-b' }] })
+      .mockResolvedValueOnce({ insert_push_devices_one: { id: 'new' } });
 
     await registerDevice('user-b', 'opaque-target');
 
-    expect(mockHasuraRequest.mock.calls[0][0]).toContain(
+    expect(mockHasuraRequest.mock.calls[0][0]).toContain('query CheckPushDeviceUser');
+    expect(mockHasuraRequest.mock.calls[0][1]).toEqual({ userId: 'user-b' });
+    expect(mockHasuraRequest.mock.calls[1][0]).toContain(
       'update_columns: [user_id, last_seen_at]',
     );
-    expect(mockHasuraRequest.mock.calls[0][1]).toEqual({
+    expect(mockHasuraRequest.mock.calls[1][1]).toEqual({
       userId: 'user-b',
       fcmTarget: 'opaque-target',
     });
-    expect(mockHasuraRequest.mock.calls[1][0]).toContain('order_by:');
-    expect(mockHasuraRequest.mock.calls[1][1]).toEqual({ userId: 'user-b', offset: 10 });
-    expect(mockHasuraRequest.mock.calls[2][0]).toContain('id: { _in: $ids }');
-    expect(mockHasuraRequest.mock.calls[2][0]).toContain('user_id: { _eq: $userId }');
-    expect(mockHasuraRequest.mock.calls[2][1]).toEqual({
-      userId: 'user-b',
-      ids: ['oldest', 'older'],
-    });
+    expect(mockHasuraRequest).toHaveBeenCalledTimes(2);
   });
 
-  it('does not issue a prune mutation when the user has at most ten devices', async () => {
+  it('returns a controlled profile-not-synced error without attempting registration', async () => {
     mockHasuraRequest
-      .mockResolvedValueOnce({ insert_push_devices_one: { id: 'new' } })
-      .mockResolvedValueOnce({ push_devices: [] });
+      .mockResolvedValueOnce({ users: [] });
+
+    await expect(registerDevice('user-a', 'target')).rejects.toBeInstanceOf(
+      DeviceUserProfileMissingError,
+    );
+
+    expect(mockHasuraRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps a profile foreign-key race to the controlled profile-not-synced error', async () => {
+    mockHasuraRequest
+      .mockResolvedValueOnce({ users: [{ id: 'user-a' }] })
+      .mockRejectedValueOnce(new HasuraRequestError(
+        'foreign key violation',
+        [{
+          message: 'push_devices_user_id_fkey',
+          extensions: { code: 'constraint-violation' },
+        }],
+      ));
+
+    await expect(registerDevice('user-a', 'target')).rejects.toBeInstanceOf(
+      DeviceUserProfileMissingError,
+    );
+  });
+
+  it('serializes the device cap with the database write rather than racing a separate prune', async () => {
+    mockHasuraRequest
+      .mockResolvedValueOnce({ users: [{ id: 'user-a' }] })
+      .mockResolvedValueOnce({ insert_push_devices_one: { id: 'new' } });
 
     await registerDevice('user-a', 'target');
 
-    expect(mockHasuraRequest).toHaveBeenCalledTimes(2);
+    const operations = mockHasuraRequest.mock.calls.map(([query]) => query);
+    expect(operations.some((query) => query.includes('GetUserPushDevices'))).toBe(false);
+    expect(operations.some((query) => query.includes('PruneUserPushDevices'))).toBe(false);
+    expect(operations.filter((query) => query.includes('mutation RegisterPushDevice'))).toHaveLength(1);
   });
 
   it('scopes unregistration to both caller and target', async () => {

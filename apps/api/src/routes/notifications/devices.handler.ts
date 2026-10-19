@@ -1,6 +1,10 @@
 import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
-import { registerDevice, unregisterDevice } from '../../services/push-devices-db.js';
+import {
+  DeviceUserProfileMissingError,
+  registerDevice,
+  unregisterDevice,
+} from '../../services/push-devices-db.js';
 
 type DeviceBody = {
   fcmTarget?: unknown;
@@ -47,7 +51,11 @@ export async function registerDeviceHandler(
     await registerDevice(uid, validated.fcmTarget);
     console.info(`[notifications/devices] userId=${uid} outcome=registered`);
     return res.status(204).end();
-  } catch {
+  } catch (error) {
+    if (error instanceof DeviceUserProfileMissingError) {
+      console.info(`[notifications/devices] userId=${uid} outcome=profile-not-synced`);
+      return res.status(409).json({ error: 'USER_PROFILE_NOT_SYNCED' });
+    }
     console.error(`[notifications/devices] userId=${uid} outcome=register-failed`);
     return res.status(500).json({ error: 'Failed to register device' });
   }
