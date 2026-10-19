@@ -2,6 +2,7 @@ import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { ApiError } from '../../http/api-error.js';
 import { asyncHandler } from '../../http/async-handler.js';
+import { notifyManualMessageRecipient } from '../../services/conversation-events.js';
 import { getConversation, insertManualMessage } from '../../services/messages-db.js';
 
 const FORBIDDEN_FIELDS = [
@@ -55,6 +56,7 @@ export const sendMessageHandler = asyncHandler(
       readerRole: role,
     });
 
+    void notifyManualMessageRecipient(convo.id, req.user.uid);
     return res.status(201).json({ message });
   },
 );
