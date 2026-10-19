@@ -16,6 +16,7 @@ import resolveDisputeRouter from './routes/escrow/resolve-dispute.route.js';
 import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.js';
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
+import readinessRouter from './routes/escrow/readiness.route.js';
 import conversationsRouter from './routes/messages/conversations.route.js';
 import messagesRouter from './routes/messages/send.route.js';
 import notificationDevicesRouter from './routes/notifications/devices.route.js';
@@ -66,6 +67,7 @@ app.use('/api/escrow', resolveDisputeRouter);
 app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);
+app.use('/api/escrow', readinessRouter);
 
 // Messages routes
 app.use('/api/messages', conversationsRouter);
