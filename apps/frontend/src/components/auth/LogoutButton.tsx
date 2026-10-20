@@ -6,7 +6,7 @@ import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useGlobalAuthenticationStore } from "@core/store/data";
+import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { auth } from "@/lib/firebase";
 import { disablePush } from "@/lib/push";
 
