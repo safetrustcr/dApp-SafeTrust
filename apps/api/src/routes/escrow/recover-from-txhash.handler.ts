@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express'; import { trustlessWorkRequest } from '../../services/trustlesswork(js)'; import { findByTxHash, markPendingActionFailed } from '../../services/pending-actions.js'; import { assertEscrowParticipant } from '../../services/escrow-access.js'; import { applySubmittedAction } from '../../services/submitted-effects.js'; import { confirmStellarTransaction } from '../../services/stellar-confirm.js'; import { ApiError } from '../../http/api-error.js'; import { asyncHandler } from '../../http/async-handler.js'; import { getAuthenticatedUser } from '../../http/auth.js';
+import type { Request, Response } from 'express'; import { updateIndexerFromTxHash } from '../../services/trustlesswork(js)'; import { findByTxHash, markPendingActionFailed } from '../../services/pending-actions.js'; import { assertEscrowParticipant } from '../../services/escrow-access.js'; import { applySubmittedAction } from '../../services/submitted-effects.js'; import { confirmStellarTransaction } from '../../services/stellar-confirm.js'; import { ApiError } from '../../http/api-error.js'; import { asyncHandler } from '../../http/async-handler.js'; import { getAuthenticatedUser } from '../../http/auth.js';
 
 const TX_HASH_REGEX = /^[0-9a-f]{64}$/i;
 
@@ -106,14 +106,7 @@ export const recoverFromTxhashHandler = asyncHandler(async (
   });
 
   // 7. Best-effort: tell Trustless Work's indexer about the transaction.
-  try {
-    await trustlessWorkRequest('/indexer/update-from-txHash', {
-      method: 'POST',
-      body: { txHash },
-    });
-  } catch (err) {
-    console.warn('[indexer/update-from-txHash] failed', { txHash, err });
-  }
+  await updateIndexerFromTxHash(txHash);
 
   return res.status(200).json({
     recovered: true,

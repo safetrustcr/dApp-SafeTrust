@@ -55,16 +55,16 @@ export function useEscrowAction() {
         config.apiBody,
         { idempotencyKey: attempt.build },
       );
-      const { unsignedPdr } = built;
-      if (!unsignedPdr) throw new Error('No unsigned XDR returned from API');
+      const unsignedXdr = built.unsignedXdr;
+      if (!unsignedXdr) throw new Error('No unsigned XDR returned from API');
 
       setPhase('signing');
-      const signedXdr = await signXDR(unsignedPdr);
+      const signedXdr = await signXDR(unsignedXdr);
 
       setPhase('submitting');
       const result = await postEscrowApi<Record<string, unknown>>(
         '/api/escrow/send-transaction',
-        { signedPdr, signedXdr, ...config.sendTransactionBody },
+        { signedXdr, ...config.sendTransactionBody },
         { idempotencyKey: attempt.submit },
       );
       console.log('[escrow-action] Transaction confirmed:', result.txHash);

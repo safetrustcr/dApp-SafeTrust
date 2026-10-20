@@ -165,3 +165,29 @@ export async function updateIndexerFromTxHash(txHash: string): Promise<void> {
     });
   }
 }
+
+/**
+ * Best-effort lookup of an escrow's on-chain state by transaction hash.
+ *
+ * Used by the recovery flow to derive the escrow's current status and
+ * pending actions directly from the ledger instead of trusting stale local
+ * records. Returns `null` when the escrow cannot be found or the request
+ * fails, so callers can fall back to local state.
+ */
+export async function getEscrowFromTxHash(
+  txHash: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const result = await trustlessWorkRequest<Record<string, unknown>>(
+      `/escrow/${encodeURIComponent(txHash)}`,
+      { method: 'GET' },
+    );
+    return result ?? null;
+  } catch (err) {
+    console.error('[trustlesswork] getEscrowFromTxHash failed', {
+      txHash,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}

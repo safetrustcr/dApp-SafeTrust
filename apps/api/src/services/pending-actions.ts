@@ -5,6 +5,7 @@
  * this row, never from the request body.
  */
 import { hasuraRequest } from './hasura.js';
+const { hasuraRequest } = await import('./hasura.js');
 import type { EscrowAction } from './escrow-authz.js';
 
 export type PendingStatus = 'built' | 'submitted' | 'confirmed' | 'failed' | 'expired';
@@ -29,7 +30,7 @@ export type PendingAction = {
 export type NewPendingAction = Pick<
   PendingAction,
   'engagement_id' | 'contract_id' | 'action' | 'tx_hash' | 'unsigned_xdr' | 'built_for_uid' | 'signer_address' | 'payload'
-> & { expires_at: Date };
+ > & { expires_at: Date };
 
 const FIELDS = `
   id engagement_id contract_id action tx_hash unsigned_xdr built_for_uid

@@ -72,10 +72,10 @@ const sleep = (ms: number) =>
  * transaction is still pending after the attempts are exhausted.
  */
 export async function recoverEscrowFromTxHash(
-  tyHash: string,
+  txHash: string,
   options?: PostEscrowOptions,
 ): Promise<RecoverFromTxHashResponse> {
-  const normalizedHash = tyHash.trim();
+  const normalizedHash = txHash.trim();
   if (!/^[0-9a-f]{64}$/i.test(normalizedHash)) {
     throw new EscrowApiError('Invalid transaction hash.', 400, null);
   }

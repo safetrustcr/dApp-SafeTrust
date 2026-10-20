@@ -2,8 +2,8 @@
   "name": "dapp-safetrust",
   "private": true,
   "scripts": {
-    "dev": "turbo run dev --filter=@safetrust/web --filter=@safetrust/api",
-    "build": "turbo run build",
+    "dev": "node api.js && turbo run dev --filter=@safetrust/web --filter=@safetrust/api",
+    "build": "node api.js && turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",

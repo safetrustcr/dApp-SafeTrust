@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { authenticateFirebase } from '../../middleware/auth.middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.middleware.js';
 import { recoverFromTxhashHandler } from './recover-from-txhash.handler.js';
+import { pendingActionsService } from '../../services/pending-actions.js';
+import { trustlessWorkService } from '../../services/trustlesswork.js';
 
 const router = Router();
 
@@ -18,6 +20,10 @@ router.post(
   '/recover-from-txhash',
   authenticateFirebase,
   recoverRateLimit,
+  (req, res, next) => {
+    req.services = { pendingActions: pendingActionsService, trustlessWork: trustlessWorkService };
+    next();
+  },
   recoverFromTxhashHandler,
 );
 

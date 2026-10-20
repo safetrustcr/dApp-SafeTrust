@@ -1,0 +1,18 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "main",
+    "origin",
+    "security/issue-508-security-escrow-recover-from-txhash-must-derive"
+  ],
+  "parent": {
+    "main": null,
+    "origin": "main",
+    "security/issue-508-security-escrow-recover-from-txhash-must-derive": "main"
+  },
+  "order": [
+    "main",
+    "origin",
+    "security/issue-508-security-escrow-recover-from-txhash-must-derive"
+  ]
+}
