@@ -1,45 +1,37 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { hasuraRequest } from '../../services/hasura.js';
+import { refreshHasuraClaims } from '../../services/user-provisioning.js';
 
 export const promoteToHostHandler = async (
   req: AuthenticatedRequest,
   res: Response
 ): Promise<Response> => {
-  const { uid, email } = req.user;
+  const { uid } = req.user;
 
   try {
-    // Step 1 — Ensure user row exists (sync-user may not have been called)
-    await hasuraRequest(
-      `mutation EnsureUser($id: String!, $email: String!) {
-        insert_users_one(
-          object: { id: $id, email: $email }
-          on_conflict: {
-            constraint: users_pkey
-            update_columns: [last_seen]
-          }
-        ) { id }
-      }`,
-      { id: uid, email: email ?? '' }
-    );
-
-    // Step 2 — Get host role id
+    // Step 1: Look up host role id — pass { name: 'host' } as variables
     const rolesData = await hasuraRequest<{
       roles: Array<{ id: number; name: string }>;
     }>(
-      `query GetHostRole {
-        roles(where: { name: { _eq: "host" } }, limit: 1) {
-          id name
+      `query GetHostRole($name: String!) {
+        roles(where: { name: { _eq: $name } }, limit: 1) {
+          id
+          name
         }
-      }`
+      }`,
+      { name: 'host' }
     );
 
     const hostRoleId = rolesData.roles?.[0]?.id;
+
     if (!hostRoleId) {
-      return res.status(500).json({ error: 'host role not found in roles table' });
+      console.error('[auth/promote-to-host] ❌ host role not found in roles table');
+      return res.status(500).json({ error: 'Host role is not configured' });
     }
 
-    // Step 3 — Insert host role — ON CONFLICT DO NOTHING if already host
+    // Step 2: Insert host role — ON CONFLICT DO NOTHING (idempotent)
+    // Pass { userId, roleId } — camelCase matches test assertion
     await hasuraRequest(
       `mutation PromoteToHost($userId: String!, $roleId: Int!) {
         insert_user_roles_one(
@@ -53,7 +45,10 @@ export const promoteToHostHandler = async (
       { userId: uid, roleId: hostRoleId }
     );
 
-    console.log(`[auth/promote-to-host] ✅ user ${uid} promoted to host`);
+    // Step 3: put 'host' into the Hasura claims (best-effort; never fails the promotion)
+    await refreshHasuraClaims(uid);
+
+    console.log(`[auth/promote-to-host] ✅ user ${uid} promoted to host (roleId: ${hostRoleId})`);
     return res.status(200).json({ role: 'host', promoted: true });
 
   } catch (error) {

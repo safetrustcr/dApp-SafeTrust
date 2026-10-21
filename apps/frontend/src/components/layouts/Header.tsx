@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { SearchHeader } from "@/components/layouts/SearchHeader";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
+import { useAuthUser } from "@/components/auth/hooks/auth.hook";
 
 
 interface HeaderProps {
@@ -24,6 +25,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
   };
 
   const { address } = useGlobalAuthenticationStore();
+  const { user } = useAuthUser();
   const [fallbackAddress, setFallbackAddress] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,13 +35,21 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
 
   const activeAddress = address || fallbackAddress;
 
-  const displayName = activeAddress
-    ? `${activeAddress.slice(0, 4)}...${activeAddress.slice(-4)}`
-    : "Account";
+  const displayName =
+    user?.displayName?.trim() ||
+    user?.email?.split("@")[0] ||
+    "";
 
-  const initials = activeAddress
-    ? (activeAddress.startsWith("0x") ? activeAddress.slice(2, 4) : activeAddress.slice(0, 2)).toUpperCase() || "AC"
-    : "AC";
+  const initials = displayName
+    ? displayName
+        .split(/\s+/)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : activeAddress
+      ? (activeAddress.startsWith("0x") ? activeAddress.slice(2, 4) : activeAddress.slice(0, 2)).toUpperCase()
+      : "AC";
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm dark:border-b dark:border-gray-800 dark:bg-gray-900">
@@ -91,9 +101,11 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
                 type="button"
                 className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full px-2 py-1 transition-colors"
               >
-                <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-200">
-                  {displayName}
-                </span>
+                {displayName && (
+                  <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    {displayName}
+                  </span>
+                )}
                 <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0">
                   <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
                     {initials}

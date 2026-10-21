@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-
 import type { NextFunction, Request, Response } from 'express';
+import { authenticateFirebase, type AuthenticatedRequest } from '../auth.middleware.js';
 
-import { requireAuth, type AuthenticatedRequest } from '../auth.middleware.js';
-
-function makeToken(payload: Record<string, unknown>): string {
-  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  return `header.${encoded}.signature`;
-}
+// Mock firebase-admin/auth
+const mockVerifyIdToken = vi.fn();
+vi.mock('firebase-admin/auth', () => ({
+  getAuth: () => ({
+    verifyIdToken: mockVerifyIdToken,
+  }),
+}));
 
 function mockRes() {
   const res = {
@@ -29,55 +30,57 @@ function mockReq(authorization?: string) {
   return { headers: authorization ? { authorization } : {} } as Request;
 }
 
-describe('requireAuth', () => {
-  it('attaches the uid from user_id and calls next', () => {
-    const req = mockReq(`Bearer ${makeToken({ user_id: 'uid-1', email: 'a@b.c' })}`);
+describe('authenticateFirebase', () => {
+  it('attaches the user and calls next on valid token', async () => {
+    mockVerifyIdToken.mockResolvedValueOnce({ uid: 'uid-1', email: 'a@b.c' });
+
+    const req = mockReq('Bearer valid-token');
+    const res = mockRes();
     const next = vi.fn() as unknown as NextFunction;
 
-    requireAuth(req, mockRes(), next);
+    await authenticateFirebase(req, res, next);
 
+    expect(mockVerifyIdToken).toHaveBeenCalledWith('valid-token', true);
     expect(next).toHaveBeenCalledOnce();
-    expect((req as AuthenticatedRequest).user).toEqual({ uid: 'uid-1', email: 'a@b.c' });
+    expect((req as AuthenticatedRequest).user).toEqual({
+      uid: 'uid-1',
+      email: 'a@b.c',
+      role: 'guest',
+    });
   });
 
-  it('falls back to sub when user_id is absent', () => {
-    const req = mockReq(`Bearer ${makeToken({ sub: 'uid-2' })}`);
-    const next = vi.fn() as unknown as NextFunction;
-
-    requireAuth(req, mockRes(), next);
-
-    expect((req as AuthenticatedRequest).user.uid).toBe('uid-2');
-  });
-
-  it('401s when the Authorization header is missing', () => {
+  it('401s when the Authorization header is missing', async () => {
     const res = mockRes();
     const next = vi.fn() as unknown as NextFunction;
 
-    requireAuth(mockReq(), res, next);
+    await authenticateFirebase(mockReq(), res, next);
 
     expect(res._status).toBe(401);
-    expect(res._body).toEqual({ error: 'Missing token' });
+    expect(res._body).toEqual({ error: 'Missing or malformed Bearer token' });
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('401s on a malformed token', () => {
+  it('401s when Authorization header does not start with Bearer', async () => {
     const res = mockRes();
     const next = vi.fn() as unknown as NextFunction;
 
-    requireAuth(mockReq('Bearer not-a-jwt'), res, next);
+    await authenticateFirebase(mockReq('Basic token'), res, next);
 
     expect(res._status).toBe(401);
-    expect(res._body).toEqual({ error: 'Invalid token' });
+    expect(res._body).toEqual({ error: 'Missing or malformed Bearer token' });
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('401s when the token carries no uid claim', () => {
+  it('401s when Firebase token verification fails', async () => {
+    mockVerifyIdToken.mockRejectedValueOnce(new Error('Invalid token'));
+
     const res = mockRes();
     const next = vi.fn() as unknown as NextFunction;
 
-    requireAuth(mockReq(`Bearer ${makeToken({ email: 'a@b.c' })}`), res, next);
+    await authenticateFirebase(mockReq('Bearer invalid-token'), res, next);
 
     expect(res._status).toBe(401);
+    expect(res._body).toEqual({ error: 'Invalid or expired Firebase token' });
     expect(next).not.toHaveBeenCalled();
   });
 });

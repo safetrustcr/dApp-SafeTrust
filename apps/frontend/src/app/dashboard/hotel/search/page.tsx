@@ -4,8 +4,8 @@ import Header from "@/components/layouts/Header";
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import DatePicker from "@/components/hotels/search/datepicker";
 import { Heart, MapPin } from "lucide-react";
+import Image from "next/image";
 
 export default function HotelSearch() {
   const searchData = [
@@ -48,7 +48,7 @@ export default function HotelSearch() {
         <div className="flex justify-between items-center gap-[10px]">
           <div>
             <label className="block mb-3">Date</label>
-            <DatePicker />
+            <Input type="date" className="w-full" />
           </div>
           <div>
             <label className="block mb-3">Where to</label>
@@ -66,11 +66,15 @@ export default function HotelSearch() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-8">
         {searchData.map((data, idx) => (
           <Card key={idx}>
-            <img
-              src={data.image}
-              alt={data.name}
-              className="w-full h-48 object-cover rounded-t-md"
-            />
+            <div className="relative w-full h-48">
+              <Image
+                src={data.image}
+                alt={data.name}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+                className="object-cover rounded-t-md"
+              />
+            </div>
             <CardContent className="p-4">
               <h3 className="text-lg font-semibold flex justify-between py-2">
                 {data.name}{" "}

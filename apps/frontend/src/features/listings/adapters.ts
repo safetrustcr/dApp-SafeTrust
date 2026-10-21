@@ -182,6 +182,10 @@ export function toListingFromApartment(row: ApartmentQueryRow): ListingView {
     coordinates: toCoordinates(row.coordinates),
     province: toProvince(row.address),
     hostName: toHostName(row.owner ?? null),
+    ownerId:
+      typeof row.owner_id === "string" && row.owner_id.trim()
+        ? row.owner_id.trim()
+        : undefined,
   };
 }
 
@@ -210,5 +214,6 @@ export function toListingFromHotel(row: HotelQueryRow): ListingView {
     coordinates: toCoordinates(row.hotel.coordinates),
     province: toProvince(row.hotel.address),
     hostName: undefined,
+    ownerId: undefined,
   };
 }

@@ -4,6 +4,7 @@ import { HOTEL_CATEGORIES, HOTEL_LOCATIONS } from '@/lib/mockData/hotels';
 import { formatListingPrice } from './formatListingPrice';
 
 interface FilterSidebarProps {
+  showCategories?: boolean;
   selectedCategories: string[];
   selectedLocations: string[];
   minPrice: number;
@@ -14,18 +15,6 @@ interface FilterSidebarProps {
   onMaxPriceChange: (value: number) => void;
 }
 
-const PRICE_BARS = [
-  { id: 'bar-1', height: 10 },
-  { id: 'bar-2', height: 18 },
-  { id: 'bar-3', height: 24 },
-  { id: 'bar-4', height: 20 },
-  { id: 'bar-5', height: 28 },
-  { id: 'bar-6', height: 16 },
-  { id: 'bar-7', height: 22 },
-  { id: 'bar-8', height: 14 },
-  { id: 'bar-9', height: 10 },
-  { id: 'bar-10', height: 26 },
-];
 
 function CheckboxRow({
   checked,
@@ -50,6 +39,7 @@ function CheckboxRow({
 }
 
 export default function FilterSidebar({
+  showCategories = true,
   selectedCategories,
   selectedLocations,
   minPrice,
@@ -59,12 +49,12 @@ export default function FilterSidebar({
   onMinPriceChange,
   onMaxPriceChange,
 }: FilterSidebarProps) {
-  const leftPercent = ((minPrice - 3200) / (206000 - 3200)) * 100;
-  const rightPercent = ((maxPrice - 3200) / (206000 - 3200)) * 100;
+  const leftPercent = (minPrice / 206000) * 100;
+  const rightPercent = (maxPrice / 206000) * 100;
 
   return (
     <aside className="w-full border-b border-[#e8e1da] px-6 py-8 lg:w-[215px] lg:border-b-0 lg:border-r">
-      <section className="pb-8">
+      {showCategories && <section className="pb-8">
         <h2 className="mb-5 text-[15px] font-semibold text-[#1d1d1d]">
           Category
         </h2>
@@ -78,7 +68,7 @@ export default function FilterSidebar({
             />
           ))}
         </div>
-      </section>
+      </section>}
 
       <div className="my-0 h-px bg-[#ebe3dd]" />
 
@@ -91,15 +81,6 @@ export default function FilterSidebar({
         </p>
 
         <div className="relative px-2 pb-3">
-          <div className="mb-4 flex h-10 items-end justify-between gap-1">
-            {PRICE_BARS.map((bar) => (
-              <span
-                key={bar.id}
-                className="w-full rounded-t-sm bg-[#ffbf93]"
-                style={{ height: `${bar.height}px` }}
-              />
-            ))}
-          </div>
           <div className="relative h-1 rounded-full bg-[#ffd7bd]">
             <div
               className="absolute h-1 rounded-full bg-[#ff6a00]"
@@ -119,9 +100,9 @@ export default function FilterSidebar({
           </div>
           <input
             type="range"
-            min={3200}
+            min={0}
             max={206000}
-            step={100}
+            step={10}
             value={minPrice}
             onChange={(event) =>
               onMinPriceChange(Math.min(Number(event.target.value), maxPrice))
@@ -131,9 +112,9 @@ export default function FilterSidebar({
           />
           <input
             type="range"
-            min={3200}
+            min={0}
             max={206000}
-            step={100}
+            step={10}
             value={maxPrice}
             onChange={(event) =>
               onMaxPriceChange(Math.max(Number(event.target.value), minPrice))

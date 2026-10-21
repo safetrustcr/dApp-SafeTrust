@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../../services/user-provisioning.js', () => ({ refreshHasuraClaims: vi.fn() }));
 vi.mock('../../../services/hasura.js', () => ({
   hasuraRequest: vi.fn(),
   HasuraRequestError: class extends Error {},

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { formatListingPrice } from './formatListingPrice';
+import { canonicalApartmentRouteId } from '@/lib/stub-apartments';
 
 export interface SuggestionCardProps {
   id: string;
@@ -47,7 +48,8 @@ export default function SuggestionCard({
       return;
     }
 
-    router.push(`/hotel/${id}`);
+    const routeId = canonicalApartmentRouteId(id);
+    router.push(routeId ? `/apartment/${routeId}` : '/rent');
   };
 
   const handleLikeClick = () => {

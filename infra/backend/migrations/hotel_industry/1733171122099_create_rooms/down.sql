@@ -1,6 +1,4 @@
--- Drop indexes
-DROP INDEX IF EXISTS idx_rooms_hotel_id;
-DROP INDEX IF EXISTS idx_rooms_room_type;
-
--- Drop table
-DROP TABLE IF EXISTS rooms; 
+DROP TRIGGER IF EXISTS rooms_set_updated_at ON hotel_industry.rooms;
+DROP INDEX IF EXISTS hotel_industry.idx_rooms_room_type;
+DROP INDEX IF EXISTS hotel_industry.idx_rooms_hotel_id;
+DROP TABLE IF EXISTS hotel_industry.rooms;

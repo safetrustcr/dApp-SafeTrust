@@ -6,8 +6,9 @@ import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useGlobalAuthenticationStore } from "@/core/store/data";
+import { useGlobalAuthenticationStore } from "@core/store/data";
 import { auth } from "@/lib/firebase";
+import { disablePush } from "@/lib/push";
 
 interface LogoutButtonProps {
   /**
@@ -27,12 +28,18 @@ export function LogoutButton({ variant = "sidebar" }: LogoutButtonProps) {
     setIsLoggingOut(true);
 
     try {
+      // Must register the DELETE before the Firebase token is cleared.
+      // Failures are ignored so logout is never blocked.
+      // Must register the DELETE before the Firebase token is cleared.
+      // Failures are ignored so logout is never blocked.
+      await disablePush().catch(() => {});
       await signOut(auth);
     } finally {
       Cookies.remove("firebase-token");
       Cookies.remove("auth-token");
-      // Clear role cookie so middleware doesn't serve stale role on next login
-      document.cookie = "user-role=; Max-Age=0; path=/";
+      // Non-fatal: if the fetch fails the cookie expires in 1h anyway.
+      // Since the Firebase token is also cleared, middleware redirects to /login.
+      await fetch('/api/auth/role-cookie', { method: 'DELETE' }).catch(() => {});
       disconnect();
       router.push("/login");
       router.refresh();
