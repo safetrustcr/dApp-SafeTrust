@@ -1,112 +1,53 @@
-"use client";
+'use client';
 
-import { useMutation, useApolloClient, gql } from "@apollo/client";
-import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
-import { useState, useEffect } from "react";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { useAuthUser } from '@/components/auth/hooks/auth.hook';
+import { startConversation } from '@/lib/api/messages';
+import { routes } from '@/lib/routes';
 
-const START_CONVERSATION = gql`
-  mutation StartConversation($apartmentId: uuid!, $hostId: String!, $guestId: String!) {
-    insert_conversations_one(
-      object: {
-        apartment_id: $apartmentId,
-        host_id: $hostId,
-        guest_id: $guestId
-      }
-    ) {
-      id
-    }
-  }
-`;
-
-const GET_EXISTING_CONVERSATION = gql`
-  query GetExistingConversation($apartmentId: uuid!, $guestId: String!) {
-    conversations(
-      where: {
-        apartment_id: { _eq: $apartmentId },
-        guest_id: { _eq: $guestId }
-      }
-      limit: 1
-    ) {
-      id
-    }
-  }
-`;
-
-export function MessageHostButton({ apartmentId, hostId }: { apartmentId: string, hostId: string }) {
+export function MessageHostButton({
+  apartmentId,
+  hostId,
+}: {
+  apartmentId: string;
+  hostId: string;
+}) {
   const router = useRouter();
-  const client = useApolloClient();
-  const [startConversation] = useMutation(START_CONVERSATION);
-  const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user, loading } = useAuthUser();
+  const [isMessaging, setIsMessaging] = useState(false);
 
-  useEffect(() => {
-    return auth.onAuthStateChanged((user) => {
-      setUserId(user?.uid || null);
-    });
-  }, []);
+  if (!loading && user?.uid === hostId) return null;
 
   const handleClick = async () => {
-    if (!auth.currentUser) {
-      router.push(`/login?redirect=/apartment/${apartmentId}`);
+    if (!user) {
+      router.push(routes.login(routes.listing({ kind: 'apartment', id: apartmentId })));
       return;
     }
-    const guestId = auth.currentUser.uid;
-    if (guestId === hostId) return;
 
-    setLoading(true);
+    setIsMessaging(true);
     try {
-      const { data: existingData } = await client.query({
-        query: GET_EXISTING_CONVERSATION,
-        variables: { apartmentId, guestId },
-        fetchPolicy: "network-only"
+      const conversation = await startConversation(apartmentId);
+      router.push(routes.conversation(conversation.conversationId));
+    } catch (cause) {
+      console.error('Failed to start conversation:', cause);
+      toast.error('Failed to start conversation', {
+        description: 'Please try again.',
       });
-
-      if (existingData?.conversations?.length > 0) {
-        router.push(`/dashboard/messages/${existingData.conversations[0].id}`);
-        return;
-      }
-
-      const { data } = await startConversation({
-        variables: {
-          apartmentId,
-          hostId,
-          guestId
-        }
-      });
-      if (data?.insert_conversations_one?.id) {
-        router.push(`/dashboard/messages/${data.insert_conversations_one.id}`);
-      }
-    } catch (e: any) {
-      console.error(e);
-      alert("Failed to start conversation. Please try again.");
     } finally {
-      setLoading(false);
+      setIsMessaging(false);
     }
   };
 
-  if (userId && userId === hostId) {
-    return null;
-  }
-
   return (
-    <button 
+    <button
+      type="button"
       onClick={handleClick}
-      disabled={loading}
-      style={{
-        display: "inline-flex",
-        backgroundColor: "#f97316",
-        color: "#ffffff",
-        fontWeight: 700,
-        padding: "0.75rem 1.5rem",
-        borderRadius: "0.75rem",
-        marginTop: "1rem",
-        cursor: "pointer",
-        border: "none",
-        width: "100%"
-      }}
+      disabled={loading || isMessaging}
+      className="mt-3 w-full rounded-xl border-2 border-orange-600 px-5 py-3 font-semibold text-orange-700 transition hover:bg-orange-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-orange-300 dark:hover:text-white"
     >
-      {loading ? "Starting..." : "Message Host"}
+      {isMessaging ? 'Starting conversation…' : 'Message host'}
     </button>
   );
 }

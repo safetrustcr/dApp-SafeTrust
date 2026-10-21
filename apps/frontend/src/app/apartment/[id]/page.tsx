@@ -1,275 +1,184 @@
-// TODO: replace with real detail components once merged in frontend-SafeTrust
-// Sources:
-//   frontend-SafeTrust/src/components/hotel/ApartmentDetail.tsx
-//   frontend-SafeTrust/src/components/hotel/ImageGallery.tsx
-//   frontend-SafeTrust/src/components/hotel/SuggestionsList.tsx
-//   frontend-SafeTrust/src/components/hotel/AmenityIcons.tsx
-//
-// Data source (when wired):
-//   Apollo query: GET_APARTMENT_BY_ID -> public.apartments (Hasura)
-
 'use client';
 
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { useRouter } from "next/navigation";
-import type { CSSProperties } from "react";
-import React from "react";
+import Link from 'next/link';
+import { useQuery } from '@apollo/client';
+import { useAuthUser } from '@/components/auth/hooks/auth.hook';
+import { MessageHostButton } from '@/app/apartment/[id]/MessageHostButton';
+import { Image } from '@/components/ui/image';
+import { GET_APARTMENT_BY_ID } from '@/graphql/queries/apartment-queries';
+import { routes } from '@/lib/routes';
+import { useParams } from 'next/navigation';
 
-import { getStubApartmentById } from "@/lib/stub-apartments";
-import { useAuthUser } from "@/components/auth/hooks/auth.hook";
-import { startConversation } from "@/lib/api/messages";
-import { toast } from "sonner";
+interface ApartmentDetailRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  image_urls: string[] | null;
+  address: { street?: string; neighborhood?: string; city?: string; country?: string } | null;
+  price: number | string | null;
+  warranty_deposit: number | string | null;
+  owner_id: string;
+  coordinates: unknown;
+  owner?: { first_name?: string | null; last_name?: string | null } | null;
+}
 
-const styles = {
-  page: {
-    display: "flex",
-    minHeight: "100vh",
-    backgroundColor: "#fff7ed",
-    color: "#111827",
-  } satisfies CSSProperties,
-  aside: {
-    width: "18rem",
-    borderRight: "1px solid #fed7aa",
-    padding: "1rem",
-    flexShrink: 0,
-  } satisfies CSSProperties,
-  suggestionCard: {
-    display: "flex",
-    gap: "0.5rem",
-    padding: "0.5rem",
-    marginBottom: "0.5rem",
-    border: "1px solid #fdba74",
-    borderRadius: "0.75rem",
-    backgroundColor: "#ffffff",
-    fontSize: "0.75rem",
-  } satisfies CSSProperties,
-  imagePlaceholder: {
-    backgroundColor: "#fed7aa",
-    borderRadius: "1rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#9a3412",
-  } satisfies CSSProperties,
-  main: {
-    flex: 1,
-    maxWidth: "64rem",
-    padding: "1.5rem",
-  } satisfies CSSProperties,
-  gallery: {
-    display: "grid",
-    gridTemplateColumns: "2fr 1fr",
-    gap: "0.5rem",
-    marginBottom: "1.5rem",
-  } satisfies CSSProperties,
-  thumbs: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
-  } satisfies CSSProperties,
-  header: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "1rem",
-    marginBottom: "1rem",
-  } satisfies CSSProperties,
-  button: {
-    display: "inline-block",
-    backgroundColor: "#f97316",
-    color: "#ffffff",
-    fontWeight: 700,
-    padding: "0.75rem 1.5rem",
-    borderRadius: "0.75rem",
-  } satisfies CSSProperties,
-  metaRow: {
-    display: "flex",
-    gap: "1rem",
-    marginBottom: "1rem",
-    flexWrap: "wrap",
-  } satisfies CSSProperties,
-} as const;
+interface ApartmentDetailResult {
+  apartments: ApartmentDetailRecord[];
+}
 
-export default function ApartmentDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const router = useRouter();
+function parseCoordinates(value: unknown): { latitude: number; longitude: number } | null {
+  let parsed = value;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed) as unknown;
+    } catch {
+      const match = parsed.match(/(?:POINT\s*)?\(?\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)\s*\)?/i);
+      if (!match) return null;
+      const longitude = Number(match[1]);
+      const latitude = Number(match[2]);
+      return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : null;
+    }
+  }
+  if (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    'coordinates' in parsed &&
+    Array.isArray(parsed.coordinates) &&
+    parsed.coordinates.length >= 2
+  ) {
+    const longitude = Number(parsed.coordinates[0]);
+    const latitude = Number(parsed.coordinates[1]);
+    return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : null;
+  }
+  return null;
+}
+
+function DetailSkeleton() {
+  return (
+    <main role="status" aria-label="Loading listing" className="mx-auto max-w-6xl animate-pulse space-y-6 px-5 py-8">
+      <div className="h-8 w-32 rounded bg-muted" />
+      <div className="grid gap-3 md:grid-cols-[2fr_1fr]">
+        <div className="min-h-72 rounded-2xl bg-muted" />
+        <div className="grid gap-3"><div className="min-h-36 rounded-2xl bg-muted" /><div className="min-h-36 rounded-2xl bg-muted" /></div>
+      </div>
+      <div className="h-8 w-1/2 rounded bg-muted" />
+      <div className="h-24 rounded bg-muted" />
+    </main>
+  );
+}
+
+export default function ApartmentDetailPage() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+  const { data, loading, error } = useQuery<ApartmentDetailResult>(GET_APARTMENT_BY_ID, {
+    variables: { id },
+    fetchPolicy: 'network-only',
+  });
   const { user, loading: authLoading } = useAuthUser();
-  const [isMessaging, setIsMessaging] = React.useState(false);
+  const apartment = data?.apartments[0];
 
-  const apartment = getStubApartmentById(params.id);
+  if (loading) return <DetailSkeleton />;
+  if (error) {
+    return (
+      <main className="mx-auto max-w-4xl px-5 py-16 text-center">
+        <p role="alert">We couldn&apos;t load stays. Try again.</p>
+      </main>
+    );
+  }
   if (!apartment) {
-    notFound();
+    return (
+      <main className="mx-auto max-w-4xl px-5 py-16 text-center">
+        <h1 className="text-2xl font-bold">Stay not found</h1>
+        <p className="mt-2 text-muted-foreground">This listing may have been removed or is no longer available.</p>
+        <Link href={routes.rent()} className="mt-5 inline-block font-semibold text-orange-700 underline dark:text-orange-300">
+          Browse stays
+        </Link>
+      </main>
+    );
   }
 
-  const isOwner = user && apartment.owner?.id === user.uid;
-
-  const handleMessageHost = async () => {
-    if (!user) {
-      router.push(`/login?redirect=${encodeURIComponent(window.location.href)}`);
-      return;
-    }
-
-    if (isOwner) {
-      return;
-    }
-
-    setIsMessaging(true);
-
-    try {
-      const response = await startConversation(apartment.id);
-      router.push(`/dashboard/messages/${response.conversationId}`);
-    } catch (error) {
-      console.error('Failed to start conversation:', error);
-      toast.error('Failed to start conversation', {
-        description: 'Please try again',
-        action: {
-          label: 'Retry',
-          onClick: handleMessageHost,
-        },
-      });
-    } finally {
-      setIsMessaging(false);
-    }
-  };
-
-  // Hide button while loading auth or if user owns the listing
-  const shouldShowMessageButton = !authLoading && !isOwner;
+  const imageUrls = apartment.image_urls?.filter(Boolean) ?? [];
+  const address = [
+    apartment.address?.street,
+    apartment.address?.neighborhood,
+    apartment.address?.city,
+    apartment.address?.country,
+  ].filter(Boolean).join(', ');
+  const hostName = [apartment.owner?.first_name, apartment.owner?.last_name].filter(Boolean).join(' ');
+  const coordinates = parseCoordinates(apartment.coordinates);
+  const mapUrl = coordinates
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${coordinates.longitude - 0.01}%2C${coordinates.latitude - 0.01}%2C${coordinates.longitude + 0.01}%2C${coordinates.latitude + 0.01}&layer=mapnik&marker=${coordinates.latitude}%2C${coordinates.longitude}`
+    : undefined;
+  const bookHref = authLoading || user
+    ? routes.bookApartment(apartment.id)
+    : routes.login(routes.bookApartment(apartment.id));
 
   return (
-    <div style={styles.page}>
-      <aside
-        style={styles.aside}
-        className="desktop-suggestions hidden lg:block"
-      >
-        <p
-          style={{
-            marginBottom: "0.25rem",
-            fontSize: "0.875rem",
-            fontWeight: 600,
-          }}
-        >
-          Suggestions
-        </p>
+    <main className="min-h-screen bg-background text-foreground">
+      <header className="border-b">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
+          <Link href={routes.rent()} className="text-sm font-semibold text-muted-foreground hover:text-foreground">
+            ← Back to stays
+          </Link>
+          <Link href={routes.home()} className="text-xl font-bold">SafeTrust</Link>
+        </div>
+      </header>
 
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} style={styles.suggestionCard}>
-            <div
-              style={{
-                width: "3rem",
-                height: "3rem",
-                flexShrink: 0,
-                borderRadius: "0.75rem",
-                backgroundColor: "#fed7aa",
-              }}
-            />
-            <div>
-              <p style={{ margin: 0, fontWeight: 500 }}>Los yoses</p>
-              <p style={{ margin: "0.25rem 0", color: "#78716c" }}>
-                329 Calle santos, San José
-              </p>
-              <p style={{ margin: 0, color: "#ea580c", fontWeight: 600 }}>
-                $4.000
-              </p>
-            </div>
+      <div className="mx-auto max-w-6xl space-y-8 px-5 py-8">
+        <section aria-label="Listing photos" className="grid gap-3 md:grid-cols-[2fr_1fr]">
+          <div className="relative min-h-64 overflow-hidden rounded-2xl bg-muted md:min-h-[28rem]">
+            {imageUrls[0] ? <Image src={imageUrls[0]} alt={apartment.name} fill priority sizes="(max-width: 768px) 100vw, 66vw" className="object-cover" /> : <div className="grid h-full place-items-center text-muted-foreground">No photos available</div>}
           </div>
-        ))}
-      </aside>
-
-      <main style={styles.main}>
-        <div style={styles.gallery}>
-          <div style={{ ...styles.imagePlaceholder, minHeight: "16rem" }}>
-            <span style={{ fontSize: "0.75rem" }}>Main image</span>
-          </div>
-
-          <div style={styles.thumbs}>
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                style={{
-                  ...styles.imagePlaceholder,
-                  flex: 1,
-                  minHeight: "5rem",
-                }}
-              >
-                <span style={{ fontSize: "0.75rem" }}>Thumb {i}</span>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-1">
+            {imageUrls.slice(1, 3).map((image, index) => (
+              <div key={`${image}-${index}`} className="relative min-h-32 overflow-hidden rounded-2xl bg-muted md:min-h-0">
+                <Image src={image} alt={`${apartment.name} photo ${index + 2}`} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" />
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div style={styles.header}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: "2rem", fontWeight: 700 }}>
-              {apartment.name}
-            </h1>
-
-            <p
-              style={{ marginTop: "0.5rem", color: "#ea580c", fontWeight: 600 }}
-            >
-              ${apartment.price.toLocaleString()}.00 Per month
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <Link
-              href={`/escrow/${params.id}/escrow/create`}
-              style={styles.button}
-            >
-              BOOK
-            </Link>
-            {shouldShowMessageButton && (
-              <button
-                onClick={handleMessageHost}
-                disabled={isMessaging}
-                style={{
-                  ...styles.button,
-                  backgroundColor: "#ffffff",
-                  color: "#f97316",
-                  border: "2px solid #f97316",
-                  opacity: isMessaging ? 0.5 : 1,
-                  cursor: isMessaging ? "not-allowed" : "pointer",
-                }}
-              >
-                {isMessaging ? "Loading..." : "Message host"}
-              </button>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <section className="min-w-0 space-y-6">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-orange-700 dark:text-orange-300">Apartment</p>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">{apartment.name}</h1>
+              {address && <p className="mt-3 text-muted-foreground">{address}</p>}
+            </div>
+            <div className="border-t pt-6">
+              <h2 className="text-xl font-semibold">About this stay</h2>
+              <p className="mt-3 whitespace-pre-line leading-7 text-muted-foreground">
+                {apartment.description || 'No description provided.'}
+              </p>
+            </div>
+            {coordinates && mapUrl && (
+              <section className="border-t pt-6">
+                <h2 className="mb-4 text-xl font-semibold">Location</h2>
+                <iframe title={`Map showing ${apartment.name}`} src={mapUrl} className="h-72 w-full rounded-xl border" loading="lazy" />
+              </section>
             )}
-          </div>
-        </div>
+          </section>
 
-        <div
-          style={{ ...styles.metaRow, color: "#57534e", fontSize: "0.95rem" }}
-        >
-          <span>📍 {apartment.address}</span>
+          <aside className="h-fit rounded-2xl border bg-card p-5 shadow-sm">
+            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+              {apartment.price === null ? 'Price unavailable' : `$${Number(apartment.price).toLocaleString()} per month`}
+            </p>
+            {apartment.warranty_deposit !== null && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Deposit: ${Number(apartment.warranty_deposit).toLocaleString()}
+              </p>
+            )}
+            <Link href={bookHref} className="mt-5 block rounded-xl bg-orange-600 px-5 py-3 text-center font-semibold text-white hover:bg-orange-700">
+              Book
+            </Link>
+            <MessageHostButton apartmentId={apartment.id} hostId={apartment.owner_id} />
+            <div className="mt-6 border-t pt-5">
+              <p className="text-sm text-muted-foreground">Hosted by</p>
+              <p className="mt-1 font-semibold">{hostName || 'Host'}</p>
+            </div>
+          </aside>
         </div>
-
-        <div style={{ ...styles.metaRow, fontSize: "0.95rem" }}>
-          <span>🛏 {apartment.bedrooms} bd</span>
-          <span>
-            🐾 {apartment.petFriendly ? "pet friendly" : "no pets"}
-          </span>
-          <span>🚿 {apartment.bathrooms} ba</span>
-        </div>
-
-        <div style={{ marginBottom: "1rem" }}>
-          <p style={{ marginBottom: "0.25rem", fontWeight: 600 }}>
-            Owner: {apartment.owner.name}
-          </p>
-        </div>
-
-        <div>
-          <h2 style={{ marginBottom: "0.25rem", fontWeight: 600 }}>
-            Apartment details
-          </h2>
-
-          <p style={{ color: "#57534e", lineHeight: 1.6 }}>
-            {apartment.description}
-          </p>
-        </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }

@@ -117,7 +117,10 @@ export const GET_APARTMENT_BY_ID = gql`
       price
       warranty_deposit
       owner_id
+      coordinates
       owner {
+        first_name
+        last_name
         user_wallets(
           where: { is_primary: { _eq: true }, chain_type: { _eq: "STELLAR" } }
           order_by: [{ updated_at: desc }, { id: asc }]

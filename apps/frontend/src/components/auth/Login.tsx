@@ -29,7 +29,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   "auth/invalid-email": "Invalid email address",
 };
 
-export default function LoginPage() {
+export default function LoginPage({ nextPath = "/dashboard" }: { nextPath?: string }) {
   const { token } = useGlobalAuthenticationStore();
   const {
     handleConnect,
@@ -51,9 +51,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (token && pathname === "/login") {
-      router.push("/dashboard");
+      router.push(nextPath);
     }
-  }, [token, router, pathname]);
+  }, [token, router, pathname, nextPath]);
 
   const authenticateStellarWallet = async (
     address: string,
@@ -121,9 +121,9 @@ export default function LoginPage() {
       useGlobalAuthenticationStore.getState().setToken(idToken);
 
       toast.success("Wallet login successful!", {
-        description: "Redirecting to your dashboard...",
+        description: "Redirecting...",
       });
-      router.push("/dashboard");
+      router.push(nextPath);
     } catch (cause: unknown) {
       const message =
         cause instanceof Error
@@ -150,9 +150,9 @@ export default function LoginPage() {
       useGlobalAuthenticationStore.getState().setToken(idToken);
 
       toast.success("Login successful!", {
-        description: "Redirecting to your dashboard...",
+        description: "Redirecting...",
       });
-      router.push("/dashboard");
+      router.push(nextPath);
     } catch (err: unknown) {
       if (err instanceof FirebaseError) {
         toast.error(
