@@ -1,0 +1,54 @@
+name: MCP escrow tools
+
+# The MCP escrow tools must follow the API that actually runs (#531):
+# - mcp tests run every tool against a stubbed local stack, and fail if a tool
+#   other than deploy-escrow / fund-escrow prints an unsigned XDR, or if any MCP
+#   module talks to Trustless Work;
+# - the apps/api contract test runs the real routers and handlers against the
+#   routes, fields and roles the MCP relies on.
+
+on:
+  pull_request:
+    branches:
+      - consolidation-pattern
+    paths:
+      - 'mcp/**'
+      - 'apps/api/src/**'
+      - 'apps/api/tests/mcp-contract.test.ts'
+      - '.github/workflows/mcp-escrow.yml'
+  push:
+    branches:
+      - consolidation-pattern
+
+permissions:
+  contents: read
+
+jobs:
+  mcp-escrow:
+    name: MCP escrow tools and API contract
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile --filter @safetrust/mcp... --filter @safetrust/api...
+
+      - name: Type-check the MCP server
+        run: pnpm --filter @safetrust/mcp type-check
+
+      - name: MCP escrow tools against a stubbed stack
+        run: pnpm --filter @safetrust/mcp test:escrow
+
+      - name: Build shared types for apps/api
+        run: pnpm --filter @safetrust/types build
+
+      - name: apps/api ↔ MCP contract
+        run: pnpm --filter @safetrust/api exec vitest run tests/mcp-contract.test.ts

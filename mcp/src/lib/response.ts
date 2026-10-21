@@ -1,5 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
+import { redactXdr } from './redact.js';
+
 /** Successful tool result — one text block, one line per argument. */
 export function textResult(...lines: string[]): CallToolResult {
   return { content: [{ type: 'text', text: lines.join('\n') }] };
@@ -10,9 +12,12 @@ export function errorResult(...lines: string[]): CallToolResult {
   return { content: [{ type: 'text', text: lines.join('\n') }], isError: true };
 }
 
-/** Renders rows as a fenced JSON block so the model gets the raw field names. */
+/**
+ * Renders rows as a fenced JSON block so the model gets the raw field names.
+ * Unsigned XDRs are withheld: only the build tools may return one.
+ */
 export function jsonBlock(value: unknown): string {
-  return ['```json', JSON.stringify(value, null, 2), '```'].join('\n');
+  return ['```json', JSON.stringify(redactXdr(value), null, 2), '```'].join('\n');
 }
 
 export function describeError(error: unknown): string {

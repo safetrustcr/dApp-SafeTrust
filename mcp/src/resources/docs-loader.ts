@@ -67,24 +67,41 @@ fulfilment, or returned on dispute.
 
 ## Escrow lifecycle
 
-1. Tenant picks an apartment — \`public.apartments\`, \`warranty_deposit\` is the escrow amount.
-2. Deploy — \`POST ${SAFETRUST_API_URL}/api/escrow/deploy\` calls TrustlessWork
-   \`/deployer/single-release\` and returns an unsigned XDR. \`engagementId\` is the
-   idempotency key (see \`apps/api/src/services/idempotency.ts\`).
-3. Tenant signs the XDR with Freighter and submits it via the frontend route
-   \`POST /api/escrow/send-transaction\`.
-4. Fund — \`POST ${SAFETRUST_API_URL}/api/escrow/fund\` → another XDR to sign.
-5. Milestone — \`POST /api/escrow/milestone-status\` (serviceProvider marks it done).
-6. Release — \`POST /api/escrow/release-funds\` sends funds to the owner.
-7. Hasura event triggers call \`apps/api\` (via \`WEBHOOK_URL\`), which updates escrow status rows.
+Two booking kinds share one escrow model: apartment deposits
+(engagement id \`rental:<apartmentId>:<guestUid>\`) and hotel reservations
+(\`hotel:<reservationId>\`). Every step goes through \`apps/api\` at
+${SAFETRUST_API_URL}, signed in with Firebase.
+
+1. Terms — apps/api derives amount and host wallet server-side: the apartment's
+   \`warranty_deposit\` and the owner's primary wallet, or the reservation's
+   \`total_amount\` and the hotel owner's primary wallet
+   (\`GET /api/escrow/hotel-reservations/:id\` shows them to the guest).
+2. Build — \`POST /api/escrow/deploy\` (\`apartmentId\` or \`reservationId\` +
+   the guest's registered wallet), then \`/fund\`, \`/milestone-status\`,
+   \`/approve-milestone\`, \`/release-funds\`, \`/resolve-dispute\`. Each checks that
+   the caller's registered wallet holds the signing role
+   (\`services/escrow-authz.ts\`) and records the unsigned XDR in
+   \`escrow_pending_actions\` under its transaction hash (status \`built\`).
+3. Sign and submit — the signer signs in their wallet in the browser and the
+   frontend calls \`POST /api/escrow/send-transaction\`, which only accepts a
+   signed XDR whose hash matches a row built for the same user (→ \`submitted\`).
+4. Transition — each status change is checked against
+   \`escrow_status_transitions\` and logged, append-only, in
+   \`escrow_transactions\` (source \`submit\`, \`reconciler\` or \`admin\`).
+5. Reconcile — \`POST /reconciliation/sync-escrows\` (cron, secret header) asks
+   Horizon about submitted transactions and applies the ones that landed.
 
 ## Tables that matter (Hasura at ${HASURA_GRAPHQL_URL})
 
-- \`public.escrows\` — current single-release rental deposits.
-  \`contract_id\`, \`engagement_id\` (unique), \`apartment_id\`, \`sender_address\` (tenant),
-  \`receiver_address\` (owner), \`amount\`, \`status\`, \`unsigned_xdr\`, \`tenant_id\`.
-  Status is constrained to: deploying, pending_signature, funded, completed, disputed,
-  resolved, cancelled.
+- \`public.escrows\` — one row per escrow, apartments and hotel reservations alike.
+  \`contract_id\`, \`engagement_id\` (unique), \`apartment_id\`, \`property_id\`,
+  \`sender_address\` (guest), \`receiver_address\` (host), \`amount\`, \`status\`,
+  \`tenant_id\` (\`safetrust\` or \`hotel_industry\`). Statuses move along
+  \`escrow_status_transitions\`: pending_signature → created → funded →
+  milestone_approved → completed, with disputed/resolved/cancelled branches.
+- \`public.escrow_pending_actions\` — every built transaction: action, \`tx_hash\`,
+  signer, status (built, submitted, confirmed, failed, expired), \`expires_at\`.
+- \`public.escrow_transactions\` — append-only transition audit log.
 - \`public.trustless_work_escrows\` — TrustlessWork mirror, exposed as
   \`trustlessWorkEscrows\` with camelCase fields. Role columns: \`marker\`, \`approver\`,
   \`releaser\`, \`resolver\`. Carries the legacy hotel-booking fields.
@@ -93,8 +110,9 @@ fulfilment, or returned on dispute.
 - \`public.escrow_milestones\`, \`public.trustless_work_webhook_events\` — milestone and
   webhook history.
 
-Every SafeTrust row carries \`tenant_id = 'safetrust'\`; the same database also serves
-the \`hotel_industry\` tenant.
+Hotel data lives in the \`hotel_industry\` source of the same Hasura
+(\`reservations\`, \`rooms\`, \`hotels\`, \`users_wallets\`); hotel escrows still land in
+\`public.escrows\` with \`tenant_id = 'hotel_industry'\`.
 
 ${escrowRolesDoc()}`;
 }

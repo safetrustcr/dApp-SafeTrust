@@ -5,6 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { HASURA_GRAPHQL_URL, SAFETRUST_API_URL } from './config.js';
 import { loadSafeTrustDocs } from './resources/docs-loader.js';
 import { registerApartmentTools } from './tools/apartments.js';
+import { registerEscrowDiagnosticsTools } from './tools/escrow-diagnostics.js';
 import { registerEscrowTools } from './tools/escrow.js';
 import { registerHasuraTools } from './tools/hasura.js';
 import { registerHealthTools } from './tools/health.js';
@@ -15,6 +16,7 @@ const server = new McpServer({
 });
 
 registerEscrowTools(server);
+registerEscrowDiagnosticsTools(server);
 registerApartmentTools(server);
 registerHasuraTools(server);
 registerHealthTools(server);

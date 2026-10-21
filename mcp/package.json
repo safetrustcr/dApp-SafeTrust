@@ -11,7 +11,8 @@
     "type-check": "tsc --noEmit",
     "lint": "echo \"no lint configured\"",
     "test": "echo \"no tests\"",
-    "test:integration": "tsx --test tests/integration.test.ts"
+    "test:integration": "tsx --test tests/integration.test.ts",
+    "test:escrow": "tsx --test tests/escrow-tools.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
