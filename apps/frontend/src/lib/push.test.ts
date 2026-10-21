@@ -50,7 +50,6 @@ function restoreServiceWorker() {
   if (originalServiceWorker) {
     Object.defineProperty(navigator, "serviceWorker", originalServiceWorker);
   } else {
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete (navigator as unknown as { serviceWorker?: unknown }).serviceWorker;
   }
 }
