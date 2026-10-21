@@ -168,11 +168,16 @@ restart Claude Desktop:
 ### MCP Inspector
 
 ```bash
-HASURA_ADMIN_SECRET=myadminsecretkey \
-  npx @modelcontextprotocol/inspector --cli node mcp/dist/index.js --method tools/list
+npx @modelcontextprotocol/inspector --cli \
+  -e HASURA_GRAPHQL_URL=http://localhost:8080/v1/graphql \
+  -e HASURA_ADMIN_SECRET=myadminsecretkey \
+  -e SAFETRUST_API_URL=http://localhost:3002 \
+  node mcp/dist/index.js --method tools/list
 ```
 
-Drop `--cli … --method tools/list` to open the browser UI instead.
+Pass variables with `-e`: the Inspector does not forward your shell environment to
+the server, so `HASURA_ADMIN_SECRET=… npx …` leaves the Hasura tools without a
+secret. Drop `--cli` and `--method tools/list` to open the browser UI instead.
 
 ### Check it works
 
