@@ -10,6 +10,8 @@ export const API_CONTRACT = {
     method: 'POST',
     mount: '/api/escrow',
     path: '/deploy',
+    /** Identifier apps/api/src/index.ts mounts the router under. */
+    router: 'deployEscrowRouter',
     /** Exactly one of apartmentId / reservationId, plus the guest wallet. */
     request: ['apartmentId', 'reservationId', 'senderAddress'],
     response: ['status', 'engagementId', 'contractId', 'unsignedXDR'],
@@ -20,14 +22,26 @@ export const API_CONTRACT = {
     method: 'POST',
     mount: '/api/escrow',
     path: '/fund',
+    router: 'fundEscrowRouter',
     request: ['engagementId'],
     response: ['unsignedXdr', 'txHash', 'engagementId', 'contractId', 'expiresAt', 'reused'],
+    optionalResponse: [],
+  },
+  readiness: {
+    method: 'GET',
+    mount: '/api/escrow',
+    path: '/readiness',
+    router: 'readinessRouter',
+    /** Query string: exactly one of apartmentId / reservationId. */
+    request: ['apartmentId', 'reservationId'],
+    response: ['ready', 'network', 'asset', 'amount', 'guest', 'counterparties'],
     optionalResponse: [],
   },
   health: {
     method: 'GET',
     mount: '',
     path: '/health',
+    router: null,
     request: [],
     response: [],
     optionalResponse: [],

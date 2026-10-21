@@ -15,9 +15,9 @@ const stellarAddress = z
  * apps/api answers errors as RFC 7807 problem details ({ type, title, detail })
  * from ApiError, or as { error, code? } from the auth middleware.
  */
-type ApiFailure = { error?: string; code?: string; detail?: string; title?: string; type?: string };
+export type ApiFailure = { error?: string; code?: string; detail?: string; title?: string; type?: string };
 
-function apiFailure(action: string, status: number, data: ApiFailure) {
+export function apiFailure(action: string, status: number, data: ApiFailure) {
   const code = data.code ?? data.type?.split('/').pop()?.replace(/-/g, '_').toUpperCase();
   const message = data.detail ?? data.error ?? data.title ?? 'unknown error';
   const lines = [`${action} failed (HTTP ${status}${code ? ` ${code}` : ''}): ${message}`];

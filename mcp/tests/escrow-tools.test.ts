@@ -178,6 +178,30 @@ function hasura(query: string, variables: Record<string, unknown>): unknown {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
+/**
+ * How the stubbed apps/api answers GET /api/escrow/readiness. Defaults to what
+ * it answers today without a signed-in user (#528): 401.
+ */
+let readinessReply: () => Response = () => json({ error: 'Missing or invalid Authorization header' }, 401);
+
+const API_READY = {
+  ready: false,
+  network: 'testnet',
+  asset: { code: 'USDC', issuer: ISSUER },
+  amount: '450.0000000',
+  guest: {
+    wallet: GUEST,
+    checks: {
+      registeredWallet: { ok: true },
+      accountExists: { ok: true },
+      xlmForFees: { ok: true, balance: '20.0000000', required: '2.0000000' },
+      trustline: { ok: false, fix: 'ADD_TRUSTLINE' },
+      assetBalance: { ok: false, balance: '0', required: '450.0000000', fix: 'GET_TEST_USDC' },
+    },
+  },
+  counterparties: { hostCanReceive: { ok: true }, platformCanReceive: { ok: true } },
+};
+
 const realFetch = globalThis.fetch;
 before(() => {
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -191,6 +215,7 @@ before(() => {
     if (url === 'http://localhost:3002/api/escrow/deploy') {
       return json({ status: 'SUCCESS', engagementId: `rental:${APARTMENT}:guest-uid`, contractId: 'CNEW', unsignedXDR: XDR });
     }
+    if (url.startsWith('http://localhost:3002/api/escrow/readiness?')) return readinessReply();
     if (url === 'http://localhost:3002/api/escrow/fund') {
       return json({ unsignedXdr: XDR, txHash: 'hash-fund', engagementId: 'rental:x', contractId: 'CX', expiresAt: minutesAhead(30), reused: false });
     }
@@ -372,6 +397,74 @@ describe('get-pending-action, get-escrow-status and get-wallet-readiness', () =>
   it('readiness for an apartment checks a supplied guest wallet', async () => {
     const { text } = await call('get-wallet-readiness', { apartmentId: APARTMENT, guestAddress: GUEST });
     assert.match(text, /❌ guest-wallet-registered/);
+  });
+});
+
+describe('get-wallet-readiness asks apps/api first', () => {
+  const restore = readinessReply;
+  after(() => {
+    readinessReply = restore;
+  });
+
+  it('reports GET /api/escrow/readiness as apps/api answers it, with fixes and redacted wallets', async () => {
+    readinessReply = () => json(API_READY);
+    const { text, isError } = await call('get-wallet-readiness', { reservationId: RESERVATION });
+    assert.equal(isError, false, text);
+    assert.match(text, /^Not ready: apps\/api reports blocking checks\./);
+    assert.match(text, /source: GET \/api\/escrow\/readiness \(testnet\)/);
+    assert.match(text, /amount: 450\.0000000 USDC/);
+    assert.match(text, /✅ guest holds XLM for reserves and fees \(balance 20\.0000000, needs 2\.0000000\)/);
+    assert.match(text, /❌ guest has the USDC trustline\n   fix \(ADD_TRUSTLINE\): .*readiness\/trustline/);
+    assert.match(text, /❌ guest holds enough USDC \(balance 0, needs 450\.0000000\)\n   fix \(GET_TEST_USDC\)/);
+    assert.match(text, /✅ host wallet can receive USDC/);
+    assert.ok(!text.includes(GUEST), 'guest wallet must be redacted');
+    assert.match(text, /guest wallet: GGUE…AAAA/);
+    // The API answered, so the MCP did not run its own Hasura/Horizon checks.
+    assert.ok(calls.every((u) => u.startsWith('http://localhost:3002/api/escrow/readiness?')), calls.join('\n'));
+    assert.deepEqual(calls, [`http://localhost:3002/api/escrow/readiness?reservationId=${RESERVATION}`]);
+  });
+
+  it('shows checks apps/api skipped when no wallet is registered', async () => {
+    readinessReply = () =>
+      json({
+        ...API_READY,
+        guest: { wallet: null, checks: { registeredWallet: { ok: false, fix: 'LINK_WALLET' } } },
+      });
+    const { text } = await call('get-wallet-readiness', { apartmentId: APARTMENT });
+    assert.match(text, /guest wallet: \(none registered\)/);
+    assert.match(text, /❌ guest wallet registered\n   fix \(LINK_WALLET\)/);
+    assert.match(text, /➖ guest account exists on chain: not checked/);
+  });
+
+  it('surfaces a real apps/api refusal instead of guessing', async () => {
+    readinessReply = () =>
+      json(
+        {
+          type: 'https://api.safetrust.dev/problems/self-escrow-not-allowed',
+          title: 'Conflict',
+          status: 409,
+          detail: 'You cannot create a rental escrow for your own apartment.',
+        },
+        409,
+      );
+    const { text, isError } = await call('get-wallet-readiness', { apartmentId: APARTMENT });
+    assert.equal(isError, true);
+    assert.match(text, /Readiness failed \(HTTP 409 SELF_ESCROW_NOT_ALLOWED\): You cannot create a rental escrow/);
+  });
+
+  it('falls back to its own read-only checks, and says so, while it cannot sign in (#528)', async () => {
+    readinessReply = restore;
+    const { text } = await call('get-wallet-readiness', { reservationId: RESERVATION });
+    assert.match(text, /source: MCP read-only checks \(Hasura \+ Testnet Horizon\), not apps\/api — .*HTTP 401.*#528/);
+    assert.match(text, /❌ host-usdc-trustline/);
+  });
+
+  it('falls back when apps/api is not running', async () => {
+    readinessReply = () => {
+      throw new TypeError('fetch failed');
+    };
+    const { text } = await call('get-wallet-readiness', { reservationId: RESERVATION });
+    assert.match(text, /source: MCP read-only checks .*Cannot reach apps\/api/);
   });
 });
 

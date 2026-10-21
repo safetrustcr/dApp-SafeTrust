@@ -10,6 +10,7 @@ name: MCP escrow tools
 on:
   pull_request:
     branches:
+      - main
       - consolidation-pattern
     paths:
       - 'mcp/**'
@@ -18,6 +19,7 @@ on:
       - '.github/workflows/mcp-escrow.yml'
   push:
     branches:
+      - main
       - consolidation-pattern
 
 permissions:

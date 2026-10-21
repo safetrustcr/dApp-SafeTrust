@@ -44,6 +44,11 @@ vi.mock('../src/lib/stellar-xdr.js', () => ({ transactionHash: vi.fn(), transact
 
 import deployRouter from '../src/routes/escrow/deploy.route.js';
 import fundRouter from '../src/routes/escrow/fund.route.js';
+import readinessRouter from '../src/routes/escrow/readiness.route.js';
+import { getReadinessHandler } from '../src/routes/escrow/readiness.handler.js';
+import { Horizon } from '@stellar/stellar-sdk';
+import { hasuraRequest } from '../src/services/hasura.js';
+import { clearHorizonCache } from '../src/services/wallet-readiness.js';
 import { deployEscrowHandler } from '../src/routes/escrow/deploy.handler.js';
 import { fundEscrowHandler } from '../src/routes/escrow/fund.handler.js';
 import { trustlessWorkRequest } from '../src/services/trustlesswork.js';
@@ -95,15 +100,16 @@ describe('MCP ↔ apps/api contract: routes', () => {
         );
       } else {
         expect(indexSource, `${name} must be mounted at ${route.mount}`).toMatch(
-          new RegExp(`app\\.use\\('${route.mount}', ${name}EscrowRouter\\)`),
+          new RegExp(`app\\.use\\('${route.mount}', ${route.router}\\)`),
         );
       }
     }
   });
 
-  it('declares deploy and fund with the method and path the MCP calls', () => {
+  it('declares deploy, fund and readiness with the method and path the MCP calls', () => {
     expect(hasRoute(deployRouter, API_CONTRACT.deploy.method, API_CONTRACT.deploy.path)).toBe(true);
     expect(hasRoute(fundRouter, API_CONTRACT.fund.method, API_CONTRACT.fund.path)).toBe(true);
+    expect(hasRoute(readinessRouter, API_CONTRACT.readiness.method, API_CONTRACT.readiness.path)).toBe(true);
   });
 });
 
@@ -169,6 +175,64 @@ describe('MCP ↔ apps/api contract: response shapes', () => {
     const res = await run(fundEscrowHandler, mcpRequest('fund', { engagementId: 'rental:x' }));
     expect(res._status).toBe(200);
     for (const key of API_CONTRACT.fund.response) expect(res._body, `fund response lost ${key}`).toHaveProperty(key);
+  });
+});
+
+describe('MCP ↔ apps/api contract: wallet readiness', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearHorizonCache();
+    process.env.PLATFORM_STELLAR_ADDRESS = PLATFORM;
+    process.env.USDC_TRUSTLINE_ADDRESS = 'GISSUER';
+  });
+
+  async function readiness(query: Record<string, string>) {
+    const res = mockRes() as ReturnType<typeof mockRes> & { _status: number | null; _body: Record<string, unknown> };
+    const next = mockNext() as ((err?: unknown) => void) & { error?: unknown };
+    const allowed = new Set<string>(API_CONTRACT.readiness.request);
+    for (const key of Object.keys(query)) expect(allowed.has(key), `MCP does not send ${key} to readiness`).toBe(true);
+    await getReadinessHandler({ query, user: { uid: 'guest-uid' } } as never, res as never, next as never);
+    if (next.error) throw next.error;
+    return res;
+  }
+
+  it('answers every field get-wallet-readiness reads, including the per-check fixes', async () => {
+    vi.mocked(getApartmentEscrowTerms).mockResolvedValue({
+      apartmentId: APARTMENT, ownerUserId: 'host-uid', receiverAddress: HOST, amount: 1200,
+    });
+    vi.mocked(hasuraRequest).mockResolvedValue({ user_wallets: [{ wallet_address: GUEST }] } as never);
+    // Guest account exists with XLM but no USDC trustline.
+    const loadAccount = vi
+      .spyOn(Horizon.Server.prototype, 'loadAccount')
+      .mockResolvedValue({ subentry_count: 0, balances: [{ asset_type: 'native', balance: '50.0000000' }] } as never);
+
+    const res = await readiness({ apartmentId: APARTMENT });
+    loadAccount.mockRestore();
+
+    expect(res._status).toBe(200);
+    for (const key of API_CONTRACT.readiness.response) expect(res._body, `readiness response lost ${key}`).toHaveProperty(key);
+    const body = res._body as {
+      asset: { code: string }; amount: string;
+      guest: { wallet: string; checks: Record<string, { ok: boolean; fix?: string; balance?: string }> };
+      counterparties: Record<string, { ok: boolean }>;
+    };
+    // Fields formatApiReadiness (mcp/src/lib/readiness.ts) reads.
+    expect(typeof body.amount).toBe('string');
+    expect(body.asset.code).toBe('USDC');
+    expect(body.guest.wallet).toBe(GUEST);
+    expect(Object.keys(body.guest.checks).sort()).toEqual(
+      ['accountExists', 'assetBalance', 'registeredWallet', 'trustline', 'xlmForFees'],
+    );
+    expect(body.guest.checks.trustline).toMatchObject({ ok: false, fix: 'ADD_TRUSTLINE' });
+    expect(Object.keys(body.counterparties).sort()).toEqual(['hostCanReceive', 'platformCanReceive']);
+  });
+
+  it('uses only fix codes the MCP can explain', async () => {
+    const { FIX_HINTS } = await import('../../../mcp/src/lib/readiness.js');
+    const source = readFileSync(join(here, '../src/services/wallet-readiness.ts'), 'utf8');
+    const codes = new Set([...source.matchAll(/fix: '([A-Z_]+)'/g)].map((m) => m[1]));
+    expect(codes.size).toBeGreaterThan(0);
+    for (const code of codes) expect(FIX_HINTS, `MCP has no hint for fix ${code}`).toHaveProperty(code);
   });
 });
 

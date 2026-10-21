@@ -29,6 +29,10 @@ import {
   isWalletRegistered,
 } from '../lib/escrow-data.js';
 import { getAccount, getTransactionStatus } from '../lib/horizon.js';
+import { apiRequest } from '../lib/api.js';
+import { routeUrl } from '../lib/api-contract.js';
+import { formatApiReadiness, isApiReadiness } from '../lib/readiness.js';
+import { apiFailure, type ApiFailure } from './escrow.js';
 import { redactWallet } from '../lib/redact.js';
 import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
 
@@ -187,21 +191,51 @@ export function registerEscrowDiagnosticsTools(server: McpServer) {
     {
       title: 'Get wallet readiness',
       description:
-        'Can this booking be escrowed? Checks the booking terms apps/api enforces, that the guest wallet is ' +
-        'registered, and on Stellar Testnet (read-only) that guest and host accounts exist, hold XLM for fees ' +
-        'and a USDC trustline, and that the guest holds enough USDC. Each failing check comes with its fix.',
+        'Can this booking be escrowed? Asks apps/api GET /api/escrow/readiness — the same checks the app shows ' +
+        'the guest: registered wallet, account exists, XLM for fees, USDC trustline, USDC balance, and whether ' +
+        'host and platform can receive USDC — each failing check with its fix. While the MCP cannot call ' +
+        "authenticated routes (#528) it falls back to its own read-only Hasura + Testnet Horizon checks and says so.",
       inputSchema: {
         ...booking,
         guestAddress: z
           .string()
           .regex(STELLAR_ADDRESS_REGEX)
           .optional()
-          .describe('Guest wallet to check for an apartment (reservations carry their own)'),
+          .describe(
+            'Fallback only: guest wallet to check for an apartment. apps/api always uses the signed-in ' +
+              "user's registered wallet; reservations carry their own.",
+          ),
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ apartmentId, reservationId, guestAddress }) => {
+      if (Boolean(apartmentId) === Boolean(reservationId)) {
+        return errorResult('Provide exactly one of apartmentId or reservationId.');
+      }
       try {
+        const query = apartmentId
+          ? `apartmentId=${encodeURIComponent(apartmentId)}`
+          : `reservationId=${encodeURIComponent(reservationId!)}`;
+        let fallbackReason: string;
+        try {
+          const { ok, status, data } = await apiRequest<unknown>(`${routeUrl('readiness')}?${query}`);
+          if (ok && isApiReadiness(data)) return textResult(...formatApiReadiness(data));
+          if (ok) {
+            fallbackReason = 'apps/api answered GET /api/escrow/readiness with an unexpected shape';
+          } else if (status === 401 || status === 403) {
+            fallbackReason =
+              `apps/api GET /api/escrow/readiness needs the signed-in Testnet test user (HTTP ${status}); ` +
+              'the MCP signs in once #528 lands';
+          } else if (status === 404 && !(data as ApiFailure | null)?.type && !(data as ApiFailure | null)?.code) {
+            fallbackReason = 'this apps/api has no GET /api/escrow/readiness route yet';
+          } else {
+            // A real answer from apps/api (e.g. 409 SELF_ESCROW_NOT_ALLOWED, 404 APARTMENT_NOT_FOUND).
+            return apiFailure('Readiness', status, data as ApiFailure);
+          }
+        } catch (error) {
+          fallbackReason = describeError(error);
+        }
+
         const loaded = await loadContext(apartmentId, reservationId);
         if (typeof loaded === 'string') return errorResult(loaded);
         const context = { ...loaded, guestWallet: loaded.guestWallet ?? guestAddress ?? null };
@@ -221,6 +255,7 @@ export function registerEscrowDiagnosticsTools(server: McpServer) {
           failing.length === 0
             ? `Ready: ${checks.filter((c) => c.result === 'pass').length} checks pass.`
             : `Not ready: ${failing.length} check(s) fail.`,
+          `source: MCP read-only checks (Hasura + Testnet Horizon), not apps/api — ${fallbackReason}.`,
           ...checks.map((c) => `${c.result === 'pass' ? '✅' : c.result === 'fail' ? '❌' : '➖'} ${c.id}: ${c.detail}${c.fix ? `\n   fix: ${c.fix}` : ''}`),
         );
       } catch (error) {

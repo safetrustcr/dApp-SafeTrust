@@ -51,7 +51,7 @@ Two booking kinds share one escrow model in `apps/api`:
 | Tool | What it answers | Reads |
 |---|---|---|
 | `get-booking-context` | Property, dates, amount + asset, host/guest wallets (shortened), existing escrows, and anything that would make `apps/api` refuse to deploy | Hasura |
-| `get-wallet-readiness` | Can this booking be escrowed? Booking terms, guest wallet registered, guest/host Testnet accounts, XLM, USDC trustlines and balance — each failing check with its fix | Hasura, Testnet Horizon |
+| `get-wallet-readiness` | Can this booking be escrowed? The checks the app shows the guest — registered wallet, account, XLM for fees, USDC trustline and balance, host and platform can receive — each failing check with its fix | `apps/api` `GET /api/escrow/readiness`; fallback Hasura + Testnet Horizon |
 | `diagnose-escrow` | Plain-language status and next step: built-not-signed, expired, submitted-not-confirmed, lost, confirmed-but-DB-behind (reconciler), failed, synced | Hasura, Testnet Horizon |
 | `get-escrow-status` | The escrow row, its last 10 transitions and the Trustless Work mirror status | Hasura |
 | `get-pending-action` | Built transactions for an escrow: action, status, tx hash, signer, expiry — never the XDR | Hasura |
@@ -76,9 +76,14 @@ test user yet ([#528](https://github.com/safetrustcr/dApp-SafeTrust/issues/528))
 Until then they return `401`; build through the app and use the read tools to
 follow along.
 
-**Readiness is computed by the MCP.** `apps/api` has no readiness endpoint, so
-`get-wallet-readiness` applies the same rules the deploy route enforces, plus
-read-only Testnet Horizon checks.
+**Readiness comes from `apps/api`.** `get-wallet-readiness` calls
+`GET /api/escrow/readiness`, so it reports exactly what the app's readiness
+checklist shows, and explains each fix code (`LINK_WALLET`, `FUND_XLM`,
+`ADD_TRUSTLINE`, `GET_TEST_USDC`). That route needs a signed-in user, so until
+[#528](https://github.com/safetrustcr/dApp-SafeTrust/issues/528) lands — or when
+`apps/api` is not running — the tool falls back to its own read-only Hasura and
+Testnet Horizon checks and labels its answer as such. A real refusal from
+`apps/api` (for example `SELF_ESCROW_NOT_ALLOWED`) is shown as is.
 
 **Reads use the admin secret today.**
 [#530](https://github.com/safetrustcr/dApp-SafeTrust/issues/530) moves them to
