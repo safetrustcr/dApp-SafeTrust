@@ -1,18 +1,18 @@
-// TODO: replace with real detail components once merged in frontend-SafeTrust
-// Sources:
-//   frontend-SafeTrust/src/components/hotel/ApartmentDetail.tsx
-//   frontend-SafeTrust/src/components/hotel/ImageGallery.tsx
-//   frontend-SafeTrust/src/components/hotel/SuggestionsList.tsx
-//   frontend-SafeTrust/src/components/hotel/AmenityIcons.tsx
+// Apartment detail page — renders one real listing through the typed model.
 //
-// Data source (when wired):
-//   Apollo query: GET_APARTMENT_BY_ID -> public.apartments (Hasura)
+// Data: useListing('apartment', id) → GET_APARTMENT_BY_ID → features/listings
+// (see docs/frontend-migration/listing-fields.md for the field matrix).
+// Fields the API doesn't have (bedrooms, bathrooms, pets, amenities,
+// description…) stay hidden — never invented. The gallery shows real
+// image_urls or an honest "No photos" placeholder.
+
+"use client";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 
-import { getStubApartmentById } from "@/lib/stub-apartments";
+import { useListing } from "@/features/listings/use-listings";
 
 const styles = {
   page: {
@@ -21,21 +21,16 @@ const styles = {
     backgroundColor: "#fff7ed",
     color: "#111827",
   } satisfies CSSProperties,
-  aside: {
-    width: "18rem",
-    borderRight: "1px solid #fed7aa",
-    padding: "1rem",
-    flexShrink: 0,
+  imageFrame: {
+    borderRadius: "1rem",
+    overflow: "hidden",
+    backgroundColor: "#fed7aa",
   } satisfies CSSProperties,
-  suggestionCard: {
-    display: "flex",
-    gap: "0.5rem",
-    padding: "0.5rem",
-    marginBottom: "0.5rem",
-    border: "1px solid #fdba74",
-    borderRadius: "0.75rem",
-    backgroundColor: "#ffffff",
-    fontSize: "0.75rem",
+  image: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
   } satisfies CSSProperties,
   imagePlaceholder: {
     backgroundColor: "#fed7aa",
@@ -82,90 +77,113 @@ const styles = {
     marginBottom: "1rem",
     flexWrap: "wrap",
   } satisfies CSSProperties,
+  statusText: {
+    color: "#57534e",
+    fontSize: "1rem",
+    lineHeight: 1.6,
+  } satisfies CSSProperties,
+  errorText: {
+    color: "#b91c1c",
+    fontSize: "1rem",
+    lineHeight: 1.6,
+    marginBottom: "1rem",
+  } satisfies CSSProperties,
 } as const;
+
+const PRICE_UNIT_LABEL = { month: "Per month", night: "Per night" } as const;
+
+function formatAmount(amount: number): string {
+  return `$${amount.toLocaleString()}`;
+}
 
 export default function ApartmentDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const apartment = getStubApartmentById(params.id);
-  if (!apartment) {
+  const listing = useListing("apartment", params.id);
+
+  if (listing.status === "not_found") {
     notFound();
   }
 
+  if (listing.status === "loading") {
+    return (
+      <div style={styles.page}>
+        <main style={styles.main}>
+          <p style={styles.statusText}>Loading listing…</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (listing.status === "error") {
+    return (
+      <div style={styles.page}>
+        <main style={styles.main}>
+          <h1 style={{ margin: "0 0 0.5rem", fontSize: "1.5rem", fontWeight: 700 }}>
+            Couldn’t load this listing
+          </h1>
+          <p style={styles.errorText}>
+            {listing.error === "unauthorized"
+              ? "You don’t have permission to view this listing."
+              : "A network error occurred. Check your connection and try again."}
+          </p>
+          <Link href="/apartment" style={styles.button}>
+            Back to listings
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  const apartment = listing.item;
+  const [mainImage, ...restImages] = apartment.images;
+
   return (
     <div style={styles.page}>
-      <aside
-        style={styles.aside}
-        className="desktop-suggestions hidden lg:block"
-      >
-        <p
-          style={{
-            marginBottom: "0.25rem",
-            fontSize: "0.875rem",
-            fontWeight: 600,
-          }}
-        >
-          Suggestions
-        </p>
-
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} style={styles.suggestionCard}>
-            <div
-              style={{
-                width: "3rem",
-                height: "3rem",
-                flexShrink: 0,
-                borderRadius: "0.75rem",
-                backgroundColor: "#fed7aa",
-              }}
-            />
-            <div>
-              <p style={{ margin: 0, fontWeight: 500 }}>Los yoses</p>
-              <p style={{ margin: "0.25rem 0", color: "#78716c" }}>
-                329 Calle santos, San José
-              </p>
-              <p style={{ margin: 0, color: "#ea580c", fontWeight: 600 }}>
-                $4.000
-              </p>
-            </div>
-          </div>
-        ))}
-      </aside>
-
       <main style={styles.main}>
-        <div style={styles.gallery}>
-          <div style={{ ...styles.imagePlaceholder, minHeight: "16rem" }}>
-            <span style={{ fontSize: "0.75rem" }}>Main image</span>
-          </div>
+        {mainImage ? (
+          <div style={styles.gallery}>
+            <div style={{ ...styles.imageFrame, minHeight: "16rem" }}>
+              <img
+                src={mainImage}
+                alt={apartment.title}
+                style={{ ...styles.image, minHeight: "16rem" }}
+              />
+            </div>
 
-          <div style={styles.thumbs}>
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                style={{
-                  ...styles.imagePlaceholder,
-                  flex: 1,
-                  minHeight: "5rem",
-                }}
-              >
-                <span style={{ fontSize: "0.75rem" }}>Thumb {i}</span>
+            {restImages.length > 0 && (
+              <div style={styles.thumbs}>
+                {restImages.slice(0, 3).map((src) => (
+                  <div key={src} style={{ ...styles.imageFrame, flex: 1, minHeight: "5rem" }}>
+                    <img src={src} alt="" style={styles.image} />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        </div>
+        ) : (
+          <div style={{ ...styles.imagePlaceholder, minHeight: "16rem", marginBottom: "1.5rem" }}>
+            <span style={{ fontSize: "0.75rem" }}>No photos</span>
+          </div>
+        )}
 
         <div style={styles.header}>
           <div>
             <h1 style={{ margin: 0, fontSize: "2rem", fontWeight: 700 }}>
-              {apartment.name}
+              {apartment.title}
             </h1>
 
             <p
-              style={{ marginTop: "0.5rem", color: "#ea580c", fontWeight: 600 }}
+              style={{
+                marginTop: "0.5rem",
+                color: "#ea580c",
+                fontWeight: 600,
+              }}
             >
-              ${apartment.price.toLocaleString()}.00 Per month
+              {formatAmount(apartment.price.amount)}{" "}
+              {PRICE_UNIT_LABEL[apartment.price.unit]}
             </p>
           </div>
 
@@ -180,30 +198,20 @@ export default function ApartmentDetailPage({
         <div
           style={{ ...styles.metaRow, color: "#57534e", fontSize: "0.95rem" }}
         >
-          <span>📍 {apartment.address}</span>
-        </div>
-
-        <div style={{ ...styles.metaRow, fontSize: "0.95rem" }}>
-          <span>🛏 {apartment.bedrooms} bd</span>
           <span>
-            🐾 {apartment.petFriendly ? "pet friendly" : "no pets"}
+            📍 {apartment.addressLine}
+            {apartment.province ? ` · ${apartment.province}` : ""}
           </span>
-          <span>🚿 {apartment.bathrooms} ba</span>
+          {apartment.deposit && (
+            <span>
+              🔒 Deposit: {formatAmount(apartment.deposit.amount)}
+            </span>
+          )}
         </div>
 
         <div style={{ marginBottom: "1rem" }}>
           <p style={{ marginBottom: "0.25rem", fontWeight: 600 }}>
-            Owner: {apartment.owner.name}
-          </p>
-        </div>
-
-        <div>
-          <h2 style={{ marginBottom: "0.25rem", fontWeight: 600 }}>
-            Apartment details
-          </h2>
-
-          <p style={{ color: "#57534e", lineHeight: 1.6 }}>
-            {apartment.description}
+            {apartment.hostName ? `Host: ${apartment.hostName}` : "Host"}
           </p>
         </div>
       </main>
