@@ -1,0 +1,111 @@
+name: MCP tests
+
+# The MCP server calls apps/api and Hasura directly, so its tests run whenever the
+# server, the routes it consumes, or the shared types change.
+on:
+  pull_request:
+    branches:
+      - consolidation-pattern
+    paths:
+      - 'mcp/**'
+      - 'apps/api/src/app.ts'
+      - 'apps/api/src/routes/**'
+      - 'apps/api/src/middleware/**'
+      - 'packages/types/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/mcp-ci.yml'
+  push:
+    branches:
+      - consolidation-pattern
+    paths:
+      - 'mcp/**'
+      - 'apps/api/src/app.ts'
+      - 'apps/api/src/routes/**'
+      - 'apps/api/src/middleware/**'
+      - 'packages/types/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/mcp-ci.yml'
+  schedule:
+    - cron: '30 3 * * *' # 03:30 UTC nightly smoke run
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: 'Run the Testnet smoke suite (needs the E2E_* secrets)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+jobs:
+  unit-contract:
+    name: Unit + contract (no network)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build shared types
+        run: pnpm --filter @safetrust/types build
+
+      - name: Type-check MCP server
+        run: pnpm --filter @safetrust/mcp type-check
+
+      - name: Unit tests (fetch mocked, no network)
+        run: pnpm --filter @safetrust/mcp test
+
+      - name: Contract tests (apps/api in-process, Hasura + Firebase mocked)
+        run: pnpm --filter @safetrust/mcp test:contract
+
+  smoke:
+    name: Testnet smoke (read-only)
+    if: github.event_name == 'schedule' || github.event.inputs.smoke == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build shared types
+        run: pnpm --filter @safetrust/types build
+
+      - name: Start API server
+        run: pnpm --filter @safetrust/api dev &
+        env:
+          DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+          HASURA_GRAPHQL_URL: ${{ secrets.E2E_HASURA_GRAPHQL_URL }}
+          HASURA_ADMIN_SECRET: ${{ secrets.E2E_HASURA_ADMIN_SECRET }}
+          TRUSTLESS_WORK_API_KEY: ${{ secrets.TRUSTLESS_WORK_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.E2E_FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Wait for the API
+        run: timeout 90 bash -c 'until curl -sf http://localhost:3002/health; do sleep 2; done'
+
+      - name: Smoke suite (never builds a transaction)
+        run: pnpm --filter @safetrust/mcp test:smoke
+        env:
+          MCP_TESTNET_SMOKE: 'true'
+          SAFETRUST_API_URL: http://localhost:3002
+          HASURA_GRAPHQL_URL: ${{ secrets.E2E_HASURA_GRAPHQL_URL }}
+          HASURA_ADMIN_SECRET: ${{ secrets.E2E_HASURA_ADMIN_SECRET }}
