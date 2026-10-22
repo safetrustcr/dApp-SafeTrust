@@ -27,13 +27,24 @@ USDC_TRUSTLINE_ADDRESS=G...
 
 `FIREBASE_*` admin credentials must also be configured for the API so it can verify browser ID tokens. The escrow detail stream is currently a read-only development endpoint; do not expose it beyond local development until it authenticates a participant for the requested escrow.
 
-Before attempting a transaction, every wallet participating in the flow must:
+Before attempting a transaction, every wallet participating in the flow must meet the wallet readiness checks.
 
-1. Be on Stellar testnet.
-2. Hold test XLM for transaction fees.
-3. Have a trustline for the same testnet asset issuer configured above.
-4. Match the escrow role address: tenant/approver, host/service provider, or
-   platform/dispute resolver.
+## Wallet readiness requirements
+
+| Requirement | Why | Fix on Testnet | Mainnet behavior |
+| :--- | :--- | :--- | :--- |
+| **Connected wallet registered** | SafeTrust enforces caller authorization (#443) | "Link this wallet" (`/api/auth/sync-wallet`) or switch wallet | Switch or link wallet |
+| **Account exists + spare XLM** | Stellar base reserve (`(2 + subentries) × 0.5 XLM`) + 1.0 XLM fee buffer | "Fund with Friendbot" (`https://friendbot.stellar.org?addr=...`) | Deposit XLM to cover reserve & fees |
+| **USDC trustline** | Stellar accounts cannot hold custom assets without an explicit trustline for the configured issuer (`USDC_TRUSTLINE_ADDRESS`) | "Add USDC trustline" (sign unsigned `changeTrust` XDR from `/api/escrow/readiness/trustline` and submit to Horizon) | Sign `changeTrust` XDR |
+| **USDC balance ≥ amount** | The fund escrow transaction transfers the deposit/payment in USDC | Testnet faucet: [Circle USDC Testnet Faucet](https://faucet.circle.com/) | Deposit USDC |
+| **Host USDC trustline** | Release funds transfers deposit to host | Blocks guest until host completes wallet setup ("Message host") | Blocks guest until host completes wallet setup |
+| **Platform USDC trustline** | Platform fees transfer to `PLATFORM_STELLAR_ADDRESS` | Checked server-side | Checked server-side |
+
+### Testnet faucets
+
+- **XLM Faucet (Friendbot)**: `https://friendbot.stellar.org?addr={publicKey}`
+- **USDC Faucet**: For Circle's official Testnet USDC issuer (`GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`), obtain testnet USDC from [https://faucet.circle.com/](https://faucet.circle.com/).
+
 
 ## Verified API contract
 
