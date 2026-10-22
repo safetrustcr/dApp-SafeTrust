@@ -1,4 +1,4 @@
-import { REQUEST_TIMEOUT_MS, SAFETRUST_API_URL } from '../config.js';
+import { REQUEST_TIMEOUT_MS, SAFETRUST_API_TOKEN, SAFETRUST_API_URL } from '../config.js';
 
 export class ApiRequestError extends Error {
   constructor(message: string) {
@@ -25,11 +25,17 @@ export async function apiRequest<T = Record<string, unknown>>(
   const url = `${SAFETRUST_API_URL}${path}`;
   let response: Response;
 
+  // apps/api rejects unauthenticated escrow calls, so always forward the token
+  // when one is configured. Never fall back to a shared/admin credential.
+  const headers: Record<string, string> = {};
+  if (SAFETRUST_API_TOKEN) headers.Authorization = `Bearer ${SAFETRUST_API_TOKEN}`;
+  if (init.body) headers['Content-Type'] = 'application/json';
+
   try {
     response = await fetch(url, {
       method: init.method,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      headers: init.body ? { 'Content-Type': 'application/json' } : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       body: init.body ? JSON.stringify(init.body) : undefined,
     });
   } catch (error) {

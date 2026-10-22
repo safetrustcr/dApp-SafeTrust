@@ -36,7 +36,7 @@ Restart the MCP client after a rebuild — stdio servers are started once per se
 | `query-escrows` | Filter `public.escrows` by status, apartment or wallet | Hasura |
 | `query-trustless-work-escrows` | Filter `public.trustless_work_escrows` (`marker`/`approver`/`releaser`/`resolver`) | Hasura |
 | `query-user-wallets` | Resolve wallets by user id, email or address | Hasura |
-| `hasura-query` | Escape hatch: any read-only GraphQL query. Mutations and subscriptions are refused | Hasura |
+| `hasura-query` | Escape hatch: any read-only GraphQL query. Mutations and subscriptions are refused. **Only registered when `SAFETRUST_MCP_ENABLE_RAW_HASURA=true`** | Hasura |
 
 `deploy-escrow` and `fund-escrow` never sign or submit anything — they return the
 unsigned XDR that a wallet (Freighter) has to sign, exactly like the HTTP routes do.
@@ -82,13 +82,38 @@ development. All of them have defaults that match `bin/start`.
 | `HASURA_GRAPHQL_URL` | `http://localhost:8080/v1/graphql` | every Hasura tool |
 | `HASURA_ADMIN_SECRET` | `myadminsecretkey` | every Hasura tool (`HASURA_GRAPHQL_ADMIN_SECRET` also accepted) |
 | `SAFETRUST_API_URL` | `http://localhost:3002` | `deploy-escrow`, `fund-escrow` |
+| `SAFETRUST_API_TOKEN` | unset | `Authorization: Bearer …` sent to apps/api — required by `deploy-escrow`/`fund-escrow`, which sit behind Firebase auth |
+| `SAFETRUST_MCP_ENABLE_RAW_HASURA` | unset (off) | registers `hasura-query` when set to `true` |
 | `PLATFORM_STELLAR_ADDRESS` | unset | shown by `explain-escrow-roles` (`NEXT_PUBLIC_PLATFORM_ADDRESS` also accepted) |
 | `NEXT_PUBLIC_USDC_ADDRESS` | testnet USDC issuer | shown by `explain-escrow-roles` |
 | `SAFETRUST_REPO_ROOT` | auto-detected | overrides repo-root detection for the docs resources |
 
 Queries run with the Hasura **admin secret**, bypassing row-level permissions — this is
 a local developer tool, so treat its output as privileged and do not point it at a
-production Hasura instance.
+production Hasura instance. The only tool without a fixed, allow-listed query is
+`hasura-query`, and it is not registered unless `SAFETRUST_MCP_ENABLE_RAW_HASURA=true`.
+
+## Tests
+
+Three suites, all run from the repo root or with `--filter @safetrust/mcp`:
+
+| Suite | Command | Needs | Runs |
+|---|---|---|---|
+| Unit | `pnpm --filter @safetrust/mcp test` | nothing — every `fetch` is stubbed | every PR |
+| Contract | `pnpm --filter @safetrust/mcp test:contract` | nothing — apps/api is mounted in-process, Hasura and Firebase are mocked | PRs touching `mcp/**` or `apps/api/src/routes/**` |
+| Smoke | `MCP_TESTNET_SMOKE=true pnpm --filter @safetrust/mcp test:smoke` | local stack (`bin/start` + apps/api) with seeded data | manual / nightly |
+
+- `tests/unit/` drives the real MCP protocol over an in-memory transport and asserts
+  outbound requests: the `Authorization` header, the admin secret being required (no
+  fallback), which filters reach Hasura, and that `hasura-query` stays off by default.
+- `tests/contract/` starts `createApp()` from `apps/api/src/app.ts` on an ephemeral
+  port and asserts the exact status codes and response bodies the MCP tools depend on
+  (`/health`, the `401`/`400` envelopes, RFC 7807 problem details, idempotent replay).
+- `tests/smoke/` is skipped unless `MCP_TESTNET_SMOKE=true` and only calls read-only
+  tools — it asserts that no transaction is ever built.
+
+The suites use Node's built-in `fetch` through a recording stub, so they need no
+network and no Firebase/Hasura credentials.
 
 ## Prerequisites
 
