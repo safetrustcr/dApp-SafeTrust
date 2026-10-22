@@ -1,0 +1,18 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "fix/issue-510-fix-db-one-escrow-transition-matrix-that",
+    "main",
+    "origin"
+  ],
+  "parent": {
+    "fix/issue-510-fix-db-one-escrow-transition-matrix-that": "main",
+    "main": null,
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "fix/issue-510-fix-db-one-escrow-transition-matrix-that",
+    "origin"
+  ]
+}
