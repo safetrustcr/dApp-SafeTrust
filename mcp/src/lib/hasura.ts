@@ -1,4 +1,4 @@
-import { HASURA_GRAPHQL_URL, REQUEST_TIMEOUT_MS } from '../config.js';
+import { HASURA_ADMIN_SECRET, HASURA_GRAPHQL_URL, REQUEST_TIMEOUT_MS } from '../config.js';
 
 export class HasuraRequestError extends Error {
   constructor(
@@ -11,22 +11,14 @@ export class HasuraRequestError extends Error {
 }
 
 /**
- * Runs a GraphQL operation against Hasura with the admin secret.
- * Mirrors apps/api/src/services/hasura.ts — the MCP server is a local developer
- * tool, so it talks to Hasura with admin rights and bypasses row permissions.
+ * Runs a GraphQL operation against Hasura while assuming the constrained
+ * mcp_reader role. The admin secret authenticates the local MCP server; it does
+ * not grant the query the admin role.
  */
 export async function hasuraRequest<T>(
   query: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {
-  const adminSecret = process.env.HASURA_ADMIN_SECRET;
-  if (!adminSecret) {
-    throw new Error(
-      '[safetrust-mcp] HASURA_ADMIN_SECRET is not set. ' +
-      'Copy mcp/.env.example to mcp/.env and fill in the value.'
-    );
-  }
-
   let response: Response;
 
   try {
@@ -35,7 +27,8 @@ export async function hasuraRequest<T>(
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         'Content-Type': 'application/json',
-        'x-hasura-admin-secret': adminSecret,
+        'x-hasura-admin-secret': HASURA_ADMIN_SECRET,
+        'x-hasura-role': 'mcp_reader',
       },
       body: JSON.stringify({ query, variables }),
     });

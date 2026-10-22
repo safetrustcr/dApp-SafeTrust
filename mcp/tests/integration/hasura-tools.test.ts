@@ -17,7 +17,7 @@ describe.skipIf(!INTEGRATION_ENABLED)('MCP Hasura tools', () => {
   it('query-user-wallets returns wallets list', async () => {
     const result = await client.callTool({
       name: 'query-user-wallets',
-      arguments: { limit: 1, email: 'test@example.com' },
+      arguments: { limit: 1, userId: 'test-user' },
     });
     const text = (result.content[0] as { text: string }).text;
     expect(text).toMatch(/wallet\(s\)/);

@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { HASURA_GRAPHQL_URL, SAFETRUST_API_URL } from '../config.js';
+import { auditToolCall } from '../lib/audit.js';
 import { textResult } from '../lib/response.js';
 
 const TW_BASE = 'https://dev.api.trustlesswork.com';
@@ -25,6 +26,7 @@ export function registerHealthTools(server: McpServer) {
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async () => {
+      auditToolCall('check-stack-health');
       const [api, hasura, tw] = await Promise.all([
         ping(`${SAFETRUST_API_URL}/health`),
         ping(`${HASURA_GRAPHQL_URL.replace('/v1/graphql', '')}/healthz`),
