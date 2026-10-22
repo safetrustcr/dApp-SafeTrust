@@ -1,7 +1,10 @@
 #!/bin/bash
 set -e
 
-HASURA_ADMIN_SECRET="myadminsecretkey"
+# Overridable so a leaked local secret can be rotated (docs/mcp/README.md,
+# "Incident response"); docker-compose.yml reads the same variable.
+HASURA_ADMIN_SECRET="${HASURA_ADMIN_SECRET:-myadminsecretkey}"
+export HASURA_ADMIN_SECRET
 
 if [[ $# -eq 0 ]]; then
   echo "❌ Error: At least one tenant name is required."

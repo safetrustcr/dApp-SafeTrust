@@ -49,6 +49,9 @@ jobs:
       - name: MCP escrow tools against a stubbed stack
         run: pnpm --filter @safetrust/mcp test:escrow
 
+      - name: Trust-boundary doc matches the server (#533)
+        run: pnpm --filter @safetrust/mcp test:boundary
+
       - name: Build shared types for apps/api
         run: pnpm --filter @safetrust/types build
 

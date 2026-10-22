@@ -233,9 +233,9 @@ beforeEach(() => {
   calls.length = 0;
 });
 
-/** The same register calls src/index.ts makes, read from its source. */
+/** The same register calls src/server.ts makes, read from its source. */
 async function client() {
-  const index = readFileSync(join(mcpDir, 'src', 'index.ts'), 'utf8');
+  const index = readFileSync(join(mcpDir, 'src', 'server.ts'), 'utf8');
   const registrars: Record<string, (s: InstanceType<typeof McpServer>) => void> = {
     registerEscrowTools,
     registerEscrowDiagnosticsTools,
@@ -243,8 +243,8 @@ async function client() {
     registerHasuraTools,
     registerHealthTools,
   };
-  const used = [...index.matchAll(/^(register\w+)\(server\);$/gm)].map((m) => m[1]);
-  assert.deepEqual([...used].sort(), Object.keys(registrars).sort(), 'test registrars must match src/index.ts');
+  const used = [...index.matchAll(/^\s*(register\w+)\(server\);$/gm)].map((m) => m[1]);
+  assert.deepEqual([...used].sort(), Object.keys(registrars).sort(), 'test registrars must match src/server.ts');
   const server = new McpServer({ name: 'test', version: '0.0.0' });
   for (const name of used) registrars[name](server);
   const [a, b] = InMemoryTransport.createLinkedPair();

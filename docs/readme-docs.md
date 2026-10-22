@@ -25,6 +25,9 @@ transactions built on the Stellar blockchain via TrustlessWork API.
 - [Frontend Architecture](./frontend/architecture.md)
 - [Wallet Integration](./frontend/wallet-integration.md)
 
+### Developer tooling
+- [SafeTrust MCP server: trust boundary and runbook](./mcp/README.md)
+
 ### Infrastructure
 - [Bootstrap Guide](./infra/bootstrap.md)
 - [Docker Compose](./infra/docker.md)

@@ -28,6 +28,14 @@ const DOC_FILES: DocFile[] = [
     description: 'Setup and tool reference for this MCP server.',
   },
   {
+    name: 'safetrust-mcp-trust-boundary',
+    path: 'docs/mcp/README.md',
+    title: 'SafeTrust MCP trust boundary and runbook',
+    description:
+      'What this server is and is not, client setup, the tool safety catalogue, ' +
+      'and incident steps for exposed credentials.',
+  },
+  {
     name: 'safetrust-frontend-readme',
     path: 'apps/frontend/README.md',
     title: 'SafeTrust frontend README',

@@ -9,6 +9,13 @@ for guest `G…`?"* and it answers from the same tables and rules `apps/api` use
 It never signs, submits or holds keys, and it never talks to Trustless Work:
 every transaction is built by `apps/api` and signed by a person in their wallet.
 
+> **Read [`docs/mcp/README.md`](../docs/mcp/README.md) first.** It states what this
+> server is and is not (local stdio tooling, never a public API, never holds keys or
+> submits transactions), how to connect Claude Code, Claude Desktop or the MCP
+> Inspector, the safety of every tool, and what to do if an AI client is exposed to
+> privileged data. It is also served as the resource
+> `safetrust://docs/safetrust-mcp-trust-boundary`.
+
 ## Setup
 
 ```bash
@@ -17,10 +24,11 @@ pnpm --filter @safetrust/mcp build
 ```
 
 The root [`mcp.json`](../mcp.json) registers this server over stdio for editors
-that read it (Cursor). Its `args` are repo-root relative (`mcp/dist/index.js`), so
-build before the editor connects; `pnpm --filter @safetrust/mcp dev` runs the
-TypeScript sources through `tsx`. Restart the client after a rebuild — stdio
-servers start once per session.
+that read it (Cursor). Claude Code and Claude Desktop need their own entry — see
+[client setup](../docs/mcp/README.md#3-set-it-up). Its `args` are repo-root
+relative (`mcp/dist/index.js`), so build before the editor connects;
+`pnpm --filter @safetrust/mcp dev` runs the TypeScript sources through `tsx`.
+Restart the client after a rebuild — stdio servers start once per session.
 
 ## The flow these tools follow
 
@@ -102,6 +110,7 @@ and confirmed-and-synced. The file header has the `psql` command.
 | `safetrust://docs/architecture` | Escrow lifecycle, monorepo layout, tables and role mappings — generated at read time |
 | `safetrust://docs/safetrust-readme` | Root `README.md` |
 | `safetrust://docs/safetrust-mcp-readme` | This file |
+| `safetrust://docs/safetrust-mcp-trust-boundary` | `docs/mcp/README.md` — trust boundary, client setup, tool safety, incident response |
 | `safetrust://docs/safetrust-api-env-example` | `apps/api/.env.example` |
 | `safetrust://docs/safetrust-frontend-readme` | `apps/frontend/README.md`, when it exists |
 
@@ -109,7 +118,11 @@ File-backed resources are read on each request; missing files are skipped.
 
 ## Environment
 
-The server reads only its environment (the MCP client's `env` block).
+Read from the MCP client's `env` block — the server does not load a `.env` file.
+`HASURA_ADMIN_SECRET` has no default and must be set for every Hasura tool. The
+full list, with what each variable grants, is in
+[`docs/mcp/README.md`](../docs/mcp/README.md#configuration), generated from
+[`.env.example`](.env.example).
 
 | Variable | Default | Used by |
 |---|---|---|
@@ -128,6 +141,7 @@ privileged and never point the server at a non-local Hasura.
 
 ```bash
 pnpm --filter @safetrust/mcp test:escrow     # tools against a stubbed local stack
+pnpm --filter @safetrust/mcp test:boundary   # docs/mcp/README.md matches the server
 pnpm --filter @safetrust/api exec vitest run tests/mcp-contract.test.ts
 ```
 
