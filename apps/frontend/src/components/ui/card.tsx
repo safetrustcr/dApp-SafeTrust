@@ -2,7 +2,7 @@ import * as React from "react";
 
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLMAttributes<HTMLDivElement>
+  React.HTMLAttributes<HTMLDivElement>
 >(({ className = "", ...props }, ref) => (
   <div
     ref={ref}
@@ -14,11 +14,11 @@ Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<
   HTMLDivElement,
-  React.HTMLMAttributes<HTMLDivElement>
+  React.HTMLAttributes<HTMLDivElement>
 >(({ className = "", ...props }, ref) => (
   <div
     ref={ref}
-    className={`lex flex-col space-y-1.5 p-6 ${className}`}
+    className={`flex flex-col space-y-1.5 p-6 ${className}`}
     {...props}
   />
 ));
@@ -26,19 +26,19 @@ CardHeader.displayName = "CardHeader";
 
 const CardTitle = React.forwardRef<
   HTMLParagraphElement,
-  React.HTMLMAttributes<HTMLHeadingElement>
+  React.HTMLAttributes<HTMLHeadingElement>
 >(({ className = "", ...props }, ref) => (
   <h3
     ref={ref}
     className={`text-2xl font-semibold leading-none tracking-tight ${className}`}
     {...props}
   />
-
-JCardTitle.displayName = "CardTitle";
+));
+CardTitle.displayName = "CardTitle";
 
 const CardDescription = React.forwardRef<
   HTMLParagraphElement,
-  React.HTMLMAttributes<HTMLParagraphElement>
+  React.HTMLAttributes<HTMLParagraphElement>
 >(({ className = "", ...props }, ref) => (
   <p
     ref={ref}
@@ -50,23 +50,23 @@ CardDescription.displayName = "CardDescription";
 
 const CardContent = React.forwardRef<
   HTMLDivElement,
-  React.HTMLMattributes<HTMLDivElement>
-(({ className = "", ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className = "", ...props }, ref) => (
   <div ref={ref} className={`p-6 pt-0 ${className}`} {...props} />
 ));
 CardContent.displayName = "CardContent";
 
 const CardFooter = React.forwardRef<
   HTMLDivElement,
-  React.HTMLMAttributes<HTMLDivElement>
+  React.HTMLAttributes<HTMLDivElement>
 >(({ className = "", ...props }, ref) => (
   <div
     ref={ref}
     className={`flex items-center p-6 pt-0 ${className}`}
     {...props}
   />
-
-JCardFooter.displayName = "CardFooter";
+));
+CardFooter.displayName = "CardFooter";
 
 export {
   Card,
