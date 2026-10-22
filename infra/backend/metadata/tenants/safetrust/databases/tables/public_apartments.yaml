@@ -50,3 +50,19 @@ select_permissions:
       filter:
         owner_id:
           _eq: X-Hasura-User-Id
+  - role: mcp_reader
+    permission:
+      columns:
+        - id
+        - owner_id
+        - name
+        - price
+        - warranty_deposit
+        - is_available
+        - available_from
+        - available_until
+        - created_at
+        - updated_at
+      filter:
+        deleted_at:
+          _is_null: true
