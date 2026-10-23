@@ -128,6 +128,7 @@ export const GET_APARTMENT_BY_ID = gql`
       warranty_deposit
       coordinates
       owner_id
+      coordinates
       owner {
         first_name
         last_name
