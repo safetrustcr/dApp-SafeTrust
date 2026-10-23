@@ -6,7 +6,9 @@ import { LogoutButton } from "@/components/auth/LogoutButton";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 // Add to imports at the top:
-import { Bell, Building2, Heart, Home, LayoutDashboard, PlusSquare, Shield, Users } from "lucide-react";
+import { Bell, Building2, Heart, Home, Hotel, LayoutDashboard, PlusSquare, Shield, Users, MessageSquare } from "lucide-react";
+import { useAuthUser } from "@/components/auth/hooks/auth.hook";
+import { UnreadBadge } from "@/components/messages/UnreadBadge";
 
 interface SideBarProps {
   className?: string;
@@ -25,11 +27,12 @@ export function SideBar({
 }: SideBarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAuthUser();
 
   return (
     <div
       className={cn(
-        "fixed top-16 flex flex-col h-[calc(100vh-4rem)] bg-background border-r transition-all duration-300 z-40 dark:bg-gray-900 dark:border-gray-700",
+        "fixed top-16 flex h-[calc(100vh-4rem)] flex-col overflow-y-auto overscroll-contain bg-background border-r transition-all duration-300 z-40 dark:bg-gray-900 dark:border-gray-700",
         variant === "drawer"
           ? cn(
               "left-0 w-64 md:hidden transform",
@@ -39,7 +42,7 @@ export function SideBar({
         className,
       )}
     >
-      <div className="flex h-full flex-col items-start gap-4 py-4 px-2 lg:px-4">
+      <div className="flex min-h-full flex-col items-start gap-4 py-4 px-2 lg:px-4">
         <Link
           href="/dashboard/escrow"
           onClick={onClose}
@@ -81,6 +84,23 @@ export function SideBar({
           <span className="md:hidden lg:block">Rent</span>
           <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
             Rent
+          </span>
+        </Link>
+        <Link
+          href="/dashboard/messages"
+          onClick={onClose}
+          className={cn(
+            "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full relative group dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
+            pathname.startsWith("/dashboard/messages") &&
+              "bg-accent font-medium dark:bg-gray-800 dark:text-white"
+          )}
+        >
+          <MessageSquare className="w-6 h-6 shrink-0 dark:text-gray-400" />
+          <span className="md:hidden lg:block">Messages</span>
+          <UnreadBadge userId={user?.uid} />
+          {/* Tooltip for rail mode */}
+          <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
+            Messages
           </span>
         </Link>
         <Link
@@ -166,6 +186,22 @@ export function SideBar({
                   <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
                     New Apartment
                   </span>
+              </Link>
+
+              <Link
+                href="/dashboard/hotels"
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white group relative",
+                  pathname.startsWith("/dashboard/hotels") &&
+                    "bg-accent font-medium dark:bg-gray-800 dark:text-white",
+                )}
+              >
+                <Hotel className="w-6 h-6 dark:text-gray-400 shrink-0" />
+                <span className="md:hidden lg:block">Hotels</span>
+                <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
+                  Hotels
+                </span>
               </Link>
 
         <div className="mt-auto w-full pt-4">

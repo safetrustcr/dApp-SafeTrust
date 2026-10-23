@@ -1,0 +1,33 @@
+table:
+  name: user_roles
+  schema: public
+object_relationships:
+  - name: role
+    using:
+      foreign_key_constraint_on: role_id
+  - name: user
+    using:
+      foreign_key_constraint_on: user_id
+select_permissions:
+  # Users may read their own role assignments only. Role *writes* go through
+  # the admin-secret path in apps/api (promote-to-host), never from the client.
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - user_id
+        - role_id
+        - created_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - user_id
+        - role_id
+        - created_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

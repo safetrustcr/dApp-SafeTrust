@@ -18,10 +18,11 @@ export const STUB_HOTELS: HotelListing[] = [
     ],
     category: 'Family',
     location: 'San José',
-    owner: { name: 'Alberto Casas', avatar: '/img/person.png' },
+    owner: { name: 'Alberto Casas', avatar: '/img/person.png', id: 'owner-1' },
     description:
       'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry’s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.',
     favorite: false,
+    isStub: true,
   },
   {
     id: '2',
@@ -40,10 +41,11 @@ export const STUB_HOTELS: HotelListing[] = [
     ],
     category: 'Students',
     location: 'San José',
-    owner: { name: 'Alberto Casas', avatar: '/img/person.png' },
+    owner: { name: 'Alberto Casas', avatar: '/img/person.png', id: 'owner-1' },
     description:
       'Compact apartment near key routes with bright interiors and fast access to the city center.',
     favorite: false,
+    isStub: true,
   },
   {
     id: '3',
@@ -62,10 +64,11 @@ export const STUB_HOTELS: HotelListing[] = [
     ],
     category: 'Travelers',
     location: 'San José',
-    owner: { name: 'Randall Valenciano', avatar: '/img/person.png' },
+    owner: { name: 'Randall Valenciano', avatar: '/img/person.png', id: 'owner-2' },
     description:
       'Loft-style living with clean finishes, natural light, and walkable access to major amenities.',
     favorite: true,
+    isStub: true,
   },
   {
     id: '4',
@@ -84,10 +87,11 @@ export const STUB_HOTELS: HotelListing[] = [
     ],
     category: 'Family',
     location: 'Heredia',
-    owner: { name: 'María López', avatar: '/img/person.png' },
+    owner: { name: 'María López', avatar: '/img/person.png', id: 'owner-3' },
     description:
       'Larger family-ready floor plan with flexible living space and strong natural ventilation.',
     favorite: false,
+    isStub: true,
   },
   {
     id: '5',
@@ -106,10 +110,11 @@ export const STUB_HOTELS: HotelListing[] = [
     ],
     category: 'Travelers',
     location: 'Alajuela',
-    owner: { name: 'Luis Salas', avatar: '/img/person.png' },
+    owner: { name: 'Luis Salas', avatar: '/img/person.png', id: 'owner-4' },
     description:
       'Quiet rental with a warm palette, ideal for medium stays and airport-adjacent access.',
     favorite: true,
+    isStub: true,
   },
   {
     id: '6',
@@ -128,10 +133,11 @@ export const STUB_HOTELS: HotelListing[] = [
     ],
     category: 'Students',
     location: 'Cartago',
-    owner: { name: 'Ana Ruiz', avatar: '/img/person.png' },
+    owner: { name: 'Ana Ruiz', avatar: '/img/person.png', id: 'owner-5' },
     description:
       'Balanced shared-living layout with comfortable bedrooms and a practical amenity mix.',
     favorite: false,
+    isStub: true,
   },
 ];
 

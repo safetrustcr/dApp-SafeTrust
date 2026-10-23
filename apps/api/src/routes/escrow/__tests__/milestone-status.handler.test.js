@@ -1,112 +1,70 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { changeMilestoneStatusHandler } from '../milestone-status.handler.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../lib/trustlesswork.js', () => ({
-  trustlessWork: { post: vi.fn() },
-}));
+vi.mock('../build-escrow-action.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, buildEscrowAction: vi.fn() };
+});
 
-import { trustlessWork } from '../../../lib/trustlesswork.js';
-import { mockReq, mockRes } from './helpers.js';
+import { ApiError } from '../../../http/api-error.js';
+import { buildEscrowAction } from '../build-escrow-action.js';
+import { milestoneStatusHandler } from '../milestone-status.handler.js';
+import { mockNext, mockReq, mockRes } from './helpers.js';
 
-describe('changeMilestoneStatusHandler', () => {
+const mockBuildEscrowAction = vi.mocked(buildEscrowAction);
+const authedReq = (body) => ({ ...mockReq(body), user: { uid: 'host-uid' } });
 
+describe('milestoneStatusHandler', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('returns 400 when contractId is missing', async () => {
-    const res = mockRes();
-    await changeMilestoneStatusHandler(
-      mockReq({ milestoneIndex: 0, newEvidence: 'done', newStatus: 'completed', serviceProvider: 'GOWNER' }),
-      res,
-    );
-    expect(res._status).toBe(400);
-    expect(res._body.error).toContain('contractId');
+  it('forwards 401 when the caller is not authenticated', async () => {
+    const next = mockNext();
+    await milestoneStatusHandler(mockReq({ engagementId: 'e1', milestoneIndex: 0 }), mockRes(), next);
+
+    expect(next.error).toMatchObject({ status: 401, code: 'UNAUTHENTICATED' });
   });
 
-  it('returns 400 when newEvidence is missing', async () => {
-    const res = mockRes();
-    await changeMilestoneStatusHandler(
-      mockReq({ contractId: 'CAZT001', milestoneIndex: 0, newStatus: 'completed', serviceProvider: 'GOWNER' }),
-      res,
-    );
-    expect(res._status).toBe(400);
-    expect(res._body.error).toContain('newEvidence');
+  it('forwards 400 when milestoneIndex is invalid', async () => {
+    const next = mockNext();
+    await milestoneStatusHandler(authedReq({ engagementId: 'e1', milestoneIndex: -1 }), mockRes(), next);
+
+    expect(next.error).toMatchObject({ status: 400 });
+    expect(mockBuildEscrowAction).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when serviceProvider is missing', async () => {
+  it('builds a milestone-completion action from the authorized host wallet', async () => {
+    const result = { unsignedXdr: 'MILESTONE_XDR_001', txHash: 'hash-456' };
+    mockBuildEscrowAction.mockResolvedValueOnce(result);
+
     const res = mockRes();
-    await changeMilestoneStatusHandler(
-      mockReq({ contractId: 'CAZT001', milestoneIndex: 0, newEvidence: 'done', newStatus: 'completed' }),
+    await milestoneStatusHandler(
+      authedReq({ engagementId: 'eng-1', milestoneIndex: 0, newEvidence: 'Rental period completed' }),
       res,
+      mockNext(),
     );
-    expect(res._status).toBe(400);
-    expect(res._body.error).toContain('serviceProvider');
-  });
 
-  it('calls TrustlessWork with correct milestone payload including milestoneIndex', async () => {
-    trustlessWork.post.mockResolvedValueOnce({
-      data: { unsignedTransaction: 'MILESTONE_XDR_001' },
-    });
-
-    await changeMilestoneStatusHandler(
-      mockReq({
+    expect(res._body).toEqual(result);
+    const [options] = mockBuildEscrowAction.mock.calls[0];
+    expect(options).toMatchObject({ uid: 'host-uid', engagementId: 'eng-1', action: 'mark_milestone_completed' });
+    expect(options.request({ signer: 'HOST_WALLET', escrow: { contract_id: 'CAZT001' } })).toEqual({
+      path: '/escrow/single-release/change-milestone-status',
+      body: {
         contractId: 'CAZT001',
-        milestoneIndex: 0,
-        newEvidence: 'Rental period completed',
+        serviceProvider: 'HOST_WALLET',
+        milestoneIndex: '0',
         newStatus: 'completed',
-        serviceProvider: 'GOWNER111',
-      }),
-      mockRes(),
-    );
-
-    expect(trustlessWork.post).toHaveBeenCalledWith(
-      '/escrow/single-release/change-milestone-status',
-      {
-        contractId: 'CAZT001',
-        milestoneIndex: 0,
         newEvidence: 'Rental period completed',
-        newStatus: 'completed',
-        serviceProvider: 'GOWNER111',
       },
-    );
-  });
-
-  it('returns 201 with unsignedTransaction on success', async () => {
-    trustlessWork.post.mockResolvedValueOnce({
-      data: { unsignedTransaction: 'MILESTONE_XDR_001' },
+      payload: { milestoneIndex: 0, milestoneId: 'check_in', newStatus: 'completed' },
     });
-
-    const res = mockRes();
-    await changeMilestoneStatusHandler(
-      mockReq({
-        contractId: 'CAZT001',
-        milestoneIndex: 0,
-        newEvidence: 'done',
-        newStatus: 'completed',
-        serviceProvider: 'GOWNER',
-      }),
-      res,
-    );
-
-    expect(res._status).toBe(201);
-    expect(res._body).toEqual({ unsignedTransaction: 'MILESTONE_XDR_001' });
   });
 
-  it('returns 500 on TrustlessWork network failure', async () => {
-    trustlessWork.post.mockRejectedValueOnce(new Error('Timeout'));
+  it('forwards action errors to the global error middleware', async () => {
+    const error = new ApiError(409, 'INVALID_ESCROW_STATE', 'Escrow is not funded.');
+    mockBuildEscrowAction.mockRejectedValueOnce(error);
+    const next = mockNext();
 
-    const res = mockRes();
-    await changeMilestoneStatusHandler(
-      mockReq({
-        contractId: 'CAZT001',
-        milestoneIndex: 0,
-        newEvidence: 'done',
-        newStatus: 'completed',
-        serviceProvider: 'GOWNER',
-      }),
-      res,
-    );
+    await milestoneStatusHandler(authedReq({ engagementId: 'eng-1', milestoneIndex: 0 }), mockRes(), next);
 
-    expect(res._status).toBe(500);
-    expect(res._body.error).toBe('Failed to change milestone status');
+    expect(next.error).toBe(error);
   });
 });

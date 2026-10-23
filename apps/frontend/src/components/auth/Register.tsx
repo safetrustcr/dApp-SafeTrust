@@ -2,10 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { FirebaseError } from "firebase/app";
 import { auth } from "@/lib/firebase";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { Button } from "@/components/ui/button";
@@ -18,124 +15,78 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import Illustration from "@/components/auth/ui/Illustration";
 import Cookies from "js-cookie";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { toast } from "sonner";
+import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
+import { PollarWalletStatus } from "@/components/auth/pollar/PollarWalletStatus";
+import { useRegisterForm } from "@/hooks/use-register-form";
+import { validateRegisterForm } from "@/lib/auth/register-validation";
+import { registerUser } from "@/lib/auth/register-user";
+import { getRegisterErrorMessage } from "@/lib/auth/register-errors";
+import { getBackendUrl } from "@/lib/config";
 
 const COUNTRY_CODES = [
-  { code: "+506", country: "Costa Rica", flag: "🇨🇷" },
-  { code: "+1",   country: "United States", flag: "🇺🇸" },
-  { code: "+52",  country: "Mexico", flag: "🇲🇽" },
-  { code: "+34",  country: "Spain", flag: "🇪🇸" },
+  { code: "+506", country: "Costa Rica",     flag: "🇨🇷" },
+  { code: "+1",   country: "United States",  flag: "🇺🇸" },
+  { code: "+52",  country: "Mexico",         flag: "🇲🇽" },
+  { code: "+34",  country: "Spain",          flag: "🇪🇸" },
   { code: "+44",  country: "United Kingdom", flag: "🇬🇧" },
-  { code: "+49",  country: "Germany", flag: "🇩🇪" },
-  { code: "+55",  country: "Brazil", flag: "🇧🇷" },
-  { code: "+57",  country: "Colombia", flag: "🇨🇴" },
-  { code: "+51",  country: "Peru", flag: "🇵🇪" },
-  { code: "+54",  country: "Argentina", flag: "🇦🇷" },
+  { code: "+49",  country: "Germany",        flag: "🇩🇪" },
+  { code: "+55",  country: "Brazil",         flag: "🇧🇷" },
+  { code: "+57",  country: "Colombia",       flag: "🇨🇴" },
+  { code: "+51",  country: "Peru",           flag: "🇵🇪" },
+  { code: "+54",  country: "Argentina",      flag: "🇦🇷" },
 ];
-
-const ERROR_MESSAGES: Record<string, string> = {
-  "auth/email-already-in-use": "An account with this email already exists",
-  "auth/weak-password": "Password must be at least 6 characters",
-  "auth/invalid-email": "Invalid email address",
-};
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [phoneCountryCode, setPhoneCountryCode] = useState("+506");
-  const [phone, setPhone] = useState("");
-  const [location, setLocation] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const clearError = () => setError("");
+  
+  const {
+    fields,
+    handleChange,
+    isLoading,
+    setIsLoading,
+    error,
+    setError,
+  } = useRegisterForm();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError("");
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) {
-      setError("Server configuration error — please contact support");
-      setIsLoading(false);
+    const validationError = validateRegisterForm(fields);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
+    setIsLoading(true);
+
     try {
-      const credential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password,
-      );
-
-      await updateProfile(credential.user, {
-        displayName: `${firstName} ${lastName}`.trim(),
-      });
-
-      const token = await credential.user.getIdToken();
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      const syncRes = await fetch(
-        `${backendUrl}/api/auth/sync-user`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-            phone_number: phone,
-            country_code: phoneCountryCode,
-            location,
-          }),
-        },
-      );
+      const { token } = await registerUser(auth, fields, getBackendUrl());
 
       Cookies.set("firebase-token", token, {
-        expires: 7,
-        secure: true,
+        expires:  7,
+        secure:   true,
         sameSite: "strict",
       });
 
-      clearTimeout(timeoutId);
-
-      if (!syncRes.ok) {
-        throw new Error("SYNC_USER_FAILED");
-      }
-
       useGlobalAuthenticationStore.getState().setToken(token);
+
       toast.success("Account created successfully!", {
-        description: "Please sign in with your new credentials.",
+        description: "Taking you to your SafeTrust dashboard.",
         duration: 4000,
       });
-      router.push("/login");
+
+      router.push("/dashboard");
+
     } catch (err: unknown) {
-      if (err instanceof FirebaseError) {
-        toast.error(
-          ERROR_MESSAGES[err.code] ?? "An unexpected error occurred. Please try again.",
-          { duration: 4000 }
-        );
-        setError(
-          ERROR_MESSAGES[err.code] ?? "Registration failed — please try again",
-        );
-      } else if (err instanceof Error && err.name === "AbortError") {
-        toast.error("Registration timed out. Please try again.", { duration: 4000 });
-        setError("Registration timed out — please try again");
-      } else {
-        toast.error("An unexpected error occurred. Please try again.", { duration: 4000 });
-        setError("Registration failed — please try again");
-      }
+      const message = getRegisterErrorMessage(err);
+      toast.error(message, { duration: 4000 });
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -145,6 +96,8 @@ export default function RegisterPage() {
     <div className="flex min-h-screen">
       <div className="flex w-full flex-col items-center justify-center px-4 md:w-1/2">
         <div className="w-full max-w-sm space-y-6">
+
+          {/* Header */}
           <div className="flex items-center justify-between w-full mb-2">
             <div className="flex items-center space-x-2">
               <Image src="/img/logo.png" alt="SafeTrust" width={32} height={32} />
@@ -163,8 +116,8 @@ export default function RegisterPage() {
                   id="firstName"
                   placeholder="First name"
                   required
-                  value={firstName}
-                  onChange={(e) => { setFirstName(e.target.value); clearError(); }}
+                  value={fields.firstName}
+                  onChange={(e) => handleChange("firstName", e.target.value)}
                 />
               </div>
               <div className="space-y-2 flex-1">
@@ -173,8 +126,8 @@ export default function RegisterPage() {
                   id="lastName"
                   placeholder="Last name"
                   required
-                  value={lastName}
-                  onChange={(e) => { setLastName(e.target.value); clearError(); }}
+                  value={fields.lastName}
+                  onChange={(e) => handleChange("lastName", e.target.value)}
                 />
               </div>
             </div>
@@ -184,8 +137,8 @@ export default function RegisterPage() {
               <Label htmlFor="phone">Phone Number</Label>
               <div className="flex gap-2">
                 <Select
-                  value={phoneCountryCode}
-                  onValueChange={(v) => { setPhoneCountryCode(v); clearError(); }}
+                  value={fields.phoneCountryCode}
+                  onValueChange={(v) => handleChange("phoneCountryCode", v)}
                 >
                   <SelectTrigger className="w-[120px]">
                     <SelectValue placeholder="Code" />
@@ -203,8 +156,8 @@ export default function RegisterPage() {
                   type="tel"
                   placeholder="Enter your phone number"
                   required
-                  value={phone}
-                  onChange={(e) => { setPhone(e.target.value); clearError(); }}
+                  value={fields.phone}
+                  onChange={(e) => handleChange("phone", e.target.value)}
                 />
               </div>
             </div>
@@ -213,8 +166,8 @@ export default function RegisterPage() {
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
               <Select
-                value={location}
-                onValueChange={(v) => { setLocation(v); clearError(); }}
+                value={fields.location}
+                onValueChange={(v) => handleChange("location", v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select your location" />
@@ -236,8 +189,8 @@ export default function RegisterPage() {
                 type="email"
                 placeholder="Enter your email"
                 required
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); clearError(); }}
+                value={fields.email}
+                onChange={(e) => handleChange("email", e.target.value)}
               />
             </div>
 
@@ -247,11 +200,11 @@ export default function RegisterPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder="At least 6 characters"
                 required
                 minLength={6}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); clearError(); }}
+                value={fields.password}
+                onChange={(e) => handleChange("password", e.target.value)}
               />
             </div>
 
@@ -260,13 +213,29 @@ export default function RegisterPage() {
               className="w-full bg-[#2857B8] hover:bg-[#2857B8]/90"
               disabled={isLoading}
             >
-              {isLoading ? "Creating account..." : "Sign Up"}
+              {isLoading ? "Creating account…" : "Sign Up"}
             </Button>
 
             {error && (
               <p className="text-center text-sm text-red-600">{error}</p>
             )}
           </form>
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <Separator />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white dark:bg-[#0a0a0a] px-2 text-muted-foreground dark:text-gray-400">
+                or
+              </span>
+            </div>
+          </div>
+
+          <PollarWalletStatus />
+          <PollarLoginButton
+            onWalletReady={() => router.push("/dashboard/escrow-dashboard")}
+          />
 
           <div className="text-center text-sm">
             Already have an account?{" "}

@@ -1,87 +1,59 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../build-escrow-action.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, buildEscrowAction: vi.fn() };
+});
+
+import { ApiError } from '../../../http/api-error.js';
+import { buildEscrowAction } from '../build-escrow-action.js';
 import { releaseFundsHandler } from '../release-funds.handler.js';
+import { mockNext, mockReq, mockRes } from './helpers.js';
 
-vi.mock('../../../lib/trustlesswork.js', () => ({
-  trustlessWork: { post: vi.fn() },
-}));
-
-import { trustlessWork } from '../../../lib/trustlesswork.js';
-
-const mockRes = () => {
-  const res = {};
-  res._status = undefined;
-  res._body = undefined;
-  res.status = (status) => {
-    res._status = status;
-    return res;
-  };
-  res.json = (body) => {
-    res._body = body;
-    return res;
-  };
-  return res;
-};
+const mockBuildEscrowAction = vi.mocked(buildEscrowAction);
+const authedReq = (body) => ({ ...mockReq(body), user: { uid: 'guest-uid' } });
 
 describe('releaseFundsHandler', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => vi.clearAllMocks());
 
-  it('returns 400 when contractId is missing', async () => {
-    const res = mockRes();
-    await releaseFundsHandler({ body: { releaseSigner: 'GRELEASER' } }, res);
-    expect(res._status).toBe(400);
-    expect(res._body.error).toContain('contractId');
-    expect(trustlessWork.post).not.toHaveBeenCalled();
+  it('forwards 401 when the caller is not authenticated', async () => {
+    const next = mockNext();
+    await releaseFundsHandler(mockReq({ engagementId: 'e1' }), mockRes(), next);
+
+    expect(next.error).toMatchObject({ status: 401, code: 'UNAUTHENTICATED' });
   });
 
-  it('returns 400 when releaseSigner is missing', async () => {
-    const res = mockRes();
-    await releaseFundsHandler({ body: { contractId: 'CAZT001' } }, res);
-    expect(res._status).toBe(400);
-    expect(res._body.error).toContain('releaseSigner');
-    expect(trustlessWork.post).not.toHaveBeenCalled();
+  it('forwards 400 when engagementId is missing', async () => {
+    const next = mockNext();
+    await releaseFundsHandler(authedReq({}), mockRes(), next);
+
+    expect(next.error).toMatchObject({ status: 400, code: 'INVALID_ENGAGEMENT_ID' });
   });
 
-  it('calls TrustlessWork /escrow/single-release/release-funds with correct body', async () => {
-    trustlessWork.post.mockResolvedValueOnce({
-      data: { unsignedTransaction: 'RELEASE_XDR_001' },
+  it('builds a release action from the authorized guest wallet', async () => {
+    const result = { unsignedXdr: 'RELEASE_XDR_001', txHash: 'hash-789' };
+    mockBuildEscrowAction.mockResolvedValueOnce(result);
+
+    const res = mockRes();
+    await releaseFundsHandler(authedReq({ engagementId: 'eng-1' }), res, mockNext());
+
+    expect(res._body).toEqual(result);
+    const [options] = mockBuildEscrowAction.mock.calls[0];
+    expect(options).toMatchObject({ uid: 'guest-uid', engagementId: 'eng-1', action: 'release_funds' });
+    expect(options.request({ signer: 'GUEST_WALLET', escrow: { contract_id: 'CAZT001' } })).toEqual({
+      path: '/escrow/single-release/release-funds',
+      body: { contractId: 'CAZT001', releaseSigner: 'GUEST_WALLET' },
+      payload: { releaseSigner: 'GUEST_WALLET' },
     });
-
-    await releaseFundsHandler(
-      { body: { contractId: 'CAZT001', releaseSigner: 'GRELEASER' } },
-      mockRes(),
-    );
-
-    expect(trustlessWork.post).toHaveBeenCalledWith(
-      '/escrow/single-release/release-funds',
-      { contractId: 'CAZT001', releaseSigner: 'GRELEASER' },
-    );
   });
 
-  it('returns 201 with unsignedTransaction on success', async () => {
-    trustlessWork.post.mockResolvedValueOnce({
-      data: { unsignedTransaction: 'RELEASE_XDR_001' },
-    });
+  it('forwards action errors to the global error middleware', async () => {
+    const error = new ApiError(409, 'INVALID_ESCROW_STATE', 'Escrow is not approved.');
+    mockBuildEscrowAction.mockRejectedValueOnce(error);
+    const next = mockNext();
 
-    const res = mockRes();
-    await releaseFundsHandler(
-      { body: { contractId: 'CAZT001', releaseSigner: 'GRELEASER' } },
-      res,
-    );
+    await releaseFundsHandler(authedReq({ engagementId: 'eng-1' }), mockRes(), next);
 
-    expect(res._status).toBe(201);
-    expect(res._body).toEqual({ unsignedTransaction: 'RELEASE_XDR_001' });
-  });
-
-  it('returns 500 on TrustlessWork network failure', async () => {
-    trustlessWork.post.mockRejectedValueOnce(new Error('Network timeout'));
-
-    const res = mockRes();
-    await releaseFundsHandler(
-      { body: { contractId: 'CAZT001', releaseSigner: 'GRELEASER' } },
-      res,
-    );
-
-    expect(res._status).toBe(500);
-    expect(res._body.error).toBe('Failed to release funds');
+    expect(next.error).toBe(error);
   });
 });

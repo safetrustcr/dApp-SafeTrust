@@ -1,0 +1,47 @@
+table:
+  name: users_wallets
+  schema: hotel_industry
+configuration:
+  custom_root_fields:
+    select: users_wallets
+    select_by_pk: users_wallets_by_pk
+    select_aggregate: users_wallets_aggregate
+    insert: insert_users_wallets
+    insert_one: insert_users_wallets_one
+    update: update_users_wallets
+    update_by_pk: update_users_wallets_by_pk
+    delete: delete_users_wallets
+    delete_by_pk: delete_users_wallets_by_pk
+object_relationships:
+  - name: user
+    using:
+      foreign_key_constraint_on: user_id
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - created_at
+        - updated_at
+      filter:
+        user:
+          firebase_uid:
+            _eq: X-Hasura-User-Id
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - created_at
+        - updated_at
+      filter:
+        user:
+          firebase_uid:
+            _eq: X-Hasura-User-Id
