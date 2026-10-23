@@ -22,6 +22,11 @@ export const GET_APARTMENTS = gql`
       available_until
       created_at
       owner_id
+      coordinates
+      owner {
+        first_name
+        last_name
+      }
     }
     apartments_aggregate(
       where: { deleted_at: { _is_null: true }, owner_id: { _eq: $owner_id } }
@@ -52,6 +57,11 @@ export const GET_ALL_APARTMENTS = gql`
       available_from
       available_until
       owner_id
+      coordinates
+      owner {
+        first_name
+        last_name
+      }
     }
     apartments_aggregate(
       where: { deleted_at: { _is_null: true }, is_available: { _eq: true } }
@@ -116,6 +126,7 @@ export const GET_APARTMENT_BY_ID = gql`
       address
       price
       warranty_deposit
+      coordinates
       owner_id
       coordinates
       owner {

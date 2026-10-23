@@ -19,6 +19,23 @@ export const HASURA_ADMIN_SECRET =
 /** Base URL of apps/api (Express, port 3002 by default). */
 export const SAFETRUST_API_URL = process.env.SAFETRUST_API_URL ?? 'http://localhost:3002';
 
+/**
+ * Bearer token forwarded to apps/api on every request. apps/api protects
+ * /api/escrow/* behind Firebase auth (`authenticateFirebase`), so the server
+ * needs the signed-in user's ID token to do anything beyond health checks.
+ * Unset is allowed — read-only Hasura tools keep working — but the escrow tools
+ * will surface the API's 401 instead of silently running unauthenticated.
+ */
+export const SAFETRUST_API_TOKEN = process.env.SAFETRUST_API_TOKEN ?? null;
+
+/**
+ * Opt-in escape hatch for the arbitrary-GraphQL tool. It is off unless
+ * SAFETRUST_MCP_ENABLE_RAW_HASURA=true so a default install can never re-open
+ * unrestricted reads against the database.
+ */
+export const ALLOW_RAW_HASURA_QUERY =
+  process.env.SAFETRUST_MCP_ENABLE_RAW_HASURA === 'true';
+
 /** SafeTrust platform wallet — collects the fee and resolves disputes. */
 export const PLATFORM_ADDRESS =
   process.env.PLATFORM_STELLAR_ADDRESS ?? process.env.NEXT_PUBLIC_PLATFORM_ADDRESS ?? null;
