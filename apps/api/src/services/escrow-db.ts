@@ -10,7 +10,6 @@ import {
   messageMutationFields,
   messageMutationVariable,
   ensureEscrowConversation,
-  notifyEscrowLifecycleParticipants,
 } from './conversation-events.js';
 
 async function prepareLifecycleMessage(params: {
@@ -19,21 +18,13 @@ async function prepareLifecycleMessage(params: {
   toStatus: string;
   txHash?: string;
   amount?: number;
-}): Promise<{
-  declaration: string;
-  field: string;
-  message: Record<string, unknown>;
-  conversationId: string;
-  eventType: string;
-} | null> {
+}): Promise<{ declaration: string; field: string; message: Record<string, unknown> } | null> {
   const prepared = await prepareEscrowLifecycleMessage(params);
   if (!prepared) return null;
   return {
     declaration: messageMutationVariable(),
     field: messageMutationFields(),
     message: lifecycleMessageInput(prepared.conversationId, prepared.event),
-    conversationId: prepared.conversationId,
-    eventType: prepared.event.event_type,
   };
 }
 
@@ -68,7 +59,6 @@ type UpdateResult = {
   update_escrows?: { affected_rows: number; returning: { id: string }[] };
   update_escrowMilestones?: { affected_rows: number; returning: { id: string }[] };
   insert_escrow_transactions_one?: { id: string };
-  insert_messages_one?: { id: string } | null;
 };
 
 type MilestoneUpdateResult = {
@@ -105,15 +95,6 @@ async function resolveEscrowId(contractId: string): Promise<string> {
 function assertAffectedRows(name: string, affectedRows: number, from?: string, to?: string): void {
   if (affectedRows === 0) {
     throw new ConcurrentTransitionError(from, to);
-  }
-}
-
-function notifyForInsertedLifecycleMessage(
-  lifecycle: Awaited<ReturnType<typeof prepareLifecycleMessage>>,
-  inserted: { id: string } | null | undefined,
-): void {
-  if (lifecycle && inserted?.id) {
-    void notifyEscrowLifecycleParticipants(lifecycle.conversationId, lifecycle.eventType);
   }
 }
 
@@ -330,7 +311,6 @@ export async function dbFundEscrow(
   if (!result.insert_escrow_transactions_one) {
     throw new ConcurrentTransitionError('created', 'funded');
   }
-  notifyForInsertedLifecycleMessage(lifecycle, result.insert_messages_one);
 }
 
 export async function dbMarkMilestoneCompleted(
@@ -392,7 +372,6 @@ export async function dbMarkMilestoneCompleted(
   if (!result.insert_escrow_transactions_one) {
     throw new ConcurrentTransitionError('pending', 'completed');
   }
-  notifyForInsertedLifecycleMessage(lifecycle, result.insert_messages_one);
 }
 
 export async function dbApproveMilestone(
@@ -491,7 +470,6 @@ export async function dbApproveMilestone(
   if (!result.insert_escrow_transactions_one) {
     throw new ConcurrentTransitionError('funded', 'milestone_approved');
   }
-  notifyForInsertedLifecycleMessage(lifecycle, result.insert_messages_one);
 }
 
 export async function dbReleaseFunds(
@@ -572,7 +550,6 @@ export async function dbReleaseFunds(
   if (!result.insert_escrow_transactions_one) {
     throw new ConcurrentTransitionError('milestone_approved', 'completed');
   }
-  notifyForInsertedLifecycleMessage(lifecycle, result.insert_messages_one);
 }
 
 export async function dbDisputeEscrow(
@@ -614,7 +591,6 @@ export async function dbDisputeEscrow(
   if (!result.insert_escrow_transactions_one) {
     throw new ConcurrentTransitionError('funded|milestone_approved', 'disputed');
   }
-  notifyForInsertedLifecycleMessage(lifecycle, result.insert_messages_one);
 }
 
 export async function dbResolveDispute(
@@ -656,5 +632,4 @@ export async function dbResolveDispute(
   if (!result.insert_escrow_transactions_one) {
     throw new ConcurrentTransitionError('disputed', 'resolved');
   }
-  notifyForInsertedLifecycleMessage(lifecycle, result.insert_messages_one);
 }
