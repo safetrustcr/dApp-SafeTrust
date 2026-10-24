@@ -23,10 +23,33 @@ export const SAFETRUST_API_URL = process.env.SAFETRUST_API_URL ?? 'http://localh
 export const PLATFORM_ADDRESS =
   process.env.PLATFORM_STELLAR_ADDRESS ?? process.env.NEXT_PUBLIC_PLATFORM_ADDRESS ?? null;
 
-/** USDC issuer on Stellar testnet (see root .env.example). */
+/**
+ * USDC issuer on Stellar testnet. apps/api builds the escrow trustline from
+ * USDC_TRUSTLINE_ADDRESS, so that name wins; NEXT_PUBLIC_USDC_ADDRESS is the
+ * frontend's name for the same issuer.
+ */
 export const USDC_ADDRESS =
+  process.env.USDC_TRUSTLINE_ADDRESS ??
   process.env.NEXT_PUBLIC_USDC_ADDRESS ??
   'GBBD47IF6LWK7P7MDEVSCWR2JQTMZ35MIFUQ5IQSQ9CQBZ8JMXKDPE';
+
+/**
+ * Stellar Horizon used for read-only wallet readiness and transaction lookups.
+ * Testnet only: see assertTestnetHorizon().
+ */
+export const STELLAR_HORIZON_URL =
+  process.env.STELLAR_HORIZON_URL?.trim() || 'https://horizon-testnet.stellar.org';
+
+/** The MCP only ever reads Testnet (or a local quickstart node). */
+export function assertTestnetHorizon(url: string = STELLAR_HORIZON_URL): string {
+  const host = new URL(url).hostname;
+  if (!/testnet/i.test(host) && host !== 'localhost' && host !== '127.0.0.1') {
+    throw new Error(
+      `[safetrust-mcp] Refusing to read ${url}: STELLAR_HORIZON_URL must be a Testnet or local Horizon.`,
+    );
+  }
+  return url.replace(/\/+$/, '');
+}
 
 /** Outbound request timeout for Hasura and apps/api calls. */
 export const REQUEST_TIMEOUT_MS = 15_000;
