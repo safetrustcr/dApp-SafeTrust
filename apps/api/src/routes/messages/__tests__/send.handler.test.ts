@@ -7,12 +7,8 @@ vi.mock('../../../services/messages-db.js', () => ({
   getConversation: vi.fn(),
   insertManualMessage: vi.fn(),
 }));
-vi.mock('../../../services/conversation-events.js', () => ({
-  notifyManualMessageRecipient: vi.fn(),
-}));
 
 import { getConversation, insertManualMessage } from '../../../services/messages-db.js';
-import { notifyManualMessageRecipient } from '../../../services/conversation-events.js';
 import { sendMessageHandler } from '../send.handler.js';
 
 const mockGetConversation = vi.mocked(getConversation);
@@ -196,9 +192,6 @@ describe('sendMessageHandler', () => {
       created_at: '2026-09-30T12:00:00Z',
     };
     mockInsertManualMessage.mockResolvedValueOnce(fakeMessage);
-    vi.mocked(notifyManualMessageRecipient).mockImplementation(
-      () => new Promise<void>(() => {}),
-    );
 
     const req = mockReq({
       uid: 'guest-uid-1',
@@ -217,7 +210,6 @@ describe('sendMessageHandler', () => {
     });
     expect(res._status).toBe(201);
     expect(res._body).toEqual({ message: fakeMessage });
-    expect(notifyManualMessageRecipient).toHaveBeenCalledWith(validConvoId, 'guest-uid-1');
     expect(next).not.toHaveBeenCalled();
   });
 

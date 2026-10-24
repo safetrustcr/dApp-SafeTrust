@@ -9,8 +9,7 @@ import { MainWalletSelectionModal } from '@/components/auth/wallet/components/Ma
 import { WalletSelectionModal } from '@/components/auth/wallet/components/WalletSelectionModal';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { truncateStellarAddress } from '@/lib/utils';
-import { postEscrowApi, getReadiness } from '@/lib/api/escrow';
-import { WalletReadinessChecklist } from './WalletReadinessChecklist';
+import { postEscrowApi } from '@/lib/api/escrow';
 
 type EscrowPayFlowProps = {
   apartmentId: string;
@@ -20,8 +19,6 @@ type EscrowPayFlowProps = {
   amount: number;
   bookingKind?: "apartment" | "hotel-room";
   expectedSenderAddress?: string;
-  isReadinessReady?: boolean;
-  showChecklist?: boolean;
 };
 
 const STELLAR_ADDRESS_RE = /^G[A-Z2-7]{55}$/;
@@ -42,8 +39,6 @@ export function EscrowPayFlow({
   amount,
   bookingKind = "apartment",
   expectedSenderAddress,
-  isReadinessReady,
-  showChecklist = true,
 }: EscrowPayFlowProps) {
   const router = useRouter();
   const { address, isReady, signAndSubmit } = useActiveWallet();
@@ -61,7 +56,6 @@ export function EscrowPayFlow({
   const [signing, setSigning] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [deployState, setDeployState] = useState<DeployResponse | null>(null);
-  const [readinessReady, setReadinessReady] = useState<boolean | null>(null);
   // Synchronous double-click guard — a second click in the same tick is
   // ignored so Trustless Work is only called once per PAY press.
   const deployInFlightRef = useRef(false);
@@ -155,19 +149,12 @@ export function EscrowPayFlow({
   // Error messages render below the button, inside the card header area.
 
 
-  const isReadinessBlocking =
-    isReadinessReady !== undefined
-      ? !isReadinessReady
-      : readinessReady !== null
-        ? !readinessReady
-        : false;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
       <button
         type="button"
         onClick={handlePayClick}
-        disabled={deploying || signing || (isReady && (!hasOwnerWallet || !walletMatchesReservation || isReadinessBlocking))}
+        disabled={deploying || signing || (isReady && (!hasOwnerWallet || !walletMatchesReservation))}
         style={{
           ...buttonStyle,
           opacity: deploying || signing ? 0.65 : 1,
@@ -177,17 +164,6 @@ export function EscrowPayFlow({
       >
         {isReady ? payButtonLabel : 'Connect wallet'}
       </button>
-
-      {isReady && !deployState && showChecklist !== false && (
-        <div className="w-full min-w-[280px] max-w-sm text-left mt-2">
-          <WalletReadinessChecklist
-            apartmentId={bookingKind === "hotel-room" ? undefined : apartmentId}
-            reservationId={bookingKind === "hotel-room" ? apartmentId : undefined}
-            bookingKind={bookingKind}
-            onReadyChange={setReadinessReady}
-          />
-        </div>
-      )}
 
       {isReady && !walletMatchesReservation && <p role="alert" className="max-w-60 text-xs text-orange-600">Switch to the wallet used for this reservation.</p>}
       {isReady && address && <p className="text-xs text-muted-foreground" title={address}>Wallet: {truncateStellarAddress(address)}</p>}

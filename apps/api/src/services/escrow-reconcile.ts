@@ -6,7 +6,6 @@ import {
   lifecycleMessageInput,
   messageMutationFields,
   messageMutationVariable,
-  notifyEscrowLifecycleParticipants,
 } from './conversation-events.js';
 
 export type ReconcileSummary = {
@@ -77,7 +76,6 @@ async function syncMilestoneCompletion(action: PendingActionRow, txHash: string)
   const data = await hasuraRequest<{
     update_escrowMilestones: { affected_rows: number };
     insert_escrow_transactions_one: { id: string } | null;
-    insert_messages_one?: { id: string } | null;
   }>(
     `mutation ReconcileMilestoneCompletion($escrowId: uuid!, $log: escrow_transactions_insert_input!${event ? `, ${messageMutationVariable()}` : ''}) {
       update_escrowMilestones(
@@ -103,9 +101,6 @@ async function syncMilestoneCompletion(action: PendingActionRow, txHash: string)
   );
   if (!data.update_escrowMilestones.affected_rows) {
     throw new Error('Milestone changed. Refresh and retry');
-  }
-  if (event && data.insert_messages_one?.id) {
-    void notifyEscrowLifecycleParticipants(event.conversationId, event.event.event_type);
   }
 }
 const STATUS_RANK: Record<string, number> = {
@@ -261,7 +256,7 @@ async function applyEscrowStatusTransition(params: {
     ${lifecycleMessage ? messageMutationFields() : ''}
   }`;
 
-  const result = await hasuraRequest<{ insert_messages_one?: { id: string } | null }>(mutation, {
+  await hasuraRequest(mutation, {
     contractId,
     status: params.status,
     source: params.source,
@@ -273,12 +268,6 @@ async function applyEscrowStatusTransition(params: {
       ? { message: lifecycleMessageInput(lifecycleMessage.conversationId, lifecycleMessage.event) }
       : {}),
   });
-  if (lifecycleMessage && result.insert_messages_one?.id) {
-    void notifyEscrowLifecycleParticipants(
-      lifecycleMessage.conversationId,
-      lifecycleMessage.event.event_type,
-    );
-  }
 }
 
 export async function syncEscrows(): Promise<ReconcileSummary> {
