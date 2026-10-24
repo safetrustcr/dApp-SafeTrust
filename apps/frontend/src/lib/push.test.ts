@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi} from "vitest";
-
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPost = vi.fn(() => Promise.resolve({}));
 const mockDelete = vi.fn(() => Promise.resolve({}));
@@ -34,7 +33,6 @@ function setupEnv(vapidKey = "vapid-key") {
   vi.stubEnv("NEXT_PUBLIC_FIREBASE_VAPID_KEY", vapidKey);
 }
 
-
 const originalServiceWorker = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
 
 function stubServiceWorker() {
@@ -55,7 +53,6 @@ function restoreServiceWorker() {
   } else {
     // eslint-disable-next-line
     delete (navigator as unknown as { serviceWorker?: unknown }).serviceWorker;
-
   }
 }
 
@@ -155,7 +152,6 @@ describe("lib/push", () => {
     await expect(enablePush()).resolves.toBe("unsupported");
   });
 
-
   it("disablePush deletes device and token", async () => {
     window.localStorage.setItem("safetrust:push:enabled", "1");
     const { disablePush } = await import("./push");
@@ -170,7 +166,6 @@ describe("lib/push", () => {
     const { disablePush } = await import("./push");
     await expect(disablePush()).resolves.toBeUndefined();
   });
-
 
   it("refreshPushRegistration posts token when permission granted", async () => {
     stubNotification("granted");
