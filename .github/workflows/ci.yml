@@ -49,3 +49,29 @@ jobs:
           TRUSTLESS_WORK_API_KEY: "placeholder_tw_key"
           NEXT_PUBLIC_POLLAR_PUBLISHABLE_KEY: "placeholder_pollar_key"
           NEXT_PUBLIC_E2E_WALLET: "false"
+
+  mcp-trust-boundary:
+    name: MCP trust boundary docs
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install MCP dependencies
+        run: pnpm install --no-frozen-lockfile --filter @safetrust/mcp...
+
+      - name: Type-check the MCP server
+        run: pnpm --filter @safetrust/mcp type-check
+
+      # docs/mcp/README.md must list every tool in tools/list with its safety,
+      # carry the generated configuration table, be served as an MCP resource,
+      # and match the stdio-only / no-keys / no-submit / local-only rules (#533).
+      - name: Trust-boundary doc matches the server
+        run: pnpm --filter @safetrust/mcp test:boundary
