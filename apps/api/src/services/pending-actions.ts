@@ -1,10 +1,11 @@
-/**
+/*
  * escrow_pending_actions: every unsigned XDR apps/api builds is recorded here
  * under its transaction hash. A signed XDR is only accepted if its hash matches
  * a row built for the same user — the action, escrow and parameters come from
  * this row, never from the request body.
  */
 import { hasuraRequest } from './hasura.js';
+const { hasuraRequest } = await import('./hasura.js');
 import type { EscrowAction } from './escrow-authz.js';
 
 export type PendingStatus = 'built' | 'submitted' | 'confirmed' | 'failed' | 'expired';
@@ -29,7 +30,7 @@ export type PendingAction = {
 export type NewPendingAction = Pick<
   PendingAction,
   'engagement_id' | 'contract_id' | 'action' | 'tx_hash' | 'unsigned_xdr' | 'built_for_uid' | 'signer_address' | 'payload'
-> & { expires_at: Date };
+ > & { expires_at: Date };
 
 const FIELDS = `
   id engagement_id contract_id action tx_hash unsigned_xdr built_for_uid
@@ -97,6 +98,9 @@ export async function getPendingActionByHash(txHash: string): Promise<PendingAct
   return data.escrow_pending_actions[0] ?? null;
 }
 
+/** Alias for the recovery handler: look a pending action up by transaction hash. */
+export const findByTxHash = getPendingActionByHash;
+
 /**
  * Atomically claims a built row for submission (built → submitted).
  * Returns false when another request already claimed it.
@@ -137,3 +141,32 @@ export async function setPendingContractId(id: string, contractId: string): Prom
     { id, contractId },
   );
 }
+
+/** Mark a pending action as confirmed (idempotent). */
+export async function markConfirmed(id: string, now = new Date()): Promise<void> {
+  await hasuraRequest(
+    `mutation MarkPendingConfirmed($id: uuid!, $now: timestamptz!) {
+       update_escrow_pending_actions(
+         where: { id: { _eq: $id }, status: { _neq: "confirmed" } }
+         _set: { status: "confirmed", confirmed_at: $now }
+       ) { affected_rows }
+     }`,
+    { id, now: now.toISOString() },
+  );
+}
+
+/** Mark a pending action as failed (e.g. the ledger rejected the transaction). */
+export async function markFailed(id: string): Promise<void> {
+  await hasuraRequest(
+    `mutation MarkPendingFailed($id: uuid!) {
+       update_escrow_pending_actions(
+         where: { id: { _eq: $id }, status: { _neq: "confirmed" } }
+         _set: { status: "failed" }
+       ) { affected_rows }
+     }`,
+    { id },
+  );
+}
+
+/** Alias for the recovery handler: mark a pending action as failed. */
+export const markPendingActionFailed = markFailed;
