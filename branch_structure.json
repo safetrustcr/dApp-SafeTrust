@@ -3,16 +3,19 @@
   "branches": [
     "main",
     "origin",
-    "security/issue-508-security-escrow-recover-from-txhash-must-derive"
+    "security/issue-508-security-escrow-recover-from-txhash-must-derive",
+    "fix/issue-510-fix-db-one-escrow-transition-matrix-that"
   ],
   "parent": {
     "main": null,
     "origin": "main",
-    "security/issue-508-security-escrow-recover-from-txhash-must-derive": "main"
+    "security/issue-508-security-escrow-recover-from-txhash-must-derive": "main",
+    "fix/issue-510-fix-db-one-escrow-transition-matrix-that": "main"
   },
   "order": [
     "main",
     "origin",
-    "security/issue-508-security-escrow-recover-from-txhash-must-derive"
+    "security/issue-508-security-escrow-recover-from-txhash-must-derive",
+    "fix/issue-510-fix-db-one-escrow-transition-matrix-that"
   ]
 }
