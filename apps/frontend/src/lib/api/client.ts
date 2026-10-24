@@ -119,3 +119,12 @@ export async function getAuthenticatedApi<T>(
   return payload as T;
 }
 
+export const apiClient = {
+  post: <T>(path: string, body?: unknown, options?: ApiRequestOptions) =>
+    postAuthenticatedApi<T>(path, body, { ...options, method: 'POST' }),
+  get: <T>(path: string, options?: ApiRequestOptions) =>
+    getAuthenticatedApi<T>(path, options),
+  delete: <T>(path: string, options?: { data?: unknown } & ApiRequestOptions) =>
+    postAuthenticatedApi<T>(path, options?.data, { ...options, method: 'DELETE' }),
+};
+
