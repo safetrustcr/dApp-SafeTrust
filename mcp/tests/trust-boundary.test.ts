@@ -154,12 +154,13 @@ describe('the "never" list holds', () => {
         /^\/api\/escrow\/(deploy|fund)$/,
         `${name}: ${route.method} ${route.mount}${route.path} — only build-only POST routes are allowed`,
       );
+    }
     // The only apps/api routes the MCP may call are the build-only ones.
-    const apiCalls = [...all.matchAll(/apiRequest(?:<[^>]*>)?\(\s*[`'"]([^`'"]+)[`'"]/g)].map((m) => m[1]);
-    assert.ok(apiCalls.length > 0, 'expected apiRequest calls');
-    for (const route of apiCalls) {
+    const apiCallsFromRoutes = [...all.matchAll(/apiRequest(?:<[^>]*>)?\(\s*[`'"]([^`'"]+)[`'"]/g)].map((m) => m[1]);
+    for (const route of apiCallsFromRoutes) {
       assert.match(route, /^\/api\/escrow\/(deploy|fund)$/, `MCP calls ${route}: only build-only routes are allowed`);
     }
+    assert.ok(apiCalls.length > 0, 'expected apiRequest calls');
     for (const forbidden of [
       /submitTransaction/,
       /Keypair/,
