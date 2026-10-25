@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi} from "vitest";
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPost = vi.fn(() => Promise.resolve({}));
 const mockDelete = vi.fn(() => Promise.resolve({}));
@@ -29,7 +30,7 @@ declare global {
 }
 
 function setupEnv(vapidKey = "vapid-key") {
-  vi.stubEnv({ NEXT_PUBLIC_FIREBASE_VAPID_KEY: vapidKey });
+  vi.stubEnv("NEXT_PUBLIC_FIREBASE_VAPID_KEY", vapidKey);
 }
 
 const originalServiceWorker = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
@@ -50,6 +51,7 @@ function restoreServiceWorker() {
   if (originalServiceWorker) {
     Object.defineProperty(navigator, "serviceWorker", originalServiceWorker);
   } else {
+    // eslint-disable-next-line
     delete (navigator as unknown as { serviceWorker?: unknown }).serviceWorker;
   }
 }
@@ -96,39 +98,39 @@ describe("lib/push", () => {
   it("returns unsupported when VAPID key is missing", async () => {
     setupEnv("");
     const { getPushState } = await import("./push");
-    await expect(getPushState()).resolves.to("unsupported");
+    await expect(getPushState()).resolves.toBe("unsupported");
   });
 
   it("returns unsupported when browser is not supported", async () => {
     mockIsSupported.mockImplementation(() => Promise.resolve(false));
     stubNotification("default");
     const { getPushState } = await import("./push");
-    await expect(getPushState()).resolves.to("unsupported");
+    await expect(getPushState()).resolves.toBe("unsupported");
   });
 
   it("returns denied when permission is denied", async () => {
     stubNotification("denied");
     const { getPushState } = await import("./push");
-    await expect(getPushState()).resolves.to("denied");
+    await expect(getPushState()).resolves.toBe("denied");
   });
 
   it("returns default when permission is granted but not enabled locally", async () => {
     stubNotification("granted");
     const { getPushState } = await import("./push");
-    await expect(getPushState()).resolves.to("default");
+    await expect(getPushState()).resolves.toBe("default");
   });
 
   it("returns enabled when permission granted and local flag set", async () => {
     stubNotification("granted");
     window.localStorage.setItem("safetrust:push:enabled", "1");
     const { getPushState } = await import("./push");
-    await expect(getPushState()).resolves.to("enabled");
+    await expect(getPushState()).resolves.toBe("enabled");
   });
 
   it("enablePush requests permission and registers device", async () => {
     const requestPermission = stubNotification("default", "granted");
     const { enablePush } = await import("./push");
-    await expect(enablePush()).resolves.to("enabled");
+    await expect(enablePush()).resolves.toBe("enabled");
     expect(requestPermission).toHaveBeenCalled();
     expect(mockGetToken).toHaveBeenCalled();
     expect(mockPost).toHaveBeenCalledWith(
@@ -140,14 +142,14 @@ describe("lib/push", () => {
   it("enablePush returns denied when permission rejected", async () => {
     stubNotification("default", "denied");
     const { enablePush } = await import("./push");
-    await expect(enablePush()).resolves.to("denied");
+    await expect(enablePush()).resolves.toBe("denied");
     expect(mockPost).not.toHaveBeenCalled();
   });
 
   it("enablePush returns unsupported without VAPHD key", async () => {
     setupEnv("");
     const { enablePush } = await import("./push");
-    await expect(enablePush()).resolves.to("unsupported");
+    await expect(enablePush()).resolves.toBe("unsupported");
   });
 
   it("disablePush deletes device and token", async () => {
@@ -160,9 +162,9 @@ describe("lib/push", () => {
   });
 
   it("disablePush never throws when API delete fails", async () => {
-    mockDelete.mockRejected(new Error("network"));
+    mockDelete.mockRejectedValue(new Error("network"));
     const { disablePush } = await import("./push");
-    await expect(disablePush()).resolves.toUndefined();
+    await expect(disablePush()).resolves.toBeUndefined();
   });
 
   it("refreshPushRegistration posts token when permission granted", async () => {
