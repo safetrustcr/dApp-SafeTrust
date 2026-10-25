@@ -1,0 +1,132 @@
+table:
+  name: conversations
+  schema: public
+object_relationships:
+  - name: apartment
+    using:
+      foreign_key_constraint_on: apartment_id
+  - name: host
+    using:
+      foreign_key_constraint_on: host_id
+  - name: guest
+    using:
+      foreign_key_constraint_on: guest_id
+  - name: escrow
+    using:
+      foreign_key_constraint_on: escrow_id
+array_relationships:
+  - name: messages
+    using:
+      foreign_key_constraint_on:
+        column: conversation_id
+        table:
+          name: messages
+          schema: public
+computed_fields:
+  - name: unread_count
+    definition:
+      function:
+        name: conversation_unread_count
+        schema: public
+      session_argument: hasura_session
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - host_id
+        - guest_id
+        - escrow_id
+        - status
+        - last_message_at
+        - host_last_read_at
+        - guest_last_read_at
+        - created_at
+      computed_fields:
+        - unread_count
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - _or:
+              - host_id:
+                  _eq: X-Hasura-User-Id
+              - guest_id:
+                  _eq: X-Hasura-User-Id
+      allow_aggregations: true
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - host_id
+        - guest_id
+        - escrow_id
+        - status
+        - last_message_at
+        - host_last_read_at
+        - guest_last_read_at
+        - created_at
+      computed_fields:
+        - unread_count
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - _or:
+              - host_id:
+                  _eq: X-Hasura-User-Id
+              - guest_id:
+                  _eq: X-Hasura-User-Id
+      allow_aggregations: true
+  - role: guest
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - host_id
+        - guest_id
+        - escrow_id
+        - status
+        - last_message_at
+        - host_last_read_at
+        - guest_last_read_at
+        - created_at
+      computed_fields:
+        - unread_count
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - _or:
+              - host_id:
+                  _eq: X-Hasura-User-Id
+              - guest_id:
+                  _eq: X-Hasura-User-Id
+      allow_aggregations: true
+  - role: host
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - host_id
+        - guest_id
+        - escrow_id
+        - status
+        - last_message_at
+        - host_last_read_at
+        - guest_last_read_at
+        - created_at
+      computed_fields:
+        - unread_count
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - _or:
+              - host_id:
+                  _eq: X-Hasura-User-Id
+              - guest_id:
+                  _eq: X-Hasura-User-Id
+      allow_aggregations: true

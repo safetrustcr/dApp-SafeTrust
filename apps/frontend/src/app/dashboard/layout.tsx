@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { toast } from "sonner";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { SideBar } from "@/components/layouts/SideBar";
 import { Header } from "@/components/layouts/Header";
@@ -26,13 +27,15 @@ const Layout = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // ── Watch both auth signals ──────────────────────────
+  // ── Watch both auth signals───────────────────────────
   const address = useGlobalAuthenticationStore((state) => state.address);
   const token = useGlobalAuthenticationStore((state) => state.token);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthError, setIsAuthError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const pushRefreshedRef = useRef(false);
 
   useEffect(() => {
     const checkAuth = () => {
@@ -44,7 +47,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
         const isPublic = isPublicRoute || matchesPublicPattern;
 
         const hasWalletInStorage =
-          localStorage.getItem("walletAddress") ||
+          localStorage.getItem("walletAddress")  ||
           localStorage.getItem("address-wallet");
 
         // ── Check address (wallet) OR token (Firebase email/password) ──
@@ -65,6 +68,60 @@ const Layout = ({ children }: { children: ReactNode }) => {
 
     checkAuth();
   }, [address, token, pathname, router]);
+
+  useEffect(() => {
+    const isAuthenticated = !!address || !!token;
+    if (!isAuthenticated) {
+      pushRefreshedRef.current = false;
+      return;
+    }
+    if (pushRefreshedRef.current) return;
+    pushRefreshedRef.current = true;
+
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    (async () => {
+      try {
+        const { refreshPushRegistration, getPushState } = await import(
+          "@/lib/push"
+        );
+        await refreshPushRegistration();
+        if (cancelled) return;
+
+        const state = await getPushState();
+        if (state !== "enabled") return;
+
+        const { getMessaging, onMessage } = await import("firebase/messaging");
+        const { getFirebaseApp } = await import("@/lib/firebase");
+        const messaging = getMessaging(getFirebaseApp());
+
+        unsubscribe = onMessage(messaging, (payload) => {
+          const data = (payload.data ?? {}) as Record<string, string>;
+          const url = data.url;
+          if (!url) return;
+          if (window.location.pathname === url) return;
+
+          const title =
+            payload.notification?.title ?? data.title ?? "New notification";
+          toast(title, {
+            description: payload.notification?.body ?? data.body,
+            action: {
+              label: "Open",
+              onClick: () => router.push(url),
+            },
+          });
+        });
+      } catch {
+        // Push is best-effort; never block the dashboard.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [address, token, router]);
 
   useEffect(() => {
     setIsSidebarOpen(false);

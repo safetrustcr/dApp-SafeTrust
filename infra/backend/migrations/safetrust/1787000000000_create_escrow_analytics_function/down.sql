@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.get_escrow_analytics_by_day(DATE, DATE, TEXT);

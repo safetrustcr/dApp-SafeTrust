@@ -17,10 +17,6 @@ export default function BookingEscrowPage() {
   const router = useRouter();
   const bookingId = params?.bookingId as string;
 
-  const handleComplete = () => {
-    router.push(`/dashboard/hotel/booking/${bookingId}/confirmation`);
-  };
-
   if (!bookingId) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -45,10 +41,7 @@ export default function BookingEscrowPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="container mx-auto px-4 py-8">
-        <BookingEscrowWrapper
-          bookingId={bookingId}
-          onComplete={handleComplete}
-        />
+        <BookingEscrowWrapper bookingId={bookingId} />
       </div>
     </div>
   );

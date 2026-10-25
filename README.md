@@ -37,9 +37,9 @@ Tenant finds property → PAY → Freighter signs XDR → funds locked on-chain
 ```
 Stellar Blockchain (TrustlessWork API)
 │ signed XDR
-services/webhook (Node + Express, port 3002)
+apps/api (Node + Express, port 3002)
 │ SQL
-infra/hasura (Hasura GraphQL, port 8080)
+infra/backend (Hasura GraphQL, port 8080)
 │ GraphQL
 apps/frontend (Next.js 14, port 3001)
 ```
@@ -59,6 +59,21 @@ apps/frontend (Next.js 14, port 3001)
 
 ```bash
 npm install -g pnpm hasura-cli
+```
+
+### Makefile shortcuts
+
+From the repo root, common workflows are also available via `make`:
+
+```bash
+make help   # list targets
+make full   # start Docker infra + api/web dev servers
+make infra  # start Docker infra (both tenants)
+make dev    # start api + web
+make test   # run tests
+make lint   # lint all packages
+make build  # build all packages
+make stop   # stop Docker infra
 ```
 
 ### 1. Clone and install
@@ -82,7 +97,7 @@ cp apps/frontend/.env.example apps/frontend/.env.local
 
 **Step 2 — Hasura / Backend:**
 ```bash
-cp infra/hasura/.env.example infra/hasura/.env.local
+cp infra/backend/.env.example infra/backend/.env.local
 ```
 
 Fill in both files before continuing. See the sections below for how to obtain each value.
@@ -96,7 +111,7 @@ SafeTrust uses Firebase for authentication.
 1. Go to [console.firebase.google.com](https://console.firebase.google.com) → create a project.
 2. **Authentication → Sign-in method** → enable **Email/Password**.
 3. **Project Settings → Your apps** → register a Web app → copy the config values into `apps/frontend/.env.local`.
-4. **Project Settings → Service Accounts** → Generate new private key → copy `project_id`, `client_email`, `private_key` into `infra/hasura/.env.local`.
+4. **Project Settings → Service Accounts** → Generate new private key → copy `project_id`, `client_email`, `private_key` into `infra/backend/.env.local`.
 
 ---
 
@@ -122,19 +137,18 @@ Full guide: [docs.trustlesswork.com → Request API Key](https://docs.trustlessw
 ### 5. Start the backend
 
 ```bash
-cd infra/hasura
-bin/dc_prep
+cd infra/backend
+bin/start
 ```
 
-`dc_prep` runs in order: starts Docker containers → waits for Hasura health → applies migrations → reloads metadata → applies seeds. Takes ~30 s on first run.
+`bin/start` runs in order: starts Docker containers → waits for Hasura health → applies migrations → reloads metadata → applies seeds. Takes ~30 s on first run.
 
 **Reset the database:**
 ```bash
 docker compose down -v
-bin/dc_prep
+bin/start
 ```
 
----
 
 ### 6. Run the frontend
 
@@ -186,6 +200,20 @@ Full API reference: [docs.trustlesswork.com](https://docs.trustlesswork.com)
 
 - [Contributing Guide](https://github.com/safetrustcr/Frontend/issues/34)
 - [Git Guidelines](https://github.com/safetrustcr/Frontend/issues/35)
+
+### AI-native development (optional)
+
+`mcp.json` at the repo root connects Cursor and Claude Code to:
+
+- TrustlessWork docs and live escrow tools
+- Stellar Raven — Stellar ecosystem docs + live data
+- `safetrust` — SafeTrust's own MCP server ([`mcp/`](./mcp)): escrow tools, live Hasura
+  queries and architecture context. Build it first with
+  `pnpm --filter @safetrust/mcp build`, then restart the editor.
+
+Cursor picks up `mcp.json` automatically.
+For `stellar-raven`: run `/mcp` → Authenticate → sign in in browser.
+No API keys required for any server.
 
 ---
 

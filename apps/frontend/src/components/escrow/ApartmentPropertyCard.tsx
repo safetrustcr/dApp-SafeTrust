@@ -3,6 +3,8 @@
 import { Bath, BedDouble, MapPin, PawPrint } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 
+import { Image } from "@/components/ui/image";
+
 const FALLBACK_IMAGE = "/img/room1.png";
 
 type ApartmentAddress = {
@@ -31,8 +33,8 @@ const styles = {
     justifyContent: "space-between",
     gap: "1rem",
     flexWrap: "wrap",
-    borderBottom: "1px solid #f3f4f6",
-    paddingBottom: "1rem",
+    borderBottom: "1px solid #dedede",
+    paddingBottom: "0.8rem",
   } satisfies CSSProperties,
   paySlotWrap: {
     flexShrink: 0,
@@ -40,13 +42,13 @@ const styles = {
   imageGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: "0.5rem",
+    gap: "0.35rem",
   } satisfies CSSProperties,
   img: {
     width: "100%",
-    height: "5rem",
+    height: "4.6rem",
     objectFit: "cover",
-    borderRadius: "0.75rem",
+    borderRadius: "0.2rem",
     display: "block",
   } satisfies CSSProperties,
   amenityRow: {
@@ -81,12 +83,12 @@ function AmenityPill({
         display: "inline-flex",
         alignItems: "center",
         gap: "0.35rem",
-        border: "1px solid #fed7aa",
+        border: "none",
         borderRadius: "9999px",
-        padding: "0.25rem 0.85rem",
+        padding: "0.2rem 0.25rem",
         fontSize: "0.8rem",
         color: "#374151",
-        backgroundColor: "#fff7ed",
+        backgroundColor: "transparent",
       }}
     >
       <Icon size={13} color="#f97316" strokeWidth={2} />
@@ -120,9 +122,9 @@ export function ApartmentPropertyCard({
   const addressLine = formatAddress(address);
 
   return (
-    <div style={{ display: "grid", gap: "1rem" }}>
+    <div style={{ display: "grid", gap: "1rem", padding: "0.9rem 1rem 0" }}>
       <div style={styles.headingRow}>
-        <h2 style={{ margin: 0, fontSize: "1.5rem" }}>{name}</h2>
+        <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>{name}</h2>
         {paySlot != null ? <div style={styles.paySlotWrap}>{paySlot}</div> : null}
       </div>
 
@@ -130,18 +132,16 @@ export function ApartmentPropertyCard({
 
       <div style={styles.imageGrid}>
         {images.map((src, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={i}
-            src={src}
-            alt={`${name} photo ${i + 1}`}
-            style={styles.img}
-            onError={(e) => {
-              const img = e.target as HTMLImageElement;
-              img.onerror = null;
-              img.src = FALLBACK_IMAGE;
-            }}
-          />
+          <div key={i} className="relative w-full h-[4.6rem] overflow-hidden rounded-[0.2rem]">
+            <Image
+              src={src}
+              alt={`${name} photo ${i + 1}`}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+              priority={i === 0}
+              className="object-cover"
+            />
+          </div>
         ))}
       </div>
 

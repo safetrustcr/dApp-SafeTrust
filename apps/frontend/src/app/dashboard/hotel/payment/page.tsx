@@ -50,8 +50,8 @@ const HotelPage = () => {
               description={hotelData.description}
               price={hotelData.price}
               tax={hotelData.tax}
-              checkIn={hotelData.checkIn}
-              checkOut={hotelData.checkOut}
+              checkIn={hotelData.checkIn.toISOString().slice(0, 10)}
+              checkOut={hotelData.checkOut.toISOString().slice(0, 10)}
             />
           </div>
         </div>
