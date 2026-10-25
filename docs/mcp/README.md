@@ -81,11 +81,6 @@ every variable `mcp/src` reads is listed)_
 | `PLATFORM_STELLAR_ADDRESS` | no | unset | Nothing: a public key shown by explain-escrow-roles. NEXT_PUBLIC_PLATFORM_ADDRESS is accepted as an alias. |
 | `USDC_TRUSTLINE_ADDRESS` | no | Testnet USDC issuer | Nothing: the public USDC issuer used for trustline and balance checks; the same variable apps/api deploys with. NEXT_PUBLIC_USDC_ADDRESS is accepted as an alias. |
 | `STELLAR_HORIZON_URL` | no | https://horizon-testnet.stellar.org | Read-only Horizon lookups (accounts, transactions) for get-wallet-readiness and diagnose-escrow. Refused unless it is a Testnet or localhost Horizon. |
-| `HASURA_GRAPHQL_URL` | no | http://localhost:8080/v1/graphql | Where every Hasura read goes (get-escrow-status, get-apartment, list-apartments, query-*, hasura-query). Must be the local Hasura from infra/backend/bin/start. |
-| `HASURA_ADMIN_SECRET` | yes, for every Hasura tool | none (local stack uses myadminsecretkey) | Hasura ADMIN access: every table, every row, row permissions bypassed. Treat all tool output as privileged. Local stack only; rotate per "Incident response" if exposed. HASURA_GRAPHQL_ADMIN_SECRET alone is not enough: the Hasura client reads HASURA_ADMIN_SECRET. |
-| `SAFETRUST_API_URL` | no | http://localhost:3002 | Where deploy-escrow and fund-escrow send POST /api/escrow/* (unsigned XDR only), and where check-stack-health pings. Must be the local apps/api. |
-| `PLATFORM_STELLAR_ADDRESS` | no | unset | Nothing: a public key shown by explain-escrow-roles. NEXT_PUBLIC_PLATFORM_ADDRESS is accepted as an alias. |
-| `NEXT_PUBLIC_USDC_ADDRESS` | no | Testnet USDC issuer | Nothing: a public key shown by explain-escrow-roles. |
 | `SAFETRUST_REPO_ROOT` | no | auto-detected (nearest pnpm-workspace.yaml) | Which local files the safetrust://docs/* resources read. Point it only at a SafeTrust checkout. |
 <!-- env-table:end -->
 
@@ -220,10 +215,6 @@ marked ✅)_
 | `get-pending-action` | ✅ safe | yes | Hasura (admin) `escrow_pending_actions` | — | Status, tx hash, signer, expiry — never the XDR |
 | `get-wallet-readiness` | ✅ safe | yes | `apps/api` `GET /api/escrow/readiness`; fallback Hasura (admin) + Testnet Horizon | — | Each failing check with its fix; wallets shortened |
 | `diagnose-escrow` | ✅ safe | yes | Hasura (admin), Testnet Horizon | — | Plain-language state and next step; unsigned XDRs withheld |
-| `check-stack-health` | ✅ safe | yes | `apps/api` `/health`, Hasura `/healthz`, TrustlessWork Testnet | — | Liveness only; no data returned |
-| `explain-escrow-roles` | ✅ safe | yes | — | — | Static role-mapping reference |
-| `orchestrate-escrow` | ✅ safe | yes | — | — | Stateless lifecycle guide; calls nothing |
-| `get-escrow-status` | ✅ safe | yes | Hasura (admin) `escrows` | — | Includes the stored unsigned XDR |
 | `get-apartment` | ✅ safe | yes | Hasura (admin) `apartments`, owner name and wallet | — | |
 | `list-apartments` | ✅ safe | yes | Hasura (admin) `apartments` | — | |
 | `query-escrows` | ✅ safe | yes | Hasura (admin) `escrows` | — | Filtered, max 50 rows |

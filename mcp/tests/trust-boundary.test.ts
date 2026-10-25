@@ -155,9 +155,16 @@ describe('the "never" list holds', () => {
         `${name}: ${route.method} ${route.mount}${route.path} — only build-only POST routes are allowed`,
       );
     }
-    // The only apps/api routes the MCP may call are the build-only ones.
+    // The only apps/api routes the MCP may call are the build-only ones. A plain
+    // string literal must be one of those two paths; a URL assembled from an
+    // interpolation is allowed only when it is built through routeUrl() — which
+    // the loop above has already bound to the route table.
     const apiCallsFromRoutes = [...all.matchAll(/apiRequest(?:<[^>]*>)?\(\s*[`'"]([^`'"]+)[`'"]/g)].map((m) => m[1]);
     for (const route of apiCallsFromRoutes) {
+      if (route.startsWith('$')) {
+        assert.match(route, /^\$\{routeUrl\(/, `apiRequest(${route}): build apps/api URLs with routeUrl()`);
+        continue;
+      }
       assert.match(route, /^\/api\/escrow\/(deploy|fund)$/, `MCP calls ${route}: only build-only routes are allowed`);
     }
     assert.ok(apiCalls.length > 0, 'expected apiRequest calls');
@@ -189,7 +196,6 @@ describe('the "never" list holds', () => {
       assert.match(url, /^http:\/\/localhost[:/]/, `config.ts default ${url} is not local`);
     }
     assert.throws(() => assertTestnetHorizon('https://horizon.stellar.org'), /Testnet or local Horizon/);
-    for (const url of urls) assert.match(url, /^http:\/\/localhost[:/]/, `config.ts default ${url} is not local`);
 
     const clientConfig = JSON.parse(readFileSync(join(repoRoot, 'mcp.json'), 'utf8'));
     const safetrust = clientConfig.mcpServers.safetrust;
