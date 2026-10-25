@@ -16,6 +16,13 @@ every transaction is built by `apps/api` and signed by a person in their wallet.
 > privileged data. It is also served as the resource
 > `safetrust://docs/safetrust-mcp-trust-boundary`.
 
+> **Read [`docs/mcp/README.md`](../docs/mcp/README.md) first.** It states what this
+> server is and is not (local stdio tooling, never a public API, never holds keys or
+> submits transactions), how to connect Claude Code, Claude Desktop or the MCP
+> Inspector, the safety of every tool, and what to do if an AI client is exposed to
+> privileged data. It is also served as the resource
+> `safetrust://docs/safetrust-mcp-trust-boundary`.
+
 ## Setup
 
 ```bash
@@ -29,6 +36,13 @@ that read it (Cursor). Claude Code and Claude Desktop need their own entry — s
 relative (`mcp/dist/index.js`), so build before the editor connects;
 `pnpm --filter @safetrust/mcp dev` runs the TypeScript sources through `tsx`.
 Restart the client after a rebuild — stdio servers start once per session.
+The root [`mcp.json`](../mcp.json) registers this server over stdio alongside the
+external TrustlessWork and Stellar Raven servers for editors that read it (Cursor).
+Claude Code and Claude Desktop need their own entry — see
+[client setup](../docs/mcp/README.md#3-set-it-up).
+Its `args` are repo-root relative (`mcp/dist/index.js`), which means the build has to
+run before the editor connects. During development, `pnpm --filter @safetrust/mcp dev`
+runs the TypeScript sources directly through `tsx`.
 
 ## The flow these tools follow
 
@@ -133,6 +147,12 @@ full list, with what each variable grants, is in
 | `USDC_TRUSTLINE_ADDRESS` | Testnet USDC issuer (`NEXT_PUBLIC_USDC_ADDRESS` also accepted) | trustline and balance checks; same variable `apps/api` deploys with |
 | `PLATFORM_STELLAR_ADDRESS` | unset | shown by `explain-escrow-roles` |
 | `SAFETRUST_REPO_ROOT` | auto-detected | docs resources |
+| `HASURA_GRAPHQL_URL` | `http://localhost:8080/v1/graphql` | every Hasura tool |
+| `HASURA_ADMIN_SECRET` | none — required (local stack: `myadminsecretkey`) | every Hasura tool |
+| `SAFETRUST_API_URL` | `http://localhost:3002` | `deploy-escrow`, `fund-escrow` |
+| `PLATFORM_STELLAR_ADDRESS` | unset | shown by `explain-escrow-roles` (`NEXT_PUBLIC_PLATFORM_ADDRESS` also accepted) |
+| `NEXT_PUBLIC_USDC_ADDRESS` | testnet USDC issuer | shown by `explain-escrow-roles` |
+| `SAFETRUST_REPO_ROOT` | auto-detected | overrides repo-root detection for the docs resources |
 
 Hasura reads use the admin secret and bypass row permissions: treat output as
 privileged and never point the server at a non-local Hasura.
