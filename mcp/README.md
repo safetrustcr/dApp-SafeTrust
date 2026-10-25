@@ -6,6 +6,13 @@ can ask *"what is the owner wallet for apartment `<uuid>`?"* or *"deploy an escr
 apartment `<uuid>`, tenant `G…`, owner `G…`, 1200 USDC"* and get answers wired to this
 repo's real routes, tables and role mappings — not generic TrustlessWork advice.
 
+> **Read [`docs/mcp/README.md`](../docs/mcp/README.md) first.** It states what this
+> server is and is not (local stdio tooling, never a public API, never holds keys or
+> submits transactions), how to connect Claude Code, Claude Desktop or the MCP
+> Inspector, the safety of every tool, and what to do if an AI client is exposed to
+> privileged data. It is also served as the resource
+> `safetrust://docs/safetrust-mcp-trust-boundary`.
+
 ## Setup
 
 ```bash
@@ -14,7 +21,9 @@ pnpm --filter @safetrust/mcp build
 ```
 
 The root [`mcp.json`](../mcp.json) registers this server over stdio alongside the
-external TrustlessWork and Stellar Raven servers, so editors pick it up automatically.
+external TrustlessWork and Stellar Raven servers for editors that read it (Cursor).
+Claude Code and Claude Desktop need their own entry — see
+[client setup](../docs/mcp/README.md#3-set-it-up).
 Its `args` are repo-root relative (`mcp/dist/index.js`), which means the build has to
 run before the editor connects. During development, `pnpm --filter @safetrust/mcp dev`
 runs the TypeScript sources directly through `tsx`.
@@ -66,6 +75,7 @@ ever signed server-side — Freighter signing stays in the browser.
 | `safetrust://docs/architecture` | Escrow lifecycle, monorepo layout, Hasura tables, role mappings — generated at read time |
 | `safetrust://docs/safetrust-readme` | Root `README.md` |
 | `safetrust://docs/safetrust-mcp-readme` | This file |
+| `safetrust://docs/safetrust-mcp-trust-boundary` | `docs/mcp/README.md` — trust boundary, client setup, tool safety, incident response |
 | `safetrust://docs/safetrust-api-env-example` | `apps/api/.env.example` |
 | `safetrust://docs/safetrust-frontend-readme` | `apps/frontend/README.md`, when it exists |
 
@@ -74,13 +84,16 @@ Missing files are skipped rather than failing startup.
 
 ## Environment
 
-Read from the `env` block in the root `mcp.json` — no `.env` file is needed for local
-development. All of them have defaults that match `bin/start`.
+Read from the MCP client's `env` block — the server does not load a `.env` file.
+`HASURA_ADMIN_SECRET` has no default and must be set for every Hasura tool. The
+full list, with what each variable grants, is in
+[`docs/mcp/README.md`](../docs/mcp/README.md#configuration), generated from
+[`.env.example`](.env.example).
 
 | Variable | Default | Used by |
 |---|---|---|
 | `HASURA_GRAPHQL_URL` | `http://localhost:8080/v1/graphql` | every Hasura tool |
-| `HASURA_ADMIN_SECRET` | `myadminsecretkey` | every Hasura tool (`HASURA_GRAPHQL_ADMIN_SECRET` also accepted) |
+| `HASURA_ADMIN_SECRET` | none — required (local stack: `myadminsecretkey`) | every Hasura tool |
 | `SAFETRUST_API_URL` | `http://localhost:3002` | `deploy-escrow`, `fund-escrow` |
 | `PLATFORM_STELLAR_ADDRESS` | unset | shown by `explain-escrow-roles` (`NEXT_PUBLIC_PLATFORM_ADDRESS` also accepted) |
 | `NEXT_PUBLIC_USDC_ADDRESS` | testnet USDC issuer | shown by `explain-escrow-roles` |
