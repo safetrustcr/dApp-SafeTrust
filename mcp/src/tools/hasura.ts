@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { HASURA_GRAPHQL_URL } from '../config.js';
+import { ALLOW_RAW_HASURA_QUERY, HASURA_GRAPHQL_URL } from '../config.js';
 import { buildWhere, hasuraRequest } from '../lib/hasura.js';
 import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
 
@@ -208,7 +208,9 @@ export function registerHasuraTools(server: McpServer) {
         return errorResult(describeError(error));
       }
     },
-  );
+  );  // Off by default: unrestricted GraphQL is the one tool that can read tables no
+  // other tool covers, so it needs an explicit SAFETRUST_MCP_ENABLE_RAW_HASURA=true.
+  if (!ALLOW_RAW_HASURA_QUERY) return;
 
   server.registerTool(
     'hasura-query',
@@ -216,8 +218,8 @@ export function registerHasuraTools(server: McpServer) {
       title: 'Run a read-only Hasura query',
       description:
         'Run an arbitrary read-only GraphQL query against SafeTrust Hasura and return the raw ' +
-        'JSON. Mutations and subscriptions are refused. Use the dedicated tools first — this ' +
-        'is the escape hatch for tables they do not cover (bids, roles, webhook events).',
+        'JSON. Mutations and subscriptions are refused. Disabled unless the server starts with ' +
+        'SAFETRUST_MCP_ENABLE_RAW_HASURA=true — use the dedicated tools first.',
       inputSchema: {
         query: z.string().min(1).describe('GraphQL query document'),
         variables: z

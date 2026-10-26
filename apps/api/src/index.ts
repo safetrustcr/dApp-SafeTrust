@@ -1,4 +1,5 @@
 import './config/env.js';
+import { createApp } from './app.js';
 import express from 'express';
 import cors from 'cors';
 import { apiCorsOptions } from './http/cors-options.js';
@@ -33,7 +34,7 @@ import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
 initFirebaseAdmin();
 
-const app = express();
+const app = createApp();
 const PORT = process.env.PORT || 3002;
 
 app.use(cors(apiCorsOptions()));
