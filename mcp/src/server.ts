@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { loadSafeTrustDocs } from './resources/docs-loader.js';
 import { registerApartmentTools } from './tools/apartments.js';
+import { registerEscrowDiagnosticsTools } from './tools/escrow-diagnostics.js';
 import { registerEscrowTools } from './tools/escrow.js';
 import { registerHasuraTools } from './tools/hasura.js';
 import { registerHealthTools } from './tools/health.js';
@@ -20,6 +21,7 @@ export function createSafeTrustServer() {
   });
 
   registerEscrowTools(server);
+  registerEscrowDiagnosticsTools(server);
   registerApartmentTools(server);
   registerHasuraTools(server);
   registerHealthTools(server);

@@ -1,95 +1,93 @@
-import { randomUUID } from "node:crypto";
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import { SAFETRUST_API_URL, STELLAR_ADDRESS_REGEX } from '../config.js';
 import { apiRequest } from '../lib/api.js';
+import { routeUrl } from '../lib/api-contract.js';
 import { escrowRolesDoc } from '../lib/escrow-roles.js';
-import { buildWhere, hasuraRequest } from '../lib/hasura.js';
 import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
 
 const stellarAddress = z
   .string()
   .regex(STELLAR_ADDRESS_REGEX, 'Must be a Stellar public key (G…, 56 chars)');
 
-type EscrowRow = {
-  id: string;
-  contract_id: string | null;
-  engagement_id: string;
-  status: string;
-  amount: string;
-  property_id: string | null;
-  apartment_id: string | null;
-  sender_address: string;
-  receiver_address: string;
-  unsigned_xdr: string | null;
-  created_at: string;
-  updated_at: string;
-};
+/**
+ * apps/api answers errors as RFC 7807 problem details ({ type, title, detail })
+ * from ApiError, or as { error, code? } from the auth middleware.
+ */
+export type ApiFailure = { error?: string; code?: string; detail?: string; title?: string; type?: string };
+
+export function apiFailure(action: string, status: number, data: ApiFailure) {
+  const code = data.code ?? data.type?.split('/').pop()?.replace(/-/g, '_').toUpperCase();
+  const message = data.detail ?? data.error ?? data.title ?? 'unknown error';
+  const lines = [`${action} failed (HTTP ${status}${code ? ` ${code}` : ''}): ${message}`];
+  if (status === 401) {
+    lines.push(
+      '',
+      'apps/api build routes require a signed-in user and an Idempotency-Key. The MCP does not sign in',
+      'as the Testnet test user yet (#528), so build through the app in the browser for now, and use',
+      'get-booking-context, get-wallet-readiness and diagnose-escrow to see where a booking stands.',
+    );
+  }
+  return errorResult(...lines);
+}
+
+/** Show enough of an unsigned XDR to recognise it; signing happens in the browser wallet. */
+const preview = (xdr: string | undefined | null) =>
+  xdr ? `${xdr.slice(0, 48)}… (${xdr.length} chars, unsigned)` : 'none returned';
 
 export function registerEscrowTools(server: McpServer) {
   /**
-   * Deploy — delegates to apps/api so the TrustlessWork API key and the role
-   * mapping stay server-side. That route expects tenantAddress/ownerAddress plus a
-   * caller-supplied engagementId (it doubles as the idempotency key), not the
-   * senderAddress/receiverAddress pair the frontend route takes.
+   * Deploy — POST /api/escrow/deploy. apps/api derives the host wallet and the
+   * amount from the apartment or reservation, and the engagement id from the
+   * booking, so the MCP only passes the booking and the guest wallet.
    */
   server.registerTool(
     'deploy-escrow',
     {
       title: 'Deploy escrow',
       description:
-        'Deploy a SafeTrust single-release escrow for an apartment booking. Calls apps/api ' +
-        'POST /api/escrow/deploy, which applies SafeTrust role mappings and returns an ' +
-        'unsigned XDR for the tenant to sign with Freighter.',
-      inputSchema: z.object({
-        apartmentId: z.string().uuid().describe('UUID of the apartment being rented'),
-        senderAddress: stellarAddress.describe('Tenant Stellar wallet — approver role'),
-        receiverAddress: stellarAddress.describe('Owner Stellar wallet — serviceProvider + receiver roles'),
-        amount: z.number().positive().describe('Deposit amount in USDC'),
-        engagementId: z.string().optional().describe('Optional idempotency key — generated if omitted'),
-      }),
+        'Build the unsigned deploy (initialize) transaction for an apartment deposit or a hotel reservation ' +
+        'through apps/api POST /api/escrow/deploy. Pass exactly one of apartmentId or reservationId, plus ' +
+        "the guest's registered wallet. Returns an unsigned XDR only; the guest signs it in their wallet.",
+      inputSchema: {
+        apartmentId: z.string().uuid().optional().describe('Apartment being rented (deposit escrow)'),
+        reservationId: z.string().uuid().optional().describe('Hotel reservation being paid'),
+        senderAddress: stellarAddress.describe("Guest's registered Stellar wallet (approver and release signer)"),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ apartmentId, senderAddress, receiverAddress, amount, engagementId }) => {
+    async ({ apartmentId, reservationId, senderAddress }) => {
+      if (Boolean(apartmentId) === Boolean(reservationId)) {
+        return errorResult('Provide exactly one of apartmentId or reservationId.');
+      }
       try {
-        const engagement = engagementId ?? randomUUID();
-        const { ok, status, data } = await apiRequest<{
-          unsignedXDR?: string | null;
-          engagementId?: string;
-          contractId?: string;
-          cached?: boolean;
-          error?: string;
-          details?: unknown;
-        }>('/api/escrow/deploy', {
+        const { ok, status, data } = await apiRequest<
+          { status?: string; engagementId?: string; contractId?: string; unsignedXDR?: string; cached?: boolean } & ApiFailure
+        >(routeUrl('deploy'), {
           method: 'POST',
-          body: { apartmentId, senderAddress, receiverAddress, amount, engagementId: engagement },
+          body: apartmentId ? { apartmentId, senderAddress } : { reservationId, senderAddress },
         });
+        if (!ok) return apiFailure('Deploy', status, data);
 
-        if (!ok) {
-          return errorResult(
-            `Deploy failed (HTTP ${status}): ${data.error ?? 'unknown error'}`,
-            data.details ? jsonBlock(data.details) : '',
-          );
-        }
-
-        if (data.cached) {
+        if (data.cached && !data.unsignedXDR) {
           return textResult(
-            'Escrow already deployed for this engagementId (idempotent replay).',
-            `engagementId: ${data.engagementId ?? engagementId}`,
+            'Already deployed for this booking (idempotent replay).',
+            `engagementId: ${data.engagementId}`,
             `contractId: ${data.contractId ?? 'unknown'}`,
+            '',
+            'Next: diagnose-escrow with this engagementId.',
           );
         }
-
-        const xdr = data.unsignedXDR;
-
         return textResult(
-          'Escrow deploy initiated.',
-          `engagementId: ${data.engagementId ?? engagementId}`,
-          `unsignedXDR: ${xdr ? `${xdr.slice(0, 48)}… (${xdr.length} chars)` : 'none returned'}`,
+          data.cached ? 'Deploy transaction already built and still waiting for a signature.' : 'Deploy transaction built.',
+          `status: ${data.status}`,
+          `engagementId: ${data.engagementId}`,
+          `contractId: ${data.contractId ?? '(assigned on chain)'}`,
+          `unsignedXDR: ${preview(data.unsignedXDR)}`,
           '',
-          'Next: sign the XDR with Freighter in the browser, then submit it through the',
-          'frontend route POST /api/escrow/send-transaction — apps/api has no submit route yet.',
+          'Next: the guest signs it in their wallet in the app; the frontend submits it to',
+          'POST /api/escrow/send-transaction, which only accepts the hash apps/api recorded.',
         );
       } catch (error) {
         return errorResult(describeError(error));
@@ -97,45 +95,43 @@ export function registerEscrowTools(server: McpServer) {
     },
   );
 
-  /** Fund — apps/api POST /api/escrow/fund, again returning an unsigned XDR. */
+  /** Fund — POST /api/escrow/fund. Signer and amount come from the escrow row. */
   server.registerTool(
     'fund-escrow',
     {
       title: 'Fund escrow',
       description:
-        'Fund a deployed SafeTrust escrow. Calls apps/api POST /api/escrow/fund and returns ' +
-        'the unsigned XDR the tenant signs with Freighter.',
+        'Build the unsigned fund transaction for a deployed escrow through apps/api POST /api/escrow/fund. ' +
+        "apps/api takes the signer (the guest's approver wallet) and the amount from the escrow record. " +
+        'Returns an unsigned XDR only.',
       inputSchema: {
-        contractId: z.string().min(1).describe('Stellar contract address of the deployed escrow'),
-        signer: stellarAddress.describe('Wallet funding the escrow — normally the tenant'),
-        amount: z.number().positive().describe('Amount to fund in USDC'),
+        engagementId: z.string().min(1).describe('rental:<apartmentId>:<guestUid> or hotel:<reservationId>'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ contractId, signer, amount }) => {
+    async ({ engagementId }) => {
       try {
-        const { ok, status, data } = await apiRequest<{
-          unsignedTransaction?: string;
-          error?: string;
-          details?: unknown;
-        }>('/api/escrow/fund', { method: 'POST', body: { contractId, signer, amount } });
-
-        if (!ok) {
-          return errorResult(
-            `Fund failed (HTTP ${status}): ${data.error ?? 'unknown error'}`,
-            data.details ? jsonBlock(data.details) : '',
-          );
-        }
-
-        const xdr = data.unsignedTransaction;
+        const { ok, status, data } = await apiRequest<
+          {
+            unsignedXdr?: string;
+            txHash?: string;
+            engagementId?: string;
+            contractId?: string | null;
+            expiresAt?: string;
+            reused?: boolean;
+          } & ApiFailure
+        >(routeUrl('fund'), { method: 'POST', body: { engagementId } });
+        if (!ok) return apiFailure('Fund', status, data);
 
         return textResult(
-          'Fund transaction built.',
-          `contractId: ${contractId}`,
-          `amount: ${amount} USDC`,
-          `unsignedTransaction: ${xdr ? `${xdr.slice(0, 48)}… (${xdr.length} chars)` : 'none returned'}`,
+          data.reused ? 'Fund transaction already built (reused, still unsigned).' : 'Fund transaction built.',
+          `engagementId: ${data.engagementId}`,
+          `contractId: ${data.contractId ?? '(none)'}`,
+          `txHash: ${data.txHash}`,
+          `expiresAt: ${data.expiresAt}`,
+          `unsignedXdr: ${preview(data.unsignedXdr)}`,
           '',
-          'Sign it with Freighter and submit it through the frontend send-transaction route.',
+          'Next: the guest signs it in their wallet in the app. Then diagnose-escrow shows confirmation.',
         );
       } catch (error) {
         return errorResult(describeError(error));
@@ -144,195 +140,78 @@ export function registerEscrowTools(server: McpServer) {
   );
 
   /**
-   * Orchestrate — a stateless, step-by-step guide through the full deploy →
-   * fund → release lifecycle. It never holds state and never talks to
-   * TrustlessWork directly: every step points at apps/api routes (through the
-   * other MCP tools) or at the frontend send-transaction route for Freighter
-   * signing. The caller resumes a sequence by passing back the engagementId
-   * and contractId returned by deploy-escrow / fund-escrow.
+   * Orchestrate — stateless guide through the lifecycle. Never calls anything;
+   * every step points at another tool or at what a person does in the app.
    */
   server.registerTool(
     'orchestrate-escrow',
     {
       title: 'Orchestrate escrow',
       description:
-        'Step-by-step guide for the full SafeTrust escrow lifecycle. ' +
-        'Call with step="start" to begin, then follow the "next" instruction ' +
-        'in each response. Stateless — pass engagementId and contractId from ' +
-        'previous steps to resume.',
-      inputSchema: z.object({
-        step: z
-          .enum(['start', 'after-deploy', 'after-fund', 'status'])
-          .describe('Current step in the lifecycle'),
-        apartmentId: z.string().uuid().optional().describe('UUID of the apartment being rented'),
-        senderAddress: stellarAddress.optional().describe('Tenant Stellar wallet — approver role'),
-        receiverAddress: stellarAddress.optional().describe('Owner Stellar wallet — serviceProvider + receiver roles'),
-        amount: z.number().positive().optional().describe('Deposit amount in USDC'),
-        engagementId: z.string().optional().describe('Resume key — returned by deploy-escrow'),
-        contractId: z.string().optional().describe('Resume key — returned by deploy-escrow'),
-      }),
+        'Step-by-step guide for the SafeTrust escrow lifecycle (apartment deposits and hotel reservations). ' +
+        'Stateless: call with step="start", then pass the engagementId from deploy-escrow to resume.',
+      inputSchema: {
+        step: z.enum(['start', 'after-deploy', 'after-fund', 'status']).describe('Current step in the lifecycle'),
+        apartmentId: z.string().uuid().optional().describe('Apartment being rented'),
+        reservationId: z.string().uuid().optional().describe('Hotel reservation being paid'),
+        senderAddress: stellarAddress.optional().describe("Guest's registered Stellar wallet"),
+        engagementId: z.string().optional().describe('Resume key returned by deploy-escrow'),
+      },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async ({ step, apartmentId, senderAddress, receiverAddress, amount, engagementId, contractId }) => {
+    async ({ step, apartmentId, reservationId, senderAddress, engagementId }) => {
       switch (step) {
-        case 'start':
-          if (!apartmentId || !senderAddress || !receiverAddress || !amount) {
-            return errorResult(
-              'For step=start, provide: apartmentId, senderAddress, receiverAddress, amount'
-            );
+        case 'start': {
+          if (Boolean(apartmentId) === Boolean(reservationId) || !senderAddress) {
+            return errorResult('For step=start, provide exactly one of apartmentId or reservationId, and senderAddress.');
           }
+          const booking = apartmentId ? { apartmentId } : { reservationId };
           return textResult(
-            '── Step 1: Deploy escrow ──────────────────────────────────',
-            'Call deploy-escrow with these parameters:',
-            jsonBlock({ apartmentId, senderAddress, receiverAddress, amount }),
+            '── Step 1: Check, then deploy ─────────────────────────────',
+            '1. get-wallet-readiness with:',
+            jsonBlock({ ...booking, ...(apartmentId ? { guestAddress: senderAddress } : {}) }),
+            '2. deploy-escrow with:',
+            jsonBlock({ ...booking, senderAddress }),
             '',
-            'deploy-escrow will return an unsignedXDR.',
-            'Sign it with Freighter in the browser.',
-            'Then call orchestrate-escrow again with:',
-            '  step: "after-deploy"',
-            '  engagementId: (from deploy-escrow response)',
-            '  contractId: (from deploy-escrow response)',
-            '  senderAddress: (same as above)',
-            '  amount: (same as above)',
+            'The guest signs the returned transaction in their wallet in the app.',
+            'Then call orchestrate-escrow with step="after-deploy" and the engagementId.',
           );
-
+        }
         case 'after-deploy':
-          if (!contractId || !senderAddress || !amount) {
-            return errorResult(
-              'For step=after-deploy, provide: contractId, senderAddress, amount'
-            );
-          }
+          if (!engagementId) return errorResult('For step=after-deploy, provide engagementId.');
           return textResult(
-            '── Step 2: Fund escrow ────────────────────────────────────',
-            `contractId: ${contractId}`,
-            '',
-            'The deploy XDR has been signed and submitted.',
-            'Now call fund-escrow with:',
-            jsonBlock({ contractId, signer: senderAddress, amount }),
-            '',
-            'fund-escrow returns another unsignedXDR.',
-            'Sign it with Freighter.',
-            'Then call orchestrate-escrow with step="after-fund" to continue.',
+            '── Step 2: Fund ──────────────────────────────────────────',
+            `1. diagnose-escrow { engagementId: "${engagementId}" } must report the escrow as created.`,
+            `2. fund-escrow { engagementId: "${engagementId}" } builds the fund transaction.`,
+            '3. The guest signs it in their wallet in the app.',
+            'Then call orchestrate-escrow with step="after-fund".',
           );
-
         case 'after-fund':
           return textResult(
-            '── Step 3: Escrow funded ──────────────────────────────────',
-            'The escrow is now funded and locked on Stellar.',
+            '── Step 3: Milestone and release ─────────────────────────',
+            '1. The host marks the milestone complete (POST /api/escrow/milestone-status) and signs.',
+            '2. The guest approves (POST /api/escrow/approve-milestone) and releases',
+            '   (POST /api/escrow/release-funds), signing each in their wallet.',
             '',
-            'When the host completes the service:',
-            '  1. Host marks milestone done (POST /api/escrow/milestone-status)',
-            '  2. Tenant calls release-funds (POST /api/escrow/release-funds)',
-            '',
-            'To check current status:',
-            '  call get-escrow-status with contractId or engagementId',
+            'At any point, diagnose-escrow explains where the booking stands.',
             '',
             escrowRolesDoc(),
           );
-
         case 'status':
-          if (!contractId && !engagementId) {
-            return errorResult('Provide contractId or engagementId to check status.');
-          }
-          return textResult(
-            'Call get-escrow-status with:',
-            jsonBlock({ contractId, engagementId }),
-          );
+          if (!engagementId) return errorResult('Provide engagementId to check status.');
+          return textResult('Call diagnose-escrow (plain-language) or get-escrow-status (raw rows) with:', jsonBlock({ engagementId }));
       }
     },
   );
 
-  /** Status — reads public.escrows directly, so it works without apps/api running. */
-  server.registerTool(
-    'get-escrow-status',
-    {
-      title: 'Get escrow status',
-      description:
-        'Get the current status of a SafeTrust escrow by contractId or engagementId. ' +
-        'Queries the public.escrows table in Hasura.',
-      inputSchema: {
-        contractId: z.string().optional().describe('Stellar contract address'),
-        engagementId: z.string().optional().describe('TrustlessWork engagement ID'),
-      },
-      annotations: { readOnlyHint: true },
-    },
-    async ({ contractId, engagementId }) => {
-      if (!contractId && !engagementId) {
-        return errorResult('Provide either contractId or engagementId — not both, not neither.');
-      }
-      if (contractId && engagementId) {
-        return errorResult(
-          'Provide only one identifier. ' +
-          'Supplying both contractId and engagementId is ambiguous.'
-        );
-      }
-
-      const where = buildWhere(
-        [
-          ['contractId', 'String!', '{ contract_id: { _eq: $contractId } }', contractId],
-          ['engagementId', 'String!', '{ engagement_id: { _eq: $engagementId } }', engagementId],
-        ],
-        '_or',
-      );
-
-      const query = `
-        query GetEscrowStatus${where.variableDefinitions} {
-          escrows(${where.whereArgument}, limit: 1, order_by: { created_at: desc }) {
-            id
-            contract_id
-            engagement_id
-            status
-            amount
-            property_id
-            apartment_id
-            sender_address
-            receiver_address
-            unsigned_xdr
-            created_at
-            updated_at
-          }
-        }
-      `;
-
-      try {
-        const data = await hasuraRequest<{ escrows: EscrowRow[] }>(query, where.variables);
-        const escrow = data.escrows[0];
-
-        if (!escrow) {
-          return textResult(
-            'No escrow found for that identifier in public.escrows.',
-            'If it came from the legacy hotel flow, try query-trustless-work-escrows instead.',
-          );
-        }
-
-        return textResult(
-          'Escrow found.',
-          `contractId: ${escrow.contract_id ?? '(not set yet)'}`,
-          `engagementId: ${escrow.engagement_id}`,
-          `status: ${escrow.status}`,
-          `amount: ${escrow.amount} USDC`,
-          `sender (tenant / approver): ${escrow.sender_address}`,
-          `receiver (owner): ${escrow.receiver_address}`,
-          `apartmentId: ${escrow.apartment_id ?? '(none)'}`,
-          `propertyId: ${escrow.property_id ?? '(none)'}`,
-          `unsignedXDR: ${escrow.unsigned_xdr ? `stored (${escrow.unsigned_xdr.length} chars)` : 'not stored'}`,
-          `created: ${escrow.created_at}`,
-          `updated: ${escrow.updated_at}`,
-        );
-      } catch (error) {
-        return errorResult(describeError(error));
-      }
-    },
-  );
-
-  /** Pure context — no network calls, just SafeTrust's role mapping. */
+  /** Pure context — no network calls. */
   server.registerTool(
     'explain-escrow-roles',
     {
       title: 'Explain escrow roles',
       description:
-        'Explain SafeTrust role mappings for a TrustlessWork single-release escrow, including ' +
-        'the database columns each role lands in and the USDC trustline used on testnet.',
+        'Explain which wallet fills each Trustless Work role on a SafeTrust escrow, which role signs each ' +
+        'action, the build route for each, and the engagement id formats.',
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },

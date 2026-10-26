@@ -3,6 +3,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { loadSafeTrustDocs } from '../../src/resources/docs-loader.js';
 import { registerApartmentTools } from '../../src/tools/apartments.js';
+import { registerEscrowDiagnosticsTools } from '../../src/tools/escrow-diagnostics.js';
 import { registerEscrowTools } from '../../src/tools/escrow.js';
 import { registerHasuraTools } from '../../src/tools/hasura.js';
 
@@ -13,6 +14,7 @@ export const INTEGRATION_ENABLED =
 export async function createTestClient() {
   const server = new McpServer({ name: 'test', version: '0.0.1' });
   registerEscrowTools(server);
+  registerEscrowDiagnosticsTools(server);
   registerApartmentTools(server);
   registerHasuraTools(server);
   loadSafeTrustDocs(server);

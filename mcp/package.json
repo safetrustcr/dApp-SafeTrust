@@ -12,6 +12,7 @@
     "lint": "echo \"no lint configured\"",
     "test": "echo \"no tests\"",
     "test:integration": "tsx --test tests/integration.test.ts",
+    "test:escrow": "tsx --test tests/escrow-tools.test.ts",
     "test:boundary": "tsx --test tests/trust-boundary.test.ts",
     "docs:env": "node scripts/env-table.mjs --write",
     "docs:env:check": "node scripts/env-table.mjs"

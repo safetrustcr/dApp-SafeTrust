@@ -46,6 +46,10 @@ Wallet signing, submitting and payments: browser + wallet only, never the MCP
 | The MCP server never… | Why it matters | Enforced by |
 |---|---|---|
 | runs as a public HTTP MCP server | A network listener would need full authorization and would expose admin-level reads | stdio-only entry point _(tested)_ |
+| submits a transaction on its own | Every on-chain step needs a human signature in the wallet | every `apps/api` call goes through the route table, which holds only the two build routes and read-only `GET`s; no Stellar SDK in `mcp/` _(tested)_ |
+| holds or uses wallet private keys | Keys stay in the wallet; the MCP only sees public `G…` addresses | no secret keys or signing code in `mcp/` _(tested)_ |
+| ships an end-user UI | It is contributor tooling, not product surface | the package is `private` and has no UI _(tested)_ |
+| points at production URLs | Its credentials are admin-level; production data must never reach an AI client | localhost defaults for every credentialed endpoint _(tested)_; the one remote default is the public, read-only Testnet Horizon, and a non-Testnet Horizon is refused at runtime _(tested)_; runtime refusal of other remote hosts arrives with [#529](https://github.com/safetrustcr/dApp-SafeTrust/issues/529) |
 | submits a transaction on its own | Every on-chain step needs a human signature in the wallet | no submit route or Stellar SDK in `mcp/` _(tested)_ |
 | holds or uses wallet private keys | Keys stay in the wallet; the MCP only sees public `G…` addresses | no secret keys or signing code in `mcp/` _(tested)_ |
 | ships an end-user UI | It is contributor tooling, not product surface | the package is `private` and has no UI _(tested)_ |
@@ -71,11 +75,12 @@ every variable `mcp/src` reads is listed)_
 <!-- env-table:begin (generated from mcp/.env.example by `pnpm --filter @safetrust/mcp docs:env`) -->
 | Variable | Required | Default | What it grants |
 |---|---|---|---|
-| `HASURA_GRAPHQL_URL` | no | http://localhost:8080/v1/graphql | Where every Hasura read goes (get-escrow-status, get-apartment, list-apartments, query-*, hasura-query). Must be the local Hasura from infra/backend/bin/start. |
+| `HASURA_GRAPHQL_URL` | no | http://localhost:8080/v1/graphql | Where every Hasura read goes (get-booking-context, get-escrow-status, get-pending-action, diagnose-escrow, get-apartment, list-apartments, query-*, hasura-query, and get-wallet-readiness's fallback). Must be the local Hasura from infra/backend/bin/start. |
 | `HASURA_ADMIN_SECRET` | yes, for every Hasura tool | none (local stack uses myadminsecretkey) | Hasura ADMIN access: every table, every row, row permissions bypassed. Treat all tool output as privileged. Local stack only; rotate per "Incident response" if exposed. HASURA_GRAPHQL_ADMIN_SECRET alone is not enough: the Hasura client reads HASURA_ADMIN_SECRET. |
-| `SAFETRUST_API_URL` | no | http://localhost:3002 | Where deploy-escrow and fund-escrow send POST /api/escrow/* (unsigned XDR only), and where check-stack-health pings. Must be the local apps/api. |
+| `SAFETRUST_API_URL` | no | http://localhost:3002 | Where deploy-escrow and fund-escrow send POST /api/escrow/* (unsigned XDR only), where get-wallet-readiness reads GET /api/escrow/readiness, and where check-stack-health pings. Must be the local apps/api. |
 | `PLATFORM_STELLAR_ADDRESS` | no | unset | Nothing: a public key shown by explain-escrow-roles. NEXT_PUBLIC_PLATFORM_ADDRESS is accepted as an alias. |
-| `NEXT_PUBLIC_USDC_ADDRESS` | no | Testnet USDC issuer | Nothing: a public key shown by explain-escrow-roles. |
+| `USDC_TRUSTLINE_ADDRESS` | no | Testnet USDC issuer | Nothing: the public USDC issuer used for trustline and balance checks; the same variable apps/api deploys with. NEXT_PUBLIC_USDC_ADDRESS is accepted as an alias. |
+| `STELLAR_HORIZON_URL` | no | https://horizon-testnet.stellar.org | Read-only Horizon lookups (accounts, transactions) for get-wallet-readiness and diagnose-escrow. Refused unless it is a Testnet or localhost Horizon. |
 | `SAFETRUST_REPO_ROOT` | no | auto-detected (nearest pnpm-workspace.yaml) | Which local files the safetrust://docs/* resources read. Point it only at a SafeTrust checkout. |
 <!-- env-table:end -->
 
@@ -202,10 +207,14 @@ marked ✅)_
 <!-- tool-catalogue:begin -->
 | Tool | Safety | Enabled by default | Reads | Writes | Notes |
 |---|---|---|---|---|---|
-| `check-stack-health` | ✅ safe | yes | `apps/api` `/health`, Hasura `/healthz`, TrustlessWork Testnet | — | Liveness only; no data returned |
+| `check-stack-health` | ✅ safe | yes | `apps/api` `/health`, Hasura `/healthz` | — | Liveness only; no data returned. Never calls Trustless Work |
 | `explain-escrow-roles` | ✅ safe | yes | — | — | Static role-mapping reference |
 | `orchestrate-escrow` | ✅ safe | yes | — | — | Stateless lifecycle guide; calls nothing |
-| `get-escrow-status` | ✅ safe | yes | Hasura (admin) `escrows` | — | Includes the stored unsigned XDR |
+| `get-booking-context` | ✅ safe | yes | Hasura (admin) apartment terms or `reservations`, `escrows` | — | Wallets shortened (`GABC…WXYZ`); lists what `apps/api` would refuse a deploy with |
+| `get-escrow-status` | ✅ safe | yes | Hasura (admin) `escrows`, `escrow_transactions`, `trustless_work_escrows` | — | Last 10 transitions; unsigned XDRs withheld |
+| `get-pending-action` | ✅ safe | yes | Hasura (admin) `escrow_pending_actions` | — | Status, tx hash, signer, expiry — never the XDR |
+| `get-wallet-readiness` | ✅ safe | yes | `apps/api` `GET /api/escrow/readiness`; fallback Hasura (admin) + Testnet Horizon | — | Each failing check with its fix; wallets shortened |
+| `diagnose-escrow` | ✅ safe | yes | Hasura (admin), Testnet Horizon | — | Plain-language state and next step; unsigned XDRs withheld |
 | `get-apartment` | ✅ safe | yes | Hasura (admin) `apartments`, owner name and wallet | — | |
 | `list-apartments` | ✅ safe | yes | Hasura (admin) `apartments` | — | |
 | `query-escrows` | ✅ safe | yes | Hasura (admin) `escrows` | — | Filtered, max 50 rows |

@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
+import { assertTestnetHorizon } from '../src/config.js';
+import { API_CONTRACT } from '../src/lib/api-contract.js';
 import { createSafeTrustServer } from '../src/server.js';
 // @ts-expect-error -- plain .mjs helper shared with the docs:env script
 import { parseEnvExample, renderDoc } from '../scripts/env-table.mjs';
@@ -136,12 +138,36 @@ describe('the "never" list holds', () => {
 
   it('never submits transactions or holds keys', () => {
     assert.ok(!('@stellar/stellar-sdk' in deps), 'mcp/ must not depend on the Stellar SDK');
-    // The only apps/api routes the MCP may call are the build-only ones.
-    const apiCalls = [...all.matchAll(/apiRequest(?:<[^>]*>)?\(\s*[`'"]([^`'"]+)[`'"]/g)].map((m) => m[1]);
+    // Every apps/api call goes through the route table (src/lib/api-contract.ts),
+    // never a hand-written path. The table may hold the two build-only routes
+    // and read-only GETs — never send-transaction or any other POST.
+    const callers = src.filter((s) => !s.path.endsWith(join('lib', 'api.ts'))).map((s) => s.text).join('\n');
+    const apiCalls = [...callers.matchAll(/apiRequest(?:<[\s\S]*?>)?\(\s*([^,)]+)/g)].map((m) => m[1].trim());
     assert.ok(apiCalls.length > 0, 'expected apiRequest calls');
-    for (const route of apiCalls) {
+    for (const arg of apiCalls) {
+      assert.match(arg, /^`?(\$\{)?routeUrl\('[a-z]+'/, `apiRequest(${arg}): call apps/api through routeUrl()`);
+    }
+    for (const [name, route] of Object.entries(API_CONTRACT)) {
+      if (route.method === 'GET') continue;
+      assert.match(
+        `${route.mount}${route.path}`,
+        /^\/api\/escrow\/(deploy|fund)$/,
+        `${name}: ${route.method} ${route.mount}${route.path} — only build-only POST routes are allowed`,
+      );
+    }
+    // The only apps/api routes the MCP may call are the build-only ones. A plain
+    // string literal must be one of those two paths; a URL assembled from an
+    // interpolation is allowed only when it is built through routeUrl() — which
+    // the loop above has already bound to the route table.
+    const apiCallsFromRoutes = [...all.matchAll(/apiRequest(?:<[^>]*>)?\(\s*[`'"]([^`'"]+)[`'"]/g)].map((m) => m[1]);
+    for (const route of apiCallsFromRoutes) {
+      if (route.startsWith('$')) {
+        assert.match(route, /^\$\{routeUrl\(/, `apiRequest(${route}): build apps/api URLs with routeUrl()`);
+        continue;
+      }
       assert.match(route, /^\/api\/escrow\/(deploy|fund)$/, `MCP calls ${route}: only build-only routes are allowed`);
     }
+    assert.ok(apiCalls.length > 0, 'expected apiRequest calls');
     for (const forbidden of [
       /submitTransaction/,
       /Keypair/,
@@ -162,7 +188,14 @@ describe('the "never" list holds', () => {
     const config = readFileSync(join(mcpDir, 'src', 'config.ts'), 'utf8');
     const urls = [...config.matchAll(/'(https?:\/\/[^']+)'/g)].map((m) => m[1]);
     assert.ok(urls.length > 0);
-    for (const url of urls) assert.match(url, /^http:\/\/localhost[:/]/, `config.ts default ${url} is not local`);
+    // Credentialed endpoints (Hasura, apps/api) default to localhost. The one
+    // exception is the public, read-only Testnet Horizon, which
+    // assertTestnetHorizon() refuses to swap for a non-Testnet host.
+    for (const url of urls) {
+      if (url === 'https://horizon-testnet.stellar.org') continue;
+      assert.match(url, /^http:\/\/localhost[:/]/, `config.ts default ${url} is not local`);
+    }
+    assert.throws(() => assertTestnetHorizon('https://horizon.stellar.org'), /Testnet or local Horizon/);
 
     const clientConfig = JSON.parse(readFileSync(join(repoRoot, 'mcp.json'), 'utf8'));
     const safetrust = clientConfig.mcpServers.safetrust;
