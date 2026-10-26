@@ -131,12 +131,18 @@ export async function createReservationHandler(
 
     // Insert reservation with overlap check handled by the exclusion constraint
     const result = await hasuraRequest<{ insert_reservations_one: { id: string } }>(
-      `mutation CreateReservation($object: hotel_industry_reservations_insert_input!) {
+      `mutation CreateReservation($roomId: uuid!, $now: timestamptz!, $object: hotel_industry_reservations_insert_input!) {
+        update_reservations(
+          where: { room_id: { _eq: $roomId }, reservation_status: { _eq: "PENDING" }, hold_expires_at: { _lt: $now } }
+          _set: { reservation_status: "EXPIRED" }
+        ) { affected_rows }
         insert_reservations_one(object: $object) {
           id
         }
       }`,
       {
+        roomId,
+        now: new Date().toISOString(),
         object: {
           room_id: roomId,
           check_in: checkInDate.toISOString(),
