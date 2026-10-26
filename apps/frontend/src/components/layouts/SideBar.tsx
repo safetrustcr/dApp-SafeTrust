@@ -1,14 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { LogoutButton } from "@/components/auth/LogoutButton";
-//import { Bell, Heart, LayoutDashboard, Shield, Users } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-// Add to imports at the top:
-import { Bell, Building2, Heart, Home, Hotel, LayoutDashboard, PlusSquare, Shield, Users, MessageSquare } from "lucide-react";
-import { useAuthUser } from "@/components/auth/hooks/auth.hook";
+import { usePathname } from "next/navigation";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { UnreadBadge } from "@/components/messages/UnreadBadge";
+import { useSessionView } from "@/lib/session/use-session-view";
+import { useAuthUser } from "@/components/auth/hooks/auth.hook";
+import { getNavItemsForRole, isActive } from "./nav-items";
 
 interface SideBarProps {
   className?: string;
@@ -26,13 +25,15 @@ export function SideBar({
   variant = "permanent",
 }: SideBarProps) {
   const pathname = usePathname();
-  const router = useRouter();
+  const { activeRole } = useSessionView();
   const { user } = useAuthUser();
+
+  const navItems = getNavItemsForRole(activeRole);
 
   return (
     <div
       className={cn(
-        "fixed top-16 flex h-[calc(100vh-4rem)] flex-col overflow-y-auto overscroll-contain bg-background border-r transition-all duration-300 z-40 dark:bg-gray-900 dark:border-gray-700",
+        "fixed top-16 flex flex-col h-[calc(100vh-4rem)] bg-background border-r motion-safe:transition-transform motion-safe:duration-300 z-40 dark:bg-gray-900 dark:border-gray-700",
         variant === "drawer"
           ? cn(
               "left-0 w-64 md:hidden transform",
@@ -42,172 +43,47 @@ export function SideBar({
         className,
       )}
     >
-      <div className="flex min-h-full flex-col items-start gap-4 py-4 px-2 lg:px-4">
-        <Link
-          href="/dashboard/escrow"
-          onClick={onClose}
-          className={cn(
-            "flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 w-full dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
-            pathname === "/dashboard/escrow"
-              ? "bg-accent text-accent-foreground dark:bg-gray-800 dark:text-white"
-              : "hover:bg-accent",
-          )}
-        >
-          <Shield className="w-6 h-6 dark:text-gray-400" />
-          <span>Escrows</span>
-        </Link>
-        <Link
-          href="/dashboard/escrow-dashboard"
-          onClick={onClose}
-          className={cn(
-            "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full group relative dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
-            pathname === "/dashboard/escrow-dashboard" &&
-              "bg-accent font-medium dark:bg-gray-800 dark:text-white",
-          )}
-        >
-          <Shield className="w-6 h-6 dark:text-gray-400" />
-          <span className="md:hidden lg:block">Escrow Dashboard</span>
-          <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-            Escrow Dashboard
-          </span>
-        </Link>
-        <Link
-          href="/rent"
-          onClick={onClose}
-          className={cn(
-            "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full group relative dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
-            pathname === "/rent" &&
-              "bg-accent font-medium dark:bg-gray-800 dark:text-white",
-          )}
-        >
-          <Building2 className="w-6 h-6 shrink-0 dark:text-gray-400" />
-          <span className="md:hidden lg:block">Rent</span>
-          <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-            Rent
-          </span>
-        </Link>
-        <Link
-          href="/dashboard/messages"
-          onClick={onClose}
-          className={cn(
-            "flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full relative group dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
-            pathname.startsWith("/dashboard/messages") &&
-              "bg-accent font-medium dark:bg-gray-800 dark:text-white"
-          )}
-        >
-          <MessageSquare className="w-6 h-6 shrink-0 dark:text-gray-400" />
-          <span className="md:hidden lg:block">Messages</span>
-          <UnreadBadge userId={user?.uid} />
-          {/* Tooltip for rail mode */}
-          <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-            Messages
-          </span>
-        </Link>
-        <Link
-          href="/dashboard/notifications"
-          onClick={onClose}
-          className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full relative group dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-        >
-          <Bell className="w-6 h-6 shrink-0 dark:text-gray-400" />
-          <span className="md:hidden lg:block">Notifications</span>
-          {notificationCount > 0 && (
-            <div className="absolute right-2 bg-blue-500 text-white rounded-full min-w-[18px] h-4.5 flex items-center justify-center text-[10px] font-bold px-1 dark:bg-blue-600">
-              {notificationCount}
-            </div>
-          )}
-          {/* Tooltip for rail mode */}
-          <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-            Notifications
-          </span>
-        </Link>
-        <Link
-          href="/dashboard/favorites"
-          onClick={onClose}
-          className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full group relative dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-        >
-          <Heart className="w-6 h-6 shrink-0 dark:text-gray-400" />
-          <span className="md:hidden lg:block">Favorite</span>
-          {/* Tooltip for rail mode */}
-          <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-            Favorite
-          </span>
-        </Link>
-        <button
-          onClick={() => router.push("/dashboard/guest")}
-          className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white transition-colors duration-200 w-full group relative"
-        >
-          <LayoutDashboard className="w-6 h-6 shrink-0" />
-          <span className="md:hidden lg:block">Guest view</span>
-          {/* Tooltip for rail mode */}
-          <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-            Guest view
-          </span>
-        </button>
-        <Link
-          href="/dashboard/users"
-          onClick={onClose}
-          className={cn(
-            "flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white",
-            pathname === "/dashboard/users" &&
-              "bg-accent font-medium dark:bg-gray-800 dark:text-white",
-          )}
-        >
-          <Users className="w-6 h-6 dark:text-gray-400" />
-          <span>Users</span>
-        </Link>
-
-        <Link
-            href="/dashboard/apartments"
-            onClick={onClose}
-            className={cn(
-                "flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white group relative",
-                    pathname === "/dashboard/apartments" &&
-                      "bg-accent font-medium dark:bg-gray-800 dark:text-white",
-                  )}
-            >
-              <Home className="w-6 h-6 dark:text-gray-400 shrink-0" />
-                  <span className="md:hidden lg:block">Apartments</span>
-                  <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-                    Apartments
-                  </span>
-              </Link>
-
+      <div className="flex flex-1 flex-col overflow-y-auto scrollbar-scroball">
+        <nav aria-label="Dashboard" className="flex flex-1 flex-col gap-1 p-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(pathname, item, navItems);
+            return (
               <Link
-                  href="/dashboard/apartments/new"
-                  onClick={onClose}
-                  className={cn(
-                    "flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white group relative",
-                    pathname === "/dashboard/apartments/new" &&
-                      "bg-accent font-medium dark:bg-gray-800 dark:text-white",
-                  )}
-              >
-              <PlusSquare className="w-6 h-6 dark:text-gray-400 shrink-0" />
-                  <span className="md:hidden lg:block">New Apartment</span>
-                  <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-                    New Apartment
-                  </span>
-              </Link>
-
-              <Link
-                href="/dashboard/hotels"
+                key={item.href}
+                href={item.href}
                 onClick={onClose}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors duration-200 w-full dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white group relative",
-                  pathname.startsWith("/dashboard/hotels") &&
-                    "bg-accent font-medium dark:bg-gray-800 dark:text-white",
+                  "group relative flex w-full items-center gap-3 rounded-lg p-2 transition-colors duration-200 bg-sky-50/70 hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-gray-300 dark:hover:bg-accent dark:hover:text-accent-foreground",
+                  active &&
+                    "bg-accent text-accent-foreground ring-1 ring-sky-300 dark:bg-accent dark:text-accent-foreground dark:ring-sky-700 font-medium",
                 )}
               >
-                <Hotel className="w-6 h-6 dark:text-gray-400 shrink-0" />
-                <span className="md:hidden lg:block">Hotels</span>
-                <span className="hidden md:group-hover:block lg:group-hover:hidden absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-xs z-50 whitespace-nowrap">
-                  Hotels
+                <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span className="md:hidden lg:block">{item.label}</span>
+                <span className="absolute left-14 z-50 hidden whitespace-nowrap rounded bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md md:group-hover:block lg:group-hover:hidden">
+                  {item.label}
                 </span>
+                {item.badge === "messages" && user?.uid && (
+                  <UnreadBadge userId={user.uid} />
+                )}
+                {item.badge === "notifications" && notificationCount > 0 && (
+                  <div className="absolute right-2 bg-blue-500 text-white rounded-full min-w-[18px] h-4.5 flex items-center justify-center text-[10px] font-bold px-1 dark:bg-blue-600">
+                    {notificationCount}
+                  </div>
+                )}
               </Link>
+            );
+          })}
+        </nav>
+      </div>
 
-        <div className="mt-auto w-full pt-4">
-          <LogoutButton />
-        </div>
+      <div className="mt-auto w-full px-2 pb-4 pt-4 lg:px-4">
+        <LogoutButton />
       </div>
     </div>
   );
 }
+
+export default SideBar;

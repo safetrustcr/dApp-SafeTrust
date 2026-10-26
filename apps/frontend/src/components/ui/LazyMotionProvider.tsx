@@ -24,6 +24,7 @@ export function LazyMotionProvider({
       setReady(true);
       return features.default;
     } catch {
+      // Leave the optional renderer unloaded and keep the page static and usable.
       return new Promise<FeatureBundle>(() => {});
     }
   }, []);
