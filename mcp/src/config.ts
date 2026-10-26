@@ -40,9 +40,6 @@ export const HASURA_ADMIN_SECRET =
   process.env.HASURA_GRAPHQL_ADMIN_SECRET ??
   'myadminsecretkey';
 
-/** Opt-in escape hatch for local debugging; named tools remain the default. */
-export const HASURA_QUERY_ENABLED = process.env.SAFETRUST_MCP_ENABLE_HASURA_QUERY === 'true';
-
 /** Protected API mutations are disabled unless explicitly enabled locally. */
 export const MCP_MUTATIONS_ENABLED = process.env.SAFETRUST_MCP_ALLOW_MUTATIONS === 'true';
 
@@ -70,6 +67,14 @@ export function getFirebaseTestUserCredentials(): FirebaseTestUserCredentials {
 
 /** Base URL of apps/api (Express, port 3002 by default). */
 export const SAFETRUST_API_URL = process.env.SAFETRUST_API_URL ?? 'http://localhost:3002';
+
+/**
+ * Opt-in escape hatch for the arbitrary-GraphQL tool. It is off unless
+ * SAFETRUST_MCP_ENABLE_RAW_HASURA=true so a default install can never re-open
+ * unrestricted reads against the database.
+ */
+export const ALLOW_RAW_HASURA_QUERY =
+  process.env.SAFETRUST_MCP_ENABLE_RAW_HASURA === 'true';
 
 /** SafeTrust platform wallet — collects the fee and resolves disputes. */
 export const PLATFORM_ADDRESS =

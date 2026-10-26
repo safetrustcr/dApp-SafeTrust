@@ -86,10 +86,10 @@ test password in `mcp.json`, tool arguments, or source control.
 | `HASURA_GRAPHQL_URL` | `http://localhost:8080/v1/graphql` | every Hasura tool |
 | `HASURA_ADMIN_SECRET` | `myadminsecretkey` | every Hasura tool (`HASURA_GRAPHQL_ADMIN_SECRET` also accepted) |
 | `SAFETRUST_API_URL` | `http://localhost:3002` | `deploy-escrow`, `fund-escrow` |
+| `SAFETRUST_MCP_ENABLE_RAW_HASURA` | unset (off) | registers `hasura-query` when set to `true` |
 | `PLATFORM_STELLAR_ADDRESS` | unset | shown by `explain-escrow-roles` (`NEXT_PUBLIC_PLATFORM_ADDRESS` also accepted) |
 | `NEXT_PUBLIC_USDC_ADDRESS` | testnet USDC issuer | shown by `explain-escrow-roles` |
 | `SAFETRUST_REPO_ROOT` | auto-detected | overrides repo-root detection for the docs resources |
-| `SAFETRUST_MCP_ENABLE_HASURA_QUERY` | `false` | registers the optional `hasura-query` tool when set to `true` |
 | `SAFETRUST_MCP_FIREBASE_API_KEY` | unset | Firebase web API key used for local test-user sign-in |
 | `SAFETRUST_MCP_TEST_EMAIL` | unset | email of the local Firebase Testnet test user |
 | `SAFETRUST_MCP_TEST_PASSWORD` | unset | password of the local Firebase Testnet test user |
@@ -99,10 +99,8 @@ All MCP Hasura reads authenticate locally with the admin secret and explicitly a
 the `mcp_reader` role. Hasura enforces that role's select-only table and column
 permissions; messages, conversations, push devices and idempotency keys are not
 readable. `hasura-query` is not registered unless
-`SAFETRUST_MCP_ENABLE_HASURA_QUERY` is set to `true` in the MCP server's local
-environment (for the checked-in `mcp.json`, change that server environment entry
-from `false` to `true`). Query depth and node limits are also enforced by Hasura,
-and each named list tool caps results at 100 rows.
+`SAFETRUST_MCP_ENABLE_RAW_HASURA` is set to `true`. Query depth and node limits
+are also enforced by Hasura, and each named list tool caps results at 100 rows.
 Each MCP tool invocation writes a data-free audit line to stderr.
 
 Mutation tools are disabled by default and make no API request until explicitly
@@ -112,6 +110,28 @@ five minutes before expiry. Each protected API call sends the bearer token and a
 UUID `Idempotency-Key`; the key is returned in the tool response for safe retries.
 The API returns only the unsigned XDR and pending-action identifier needed by the
 wallet flow. The MCP server never signs or submits transactions.
+
+## Tests
+
+Three suites, all run from the repo root or with `--filter @safetrust/mcp`:
+
+| Suite | Command | Needs | Runs |
+|---|---|---|---|
+| Unit | `pnpm --filter @safetrust/mcp test` | nothing — every `fetch` is stubbed | every PR |
+| Contract | `pnpm --filter @safetrust/mcp test:contract` | nothing — apps/api is mounted in-process, Hasura and Firebase are mocked | PRs touching `mcp/**` or `apps/api/src/routes/**` |
+| Smoke | `MCP_TESTNET_SMOKE=true pnpm --filter @safetrust/mcp test:smoke` | local stack (`bin/start` + apps/api) with seeded data | manual / nightly |
+
+- `tests/unit/` drives the real MCP protocol over an in-memory transport and asserts
+  outbound requests: the `Authorization` header, the admin secret being required (no
+  fallback), which filters reach Hasura, and that `hasura-query` stays off by default.
+- `tests/contract/` starts `createApp()` from `apps/api/src/app.ts` on an ephemeral
+  port and asserts the exact status codes and response bodies the MCP tools depend on
+  (`/health`, the `401`/`400` envelopes, RFC 7807 problem details, idempotent replay).
+- `tests/smoke/` is skipped unless `MCP_TESTNET_SMOKE=true` and only calls read-only
+  tools — it asserts that no transaction is ever built.
+
+The suites use Node's built-in `fetch` through a recording stub, so they need no
+network and no Firebase/Hasura credentials.
 
 ## Prerequisites
 

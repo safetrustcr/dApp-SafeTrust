@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { HASURA_GRAPHQL_URL, HASURA_QUERY_ENABLED } from '../config.js';
+import { ALLOW_RAW_HASURA_QUERY, HASURA_GRAPHQL_URL } from '../config.js';
 import { auditToolCall } from '../lib/audit.js';
 import { buildWhere, hasuraRequest } from '../lib/hasura.js';
 import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
@@ -194,25 +194,24 @@ export function registerHasuraTools(server: McpServer) {
         return errorResult(describeError(error));
       }
     },
-  );
+  );  // Off by default: unrestricted GraphQL is the one tool that can read tables no
+  // other tool covers, so it needs an explicit SAFETRUST_MCP_ENABLE_RAW_HASURA=true.
+  if (!ALLOW_RAW_HASURA_QUERY) return;
 
-  if (HASURA_QUERY_ENABLED) {
-    server.registerTool(
-      'hasura-query',
-      {
-        title: 'Run a read-only Hasura query',
-        description:
-          'Run an arbitrary read-only GraphQL query under the mcp_reader Hasura role and return ' +
-          'the raw JSON. Mutations and subscriptions are refused. Hasura permissions and query ' +
-          'limits still apply. Enable SAFETRUST_MCP_ENABLE_HASURA_QUERY=true locally to expose it.',
-        inputSchema: {
-          query: z.string().min(1).describe('GraphQL query document'),
-          variables: z
-            .record(z.unknown())
-            .optional()
-            .describe('Variables object matching the query definition'),
-        },
-        annotations: { readOnlyHint: true },
+  server.registerTool(
+    'hasura-query',
+    {
+      title: 'Run a read-only Hasura query',
+      description:
+        'Run an arbitrary read-only GraphQL query under the restricted mcp_reader role and return ' +
+        'the raw JSON. Mutations and subscriptions are refused. Enable ' +
+        'SAFETRUST_MCP_ENABLE_RAW_HASURA=true locally to expose it.',
+      inputSchema: {
+        query: z.string().min(1).describe('GraphQL query document'),
+        variables: z
+          .record(z.unknown())
+          .optional()
+          .describe('Variables object matching the query definition'),
       },
       async ({ query, variables }) => {
         auditToolCall('hasura-query');
@@ -234,5 +233,4 @@ export function registerHasuraTools(server: McpServer) {
         }
       },
     );
-  }
 }
