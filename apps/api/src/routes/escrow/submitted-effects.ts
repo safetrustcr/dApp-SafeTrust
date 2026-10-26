@@ -60,7 +60,10 @@ export async function applySubmittedAction(pending: PendingAction, ctx: SubmitCo
         const reservationId = pending.engagement_id.slice('hotel:'.length);
         await hasuraRequest(
           `mutation ConfirmReservation($reservationId: uuid!) {
-            update_reservations_by_pk(pk_columns: { id: $reservationId }, _set: { reservation_status: "CONFIRMED" }) { id }
+            update_reservations(
+              where: { id: { _eq: $reservationId }, reservation_status: { _eq: "PENDING" } }
+              _set: { reservation_status: "CONFIRMED", hold_expires_at: null }
+            ) { affected_rows }
           }`, { reservationId },
         );
       }
