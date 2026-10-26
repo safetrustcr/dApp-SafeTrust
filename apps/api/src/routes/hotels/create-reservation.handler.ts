@@ -124,7 +124,13 @@ export async function createReservationHandler(
 
     // Calculate total price
     const pricePerNight = Number(room.price_night);
-    const total = pricePerNight * nights;
+    if (!Number.isFinite(pricePerNight) || pricePerNight <= 0) {
+      return res.status(409).json({
+        error: 'ROOM_PRICE_INVALID',
+        message: 'This room has no valid price',
+      });
+    }
+    const total = Math.round(pricePerNight * nights * 100) / 100;
 
     // Calculate hold expiration (30 minutes from now)
     const holdExpiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
