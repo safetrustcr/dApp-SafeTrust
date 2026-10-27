@@ -12,6 +12,7 @@
  * status directly.
  */
 import { syncHotelEscrowTransaction } from '../../services/hotel-reservation-escrow.js';
+import { hasuraRequest } from '../../services/hasura.js';
 import type { PendingAction } from '../../services/pending-actions.js';
 import { setPendingContractId } from '../../services/pending-actions.js';
 import {
@@ -54,6 +55,18 @@ export async function applySubmittedAction(pending: PendingAction, ctx: SubmitCo
       break;
     case 'fund':
       await dbFundEscrow(contractId, Number(p.amount));
+      // Mark hotel reservation as confirmed when escrow is funded
+      if (pending.engagement_id.startsWith('hotel:')) {
+        const reservationId = pending.engagement_id.slice('hotel:'.length);
+        await hasuraRequest(
+          `mutation ConfirmReservation($reservationId: uuid!) {
+            update_reservations(
+              where: { id: { _eq: $reservationId }, reservation_status: { _eq: "PENDING" } }
+              _set: { reservation_status: "CONFIRMED", hold_expires_at: null }
+            ) { affected_rows }
+          }`, { reservationId },
+        );
+      }
       break;
     case 'mark_milestone_completed':
       await dbMarkMilestoneCompleted(contractId, String(p.milestoneId));
