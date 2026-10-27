@@ -94,7 +94,7 @@ export async function getFirebaseIdToken(): Promise<string> {
   }
   if (!pendingSession) {
     const current = session;
-    pendingSession = (current ? refresh(current.refreshToken) : signIn())
+    pendingSession = (current ? refresh(current.refreshToken).catch(() => signIn()) : signIn())
       .then((next) => {
         session = next;
         return next;
