@@ -135,16 +135,16 @@ select_permissions:
     comment: Hosts can read the escrows they marked
   - role: mcp_reader
     permission:
-    columns:
-      - id
-      - contract_id
-      - status
-      - amount
-      - created_at
-      - updated_at
-    filter:
-      tenant_id:
-        _eq: safetrust
+      columns:
+        - id
+        - contract_id
+        - status
+        - amount
+        - created_at
+        - updated_at
+      filter:
+        tenant_id:
+          _eq: safetrust
 insert_permissions:
   - role: tenant
     permission:
