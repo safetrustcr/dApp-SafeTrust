@@ -37,6 +37,7 @@ Thumbs.db
 coverage/
 
 # IDE (optional — remove if your team commits shared VS Code settings)
+.vscode/
 .idea/
 *.swp
 *.swo
