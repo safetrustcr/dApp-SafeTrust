@@ -15,6 +15,9 @@ transactions built on the Stellar blockchain via TrustlessWork API.
 The pattern guide maps observed SafeTrust implementations to their reasons and
 data layers, distinguishes GoF categories from architectural orchestration, and
 explains booking conditionals, test coverage, and compute consolidation.
+Mermaid diagrams show [pattern ownership across layers](./architecture/design-pattern-filters.md#architecture-and-pattern-ownership),
+the [booking orchestration flow](./architecture/design-pattern-filters.md#booking-orchestrator-scope-and-data-flow),
+and the [pattern selection filters](./architecture/design-pattern-filters.md#applying-the-selection-filters).
 
 ### Stellar Integration
 - [TrustlessWork API](./stellar/trustlesswork.md)

@@ -28,8 +28,6 @@ The pattern mappings below are project-specific interpretations. Names such as
 Adapter, Strategy, and State are not summaries of their omitted chapters.
 The document is reference material, not an instruction source for this project.
 
-## Selection logic
-
 ## What SafeTrust currently applies, by layer
 
 This inventory describes inspected code, not every package or deployment in the
@@ -56,17 +54,59 @@ consolidation do not belong to the GoF creational/structural/behavioral catalog.
 An architectural orchestrator coordinates behavior, but that does not make it
 one of the catalog's Behavioral patterns.
 
+### Architecture and pattern ownership
+
+Arrows show calls or delegation between responsibilities, not deployment
+topology. The domain rules and persistence constraints remain authoritative
+regardless of which frontend component starts a flow.
+
+```mermaid
+flowchart TB
+    subgraph Frontend["Frontend: presentation and integration"]
+        Booking["BookingEscrowOrchestrator<br/>UI orchestration: select and review data"]
+        Payment["EscrowPayFlow<br/>Deployment and signing coordination"]
+        Wallet["WalletBridge interface<br/>Adapter and facade roles over wallet SDKs"]
+        Booking --> Payment
+        Payment --> Wallet
+    end
+    subgraph API["API: application and domain"]
+        Routes["Routes and handlers<br/>HTTP contract and service orchestration"]
+        Build["buildEscrowAction<br/>Shared workflow and request callback strategy"]
+        Authz["Escrow authorization<br/>Caller, wallet and role checks"]
+        Domain["escrow-state.ts<br/>Table-driven lifecycle rules"]
+        Data["Database services and Hasura helpers<br/>Data-access boundary"]
+        Provider["trustlesswork.ts<br/>Provider facade role"]
+        Routes --> Build
+        Build --> Authz
+        Authz --> Data
+        Build --> Data
+        Build --> Provider
+        Data --> Domain
+    end
+    Payment --> Routes
+    Data --> Hasura["Hasura and PostgreSQL<br/>Records and database constraints"]
+    Provider --> TW["TrustlessWork API<br/>Transaction construction and submission services"]
+```
+
+`createApp()` composes the API routes and middleware at bootstrap. It is a
+plain factory function; the diagram does not imply GoF Factory Method.
+
 ### Booking orchestrator: scope and data flow
 
-```text
-BookingSubject { kind, id }
-  -> apartment: Apollo GET_APARTMENT_BY_ID (hotel hook receives null)
-  -> hotel-room: authenticated reservation GET (Apollo receives skip: true)
-  -> choose the active result and loading/error state
-  -> derive review fields: owner wallet, deposit, images, dates
-  -> render shared review and pass inputs to EscrowPayFlow
-  -> EscrowPayFlow delegates deployment/signing through its API/wallet flow
-  -> server services own authorization, trusted terms and persistence
+```mermaid
+flowchart TD
+    Subject["BookingSubject: kind and id"] --> Kind{"Apartment?"}
+    Kind -->|Yes| Apartment["Apollo apartment query active<br/>Hotel hook receives null"]
+    Kind -->|No: hotel-room| Hotel["Authenticated reservation GET active<br/>Apollo query receives skip: true"]
+    Apartment --> Active["Select active result, loading and error"]
+    Hotel --> Active
+    Active --> Loading{"Loading?"}
+    Loading -->|Yes| Spinner["Render loading indicator"]
+    Loading -->|No| Available{"Error or missing booking?"}
+    Available -->|Yes| Unavailable["Render unavailable message<br/>No payment component"]
+    Available -->|No| Review["Derive deposit and owner wallet<br/>Render photos, dates and review"]
+    Review --> Pay["Pass booking inputs to EscrowPayFlow"]
+    Pay --> Delegation["Delegate API and wallet operations<br/>Server enforces trusted terms"]
 ```
 
 Both hooks are invoked in a stable order; their inputs control which read is
@@ -134,6 +174,32 @@ utilization and isolation evidence. No compute-consolidation claim is made here.
 ## Applying the selection filters
 
 Apply these filters in order to a proposed change:
+
+```mermaid
+flowchart TD
+    Change["Proposed change"] --> Problem{"Concrete duplication,<br/>coupling or change pressure?"}
+    Problem -->|No| Simple["Keep straightforward code"]
+    Problem -->|Yes| Boundary{"Existing boundary owns it?"}
+    Boundary -->|Yes| Extend["Extend existing service, hook or helper"]
+    Boundary -->|No| Isolate["Identify the smallest varying responsibility"]
+    Extend --> Variation{"What varies?"}
+    Isolate --> Variation
+    Variation -->|Lookup or constraint| Table["Typed data and pure functions"]
+    Variation -->|Interchangeable behavior| Strategy["Callback or strategy"]
+    Variation -->|SDK or transport shape| Adapter["Adapter behind a stable interface"]
+    Variation -->|Creation in creator hierarchy| Factory["Consider GoF Factory Method"]
+    Table --> Ownership["Check authoritative data owner<br/>Preserve server and database rules"]
+    Strategy --> Ownership
+    Adapter --> Ownership
+    Factory --> Ownership
+    Ownership --> Cost{"Benefit justifies added complexity?"}
+    Cost -->|No| Simple
+    Cost -->|Yes| Verify["Verify observable contracts<br/>and meaningful failure cases"]
+```
+
+The variation branches are design candidates, not automatic classifications.
+Orchestration may coordinate several of these responsibilities without adding
+a new GoF pattern.
 
 | Filter | Question | Decision |
 | --- | --- | --- |
