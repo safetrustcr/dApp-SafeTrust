@@ -10,6 +10,11 @@ transactions built on the Stellar blockchain via TrustlessWork API.
 - [Data Model](./architecture/data-model.md)
 - [Escrow Lifecycle](./architecture/escrow-lifecycle.md)
 - [Multi-Tenant Design](./architecture/multi-tenant.md)
+- [Applied Patterns, Layers, and Decision Filters](./architecture/design-pattern-filters.md)
+
+The pattern guide maps observed SafeTrust implementations to their reasons and
+data layers, distinguishes GoF categories from architectural orchestration, and
+explains booking conditionals, test coverage, and compute consolidation.
 
 ### Stellar Integration
 - [TrustlessWork API](./stellar/trustlesswork.md)
