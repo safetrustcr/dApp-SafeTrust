@@ -82,3 +82,15 @@ select_permissions:
                     - role:
                         _eq: STAFF
       allow_aggregations: true
+  - role: mcp_reader
+    permission:
+      columns:
+        - id
+        - reservation_id
+        - contract_id
+        - escrow_status
+        - transaction_type
+        - escrow_transaction_type
+        - created_at
+        - updated_at
+      filter: {}

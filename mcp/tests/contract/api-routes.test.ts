@@ -109,7 +109,6 @@ beforeAll(async () => {
     HASURA_ADMIN_SECRET: 'contract-admin-secret',
     PLATFORM_STELLAR_ADDRESS: `G${'P'.repeat(55)}`,
     USDC_TRUSTLINE_ADDRESS: `G${'U'.repeat(55)}`,
-    SAFETRUST_API_TOKEN: undefined,
     HASURA_GRAPHQL_ADMIN_SECRET: undefined,
   });
 
@@ -243,7 +242,7 @@ describe('POST /api/escrow/fund', () => {
 
 describe('MCP → apps/api contract', () => {
   it('relays the route 401 instead of pretending the action succeeded', async () => {
-    open = await bootTestClient({ SAFETRUST_API_URL: baseUrl, SAFETRUST_API_TOKEN: undefined });
+    open = await bootTestClient({ SAFETRUST_API_URL: baseUrl });
 
     const result = await open.client.callTool({
       name: 'fund-escrow',

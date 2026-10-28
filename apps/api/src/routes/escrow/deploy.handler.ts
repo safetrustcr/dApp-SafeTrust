@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { createHash } from 'node:crypto';
 import { checkIdempotency } from '../../services/idempotency.js';
 import { hasuraRequest } from '../../services/hasura.js';
 import { trustlessWorkRequest } from '../../services/trustlesswork.js';
@@ -23,6 +24,7 @@ type DeployResponse = {
   contractId?: string;
   unsignedXDR: string;
   engagementId: string;
+  pendingActionId?: string;
   cached?: boolean;
 };
 
@@ -60,7 +62,9 @@ export const deployEscrowHandler = asyncHandler(async (
     }
     if (terms.ownerUserId === uid) throw new ApiError(409, 'SELF_ESCROW_NOT_ALLOWED', 'You cannot create a rental escrow for your own apartment.');
   }
-  const resolvedEngagementId = hotelTerms?.engagementId ?? `rental:${apartmentId}:${uid}`;
+  const resolvedEngagementId =
+    hotelTerms?.engagementId ??
+    `rental:${apartmentId}:${uid}`;
   const propertyId = reservationId ?? apartmentId!;
   const tenantId = hotelTerms ? 'hotel_industry' : 'safetrust';
 
@@ -75,6 +79,7 @@ export const deployEscrowHandler = asyncHandler(async (
         engagementId: resolvedEngagementId,
         contractId: pending.contract_id ?? undefined,
         unsignedXDR: pending.unsigned_xdr,
+        pendingActionId: pending.id,
         cached: true,
       });
       return;
@@ -184,7 +189,7 @@ export const deployEscrowHandler = asyncHandler(async (
   );
 
 
-  await insertPendingAction({
+  const pendingAction = await insertPendingAction({
     engagement_id: resolvedEngagementId,
     contract_id: twData.contractId ?? null,
     action: 'initialize',
@@ -208,5 +213,6 @@ export const deployEscrowHandler = asyncHandler(async (
     contractId: twData.contractId,
     unsignedXDR: unsignedXdr,
     engagementId: resolvedEngagementId,
+    pendingActionId: pendingAction.id,
   });
 });

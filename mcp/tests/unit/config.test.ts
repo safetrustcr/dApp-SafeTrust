@@ -17,13 +17,11 @@ describe('config defaults', () => {
     const config = await loadConfig({
       HASURA_GRAPHQL_URL: undefined,
       SAFETRUST_API_URL: undefined,
-      SAFETRUST_API_TOKEN: undefined,
       SAFETRUST_MCP_ENABLE_RAW_HASURA: undefined,
     });
 
     expect(config.HASURA_GRAPHQL_URL).toBe('http://localhost:8080/v1/graphql');
     expect(config.SAFETRUST_API_URL).toBe('http://localhost:3002');
-    expect(config.SAFETRUST_API_TOKEN).toBeNull();
   });
 
   it('leaves the arbitrary-GraphQL escape hatch off unless it is explicitly enabled', async () => {

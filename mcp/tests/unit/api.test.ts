@@ -9,7 +9,7 @@ const BASE = 'http://api.test';
 
 function loadApi(env: Record<string, string | undefined> = {}): Promise<ApiModule> {
   return loadFresh<ApiModule>(
-    { SAFETRUST_API_URL: BASE, SAFETRUST_API_TOKEN: undefined, ...env },
+    { SAFETRUST_API_URL: BASE, ...env },
     () => import('../../src/lib/api.js'),
   );
 }
@@ -48,26 +48,6 @@ describe('apiRequest', () => {
     });
   });
 
-  it('authenticates every request with the configured bearer token', async () => {
-    // apps/api protects /api/escrow/* behind authenticateFirebase; dropping this
-    // header turns every escrow tool into a 401.
-    const { calls } = stubFetch(() => jsonResponse({}));
-    const { apiRequest } = await loadApi({ SAFETRUST_API_TOKEN: 'test-id-token' });
-
-    await apiRequest('/api/escrow/fund', { method: 'POST', body: { engagementId: 'e1' } });
-
-    expect(calls[0].headers.Authorization).toBe('Bearer test-id-token');
-  });
-
-  it('sends no Authorization header when no token is configured', async () => {
-    const { calls } = stubFetch(() => jsonResponse({}));
-    const { apiRequest } = await loadApi({ SAFETRUST_API_TOKEN: undefined });
-
-    await apiRequest('/health');
-
-    expect(calls[0].headers).not.toHaveProperty('Authorization');
-  });
-
   it('returns non-2xx responses instead of throwing, so tools can relay the API message', async () => {
     stubFetch(() => jsonResponse({ error: 'Escrow not found.' }, 404));
     const { apiRequest } = await loadApi();
@@ -100,18 +80,6 @@ describe('apiRequest', () => {
     await expect(apiRequest('/api/escrow/deploy', { method: 'POST', body: {} })).rejects.toThrow(
       `Cannot reach apps/api at ${BASE}/api/escrow/deploy`,
     );
-  });
-
-  it('never echoes the bearer token in an error message', async () => {
-    stubFetch(() => {
-      throw new TypeError('fetch failed');
-    });
-    const { apiRequest } = await loadApi({ SAFETRUST_API_TOKEN: 'super-secret-token' });
-
-    const error = await apiRequest('/health').catch((caught: unknown) => caught);
-
-    expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message).not.toContain('super-secret-token');
   });
 
   it('rejects non-JSON responses and keeps only a short excerpt', async () => {

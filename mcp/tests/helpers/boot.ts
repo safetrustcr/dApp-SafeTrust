@@ -19,7 +19,6 @@ export async function bootTestClient(env: BootOptions = {}): Promise<TestClient>
     HASURA_ADMIN_SECRET: 'test-admin-secret',
     HASURA_GRAPHQL_ADMIN_SECRET: undefined,
     SAFETRUST_API_URL: 'http://api.test',
-    SAFETRUST_API_TOKEN: undefined,
     SAFETRUST_MCP_ENABLE_RAW_HASURA: undefined,
     PLATFORM_STELLAR_ADDRESS: undefined,
     NEXT_PUBLIC_PLATFORM_ADDRESS: undefined,

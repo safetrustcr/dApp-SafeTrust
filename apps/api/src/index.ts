@@ -31,6 +31,7 @@ import hotelReservationsRouter from './routes/hotels/reservations.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
+import { isTestnet } from './services/wallet-readiness.js';
 
 initFirebaseAdmin();
 
@@ -45,7 +46,11 @@ app.use(requestIdMiddleware); // attach X-Request-Id before all routes
 
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', firebase: 'configured' });
+  res.json({
+    status: 'ok',
+    firebase: 'configured',
+    stellarNetwork: isTestnet() ? 'TESTNET' : 'PUBLIC',
+  });
 });
 
 app.use('/reconciliation', reconciliationRouter);

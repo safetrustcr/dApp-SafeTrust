@@ -75,3 +75,16 @@ select_permissions:
                         - apartment_id
                   - owner_id:
                       _eq: X-Hasura-User-Id
+  - role: mcp_reader
+    permission:
+      columns:
+        - id
+        - contract_id
+        - engagement_id
+        - amount
+        - status
+        - created_at
+        - updated_at
+      filter:
+        tenant_id:
+          _eq: safetrust

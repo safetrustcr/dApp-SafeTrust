@@ -26,17 +26,17 @@ Restart the MCP client after a rebuild — stdio servers are started once per se
 | Tool | What it does | Needs |
 |---|---|---|
 | `check-stack-health` | Ping apps/api, Hasura, and TrustlessWork testnet and report their status | apps/api, Hasura, TrustlessWork |
-| `deploy-escrow` | Deploys a single-release escrow via `apps/api` `POST /api/escrow/deploy`, returns the unsigned XDR | `apps/api` |
-| `fund-escrow` | Builds the funding transaction via `POST /api/escrow/fund` | `apps/api` |
+| `deploy-escrow` | Builds a Testnet escrow via authenticated `apps/api` `POST /api/escrow/deploy`, returns unsigned XDR and pending-action id | `apps/api`, local test user |
+| `fund-escrow` | Builds a Testnet funding transaction via authenticated `POST /api/escrow/fund` | `apps/api`, local test user |
 | `orchestrate-escrow` | Stateless step-by-step guide through the whole deploy → sign → fund → release lifecycle | — |
 | `get-escrow-status` | Looks up `public.escrows` by `contractId` or `engagementId` | Hasura |
 | `explain-escrow-roles` | SafeTrust ↔ TrustlessWork role mapping reference | — |
 | `get-apartment` | Apartment details plus the owner's Stellar wallet | Hasura |
 | `list-apartments` | Search listings by name, price and availability | Hasura |
-| `query-escrows` | Filter `public.escrows` by status, apartment or wallet | Hasura |
-| `query-trustless-work-escrows` | Filter `public.trustless_work_escrows` (`marker`/`approver`/`releaser`/`resolver`) | Hasura |
-| `query-user-wallets` | Resolve wallets by user id, email or address | Hasura |
-| `hasura-query` | Escape hatch: any read-only GraphQL query. Mutations and subscriptions are refused. **Only registered when `SAFETRUST_MCP_ENABLE_RAW_HASURA=true`** | Hasura |
+| `query-escrows` | Filter safe `public.escrows` fields by status, contract or engagement id | Hasura |
+| `query-trustless-work-escrows` | Filter safe `public.trustless_work_escrows` fields | Hasura |
+| `query-user-wallets` | Resolve wallets by user id or address | Hasura |
+| `hasura-query` | Optional escape hatch: read-only GraphQL under the restricted `mcp_reader` role | Hasura; opt-in flag |
 
 `deploy-escrow` and `fund-escrow` never sign or submit anything — they return the
 unsigned XDR that a wallet (Freighter) has to sign, exactly like the HTTP routes do.
@@ -50,8 +50,8 @@ next call to resume:
 
 | Step | What it tells you to do |
 |---|---|
-| `start` | Call `deploy-escrow` with the apartment, both wallet addresses and the amount |
-| `after-deploy` | Sign the returned XDR in Freighter, then call `fund-escrow` with `contractId`, `signer`, `amount` |
+| `start` | Call `deploy-escrow` with the apartment id and the test user's registered wallet |
+| `after-deploy` | Sign the returned XDR in Freighter, then call `fund-escrow` with the returned `engagementId` |
 | `after-fund` | Lifecycle note — `milestone-status` by the host, then `release-funds` by the tenant |
 | `status` | Call `get-escrow-status` with `contractId` or `engagementId` |
 
@@ -77,21 +77,39 @@ Missing files are skipped rather than failing startup.
 Read from the `env` block in the root `mcp.json` — no `.env` file is needed for local
 development. All of them have defaults that match `bin/start`.
 
+Escrow mutations additionally require a local Testnet Firebase test-user
+configuration. Copy `mcp/.env.example` to the gitignored `mcp/.env`; never put the
+test password in `mcp.json`, tool arguments, or source control.
+
 | Variable | Default | Used by |
 |---|---|---|
 | `HASURA_GRAPHQL_URL` | `http://localhost:8080/v1/graphql` | every Hasura tool |
 | `HASURA_ADMIN_SECRET` | `myadminsecretkey` | every Hasura tool (`HASURA_GRAPHQL_ADMIN_SECRET` also accepted) |
 | `SAFETRUST_API_URL` | `http://localhost:3002` | `deploy-escrow`, `fund-escrow` |
-| `SAFETRUST_API_TOKEN` | unset | `Authorization: Bearer …` sent to apps/api — required by `deploy-escrow`/`fund-escrow`, which sit behind Firebase auth |
 | `SAFETRUST_MCP_ENABLE_RAW_HASURA` | unset (off) | registers `hasura-query` when set to `true` |
 | `PLATFORM_STELLAR_ADDRESS` | unset | shown by `explain-escrow-roles` (`NEXT_PUBLIC_PLATFORM_ADDRESS` also accepted) |
 | `NEXT_PUBLIC_USDC_ADDRESS` | testnet USDC issuer | shown by `explain-escrow-roles` |
 | `SAFETRUST_REPO_ROOT` | auto-detected | overrides repo-root detection for the docs resources |
+| `SAFETRUST_MCP_FIREBASE_API_KEY` | unset | Firebase web API key used for local test-user sign-in |
+| `SAFETRUST_MCP_TEST_EMAIL` | unset | email of the local Firebase Testnet test user |
+| `SAFETRUST_MCP_TEST_PASSWORD` | unset | password of the local Firebase Testnet test user |
+| `SAFETRUST_MCP_ALLOW_MUTATIONS` | `false` | explicitly enables `deploy-escrow` and `fund-escrow` |
 
-Queries run with the Hasura **admin secret**, bypassing row-level permissions — this is
-a local developer tool, so treat its output as privileged and do not point it at a
-production Hasura instance. The only tool without a fixed, allow-listed query is
-`hasura-query`, and it is not registered unless `SAFETRUST_MCP_ENABLE_RAW_HASURA=true`.
+All MCP Hasura reads authenticate locally with the admin secret and explicitly assume
+the `mcp_reader` role. Hasura enforces that role's select-only table and column
+permissions; messages, conversations, push devices and idempotency keys are not
+readable. `hasura-query` is not registered unless
+`SAFETRUST_MCP_ENABLE_RAW_HASURA` is set to `true`. Query depth and node limits
+are also enforced by Hasura, and each named list tool caps results at 100 rows.
+Each MCP tool invocation writes a data-free audit line to stderr.
+
+Mutation tools are disabled by default and make no API request until explicitly
+enabled. When enabled, they verify `GET /health` reports `stellarNetwork=TESTNET`,
+sign in once as the configured Firebase test user, and refresh the cached ID token
+five minutes before expiry. Each protected API call sends the bearer token and a
+UUID `Idempotency-Key`; the key is returned in the tool response for safe retries.
+The API returns only the unsigned XDR and pending-action identifier needed by the
+wallet flow. The MCP server never signs or submits transactions.
 
 ## Tests
 

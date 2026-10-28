@@ -1,6 +1,30 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+
+function loadMcpEnv(): void {
+  const envPath = join(moduleDir, '..', '.env');
+  if (!existsSync(envPath)) return;
+
+  for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!match || process.env[match[1]] !== undefined) continue;
+
+    let value = match[2];
+    const doubleQuoted = value.startsWith('"') && value.endsWith('"');
+    if (doubleQuoted || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+      if (doubleQuoted) value = value.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+    } else {
+      value = value.replace(/\s+#.*$/, '').trim();
+    }
+    process.env[match[1]] = value;
+  }
+}
+
+loadMcpEnv();
 
 /** Hasura GraphQL endpoint — same variable apps/api reads. */
 export const HASURA_GRAPHQL_URL =
@@ -16,17 +40,33 @@ export const HASURA_ADMIN_SECRET =
   process.env.HASURA_GRAPHQL_ADMIN_SECRET ??
   'myadminsecretkey';
 
+/** Protected API mutations are disabled unless explicitly enabled locally. */
+export const MCP_MUTATIONS_ENABLED = process.env.SAFETRUST_MCP_ALLOW_MUTATIONS === 'true';
+
+export type FirebaseTestUserCredentials = {
+  apiKey: string;
+  email: string;
+  password: string;
+};
+
+/** Resolve local-only Firebase credentials only when a protected call needs them. */
+export function getFirebaseTestUserCredentials(): FirebaseTestUserCredentials {
+  const apiKey = process.env.SAFETRUST_MCP_FIREBASE_API_KEY;
+  const email = process.env.SAFETRUST_MCP_TEST_EMAIL;
+  const password = process.env.SAFETRUST_MCP_TEST_PASSWORD;
+
+  if (!apiKey || !email || !password) {
+    throw new Error(
+      'Firebase test-user credentials are not configured. Set SAFETRUST_MCP_FIREBASE_API_KEY, ' +
+        'SAFETRUST_MCP_TEST_EMAIL and SAFETRUST_MCP_TEST_PASSWORD in mcp/.env.',
+    );
+  }
+
+  return { apiKey, email, password };
+}
+
 /** Base URL of apps/api (Express, port 3002 by default). */
 export const SAFETRUST_API_URL = process.env.SAFETRUST_API_URL ?? 'http://localhost:3002';
-
-/**
- * Bearer token forwarded to apps/api on every request. apps/api protects
- * /api/escrow/* behind Firebase auth (`authenticateFirebase`), so the server
- * needs the signed-in user's ID token to do anything beyond health checks.
- * Unset is allowed — read-only Hasura tools keep working — but the escrow tools
- * will surface the API's 401 instead of silently running unauthenticated.
- */
-export const SAFETRUST_API_TOKEN = process.env.SAFETRUST_API_TOKEN ?? null;
 
 /**
  * Opt-in escape hatch for the arbitrary-GraphQL tool. It is off unless
@@ -50,8 +90,6 @@ export const REQUEST_TIMEOUT_MS = 15_000;
 
 /** Stellar ed25519 public key. */
 export const STELLAR_ADDRESS_REGEX = /^G[A-Z2-7]{55}$/;
-
-const moduleDir = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Absolute path to the monorepo root. Walks up from this module — src/ under tsx,

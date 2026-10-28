@@ -1,4 +1,5 @@
-import { REQUEST_TIMEOUT_MS, SAFETRUST_API_TOKEN, SAFETRUST_API_URL } from '../config.js';
+import { REQUEST_TIMEOUT_MS, SAFETRUST_API_URL } from '../config.js';
+import { getFirebaseIdToken } from './firebase-session.js';
 
 export class ApiRequestError extends Error {
   constructor(message: string) {
@@ -20,23 +21,28 @@ export type ApiResponse<T> = {
  */
 export async function apiRequest<T = Record<string, unknown>>(
   path: string,
-  init: { method: 'GET' | 'POST'; body?: unknown } = { method: 'GET' },
+  init: {
+    method: 'GET' | 'POST';
+    body?: unknown;
+    auth?: 'required';
+    idempotencyKey?: string;
+  } = { method: 'GET' },
 ): Promise<ApiResponse<T>> {
   const url = `${SAFETRUST_API_URL}${path}`;
   let response: Response;
-
-  // apps/api rejects unauthenticated escrow calls, so always forward the token
-  // when one is configured. Never fall back to a shared/admin credential.
   const headers: Record<string, string> = {};
-  if (SAFETRUST_API_TOKEN) headers.Authorization = `Bearer ${SAFETRUST_API_TOKEN}`;
-  if (init.body) headers['Content-Type'] = 'application/json';
+  if (init.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (init.auth === 'required') {
+    headers.Authorization = `Bearer ${await getFirebaseIdToken()}`;
+  }
+  if (init.idempotencyKey) headers['Idempotency-Key'] = init.idempotencyKey;
 
   try {
     response = await fetch(url, {
       method: init.method,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      headers: Object.keys(headers).length > 0 ? headers : undefined,
-      body: init.body ? JSON.stringify(init.body) : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
     });
   } catch (error) {
     throw new ApiRequestError(
