@@ -27,6 +27,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
+          package-manager-cache: false
 
       - name: Scan repository security boundaries
         run: node scripts/security/repository-security-guard.mjs
