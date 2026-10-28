@@ -62,15 +62,9 @@ export const deployEscrowHandler = asyncHandler(async (
     }
     if (terms.ownerUserId === uid) throw new ApiError(409, 'SELF_ESCROW_NOT_ALLOWED', 'You cannot create a rental escrow for your own apartment.');
   }
-  const idempotencyKey = req.header('Idempotency-Key');
-  const engagementSuffix = idempotencyKey
-    ? createHash('sha256')
-        .update(`${apartmentId}:${uid}:${idempotencyKey}`)
-        .digest('hex')
-    : undefined;
   const resolvedEngagementId =
     hotelTerms?.engagementId ??
-    (engagementSuffix ? `rental:${engagementSuffix}` : `rental:${apartmentId}:${uid}`);
+    `rental:${apartmentId}:${uid}`;
   const propertyId = reservationId ?? apartmentId!;
   const tenantId = hotelTerms ? 'hotel_industry' : 'safetrust';
 
