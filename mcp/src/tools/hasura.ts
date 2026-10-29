@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { ALLOW_RAW_HASURA_QUERY, HASURA_GRAPHQL_URL } from '../config.js';
+import { getHasuraUrl, rawHasuraQueryEnabled } from '../config.js';
 import { auditToolCall } from '../lib/audit.js';
 import { buildWhere, hasuraRequest } from '../lib/hasura.js';
 import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
@@ -196,7 +196,7 @@ export function registerHasuraTools(server: McpServer) {
     },
   );  // Off by default: unrestricted GraphQL is the one tool that can read tables no
   // other tool covers, so it needs an explicit SAFETRUST_MCP_ENABLE_RAW_HASURA=true.
-  if (!ALLOW_RAW_HASURA_QUERY) return;
+  if (!rawHasuraQueryEnabled()) return;
 
   server.registerTool(
     'hasura-query',
@@ -213,6 +213,7 @@ export function registerHasuraTools(server: McpServer) {
           .optional()
           .describe('Variables object matching the query definition'),
       },
+    },
       async ({ query, variables }) => {
         auditToolCall('hasura-query');
         if (WRITE_OPERATION.test(query) || WRITE_ROOT_FIELD.test(query)) {
@@ -227,7 +228,7 @@ export function registerHasuraTools(server: McpServer) {
             query,
             (variables ?? {}) as Record<string, unknown>,
           );
-          return textResult(`Hasura ${HASURA_GRAPHQL_URL}`, jsonBlock(data));
+          return textResult(`Hasura ${getHasuraUrl()}`, jsonBlock(data));
         } catch (error) {
           return errorResult(describeError(error));
         }

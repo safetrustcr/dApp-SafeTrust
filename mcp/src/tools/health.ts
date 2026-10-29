@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { HASURA_GRAPHQL_URL, SAFETRUST_API_URL } from '../config.js';
+import { getHasuraUrl, getSafetrustApiUrl } from '../config.js';
 import { auditToolCall } from '../lib/audit.js';
-import { textResult } from '../lib/response.js';
+import { describeError, errorResult, textResult } from '../lib/response.js';
 
 const TW_BASE = 'https://dev.api.trustlesswork.com';
 
@@ -27,9 +27,17 @@ export function registerHealthTools(server: McpServer) {
     },
     async () => {
       auditToolCall('check-stack-health');
+      let apiUrl: string;
+      let hasuraUrl: string;
+      try {
+        apiUrl = getSafetrustApiUrl();
+        hasuraUrl = getHasuraUrl();
+      } catch (error) {
+        return errorResult(describeError(error));
+      }
       const [api, hasura, tw] = await Promise.all([
-        ping(`${SAFETRUST_API_URL}/health`),
-        ping(`${HASURA_GRAPHQL_URL.replace('/v1/graphql', '')}/healthz`),
+        ping(`${apiUrl}/health`),
+        ping(`${hasuraUrl.replace('/v1/graphql', '')}/healthz`),
         ping(TW_BASE),
       ]);
 
@@ -37,8 +45,8 @@ export function registerHealthTools(server: McpServer) {
       const allOk = api.ok && hasura.ok && tw.ok;
 
       return textResult(
-        `${icon(api.ok)} apps/api ${SAFETRUST_API_URL} (${api.ok ? 'healthy' : 'unreachable'}, ${api.ms}ms)${api.error ? ` — ${api.error}` : ''}`,
-        `${icon(hasura.ok)} Hasura ${HASURA_GRAPHQL_URL} (${hasura.ok ? 'healthy' : 'unreachable'}, ${hasura.ms}ms)${hasura.error ? ` — ${hasura.error}` : ''}`,
+        `${icon(api.ok)} apps/api ${apiUrl} (${api.ok ? 'healthy' : 'unreachable'}, ${api.ms}ms)${api.error ? ' — unreachable' : ''}`,
+        `${icon(hasura.ok)} Hasura ${hasuraUrl} (${hasura.ok ? 'healthy' : 'unreachable'}, ${hasura.ms}ms)${hasura.error ? ' — unreachable' : ''}`,
         `${icon(tw.ok)} TrustlessWork ${TW_BASE} (${tw.ok ? 'reachable' : 'unreachable'}, ${tw.ms}ms)${tw.error ? ` — ${tw.error}` : ''}`,
         '',
         allOk ? 'Stack is ready for escrow operations.' : '⚠️ One or more services unreachable. Fix before running deploy-escrow.',

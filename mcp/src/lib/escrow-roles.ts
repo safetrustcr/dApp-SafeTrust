@@ -1,4 +1,4 @@
-import { PLATFORM_ADDRESS, USDC_ADDRESS } from '../config.js';
+import { platformAddress, usdcAddress } from '../config.js';
 
 /**
  * SafeTrust's TrustlessWork role mapping, kept in one place so the
@@ -8,7 +8,7 @@ import { PLATFORM_ADDRESS, USDC_ADDRESS } from '../config.js';
  * apps/frontend/src/app/api/escrow/deploy/route.ts.
  */
 export function escrowRolesDoc(): string {
-  const platform = PLATFORM_ADDRESS ?? '(unset — PLATFORM_STELLAR_ADDRESS / NEXT_PUBLIC_PLATFORM_ADDRESS)';
+  const platform = platformAddress() ?? '(unset — PLATFORM_STELLAR_ADDRESS / NEXT_PUBLIC_PLATFORM_ADDRESS)';
 
   return `# SafeTrust escrow role mapping (TrustlessWork single-release)
 
@@ -51,6 +51,6 @@ Direct TrustlessWork calls use \`platformAddress\` as \`releaseSigner\`.
 
 ## Trustline
 
-USDC on Stellar testnet — issuer \`${USDC_ADDRESS}\`
+USDC on Stellar testnet — issuer \`${usdcAddress()}\`
 (\`NEXT_PUBLIC_USDC_ADDRESS\`).`;
 }

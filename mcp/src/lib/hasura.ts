@@ -1,4 +1,4 @@
-import { HASURA_ADMIN_SECRET, HASURA_GRAPHQL_URL, REQUEST_TIMEOUT_MS } from '../config.js';
+import { getHasuraConfig, REQUEST_TIMEOUT_MS } from '../config.js';
 
 export class HasuraRequestError extends Error {
   constructor(
@@ -19,24 +19,22 @@ export async function hasuraRequest<T>(
   query: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {
+  const { url, adminSecret } = getHasuraConfig();
   let response: Response;
 
   try {
-    response = await fetch(HASURA_GRAPHQL_URL, {
+    response = await fetch(url, {
       method: 'POST',
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         'Content-Type': 'application/json',
-        'x-hasura-admin-secret': HASURA_ADMIN_SECRET,
+        'x-hasura-admin-secret': adminSecret,
         'x-hasura-role': 'mcp_reader',
       },
       body: JSON.stringify({ query, variables }),
     });
-  } catch (error) {
-    throw new HasuraRequestError(
-      `Cannot reach Hasura at ${HASURA_GRAPHQL_URL} — is bin/start running? ` +
-        (error instanceof Error ? error.message : String(error)),
-    );
+  } catch {
+    throw new HasuraRequestError('Cannot reach local Hasura. Is infra/backend/bin/start running?');
   }
 
   const text = await response.text();
@@ -45,21 +43,15 @@ export async function hasuraRequest<T>(
   try {
     json = (text ? JSON.parse(text) : {}) as typeof json;
   } catch {
-    throw new HasuraRequestError(
-      `Hasura returned a non-JSON response (${response.status}): ${text.slice(0, 200)}`,
-    );
+    throw new HasuraRequestError(`Hasura returned an invalid response (HTTP ${response.status}).`);
   }
 
   if (!response.ok) {
-    throw new HasuraRequestError(
-      json.errors?.map((e) => e.message).join(', ') ??
-        `Hasura request failed (${response.status})`,
-      json.errors,
-    );
+    throw new HasuraRequestError(`Hasura request failed (HTTP ${response.status}).`);
   }
 
   if (json.errors?.length) {
-    throw new HasuraRequestError(json.errors.map((e) => e.message).join(', '), json.errors);
+    throw new HasuraRequestError('Hasura rejected the query.');
   }
 
   if (!json.data) {

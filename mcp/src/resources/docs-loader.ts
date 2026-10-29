@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { HASURA_GRAPHQL_URL, SAFETRUST_API_URL, repoRoot } from '../config.js';
+import { repoRoot } from '../config.js';
 import { escrowRolesDoc } from '../lib/escrow-roles.js';
 
 type DocFile = {
@@ -68,17 +68,17 @@ fulfilment, or returned on dispute.
 ## Escrow lifecycle
 
 1. Tenant picks an apartment — \`public.apartments\`, \`warranty_deposit\` is the escrow amount.
-2. Deploy — \`POST ${SAFETRUST_API_URL}/api/escrow/deploy\` calls TrustlessWork
+2. Deploy — \`POST <configured SAFETRUST_API_URL>/api/escrow/deploy\` calls TrustlessWork
    \`/deployer/single-release\` and returns an unsigned XDR. \`engagementId\` is the
    idempotency key (see \`apps/api/src/services/idempotency.ts\`).
 3. Tenant signs the XDR with Freighter and submits it via the frontend route
    \`POST /api/escrow/send-transaction\`.
-4. Fund — \`POST ${SAFETRUST_API_URL}/api/escrow/fund\` → another XDR to sign.
+4. Fund — \`POST <configured SAFETRUST_API_URL>/api/escrow/fund\` → another XDR to sign.
 5. Milestone — \`POST /api/escrow/milestone-status\` (serviceProvider marks it done).
 6. Release — \`POST /api/escrow/release-funds\` sends funds to the owner.
 7. Hasura event triggers call \`apps/api\` (via \`WEBHOOK_URL\`), which updates escrow status rows.
 
-## Tables that matter (Hasura at ${HASURA_GRAPHQL_URL})
+## Tables that matter (configured local Hasura)
 
 - \`public.escrows\` — current single-release rental deposits.
   \`contract_id\`, \`engagement_id\` (unique), \`apartment_id\`, \`sender_address\` (tenant),

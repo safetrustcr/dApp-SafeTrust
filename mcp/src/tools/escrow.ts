@@ -3,22 +3,22 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
 import {
-  MCP_MUTATIONS_ENABLED,
-  SAFETRUST_API_URL,
+  getSafetrustApiUrl,
+  mutationsEnabled,
   STELLAR_ADDRESS_REGEX,
 } from '../config.js';
 import { apiRequest } from '../lib/api.js';
 import { auditToolCall } from '../lib/audit.js';
 import { escrowRolesDoc } from '../lib/escrow-roles.js';
 import { buildWhere, hasuraRequest } from '../lib/hasura.js';
-import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
+import { describeError, errorResult, jsonBlock, textResult, textResultWithOptions } from '../lib/response.js';
 
 const stellarAddress = z
   .string()
   .regex(STELLAR_ADDRESS_REGEX, 'Must be a Stellar public key (G…, 56 chars)');
 
 async function mutationGuard(): Promise<string | undefined> {
-  if (!MCP_MUTATIONS_ENABLED) {
+  if (!mutationsEnabled()) {
     return 'Escrow mutations are disabled. Set SAFETRUST_MCP_ALLOW_MUTATIONS=true to enable them for a Testnet test user.';
   }
 
@@ -86,12 +86,12 @@ export function registerEscrowTools(server: McpServer) {
         if (!ok) {
           return errorResult(
             `Deploy failed (HTTP ${status}): ${data.error ?? 'unknown error'}`,
-            data.details ? jsonBlock(data.details) : '',
             `idempotencyKey: ${key}`,
           );
         }
 
-        return textResult(
+        return textResultWithOptions(
+          { allowUnsignedXdr: true },
           data.cached ? 'Escrow deployment replayed.' : 'Unsigned Testnet escrow deployment built.',
           `idempotencyKey: ${key}`,
           `engagementId: ${data.engagementId ?? 'not returned'}`,
@@ -142,12 +142,12 @@ export function registerEscrowTools(server: McpServer) {
         if (!ok) {
           return errorResult(
             `Fund failed (HTTP ${status}): ${data.error ?? 'unknown error'}`,
-            data.details ? jsonBlock(data.details) : '',
             `idempotencyKey: ${key}`,
           );
         }
 
-        return textResult(
+        return textResultWithOptions(
+          { allowUnsignedXdr: true },
           data.reused ? 'Funding action replayed.' : 'Unsigned Testnet funding transaction built.',
           `idempotencyKey: ${key}`,
           `engagementId: ${engagementId}`,
@@ -342,7 +342,7 @@ export function registerEscrowTools(server: McpServer) {
     },
     async () => {
       auditToolCall('explain-escrow-roles');
-      return textResult(escrowRolesDoc(), '', `apps/api base URL: ${SAFETRUST_API_URL}`);
+      return textResult(escrowRolesDoc(), '', `apps/api base URL: ${getSafetrustApiUrl()}`);
     },
   );
 }
