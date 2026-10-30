@@ -43,6 +43,15 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nreplace-with-your-private-key
 
 ## Start infrastructure
 
+Using `make` (validates `TENANTS` before launching):
+```bash
+make infra TENANTS=safetrust
+make infra TENANTS=hotel_industry
+make infra TENANTS="safetrust hotel_industry"
+```
+*(Running `make infra` without `TENANTS` exits with code 2 and lists valid tenants).*
+
+Or directly using the backend script:
 ```bash
 cd infra/backend
 bin/start safetrust hotel_industry

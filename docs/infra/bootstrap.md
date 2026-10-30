@@ -45,6 +45,15 @@ cp apps/frontend/.env.example apps/frontend/.env.local
 
 ## 3. Start the backend infrastructure
 
+From repository root:
+```bash
+make infra TENANTS=safetrust
+make infra TENANTS=hotel_industry
+make infra TENANTS="safetrust hotel_industry"
+```
+*(Running `make infra` without `TENANTS` exits with code 2 and lists valid tenants).*
+
+Or from `infra/backend`:
 ```bash
 cd infra/backend
 bin/start safetrust hotel_industry

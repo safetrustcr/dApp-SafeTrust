@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Usage: bin/validate-tenants <tenant> [<tenant>]
+# Prints the normalized tenant list on stdout; exits 2 with a message on stderr if invalid.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mapfile -t VALID < <(find "$ROOT/metadata/tenants" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+
+fail() { echo "error: $1" >&2; echo "Valid tenants: ${VALID[*]}" >&2; exit 2; }
+
+# Accept "a b", "a,b" or separate args
+read -r -a TENANTS <<< "$(echo "$*" | tr ',' ' ')"
+
+[[ ${#TENANTS[@]} -ge 1 ]] || fail "TENANTS is required. Example: make infra TENANTS=safetrust"
+[[ ${#TENANTS[@]} -le 2 ]] || fail "Pass one or two tenants, got ${#TENANTS[@]}."
+
+seen=" "
+for t in "${TENANTS[@]}"; do
+  [[ "$t" =~ ^[a-z_]+$ ]] || fail "Invalid tenant name '$t'."
+  [[ " ${VALID[*]} " == *" $t "* ]] || fail "Unknown tenant '$t'."
+  [[ "$seen" != *" $t "* ]] || fail "Tenant '$t' is listed twice."
+  seen+="$t "
+done
+
+echo "${TENANTS[*]}"
