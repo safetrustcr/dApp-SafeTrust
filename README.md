@@ -66,15 +66,18 @@ npm install -g pnpm hasura-cli
 From the repo root, common workflows are also available via `make`:
 
 ```bash
-make help   # list targets
-make full   # start Docker infra + api/web dev servers
-make infra  # start Docker infra (both tenants)
-make dev    # start api + web
-make test   # run tests
-make lint   # lint all packages
-make build  # build all packages
-make stop   # stop Docker infra
+make help                                      # list targets
+make full TENANTS=safetrust                    # start Docker infra + api/web dev servers
+make infra TENANTS=safetrust                   # start single tenant
+make infra TENANTS=hotel_industry              # start single tenant
+make infra TENANTS="safetrust hotel_industry"  # start both tenants (or TENANTS=safetrust,hotel_industry)
+make dev                                       # start api + web
+make test                                      # run tests
+make lint                                      # lint all packages
+make build                                     # build all packages
+make stop                                      # stop Docker infra
 ```
+> Note: Running `make infra` without `TENANTS` exits with code 2 and displays valid available tenants.
 
 ### 1. Clone and install
 

@@ -6,15 +6,9 @@ set -e
 HASURA_ADMIN_SECRET="${HASURA_ADMIN_SECRET:-myadminsecretkey}"
 export HASURA_ADMIN_SECRET
 
-if [[ $# -eq 0 ]]; then
-  echo "❌ Error: At least one tenant name is required."
-  echo ""
-  echo "Usage:   bin/start <tenant1> [tenant2 ...]"
-  echo "Example: bin/start safetrust hotel_industry"
-  exit 1
-fi
-
-TENANTS=("$@")
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VALIDATED_TENANTS="$("$SCRIPT_DIR/validate-tenants" "$@")" || exit $?
+read -r -a TENANTS <<< "$VALIDATED_TENANTS"
 
 TRACK_SAFETRUST_TIMINGS=false
 if [[ "${#TENANTS[@]}" -eq 1 && "${TENANTS[0]}" == "safetrust" ]]; then
