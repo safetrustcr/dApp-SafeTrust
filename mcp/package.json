@@ -18,7 +18,8 @@
     "test:escrow": "tsx --test tests/escrow-tools.test.ts",
     "test:boundary": "tsx --test tests/trust-boundary.test.ts",
     "docs:env": "node scripts/env-table.mjs --write",
-    "docs:env:check": "node scripts/env-table.mjs"
+    "docs:env:check": "node scripts/env-table.mjs",
+    "check:secrets": "bash scripts/check-secrets.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.0",

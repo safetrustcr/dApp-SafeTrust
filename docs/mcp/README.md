@@ -75,7 +75,7 @@ every variable `mcp/src` reads is listed)_
 | Variable | Required | Default | What it grants |
 |---|---|---|---|
 | `HASURA_GRAPHQL_URL` | yes, for every Hasura tool | none | Where every Hasura read goes (get-booking-context, get-escrow-status, get-pending-action, diagnose-escrow, get-apartment, list-apartments, query-*, hasura-query, and get-wallet-readiness's fallback). Must be the local Hasura from infra/backend/bin/start; non-local hosts are refused. |
-| `HASURA_ADMIN_SECRET` | yes, for every Hasura tool | none (local stack uses myadminsecretkey) | Hasura ADMIN access, narrowed to the select-only mcp_reader role on every request. Local stack only; rotate per "Incident response" if exposed. HASURA_GRAPHQL_ADMIN_SECRET is accepted as an alias. |
+| `HASURA_ADMIN_SECRET` | yes, for every Hasura tool | none (copy HASURA_GRAPHQL_ADMIN_SECRET from infra/backend/.env) | Hasura ADMIN access, narrowed to the select-only mcp_reader role on every request. Local stack only; rotate per "Incident response" if exposed. HASURA_GRAPHQL_ADMIN_SECRET is accepted as an alias. |
 | `SAFETRUST_API_URL` | yes, for apps/api tools | none | Where deploy-escrow and fund-escrow send POST /api/escrow/* (unsigned XDR only), where get-wallet-readiness reads GET /api/escrow/readiness, and where check-stack-health pings. Must be the local apps/api; non-local hosts are refused. |
 | `SAFETRUST_MCP_ALLOW_MUTATIONS` | no | false | Lets deploy-escrow and fund-escrow call apps/api as the Firebase test user. Even when true, they refuse unless apps/api reports stellarNetwork=TESTNET. |
 | `SAFETRUST_MCP_FIREBASE_API_KEY` | yes, when SAFETRUST_MCP_ALLOW_MUTATIONS=true | none | Firebase Web API key used to sign the local test user in. |
@@ -141,7 +141,7 @@ echo "$(pwd)/mcp/dist/index.js"
 # run from the repository root
 claude mcp add \
   --env HASURA_GRAPHQL_URL=http://localhost:8080/v1/graphql \
-  --env HASURA_ADMIN_SECRET=myadminsecretkey \
+  --env HASURA_ADMIN_SECRET="$HASURA_ADMIN_SECRET" \
   --env SAFETRUST_API_URL=http://localhost:3002 \
   --transport stdio safetrust -- node "$(pwd)/mcp/dist/index.js"
 
@@ -170,7 +170,7 @@ restart Claude Desktop:
       "args": ["/absolute/path/to/dApp-SafeTrust/mcp/dist/index.js"],
       "env": {
         "HASURA_GRAPHQL_URL": "http://localhost:8080/v1/graphql",
-        "HASURA_ADMIN_SECRET": "myadminsecretkey",
+        "HASURA_ADMIN_SECRET": "<your local admin secret>",
         "SAFETRUST_API_URL": "http://localhost:3002"
       }
     }
@@ -183,7 +183,7 @@ restart Claude Desktop:
 ```bash
 npx @modelcontextprotocol/inspector --cli \
   -e HASURA_GRAPHQL_URL=http://localhost:8080/v1/graphql \
-  -e HASURA_ADMIN_SECRET=myadminsecretkey \
+  -e HASURA_ADMIN_SECRET="$HASURA_ADMIN_SECRET" \
   -e SAFETRUST_API_URL=http://localhost:3002 \
   node mcp/dist/index.js --method tools/list
 ```
@@ -242,7 +242,7 @@ non-local URL, or Hasura port `8080` was reachable from your network.
 
 1. **Stop.** Remove the server from the client (`claude mcp remove safetrust`, or
    delete the `safetrust` block from `claude_desktop_config.json`) and restart it.
-2. **Rotate the Hasura admin secret.** The local default `myadminsecretkey` is
+2. **Rotate the Hasura admin secret.** A shared or well-known local value is
    public; rotate whenever it, or what it can read, may have left your machine.
    `bin/start` and `docker-compose.yml` both read `HASURA_ADMIN_SECRET`:
 

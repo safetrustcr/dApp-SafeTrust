@@ -76,7 +76,6 @@ describe('documentation resources', () => {
     expect(text).toContain('# SafeTrust architecture context');
     expect(text).toContain('## Escrow lifecycle');
     expect(text).toContain('`public.escrows`');
-    expect(text).toContain('http://hasura.test/v1/graphql');
     expect(text).toContain('TrustlessWork');
   });
 

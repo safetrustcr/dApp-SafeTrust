@@ -1,6 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { McpConfigError } from '../config.js';
-import { redactText, redactXdr, type RedactOptions } from './redact.js';
+import { redactPhoneFields, redactText, redactXdr, type RedactOptions } from './redact.js';
 
 /** Successful tool result — one text block, one line per argument. */
 export function textResult(...lines: string[]): CallToolResult {
@@ -22,7 +22,8 @@ export function errorResult(...lines: string[]): CallToolResult {
  * Unsigned XDRs are withheld unless the caller is a build tool.
  */
 export function jsonBlock(value: unknown, options: RedactOptions = {}): string {
-  const safe = options.allowUnsignedXdr ? value : redactXdr(value);
+  const fields = redactPhoneFields(value);
+  const safe = options.allowUnsignedXdr ? fields : redactXdr(fields);
   return redactText(['```json', JSON.stringify(safe, null, 2), '```'].join('\n'), options);
 }
 

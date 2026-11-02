@@ -1,9 +1,16 @@
 import { vi } from 'vitest';
 
 /**
- * Module-scope config (config.ts) reads process.env once at import, so unit
- * tests set env before loading the module and reset it afterwards.
+ * config.ts reads process.env lazily, but tool registration (hasura-query) and
+ * the mcp/.env loader are still per-module, so unit tests set env before loading
+ * the module and reset it afterwards.
  */
+/** Test doubles live on `*.test` hosts, which the MCP would otherwise refuse as remote. */
+export const TEST_HOSTS = {
+  SAFETRUST_MCP_ALLOWED_HOSTS: 'hasura.test,api.test',
+  SAFETRUST_MCP_ALLOW_REMOTE: undefined,
+  SAFETRUST_MCP_SHOW_FULL_IDS: undefined,
+} as const;
 const tracked = new Map<string, string | undefined>();
 
 export function setEnv(values: Record<string, string | undefined>): void {

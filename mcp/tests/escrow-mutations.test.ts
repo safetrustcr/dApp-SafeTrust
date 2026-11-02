@@ -42,6 +42,7 @@ describe('escrow mutation tool safety', () => {
   });
 
   it('refuses mutations when the API reports a non-Testnet network', async () => {
+    vi.stubEnv('SAFETRUST_API_URL', 'http://localhost:3002');
     vi.stubEnv('SAFETRUST_MCP_ALLOW_MUTATIONS', 'true');
     vi.resetModules();
 

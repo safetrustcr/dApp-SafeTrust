@@ -1,4 +1,5 @@
 import { getHasuraConfig, REQUEST_TIMEOUT_MS } from '../config.js';
+import { errorMessageOnly } from './redact.js';
 
 export class HasuraRequestError extends Error {
   constructor(
@@ -46,12 +47,18 @@ export async function hasuraRequest<T>(
     throw new HasuraRequestError(`Hasura returned an invalid response (HTTP ${response.status}).`);
   }
 
+  // Only the first error's message is kept: `extensions` can carry the SQL
+  // statement and internal details when the request runs with admin access.
+  const firstError = errorMessageOnly(json.errors?.[0]?.message, '');
+
   if (!response.ok) {
-    throw new HasuraRequestError(`Hasura request failed (HTTP ${response.status}).`);
+    throw new HasuraRequestError(
+      `Hasura request failed (HTTP ${response.status})${firstError ? `: ${firstError}` : '.'}`,
+    );
   }
 
   if (json.errors?.length) {
-    throw new HasuraRequestError('Hasura rejected the query.');
+    throw new HasuraRequestError(`Hasura rejected the query: ${firstError || 'unknown error'}`);
   }
 
   if (!json.data) {

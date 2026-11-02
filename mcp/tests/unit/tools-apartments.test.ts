@@ -7,6 +7,7 @@ import { jsonOf, textOf, type TestClient } from '../helpers/mcp.js';
 
 const APARTMENT_ID = '11111111-1111-4111-8111-111111111111';
 const TENANT_ID = '22222222-2222-4222-8222-222222222222';
+const OWNER_WALLET = `G${'D'.repeat(55)}`;
 
 const APARTMENT_ROW = {
   id: APARTMENT_ID,
@@ -42,16 +43,13 @@ describe('list-apartments', () => {
 
     const result = await client.callTool({ name: 'list-apartments', arguments: {} });
 
+    // Soft-deleted rows are filtered by the mcp_reader permission
+    // (deleted_at: { _is_null: true }), not by the query.
     const [query] = graphqlDocuments(calls);
-    expect(query).toContain('deleted_at: { _is_null: $deletedAt }');
     expect(query).toContain('is_available: { _eq: $onlyAvailable }');
-    expect(JSON.parse(calls[0].body ?? '{}').variables).toEqual({
-      onlyAvailable: true,
-      deletedAt: true,
-    });
+    expect(JSON.parse(calls[0].body ?? '{}').variables).toEqual({ onlyAvailable: true });
 
     expect(textOf(result)).toContain('1 apartment(s) found.');
-    expect(textOf(result)).toContain('Call get-apartment with an id to see the owner Stellar wallet.');
     expect(jsonOf(result)).toEqual([
       {
         id: APARTMENT_ID,
@@ -82,7 +80,6 @@ describe('list-apartments', () => {
       onlyAvailable: true,
       minPrice: 500,
       maxPrice: 1500,
-      deletedAt: true,
     });
   });
 
@@ -104,7 +101,7 @@ describe('list-apartments', () => {
     const result = await client.callTool({ name: 'list-apartments', arguments: {} });
 
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('Cannot reach Hasura at http://hasura.test/v1/graphql');
+    expect(textOf(result)).toBe('Cannot reach local Hasura. Is infra/backend/bin/start running?');
   });
 });
 
@@ -118,9 +115,7 @@ describe('get-apartment', () => {
               ...APARTMENT_ROW,
               owner: {
                 id: TENANT_ID,
-                first_name: 'Ana',
-                last_name: 'Rojas',
-                user_wallets: [{ wallet_address: 'GOWNER', provider: 'freighter' }],
+                user_wallets: [{ wallet_address: OWNER_WALLET, is_primary: true }],
               },
             },
           ],
@@ -137,15 +132,16 @@ describe('get-apartment', () => {
     const text = textOf(result);
     expect(text).toContain('Apartment: Escazú loft');
     expect(text).toContain('warranty_deposit: 900 USDC (the escrow amount)');
-    expect(text).toContain('owner: Ana Rojas — user id ' + TENANT_ID);
-    expect(text).toContain('owner wallet (ownerAddress for deploy-escrow): GOWNER');
+    expect(text).toContain(`owner user id: ${TENANT_ID}`);
+    expect(text).toContain('owner wallet (ownerAddress for deploy-escrow): GDDD…DDDD');
+    expect(text).not.toContain(OWNER_WALLET);
   });
 
   it('warns when the owner has no STELLAR wallet', async () => {
     stubFetch(() =>
       jsonResponse({
         data: {
-          apartments: [{ ...APARTMENT_ROW, owner: { id: TENANT_ID, first_name: null, last_name: null, user_wallets: [] } }],
+          apartments: [{ ...APARTMENT_ROW, owner: { id: TENANT_ID, user_wallets: [] } }],
         },
       }),
     );

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { auditToolCall } from '../lib/audit.js';
 import { buildWhere, hasuraRequest } from '../lib/hasura.js';
-import { describeError, errorResult, textResult } from '../lib/response.js';
+import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
 
 type OwnerWallet = { wallet_address: string; is_primary: boolean };
 
@@ -158,7 +158,7 @@ export function registerApartmentTools(server: McpServer) {
           `${rows.length} apartment(s) found.${
             rows.length >= resultLimit ? ` Result limit ${resultLimit} reached.` : ''
           }`,
-          JSON.stringify(rows, null, 2),
+          jsonBlock(rows),
         );
       } catch (error) {
         return errorResult(describeError(error));

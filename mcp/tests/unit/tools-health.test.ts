@@ -17,13 +17,12 @@ function healthyStack() {
   return stubFetch((call) => {
     if (call.url === 'http://api.test/health') return jsonResponse({ status: 'ok' });
     if (call.url === 'http://hasura.test/healthz') return textResponse('OK');
-    if (call.url === 'https://dev.api.trustlesswork.com') return jsonResponse({});
     return jsonResponse({}, 404);
   });
 }
 
 describe('check-stack-health', () => {
-  it('pings apps/api, Hasura and TrustlessWork and reports all three', async () => {
+  it('pings apps/api and Hasura only — Trustless Work is reached through apps/api', async () => {
     const { calls } = healthyStack();
     open = await bootTestClient();
 
@@ -32,13 +31,11 @@ describe('check-stack-health', () => {
     expect(calls.map((call) => call.url).sort()).toEqual([
       'http://api.test/health',
       'http://hasura.test/healthz',
-      'https://dev.api.trustlesswork.com',
     ]);
 
     const text = textOf(result);
     expect(text).toContain('✅ apps/api http://api.test');
     expect(text).toContain('✅ Hasura http://hasura.test/v1/graphql');
-    expect(text).toContain('✅ TrustlessWork https://dev.api.trustlesswork.com');
     expect(text).toContain('Stack is ready for escrow operations.');
     expect(result.isError).toBeFalsy();
   });
@@ -46,7 +43,6 @@ describe('check-stack-health', () => {
   it('flags an unreachable dependency with the local-stack fix', async () => {
     stubFetch((call) => {
       if (call.url === 'http://api.test/health') return jsonResponse({ status: 'ok' });
-      if (call.url === 'https://dev.api.trustlesswork.com') return jsonResponse({});
       return textResponse('boom', 503);
     });
     open = await bootTestClient();
