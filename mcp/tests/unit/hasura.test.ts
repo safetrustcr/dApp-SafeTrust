@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { jsonResponse, stubFetch, textResponse } from '../helpers/fetch.js';
-import { loadFresh, restoreEnv } from '../helpers/env.js';
+import { loadFresh, restoreEnv, TEST_HOSTS } from '../helpers/env.js';
 
 type HasuraModule = typeof import('../../src/lib/hasura.js');
 
@@ -10,6 +10,7 @@ const BASE = 'http://hasura.test/v1/graphql';
 function loadHasura(env: Record<string, string | undefined> = {}): Promise<HasuraModule> {
   return loadFresh<HasuraModule>(
     {
+      ...TEST_HOSTS,
       HASURA_GRAPHQL_URL: BASE,
       HASURA_ADMIN_SECRET: 'test-admin-secret',
       HASURA_GRAPHQL_ADMIN_SECRET: undefined,
@@ -60,19 +61,24 @@ describe('hasuraRequest', () => {
     expect(data).toEqual({ escrows: [{ id: 'esc-1' }] });
   });
 
-  it('surfaces GraphQL errors from a 200 response with their details', async () => {
+  it('surfaces only the GraphQL error message, never its extensions', async () => {
     stubFetch(() =>
-      jsonResponse({ errors: [{ message: 'field "nope" not found' }] }),
+      jsonResponse({
+        errors: [
+          {
+            message: 'field "nope" not found',
+            extensions: { internal: { statement: 'SELECT * FROM escrows' }, path: '$.selectionSet' },
+          },
+        ],
+      }),
     );
     const { hasuraRequest, HasuraRequestError } = await loadHasura();
 
     const error = await hasuraRequest('query { nope }').catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(HasuraRequestError);
-    expect((error as Error).message).toBe('field "nope" not found');
-    expect((error as InstanceType<typeof HasuraRequestError>).details).toEqual([
-      { message: 'field "nope" not found' },
-    ]);
+    expect((error as Error).message).toBe('Hasura rejected the query: field "nope" not found');
+    expect((error as InstanceType<typeof HasuraRequestError>).details).toBeUndefined();
   });
 
   it('turns a non-2xx response into a HasuraRequestError', async () => {
@@ -88,7 +94,7 @@ describe('hasuraRequest', () => {
     const { hasuraRequest } = await loadHasura();
 
     await expect(hasuraRequest('query { escrows { id } }')).rejects.toThrow(
-      /Hasura returned a non-JSON response \(502\)/,
+      'Hasura returned an invalid response (HTTP 502).',
     );
   });
 
@@ -108,7 +114,7 @@ describe('hasuraRequest', () => {
     const { hasuraRequest } = await loadHasura();
 
     await expect(hasuraRequest('query { escrows { id } }')).rejects.toThrow(
-      `Cannot reach Hasura at ${BASE}`,
+      'Cannot reach local Hasura. Is infra/backend/bin/start running?',
     );
   });
 });

@@ -5,6 +5,7 @@ import { apiRequest } from '../src/lib/api.js';
 describe('protected apps/api requests', () => {
   beforeEach(() => {
     clearFirebaseSession();
+    vi.stubEnv('SAFETRUST_API_URL', 'http://localhost:3002');
     vi.stubEnv('SAFETRUST_MCP_FIREBASE_API_KEY', 'local-api-key');
     vi.stubEnv('SAFETRUST_MCP_TEST_EMAIL', 'mcp-guest@test.safetrust.dev');
     vi.stubEnv('SAFETRUST_MCP_TEST_PASSWORD', 'local-only-password');

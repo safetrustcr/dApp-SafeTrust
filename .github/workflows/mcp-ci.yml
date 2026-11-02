@@ -56,11 +56,17 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: No committed Hasura admin secret (#529)
+        run: bash mcp/scripts/check-secrets.sh
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
       - name: Build shared types
         run: pnpm --filter @safetrust/types build
+
+      - name: Configuration docs match mcp/.env.example
+        run: pnpm --filter @safetrust/mcp docs:env:check
 
       - name: Type-check MCP server
         run: pnpm --filter @safetrust/mcp type-check

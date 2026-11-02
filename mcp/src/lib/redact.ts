@@ -16,8 +16,15 @@ export type RedactOptions = {
 
 const STELLAR_ADDRESS = /\bG[A-Z2-7]{55}\b/g;
 const EMAIL = /\b([A-Z0-9._%+-])(?:[A-Z0-9._%+-]*)@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi;
-const PHONE = /(?<![\w])(?:\+?\d[\d .()\-]{5,}\d)(?![\w])/g;
-const BASE64_BLOB = /\b[A-Za-z0-9+/]{200,}={0,2}\b/g;
+/**
+ * Free text only masks digit runs written like a phone number (a leading `+` or
+ * grouped with separators), so UUID segments, stroop amounts and timestamps pass
+ * through. Bare digits are masked by key instead — see PHONE_KEY.
+ */
+const PHONE = /(?<![\w+.-])(?:\+\d[\d .()-]{5,}\d|\(?\d{2,4}\)?[ .-]\d[\d .-]{3,}\d)(?![\w-])/g;
+const PHONE_KEY = /phone|mobile/i;
+// Lookarounds, not \b: `+`, `/` and `=` padding are non-word characters.
+const BASE64_BLOB = /(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{200,}={0,2}(?![A-Za-z0-9+/=])/g;
 
 const XDR_KEY = /xdr|unsigned_?transaction/i;
 /** Base64 transaction envelopes start with AAAA and are long. */
@@ -80,6 +87,33 @@ export function redactXdr<T>(value: T): T {
     return out as T;
   }
   return (looksLikeXdr(value) ? REDACTED_XDR : value) as T;
+}
+
+/**
+ * An upstream (Hasura / apps/api) error reduced to its message: first line only,
+ * capped, so a stack trace, SQL statement or echoed header never reaches the client.
+ */
+export function errorMessageOnly(value: unknown, fallback = 'unknown error'): string {
+  if (typeof value !== 'string') return fallback;
+  const line = value.split(/\r?\n/)[0].trim();
+  if (!line) return fallback;
+  return line.length > 200 ? `${line.slice(0, 200)}…` : line;
+}
+
+/** Deep copy with every phone-like field (`phone`, `phone_number`, `mobile`) masked. */
+export function redactPhoneFields<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => redactPhoneFields(item)) as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+      const scalar = typeof inner === 'string' || typeof inner === 'number';
+      out[key] = PHONE_KEY.test(key) && scalar
+        ? `***${String(inner).replace(/\D/g, '').slice(-4)}`
+        : redactPhoneFields(inner);
+    }
+    return out as T;
+  }
+  return value;
 }
 
 /** `GABC…WXYZ` — first 4 and last 4 characters of a Stellar public key. */

@@ -7,6 +7,7 @@ import { apiRequest } from '../lib/api.js';
 import { routeUrl } from '../lib/api-contract.js';
 import { auditToolCall } from '../lib/audit.js';
 import { escrowRolesDoc } from '../lib/escrow-roles.js';
+import { errorMessageOnly } from '../lib/redact.js';
 import { describeError, errorResult, jsonBlock, textResult, textResultWithOptions } from '../lib/response.js';
 
 const stellarAddress = z
@@ -35,7 +36,7 @@ export type ApiFailure = { error?: string; code?: string; detail?: string; title
 
 export function apiFailure(action: string, status: number, data: ApiFailure, idempotencyKey?: string) {
   const code = data.code ?? data.type?.split('/').pop()?.replace(/-/g, '_').toUpperCase();
-  const message = data.detail ?? data.error ?? data.title ?? 'unknown error';
+  const message = errorMessageOnly(data.detail ?? data.error ?? data.title);
   const lines = [`${action} failed (HTTP ${status}${code ? ` ${code}` : ''}): ${message}`];
   if (idempotencyKey) lines.push(`idempotencyKey: ${idempotencyKey}`);
   if (status === 401) {

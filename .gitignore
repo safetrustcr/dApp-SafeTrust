@@ -44,4 +44,7 @@ coverage/
 
 # Vercel
 .vercel
+# MCP server: local credentials only (issue #529)
 mcp/.env
+mcp/.env.*
+!mcp/.env.example

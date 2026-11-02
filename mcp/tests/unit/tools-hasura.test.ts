@@ -75,7 +75,6 @@ describe('query-escrows', () => {
               engagement_id: 'rental:apt-1:uid',
               status: 'funded',
               amount: '1200',
-              apartment_id: 'apt-1',
             },
           ],
         },
@@ -85,17 +84,17 @@ describe('query-escrows', () => {
 
     const result = await client.callTool({
       name: 'query-escrows',
-      arguments: { status: 'funded', apartmentId: '11111111-1111-4111-8111-111111111111', limit: 5 },
+      arguments: { status: 'funded', engagementId: 'rental:apt-1:uid', limit: 5 },
     });
 
     const [query] = graphqlDocuments(calls);
     expect(query).toContain('$status: String!');
-    expect(query).toContain('$apartmentId: uuid!');
-    expect(query).not.toContain('$senderAddress');
+    expect(query).toContain('$engagementId: String!');
+    expect(query).not.toContain('$contractId');
     expect(query).toContain('limit: 5');
     expect(JSON.parse(calls[0].body ?? '{}').variables).toEqual({
+      engagementId: 'rental:apt-1:uid',
       status: 'funded',
-      apartmentId: '11111111-1111-4111-8111-111111111111',
     });
 
     expect(textOf(result)).toContain('1 escrow row(s).');
@@ -125,10 +124,10 @@ describe('query-escrows', () => {
 });
 
 describe('query-trustless-work-escrows', () => {
-  it('queries the camelCase mirror and explains the role columns', async () => {
+  it('queries the camelCase mirror', async () => {
     const { calls } = stubFetch(() =>
       jsonResponse({
-        data: { trustlessWorkEscrows: [{ id: 'tw-1', marker: 'GOWNER', approver: 'GTENANT' }] },
+        data: { trustlessWorkEscrows: [{ id: 'tw-1', contractId: 'C1', status: 'funded' }] },
       }),
     );
     const { client } = await boot();
@@ -140,10 +139,7 @@ describe('query-trustless-work-escrows', () => {
 
     expect(graphqlDocuments(calls)[0]).toContain('trustlessWorkEscrows');
     expect(textOf(result)).toContain('1 trustless_work_escrows row(s).');
-    expect(textOf(result)).toContain(
-      'marker = owner wallet, approver = tenant wallet, releaser/resolver = platform wallet.',
-    );
-    expect(jsonOf(result)).toEqual([{ id: 'tw-1', marker: 'GOWNER', approver: 'GTENANT' }]);
+    expect(jsonOf(result)).toEqual([{ id: 'tw-1', contractId: 'C1', status: 'funded' }]);
   });
 });
 
@@ -155,36 +151,28 @@ describe('query-user-wallets', () => {
     const result = await client.callTool({ name: 'query-user-wallets', arguments: {} });
 
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('Provide at least one of userId, email or walletAddress.');
+    expect(textOf(result)).toContain('Provide at least one of userId or walletAddress.');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('resolves an email through the joined user row', async () => {
+  it('looks a wallet up by address and returns it shortened', async () => {
+    const wallet = `G${'C'.repeat(55)}`;
     const { calls } = stubFetch(() =>
       jsonResponse({
-        data: {
-          user_wallets: [
-            {
-              id: 'w1',
-              wallet_address: 'G…',
-              chain_type: 'STELLAR',
-              is_primary: true,
-              user: { email: 'guest@example.com' },
-            },
-          ],
-        },
+        data: { user_wallets: [{ user_id: 'uid-1', wallet_address: wallet, is_primary: true }] },
       }),
     );
     const { client } = await boot();
 
     const result = await client.callTool({
       name: 'query-user-wallets',
-      arguments: { email: 'guest@example.com' },
+      arguments: { walletAddress: wallet },
     });
 
     const [query] = graphqlDocuments(calls);
-    expect(query).toContain('$email: String!');
-    expect(query).toContain('user: { email: { _eq: $email } }');
+    expect(query).toContain('$walletAddress: String!');
+    expect(query).toContain('wallet_address: { _eq: $walletAddress }');
     expect(textOf(result)).toContain('1 wallet(s).');
+    expect(jsonOf(result)).toEqual([{ user_id: 'uid-1', wallet_address: 'GCCC…CCCC', is_primary: true }]);
   });
 });

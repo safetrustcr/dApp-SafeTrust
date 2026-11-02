@@ -2,19 +2,43 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { bootTestClient } from '../helpers/boot.js';
 import { restoreEnv } from '../helpers/env.js';
-import { graphqlDocuments, jsonResponse, stubFetch } from '../helpers/fetch.js';
+import { graphqlDocuments, jsonResponse, stubFetch, type RecordedCall } from '../helpers/fetch.js';
 import { jsonOf, textOf, type TestClient } from '../helpers/mcp.js';
 
 const APARTMENT_ID = '11111111-1111-4111-8111-111111111111';
 const TENANT = `G${'A'.repeat(55)}`;
 const OWNER = `G${'B'.repeat(55)}`;
-const XDR = `${'A'.repeat(180)}==`;
+const XDR = `AAAAAgAAAA${'A'.repeat(180)}==`;
+const ENGAGEMENT = `rental:${APARTMENT_ID}:guest-uid`;
+
+/** Build tools are off by default; on, they act as the Firebase test user. */
+const MUTATIONS_ON = {
+  SAFETRUST_MCP_ALLOW_MUTATIONS: 'true',
+  SAFETRUST_MCP_FIREBASE_API_KEY: 'test-api-key',
+  SAFETRUST_MCP_TEST_EMAIL: 'mcp-guest@test.safetrust.dev',
+  SAFETRUST_MCP_TEST_PASSWORD: 'test-password',
+};
 
 let open: TestClient | undefined;
 
 async function boot(env: Record<string, string | undefined> = {}): Promise<TestClient> {
-  open = await bootTestClient(env);
+  open = await bootTestClient({ SAFETRUST_MCP_ALLOW_MUTATIONS: undefined, ...env });
   return open;
+}
+
+/** apps/api on Testnet plus a Firebase sign-in; `route` answers the escrow call. */
+function testnetApi(route: (call: RecordedCall) => Response) {
+  return stubFetch((call) => {
+    if (call.url.startsWith('https://identitytoolkit.googleapis.com/')) {
+      return jsonResponse({ idToken: 'test-id-token', refreshToken: 'test-refresh', expiresIn: '3600' });
+    }
+    if (call.url === 'http://api.test/health') return jsonResponse({ status: 'ok', stellarNetwork: 'TESTNET' });
+    return route(call);
+  });
+}
+
+function escrowCalls(calls: RecordedCall[]): RecordedCall[] {
+  return calls.filter((call) => call.url.startsWith('http://api.test/api/escrow/'));
 }
 
 afterEach(async () => {
@@ -24,100 +48,103 @@ afterEach(async () => {
 });
 
 describe('deploy-escrow', () => {
-  it('posts the booking to apps/api and returns the unsigned XDR untouched', async () => {
-    const { calls } = stubFetch(() =>
-      jsonResponse({ status: 'SUCCESS', contractId: 'CABC', unsignedXDR: XDR, engagementId: 'eng-1' }),
-    );
-    const { client } = await boot();
-
-    const result = await client.callTool({
-      name: 'deploy-escrow',
-      arguments: {
-        apartmentId: APARTMENT_ID,
-        senderAddress: TENANT,
-        receiverAddress: OWNER,
-        amount: 900,
-      },
-    });
-
-    expect(calls[0].url).toBe('http://api.test/api/escrow/deploy');
-    expect(calls[0].method).toBe('POST');
-    const body = JSON.parse(calls[0].body ?? '{}');
-    expect(body).toMatchObject({
-      apartmentId: APARTMENT_ID,
-      senderAddress: TENANT,
-      receiverAddress: OWNER,
-      amount: 900,
-    });
-    expect(body.engagementId).toMatch(/^[0-9a-f-]{36}$/);
-
-    const text = textOf(result);
-    expect(text).toContain('Escrow deploy initiated.');
-    expect(text).toContain(`engagementId: eng-1`);
-    expect(text).toContain(`unsignedXDR: ${XDR.slice(0, 48)}… (${XDR.length} chars)`);
-    expect(text).toContain('apps/api has no submit route yet');
-  });
-
-  it('reuses a caller-supplied engagementId as the idempotency key', async () => {
-    const { calls } = stubFetch(() => jsonResponse({ unsignedXDR: XDR, engagementId: 'eng-fixed' }));
-    const { client } = await boot();
-
-    await client.callTool({
-      name: 'deploy-escrow',
-      arguments: {
-        apartmentId: APARTMENT_ID,
-        senderAddress: TENANT,
-        receiverAddress: OWNER,
-        amount: 900,
-        engagementId: 'eng-fixed',
-      },
-    });
-
-    expect(JSON.parse(calls[0].body ?? '{}').engagementId).toBe('eng-fixed');
-  });
-
-  it('explains an idempotent replay instead of returning a new transaction', async () => {
-    stubFetch(() =>
-      jsonResponse({ cached: true, engagementId: 'eng-1', contractId: 'CABC', unsignedXDR: XDR }),
-    );
-    const { client } = await boot();
-
-    const result = await client.callTool({
-      name: 'deploy-escrow',
-      arguments: { apartmentId: APARTMENT_ID, senderAddress: TENANT, receiverAddress: OWNER, amount: 900 },
-    });
-
-    const text = textOf(result);
-    expect(text).toContain('Escrow already deployed for this engagementId (idempotent replay).');
-    expect(text).toContain('contractId: CABC');
-    expect(text).not.toContain('unsignedXDR:');
-  });
-
-  it('relays an API rejection with its HTTP status', async () => {
-    stubFetch(() =>
-      jsonResponse({ error: 'Connect and register the Stellar wallet', details: { code: 'X' } }, 403),
-    );
-    const { client } = await boot();
-
-    const result = await client.callTool({
-      name: 'deploy-escrow',
-      arguments: { apartmentId: APARTMENT_ID, senderAddress: TENANT, receiverAddress: OWNER, amount: 900 },
-    });
-
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain(
-      'Deploy failed (HTTP 403): Connect and register the Stellar wallet',
-    );
-    expect(jsonOf(result)).toEqual({ code: 'X' });
-  });
-
-  it('rejects a malformed Stellar address before any request', async () => {
+  it('is refused without a request while mutations are disabled', async () => {
     const { fetchMock } = stubFetch();
     const { client } = await boot();
 
     const result = await client.callTool({
       name: 'deploy-escrow',
-      arguments: { apartmentId: APARTMENT_ID, senderAddress: 'nope', receiverAddress: OWNER, amount: 900 },
+      arguments: { apartmentId: APARTMENT_ID, senderAddress: TENANT },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('Escrow mutations are disabled.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('posts only the booking and guest wallet and returns the unsigned XDR untouched', async () => {
+    const { calls } = testnetApi(() =>
+      jsonResponse({ status: 'SUCCESS', contractId: 'CABC', unsignedXDR: XDR, engagementId: ENGAGEMENT }),
+    );
+    const { client } = await boot(MUTATIONS_ON);
+
+    const result = await client.callTool({
+      name: 'deploy-escrow',
+      arguments: { apartmentId: APARTMENT_ID, senderAddress: TENANT },
+    });
+
+    const [deploy] = escrowCalls(calls);
+    expect(deploy.url).toBe('http://api.test/api/escrow/deploy');
+    expect(deploy.method).toBe('POST');
+    expect(deploy.headers.Authorization).toBe('Bearer test-id-token');
+    expect(deploy.headers['Idempotency-Key']).toMatch(/^[0-9a-f-]{36}$/);
+    expect(JSON.parse(deploy.body ?? '{}')).toEqual({ apartmentId: APARTMENT_ID, senderAddress: TENANT });
+
+    const text = textOf(result);
+    expect(result.isError).toBeFalsy();
+    expect(text).toContain('Unsigned Testnet escrow deployment built.');
+    expect(text).toContain(`engagementId: ${ENGAGEMENT}`);
+    expect(text).toContain(`unsignedXDR: ${XDR}`);
+  });
+
+  it('reuses a caller-supplied idempotency key', async () => {
+    const key = '33333333-3333-4333-8333-333333333333';
+    const { calls } = testnetApi(() => jsonResponse({ unsignedXDR: XDR, engagementId: ENGAGEMENT }));
+    const { client } = await boot(MUTATIONS_ON);
+
+    await client.callTool({
+      name: 'deploy-escrow',
+      arguments: { apartmentId: APARTMENT_ID, senderAddress: TENANT, idempotencyKey: key },
+    });
+
+    expect(escrowCalls(calls)[0].headers['Idempotency-Key']).toBe(key);
+  });
+
+  it('explains an idempotent replay instead of returning a new transaction', async () => {
+    testnetApi(() => jsonResponse({ cached: true, engagementId: ENGAGEMENT, contractId: 'CABC' }));
+    const { client } = await boot(MUTATIONS_ON);
+
+    const result = await client.callTool({
+      name: 'deploy-escrow',
+      arguments: { apartmentId: APARTMENT_ID, senderAddress: TENANT },
+    });
+
+    const text = textOf(result);
+    expect(text).toContain('Already deployed for this booking (idempotent replay).');
+    expect(text).toContain('contractId: CABC');
+    expect(text).not.toContain('unsignedXDR:');
+  });
+
+  it('relays only the API message, with its HTTP status', async () => {
+    testnetApi(() =>
+      jsonResponse(
+        {
+          type: 'https://safetrust.dev/problems/wallet-not-registered',
+          detail: 'Connect and register the Stellar wallet\n    at deployHandler (/app/src/deploy.ts:10:3)',
+        },
+        403,
+      ),
+    );
+    const { client } = await boot(MUTATIONS_ON);
+
+    const result = await client.callTool({
+      name: 'deploy-escrow',
+      arguments: { apartmentId: APARTMENT_ID, senderAddress: TENANT },
+    });
+
+    const text = textOf(result);
+    expect(result.isError).toBe(true);
+    expect(text).toContain('Deploy failed (HTTP 403 WALLET_NOT_REGISTERED): Connect and register the Stellar wallet');
+    expect(text).not.toContain('deployHandler');
+  });
+
+  it('rejects a malformed Stellar address before any request', async () => {
+    const { fetchMock } = stubFetch();
+    const { client } = await boot(MUTATIONS_ON);
+
+    const result = await client.callTool({
+      name: 'deploy-escrow',
+      arguments: { apartmentId: APARTMENT_ID, senderAddress: 'nope' },
     });
 
     expect(result.isError).toBe(true);
@@ -126,24 +153,22 @@ describe('deploy-escrow', () => {
 });
 
 describe('fund-escrow', () => {
-  it('builds a funding transaction through apps/api', async () => {
-    const { calls } = stubFetch(() => jsonResponse({ unsignedTransaction: XDR }));
-    const { client } = await boot();
+  it('builds a funding transaction from the engagement id alone', async () => {
+    const { calls } = testnetApi(() =>
+      jsonResponse({ unsignedXdr: XDR, txHash: 'hash-fund', engagementId: ENGAGEMENT, contractId: 'CABC' }),
+    );
+    const { client } = await boot(MUTATIONS_ON);
 
-    const result = await client.callTool({
-      name: 'fund-escrow',
-      arguments: { contractId: 'CABC', signer: TENANT, amount: 900 },
-    });
+    const result = await client.callTool({ name: 'fund-escrow', arguments: { engagementId: ENGAGEMENT } });
 
-    expect(calls[0].url).toBe('http://api.test/api/escrow/fund');
-    expect(JSON.parse(calls[0].body ?? '{}')).toEqual({
-      contractId: 'CABC',
-      signer: TENANT,
-      amount: 900,
-    });
-    expect(textOf(result)).toContain('Fund transaction built.');
-    expect(textOf(result)).toContain('Sign it with Freighter and submit it through the frontend');
-    expect(textOf(result)).toContain(`(${XDR.length} chars)`);
+    const [fund] = escrowCalls(calls);
+    expect(fund.url).toBe('http://api.test/api/escrow/fund');
+    expect(JSON.parse(fund.body ?? '{}')).toEqual({ engagementId: ENGAGEMENT });
+
+    const text = textOf(result);
+    expect(text).toContain('Unsigned Testnet funding transaction built.');
+    expect(text).toContain('txHash: hash-fund');
+    expect(text).toContain(`unsignedXDR: ${XDR}`);
   });
 });
 
@@ -165,19 +190,21 @@ describe('get-escrow-status', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('looks the escrow up with an _or filter and renders the row', async () => {
-    const { calls } = stubFetch(() =>
-      jsonResponse({
+  it('looks the escrow up with an _or filter and renders the row with redacted wallets', async () => {
+    const { calls } = stubFetch((call) => {
+      const { query } = JSON.parse(call.body ?? '{}') as { query: string };
+      if (query.includes('McpEscrowTransitions')) return jsonResponse({ data: { escrow_transactions: [] } });
+      if (query.includes('McpTwMirror')) return jsonResponse({ data: { trustlessWorkEscrows: [{ status: 'funded' }] } });
+      return jsonResponse({
         data: {
           escrows: [
             {
               id: 'esc-1',
               contract_id: 'CABC',
-              engagement_id: 'eng-1',
+              engagement_id: ENGAGEMENT,
               status: 'funded',
               amount: '900',
-              property_id: null,
-              apartment_id: APARTMENT_ID,
+              tenant_id: 'safetrust',
               sender_address: TENANT,
               receiver_address: OWNER,
               unsigned_xdr: XDR,
@@ -186,14 +213,11 @@ describe('get-escrow-status', () => {
             },
           ],
         },
-      }),
-    );
+      });
+    });
     const { client } = await boot();
 
-    const result = await client.callTool({
-      name: 'get-escrow-status',
-      arguments: { contractId: 'CABC' },
-    });
+    const result = await client.callTool({ name: 'get-escrow-status', arguments: { contractId: 'CABC' } });
 
     const [query] = graphqlDocuments(calls);
     expect(query).toContain('_or: [');
@@ -201,13 +225,20 @@ describe('get-escrow-status', () => {
     expect(query).toContain('limit: 1');
 
     const text = textOf(result);
-    expect(text).toContain('Escrow found.');
-    expect(text).toContain('status: funded');
-    expect(text).toContain(`unsignedXDR: stored (${XDR.length} chars)`);
-    expect(text).toContain(`sender (tenant / approver): ${TENANT}`);
+    expect(text).toContain(`Escrow ${ENGAGEMENT}: funded`);
+    expect(jsonOf(result)).toMatchObject({
+      contractId: 'CABC',
+      status: 'funded',
+      amount: 900,
+      guestWallet: 'GAAA…AAAA',
+      hostWallet: 'GBBB…BBBB',
+      trustlessWorkMirrorStatus: 'funded',
+    });
+    expect(text).not.toContain(TENANT);
+    expect(text).not.toContain(XDR);
   });
 
-  it('suggests the legacy mirror when the rental table has no row', async () => {
+  it('reports a missing escrow', async () => {
     stubFetch(() => jsonResponse({ data: { escrows: [] } }));
     const { client } = await boot();
 
@@ -216,8 +247,7 @@ describe('get-escrow-status', () => {
       arguments: { engagementId: 'eng-missing' },
     });
 
-    expect(textOf(result)).toContain('No escrow found for that identifier in public.escrows.');
-    expect(textOf(result)).toContain('try query-trustless-work-escrows instead');
+    expect(textOf(result)).toBe('No escrow found for eng-missing.');
   });
 });
 
@@ -234,47 +264,32 @@ describe('orchestrate-escrow', () => {
     const status = await client.callTool({ name: 'orchestrate-escrow', arguments: { step: 'status' } });
 
     expect(textOf(start)).toContain(
-      'For step=start, provide: apartmentId, senderAddress, receiverAddress, amount',
+      'For step=start, provide exactly one of apartmentId or reservationId, and senderAddress.',
     );
-    expect(textOf(afterDeploy)).toContain(
-      'For step=after-deploy, provide: contractId, senderAddress, amount',
-    );
-    expect(textOf(status)).toContain('Provide contractId or engagementId to check status.');
+    expect(textOf(afterDeploy)).toContain('For step=after-deploy, provide engagementId.');
+    expect(textOf(status)).toContain('Provide engagementId to check status.');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('walks deploy → fund without building or signing anything', async () => {
+  it('walks deploy → fund → release without building or signing anything', async () => {
     const { fetchMock } = stubFetch();
     const { client } = await boot();
 
     const start = await client.callTool({
       name: 'orchestrate-escrow',
-      arguments: {
-        step: 'start',
-        apartmentId: APARTMENT_ID,
-        senderAddress: TENANT,
-        receiverAddress: OWNER,
-        amount: 900,
-      },
+      arguments: { step: 'start', apartmentId: APARTMENT_ID, senderAddress: TENANT },
     });
     const fund = await client.callTool({
       name: 'orchestrate-escrow',
-      arguments: { step: 'after-deploy', contractId: 'CABC', senderAddress: TENANT, amount: 900 },
+      arguments: { step: 'after-deploy', engagementId: ENGAGEMENT },
     });
-    const funded = await client.callTool({
-      name: 'orchestrate-escrow',
-      arguments: { step: 'after-fund' },
-    });
+    const funded = await client.callTool({ name: 'orchestrate-escrow', arguments: { step: 'after-fund' } });
 
-    expect(textOf(start)).toContain('Step 1: Deploy escrow');
-    expect(jsonOf(start)).toEqual({
-      apartmentId: APARTMENT_ID,
-      senderAddress: TENANT,
-      receiverAddress: OWNER,
-      amount: 900,
-    });
-    expect(textOf(fund)).toContain('Step 2: Fund escrow');
-    expect(textOf(funded)).toContain('Step 3: Escrow funded');
+    expect(textOf(start)).toContain('Step 1: Check, then deploy');
+    expect(textOf(start)).toContain('deploy-escrow with:');
+    expect(textOf(fund)).toContain('Step 2: Fund');
+    expect(textOf(fund)).toContain(`fund-escrow { engagementId: "${ENGAGEMENT}" }`);
+    expect(textOf(funded)).toContain('Step 3: Milestone and release');
     expect(textOf(funded)).toContain('disputeResolver');
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -285,6 +300,7 @@ describe('explain-escrow-roles', () => {
     const { fetchMock } = stubFetch();
     const { client } = await boot({
       PLATFORM_STELLAR_ADDRESS: 'GPLATFORM',
+      USDC_TRUSTLINE_ADDRESS: undefined,
       NEXT_PUBLIC_USDC_ADDRESS: 'GISSUER',
     });
 

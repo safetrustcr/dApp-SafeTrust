@@ -128,6 +128,38 @@ closed: `HASURA_GRAPHQL_URL`, `HASURA_ADMIN_SECRET` and `SAFETRUST_API_URL` have
 defaults, and non-local hosts are refused unless `SAFETRUST_MCP_ALLOW_REMOTE=true`.
 Never put the test password in `mcp.json`, tool arguments, or source control.
 
+Configuration is read when a tool runs, not at startup: the server starts, lists
+its tools and serves the docs resources with no variables set, and each tool that
+needs a missing or invalid value returns `isError` naming the variable (never its
+value). At startup one line goes to stderr, e.g.
+`hasura: configured (http://localhost:8080/v1/graphql) · api: missing · mutations: disabled`.
+
+| Variable | Default | When missing or invalid |
+|---|---|---|
+| `HASURA_GRAPHQL_URL` | none | Hasura tools fail: `HASURA_GRAPHQL_URL is not set.` |
+| `HASURA_ADMIN_SECRET` (alias `HASURA_GRAPHQL_ADMIN_SECRET`) | none | Hasura tools fail: `HASURA_ADMIN_SECRET is not set …` |
+| `SAFETRUST_API_URL` | none | apps/api tools fail: `SAFETRUST_API_URL is not set.` |
+| `SAFETRUST_MCP_ALLOWED_HOSTS` | `localhost`, `127.0.0.1`, `host.docker.internal` | Extra comma-separated Docker service names treated as local. Any other host: `Remote hosts are disabled for the MCP.` |
+| `SAFETRUST_MCP_ALLOW_REMOTE` | `false` | `true` allows non-local hosts and logs a warning at startup. Leave off. |
+| `SAFETRUST_MCP_SHOW_FULL_IDS` | `false` | `true` prints full Stellar addresses instead of `GABC…WXYZ`. Local debugging only. |
+| `SAFETRUST_MCP_ALLOW_MUTATIONS` | `false` | Build tools return `isError` without calling apps/api. |
+
+### Output redaction
+
+Every tool result goes through [`src/lib/redact.ts`](src/lib/redact.ts) before it
+reaches the client: Stellar addresses become `GABC…WXYZ`, emails `j***@example.com`,
+phone numbers `***1234`, base64 blobs over 200 characters `<xdr 1.2 KB>` (except the
+unsigned XDR that `deploy-escrow` and `fund-escrow` exist to return), and Hasura /
+apps/api errors keep their message only — no stack, SQL, `extensions` or headers.
+
+### Secrets in git
+
+`mcp/.env` and `mcp/.env.*` are gitignored (`.env.example` is not).
+`pnpm --filter @safetrust/mcp check:secrets` (run in CI) fails if a tracked file under
+`mcp/` contains an admin-secret value — the well-known local default, or the one in
+your environment, `infra/backend/.env` or `mcp/.env` — or if `mcp/src` falls back
+to a literal secret.
+
 The full list, with what each variable grants, is in
 [`docs/mcp/README.md`](../docs/mcp/README.md#configuration), generated from
 [`.env.example`](.env.example).

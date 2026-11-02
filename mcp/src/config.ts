@@ -176,12 +176,19 @@ export function usdcAddress(): string {
 
 /** Safe startup diagnostics: URLs/status only, never secrets. */
 export function configurationSummary(): string {
-  const hasura = env('HASURA_GRAPHQL_URL');
-  const api = env('SAFETRUST_API_URL');
   const mutations = env('SAFETRUST_MCP_ALLOW_MUTATIONS') === 'true' ? 'enabled' : 'disabled';
   const remote = env('SAFETRUST_MCP_ALLOW_REMOTE') === 'true';
-  const describe = (value: string | undefined) => (value ? `configured (${safeUrlForLog(value)})` : 'missing');
-  return `hasura: ${describe(hasura)} · api: ${describe(api)} · mutations: ${mutations}${remote ? ' · WARNING remote hosts enabled' : ''}`;
+  const describe = (variable: 'HASURA_GRAPHQL_URL' | 'SAFETRUST_API_URL') => {
+    const value = env(variable);
+    if (!value) return 'missing';
+    try {
+      return `configured (${localServiceUrl(variable)})`;
+    } catch (error) {
+      // McpConfigError messages name the variable, never its value.
+      return `refused (${safeUrlForLog(value)}: ${error instanceof Error ? error.message : 'invalid'})`;
+    }
+  };
+  return `hasura: ${describe('HASURA_GRAPHQL_URL')} · api: ${describe('SAFETRUST_API_URL')} · mutations: ${mutations}${remote ? ' · WARNING remote hosts enabled (SAFETRUST_MCP_ALLOW_REMOTE=true)' : ''}`;
 }
 
 function safeUrlForLog(value: string): string {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { jsonResponse, stubFetch, textResponse } from '../helpers/fetch.js';
-import { loadFresh, restoreEnv } from '../helpers/env.js';
+import { loadFresh, restoreEnv, TEST_HOSTS } from '../helpers/env.js';
 
 type ApiModule = typeof import('../../src/lib/api.js');
 
@@ -9,7 +9,7 @@ const BASE = 'http://api.test';
 
 function loadApi(env: Record<string, string | undefined> = {}): Promise<ApiModule> {
   return loadFresh<ApiModule>(
-    { SAFETRUST_API_URL: BASE, ...env },
+    { ...TEST_HOSTS, SAFETRUST_API_URL: BASE, ...env },
     () => import('../../src/lib/api.js'),
   );
 }
@@ -78,11 +78,11 @@ describe('apiRequest', () => {
       ApiRequestError,
     );
     await expect(apiRequest('/api/escrow/deploy', { method: 'POST', body: {} })).rejects.toThrow(
-      `Cannot reach apps/api at ${BASE}/api/escrow/deploy`,
+      'Cannot reach local apps/api. Is pnpm --filter @safetrust/api dev running?',
     );
   });
 
-  it('rejects non-JSON responses and keeps only a short excerpt', async () => {
+  it('rejects non-JSON responses without echoing the body', async () => {
     const html = `<html>${'x'.repeat(400)}</html>`;
     stubFetch(() => textResponse(html, 502));
     const { apiRequest, ApiRequestError } = await loadApi();
@@ -91,8 +91,7 @@ describe('apiRequest', () => {
 
     expect(error).toBeInstanceOf(ApiRequestError);
     const message = (error as Error).message;
-    expect(message).toContain('non-JSON response (502)');
-    expect(message).toContain(html.slice(0, 200));
-    expect(message).not.toContain(html.slice(0, 201));
+    expect(message).toBe('apps/api returned an invalid response (HTTP 502).');
+    expect(message).not.toContain('<html>');
   });
 });
