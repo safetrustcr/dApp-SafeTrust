@@ -1,44 +1,36 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
+import { auditToolCall } from '../lib/audit.js';
 import { buildWhere, hasuraRequest } from '../lib/hasura.js';
-import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
+import { describeError, errorResult, textResult } from '../lib/response.js';
 
-type OwnerWallet = { wallet_address: string; provider: string | null };
+type OwnerWallet = { wallet_address: string; is_primary: boolean };
 
 type Apartment = {
   id: string;
   name: string;
-  description: string | null;
   price: string;
   warranty_deposit: string;
-  address: Record<string, unknown> | null;
   is_available: boolean;
   available_from: string;
   available_until: string | null;
-  image_urls: string[] | null;
-  created_at: string;
   owner?: {
     id: string;
-    first_name: string | null;
-    last_name: string | null;
     user_wallets: OwnerWallet[];
   } | null;
 };
 
-/** Columns shared by both queries. `coordinates`/`location_area` are PostGIS and stay out. */
+/** Columns available to the mcp_reader role. */
 const APARTMENT_FIELDS = `
   id
+  owner_id
   name
-  description
   price
   warranty_deposit
-  address
   is_available
   available_from
   available_until
-  image_urls
-  created_at
 `;
 
 export function registerApartmentTools(server: McpServer) {
@@ -55,21 +47,19 @@ export function registerApartmentTools(server: McpServer) {
       annotations: { readOnlyHint: true },
     },
     async ({ apartmentId }) => {
+      auditToolCall('get-apartment');
       const query = `
         query GetApartment($id: uuid!) {
           apartments(where: { id: { _eq: $id } }, limit: 1) {
             ${APARTMENT_FIELDS}
             owner {
               id
-              first_name
-              last_name
               user_wallets(
-                where: { chain_type: { _eq: "STELLAR" } }
-                order_by: { is_primary: desc, created_at: asc }
+                order_by: { is_primary: desc }
                 limit: 1
               ) {
                 wallet_address
-                provider
+                is_primary
               }
             }
           }
@@ -83,10 +73,8 @@ export function registerApartmentTools(server: McpServer) {
         if (!apartment) {
           return textResult(`No apartment found with id ${apartmentId}.`);
         }
-
         const owner = apartment.owner;
         const wallet = owner?.user_wallets?.[0]?.wallet_address;
-        const ownerName = [owner?.first_name, owner?.last_name].filter(Boolean).join(' ');
 
         return textResult(
           `Apartment: ${apartment.name}`,
@@ -94,13 +82,10 @@ export function registerApartmentTools(server: McpServer) {
           `price: ${apartment.price} / month`,
           `warranty_deposit: ${apartment.warranty_deposit} USDC (the escrow amount)`,
           `available: ${apartment.is_available ? 'yes' : 'no'} (from ${apartment.available_from}${apartment.available_until ? ` until ${apartment.available_until}` : ''})`,
-          `owner: ${ownerName || '(no name)'} — user id ${owner?.id ?? 'unknown'}`,
+          `owner user id: ${owner?.id ?? 'unknown'}`,
           wallet
             ? `owner wallet (ownerAddress for deploy-escrow): ${wallet}`
             : 'owner has no STELLAR wallet in public.user_wallets — deploy-escrow will be blocked',
-          '',
-          'address:',
-          jsonBlock(apartment.address),
         );
       } catch (error) {
         return errorResult(describeError(error));
@@ -123,11 +108,13 @@ export function registerApartmentTools(server: McpServer) {
           .describe('Restrict to is_available = true. Defaults to true.'),
         minPrice: z.number().nonnegative().optional().describe('Minimum monthly price'),
         maxPrice: z.number().positive().optional().describe('Maximum monthly price'),
-        limit: z.number().int().min(1).max(50).optional().describe('Row limit (default 10)'),
+        limit: z.number().int().min(1).max(100).optional().describe('Row limit (default 10)'),
       },
       annotations: { readOnlyHint: true },
     },
     async ({ search, onlyAvailable, minPrice, maxPrice, limit }) => {
+      auditToolCall('list-apartments');
+      const resultLimit = limit ?? 10;
       const where = buildWhere([
         ['search', 'String!', '{ name: { _ilike: $search } }', search ? `%${search}%` : undefined],
         [
@@ -138,7 +125,6 @@ export function registerApartmentTools(server: McpServer) {
         ],
         ['minPrice', 'numeric!', '{ price: { _gte: $minPrice } }', minPrice],
         ['maxPrice', 'numeric!', '{ price: { _lte: $maxPrice } }', maxPrice],
-        ['deletedAt', 'Boolean!', '{ deleted_at: { _is_null: $deletedAt } }', true],
       ]);
 
       const query = `
@@ -146,12 +132,9 @@ export function registerApartmentTools(server: McpServer) {
           apartments(
             ${where.whereArgument}
             order_by: { created_at: desc }
-            limit: ${limit ?? 10}
+            limit: ${resultLimit}
           ) {
             ${APARTMENT_FIELDS}
-            owner {
-              id
-            }
           }
         }
       `;
@@ -172,10 +155,10 @@ export function registerApartmentTools(server: McpServer) {
         }));
 
         return textResult(
-          `${rows.length} apartment(s) found.`,
-          jsonBlock(rows),
-          '',
-          'Call get-apartment with an id to see the owner Stellar wallet.',
+          `${rows.length} apartment(s) found.${
+            rows.length >= resultLimit ? ` Result limit ${resultLimit} reached.` : ''
+          }`,
+          JSON.stringify(rows, null, 2),
         );
       } catch (error) {
         return errorResult(describeError(error));

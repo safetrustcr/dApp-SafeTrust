@@ -35,6 +35,7 @@ export type BuildRequest = {
 };
 
 export type BuildResult = {
+  pendingActionId: string;
   unsignedXdr: string;
   txHash: string;
   engagementId: string;
@@ -59,6 +60,7 @@ export function toApiError(err: unknown): never {
 
 function fromRow(row: PendingAction, reused: boolean): BuildResult {
   return {
+    pendingActionId: row.id,
     unsignedXdr: row.unsigned_xdr,
     txHash: row.tx_hash,
     engagementId: row.engagement_id,

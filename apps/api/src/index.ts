@@ -1,4 +1,5 @@
 import './config/env.js';
+import { createApp } from './app.js';
 import express from 'express';
 import cors from 'cors';
 import { apiCorsOptions } from './http/cors-options.js';
@@ -16,21 +17,25 @@ import resolveDisputeRouter from './routes/escrow/resolve-dispute.route.js';
 import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.js';
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
+import readinessRouter from './routes/escrow/readiness.route.js';
 import conversationsRouter from './routes/messages/conversations.route.js';
 import messagesRouter from './routes/messages/send.route.js';
+import notificationDevicesRouter from './routes/notifications/devices.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
 import { requestIdMiddleware, errorHandler } from './http/error-middleware.js';
 import listingsRouter from './routes/listings/listings.route.js';
 import hotelsRouter from './routes/hotels/hotels.route.js';
+import hotelReservationsRouter from './routes/hotels/reservations.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 
 import { initFirebaseAdmin } from './lib/firebase-admin.js';
+import { isTestnet } from './services/wallet-readiness.js';
 
 initFirebaseAdmin();
 
-const app = express();
+const app = createApp();
 const PORT = process.env.PORT || 3002;
 
 app.use(cors(apiCorsOptions()));
@@ -41,7 +46,11 @@ app.use(requestIdMiddleware); // attach X-Request-Id before all routes
 
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', firebase: 'configured' });
+  res.json({
+    status: 'ok',
+    firebase: 'configured',
+    stellarNetwork: isTestnet() ? 'TESTNET' : 'PUBLIC',
+  });
 });
 
 app.use('/reconciliation', reconciliationRouter);
@@ -65,13 +74,16 @@ app.use('/api/escrow', resolveDisputeRouter);
 app.use('/api/escrow', recoverFromTxhashRouter);
 app.use('/api/escrow', sendTransactionRouter);
 app.use('/api/escrow', statusStreamRouter);
+app.use('/api/escrow', readinessRouter);
 
 // Messages routes
 app.use('/api/messages', conversationsRouter);
 app.use('/api/messages', messagesRouter);
+app.use('/api/notifications', notificationDevicesRouter);
 
 // Hotel routes
 app.use('/api/hotels', hotelsRouter);
+app.use('/api/hotel-reservations', hotelReservationsRouter);
 app.use('/api/listings', listingsRouter);
 
 // Global Problem Details error boundary

@@ -3,7 +3,34 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ push: vi.fn(), post: vi.fn(), sign: vi.fn(), connect: vi.fn(), ready: true, address: `G${'A'.repeat(55)}` }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
-vi.mock('@/lib/api/escrow', () => ({ postEscrowApi: mocks.post }));
+vi.mock('@/lib/api/escrow', () => ({
+  postEscrowApi: mocks.post,
+  getReadiness: vi.fn(() =>
+    Promise.resolve({
+      ready: true,
+      network: 'testnet',
+      asset: { code: 'USDC', issuer: 'GISSUER' },
+      amount: '240.0000000',
+      guest: {
+        wallet: mocks.address,
+        checks: {
+          registeredWallet: { ok: true },
+          accountExists: { ok: true },
+          xlmForFees: { ok: true },
+          trustline: { ok: true },
+          assetBalance: { ok: true },
+        },
+      },
+      counterparties: {
+        hostCanReceive: { ok: true },
+        platformCanReceive: { ok: true },
+      },
+    }),
+  ),
+}));
+
+
+
 vi.mock('@/hooks/use-active-wallet', () => ({ useActiveWallet: () => ({ address: mocks.address, isReady: mocks.ready, signAndSubmit: mocks.sign }) }));
 vi.mock('@/components/auth/wallet/hooks/multi-wallet.hook', () => ({ useMultiWallet: () => ({ handleConnect: mocks.connect }) }));
 vi.mock('@/components/auth/wallet/components/MainWalletSelectionModal', () => ({ MainWalletSelectionModal: () => null }));

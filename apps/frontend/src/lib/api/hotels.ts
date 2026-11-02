@@ -142,3 +142,17 @@ export async function getHotelOwnerOptions(): Promise<Array<{ id: string; name: 
   const result = await apiRequest<{ owners: Array<{ id: string; name: string }> }>('/api/hotels/owners', 'GET');
   return result.owners;
 }
+
+/**
+ * Creates a hotel reservation through apps/api.
+ */
+export async function createReservation(input: {
+  roomId: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  walletAddress: string;
+}): Promise<{ reservationId: string; total: number; holdExpiresAt: string }> {
+  const result = await apiPost<{ reservationId: string; total: number; holdExpiresAt: string }>('/api/hotel-reservations', input);
+  return result;
+}

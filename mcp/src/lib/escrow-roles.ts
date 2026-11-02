@@ -1,4 +1,4 @@
-import { PLATFORM_ADDRESS, USDC_ADDRESS } from '../config.js';
+import { platformAddress, usdcAddress } from '../config.js';
 
 /**
  * SafeTrust's Trustless Work role mapping, for display only.
@@ -46,7 +46,7 @@ const ACTOR: Record<string, string> = {
 };
 
 export function escrowRolesDoc(): string {
-  const platform = PLATFORM_ADDRESS ?? '(unset — PLATFORM_STELLAR_ADDRESS)';
+  const platform = platformAddress() ?? '(unset — PLATFORM_STELLAR_ADDRESS / NEXT_PUBLIC_PLATFORM_ADDRESS)';
   const roleOf = (role: string) =>
     Object.entries(DEPLOY_ROLES).find(([r]) => r === role)?.[1] ?? 'platform';
 
@@ -63,7 +63,7 @@ ${Object.entries(DEPLOY_ROLES)
   .join('\n')}
 
 Platform wallet: ${platform}. \`platformFee\` is 0. The escrow carries a USDC
-trustline, issuer \`${USDC_ADDRESS}\` (\`USDC_TRUSTLINE_ADDRESS\`).
+trustline, issuer \`${usdcAddress()}\` (\`USDC_TRUSTLINE_ADDRESS\`).
 
 ## Who signs what
 

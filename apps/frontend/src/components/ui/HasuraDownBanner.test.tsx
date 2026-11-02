@@ -8,6 +8,7 @@ import { HasuraDownBanner } from './HasuraDownBanner';
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  mockFetch.mockReset();
   vi.stubGlobal('fetch', mockFetch);
 });
 
@@ -27,7 +28,7 @@ function healthy() {
 
 describe('HasuraDownBanner', () => {
   it('performs an initial health check immediately after mounting', async () => {
-    mockFetch.mockResolvedValueOnce(healthy());
+    mockFetch.mockResolvedOnce(healthy());
 
     render(<HasuraDownBanner />);
     await act(async () => {});
@@ -40,7 +41,7 @@ describe('HasuraDownBanner', () => {
   });
 
   it('displays when the health endpoint reports unhealthy', async () => {
-    mockFetch.mockResolvedValueOnce(unhealthy());
+    mockFetch.mockResolvedOnce(unhealthy());
 
     render(<HasuraDownBanner />);
     await act(async () => {});
@@ -49,7 +50,7 @@ describe('HasuraDownBanner', () => {
   });
 
   it('displays the exact startup command', async () => {
-    mockFetch.mockResolvedValueOnce(unhealthy());
+    mockFetch.mockResolvedOnce(unhealthy());
 
     render(<HasuraDownBanner />);
     await act(async () => {});
@@ -63,17 +64,17 @@ describe('HasuraDownBanner', () => {
 
   it('hides when Hasura becomes healthy again without reloading', async () => {
     vi.useFakeTimers();
-    mockFetch.mockResolvedValueOnce(unhealthy());
+    mockFetch.mockResolvedOnce(unhealthy());
 
     render(<HasuraDownBanner />);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimerByTimeAsync(0);
     });
     expect(screen.getByText('Hasura is not running')).toBeTruthy();
 
     mockFetch.mockResolvedValue(healthy());
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimerByTimeAsync(5000);
     });
 
     expect(screen.queryByText('Hasura is not running')).toBeNull();
@@ -85,17 +86,17 @@ describe('HasuraDownBanner', () => {
 
     render(<HasuraDownBanner />);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimerByTimeAsync(0);
     });
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimerByTimeAsync(5000);
     });
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimerByTimeAsync(5000);
     });
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
@@ -106,21 +107,21 @@ describe('HasuraDownBanner', () => {
 
     const { unmount } = render(<HasuraDownBanner />);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimerByTimeAsync(0);
     });
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     unmount();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(15000);
+      await vi.advanceTimerByTimeAsync(15000);
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it('does not render when the health endpoint is healthy', async () => {
-    mockFetch.mockResolvedValueOnce(healthy());
+    mockFetch.mockResolvedOnce(healthy());
 
     render(<HasuraDownBanner />);
     await act(async () => {});

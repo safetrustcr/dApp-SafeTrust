@@ -1,0 +1,33 @@
+name: Repository security guard
+
+on:
+  pull_request:
+  push:
+    branches: [main, consolidation-pattern]
+  workflow_dispatch:
+
+# This job only reads the pull request checkout. Never use pull_request_target:
+# untrusted PR code must not receive repository secrets or write permissions.
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Reject editor auto-run and disguised executable files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout pull request contents
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Scan repository security boundaries
+        run: node scripts/security/repository-security-guard.mjs

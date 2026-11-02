@@ -114,3 +114,31 @@ req: AuthenticatedRequest & { body: SyncWalletBody; }, res: ApiResponse<SyncWall
     return res.status(500).json({ error: 'Failed to sync wallet' });
   }
 };
+
+export const getPrimaryWalletHandler = async (
+  req: AuthenticatedRequest,
+  res: ApiResponse<{ primaryWallet: string | null } | { error: string }>,
+): Promise<ApiResponse<{ primaryWallet: string | null } | { error: string }>> => {
+  const { uid } = req.user;
+  try {
+    const data = await hasuraRequest<{
+      user_wallets: Array<{ wallet_address: string }>;
+    }>(
+      `query CallerPrimaryWallet($uid: String!) {
+        user_wallets(
+          where: { user_id: { _eq: $uid }, is_primary: { _eq: true } }
+          limit: 1
+        ) {
+          wallet_address
+        }
+      }`,
+      { uid },
+    );
+    const primaryWallet = data.user_wallets?.[0]?.wallet_address ?? null;
+    return res.status(200).json({ primaryWallet });
+  } catch (error) {
+    console.error('[auth/sync-wallet] ❌ error fetching primary wallet:', error);
+    return res.status(500).json({ error: 'Failed to fetch primary wallet' });
+  }
+};
+

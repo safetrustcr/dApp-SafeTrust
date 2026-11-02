@@ -12,6 +12,7 @@ vi.mock('../conversation-events.js', () => ({
   messageMutationFields: vi.fn(),
   messageMutationVariable: vi.fn(),
   ensureEscrowConversation: vi.fn(),
+  notifyEscrowLifecycleParticipants: vi.fn(),
 }));
 
 import { hasuraRequest } from '../hasura.js';
@@ -24,6 +25,10 @@ import {
   dbDisputeEscrow,
   assertEscrowActionAllowed,
 } from '../escrow-db.js';
+import {
+  notifyEscrowLifecycleParticipants,
+  prepareEscrowLifecycleMessage,
+} from '../conversation-events.js';
 import { ConcurrentTransitionError, InvalidTransitionError } from '../../domain/escrow-state.js';
 
 const requestMock = hasuraRequest as unknown as Mock;
@@ -69,6 +74,37 @@ describe('dbFundEscrow', () => {
 
     await expect(dbFundEscrow('CA1', 100)).rejects.toThrow(ConcurrentTransitionError);
     await expect(dbFundEscrow('CA1', 100)).rejects.toThrow('Escrow changed. Refresh and retry');
+  });
+
+  it.each([
+    [null, false],
+    [{ id: 'event-message-1' }, true],
+  ])('notifies only when the lifecycle event was newly inserted', async (insertedMessage, shouldNotify) => {
+    vi.mocked(prepareEscrowLifecycleMessage).mockResolvedValue({
+      conversationId: 'conversation-1',
+      event: {
+        event_type: 'escrow_funded',
+        event_key: 'escrow:CA1:escrow_funded',
+        body: 'Deposit of sensitive amount is locked',
+      },
+    });
+    requestMock.mockResolvedValue({
+      update_trustlessWorkEscrows: { affected_rows: 1, returning: [{ id: 'tw-1' }] },
+      update_escrows: { affected_rows: 1, returning: [{ id: 'e-1' }] },
+      ...logRow(),
+      insert_messages_one: insertedMessage,
+    });
+
+    await dbFundEscrow('CA1', 100);
+
+    if (shouldNotify) {
+      expect(notifyEscrowLifecycleParticipants).toHaveBeenCalledWith(
+        'conversation-1',
+        'escrow_funded',
+      );
+    } else {
+      expect(notifyEscrowLifecycleParticipants).not.toHaveBeenCalled();
+    }
   });
 });
 

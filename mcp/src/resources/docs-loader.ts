@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { HASURA_GRAPHQL_URL, SAFETRUST_API_URL, repoRoot } from '../config.js';
+import { repoRoot } from '../config.js';
 import { escrowRolesDoc } from '../lib/escrow-roles.js';
 
 type DocFile = {
@@ -77,8 +77,8 @@ fulfilment, or returned on dispute.
 
 Two booking kinds share one escrow model: apartment deposits
 (engagement id \`rental:<apartmentId>:<guestUid>\`) and hotel reservations
-(\`hotel:<reservationId>\`). Every step goes through \`apps/api\` at
-${SAFETRUST_API_URL}, signed in with Firebase.
+(\`hotel:<reservationId>\`). Every step goes through \`apps/api\` at the
+configured \`SAFETRUST_API_URL\`, signed in with Firebase.
 
 1. Terms — apps/api derives amount and host wallet server-side: the apartment's
    \`warranty_deposit\` and the owner's primary wallet, or the reservation's
@@ -99,7 +99,7 @@ ${SAFETRUST_API_URL}, signed in with Firebase.
 5. Reconcile — \`POST /reconciliation/sync-escrows\` (cron, secret header) asks
    Horizon about submitted transactions and applies the ones that landed.
 
-## Tables that matter (Hasura at ${HASURA_GRAPHQL_URL})
+## Tables that matter (configured local Hasura)
 
 - \`public.escrows\` — one row per escrow, apartments and hotel reservations alike.
   \`contract_id\`, \`engagement_id\` (unique), \`apartment_id\`, \`property_id\`,

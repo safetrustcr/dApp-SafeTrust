@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner"
+import { Toaster } from "@/components/ui/sonner";
 import { HasuraDownBanner } from "@/components/ui/HasuraDownBanner";
+import { LazyMotionProvider } from "@/components/ui/LazyMotionProvider";
 
 // @ts-ignore: allow side-effect import of global css
 import "./globals.css";
@@ -24,11 +25,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <ClientProviders>
-            {children}
-            <Toaster richColors position="top-right" />
-            {process.env.NODE_ENV !== "production" && <HasuraDownBanner />}
-          </ClientProviders>
+          <LazyMotionProvider>
+            <ClientProviders>
+              {children}
+              <Toaster richColors position="top-right" />
+              {process.env.NODE_ENV !== "production" && <HasuraDownBanner />}
+            </ClientProviders>
+          </LazyMotionProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,50 +1,218 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 
-/** Hasura GraphQL endpoint — same variable apps/api reads. */
-export const HASURA_GRAPHQL_URL =
-  process.env.HASURA_GRAPHQL_URL ?? 'http://localhost:8080/v1/graphql';
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+const CONFIG_HELP = ' See mcp/README.md#configuration.';
+const DEFAULT_LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', 'host.docker.internal']);
 
-/**
- * Hasura admin secret. apps/api reads HASURA_ADMIN_SECRET while the root
- * .env.example names it HASURA_GRAPHQL_ADMIN_SECRET, so accept either before
- * falling back to the bin/start local default.
- */
-export const HASURA_ADMIN_SECRET =
-  process.env.HASURA_ADMIN_SECRET ??
-  process.env.HASURA_GRAPHQL_ADMIN_SECRET ??
-  'myadminsecretkey';
+let mcpEnvLoaded = false;
 
-/** Base URL of apps/api (Express, port 3002 by default). */
-export const SAFETRUST_API_URL = process.env.SAFETRUST_API_URL ?? 'http://localhost:3002';
-
-/** SafeTrust platform wallet — collects the fee and resolves disputes. */
-export const PLATFORM_ADDRESS =
-  process.env.PLATFORM_STELLAR_ADDRESS ?? process.env.NEXT_PUBLIC_PLATFORM_ADDRESS ?? null;
+/** Configuration failures are safe to show to an MCP client. */
+export class McpConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'McpConfigError';
+  }
+}
 
 /**
- * USDC issuer on Stellar testnet. apps/api builds the escrow trustline from
- * USDC_TRUSTLINE_ADDRESS, so that name wins; NEXT_PUBLIC_USDC_ADDRESS is the
- * frontend's name for the same issuer.
+ * Load the ignored local MCP env file only when configuration is first needed.
+ * This lets the process expose documentation resources without any credentials.
  */
-export const USDC_ADDRESS =
-  process.env.USDC_TRUSTLINE_ADDRESS ??
-  process.env.NEXT_PUBLIC_USDC_ADDRESS ??
-  'GBBD47IF6LWK7P7MDEVSCWR2JQTMZ35MIFUQ5IQSQ9CQBZ8JMXKDPE';
+function loadMcpEnv(): void {
+  if (mcpEnvLoaded) return;
+  mcpEnvLoaded = true;
+
+  const envPath = join(moduleDir, '..', '.env');
+  if (!existsSync(envPath)) return;
+
+  for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!match || process.env[match[1]] !== undefined) continue;
+
+    let value = match[2];
+    const doubleQuoted = value.startsWith('"') && value.endsWith('"');
+    if (doubleQuoted || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+      if (doubleQuoted) value = value.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+    } else {
+      value = value.replace(/\s+#.*$/, '').trim();
+    }
+    process.env[match[1]] = value;
+  }
+}
+
+function env(name: string): string | undefined {
+  loadMcpEnv();
+  const value = process.env[name]?.trim();
+  return value || undefined;
+}
+
+function required(name: string): string {
+  const value = env(name);
+  if (!value) throw new McpConfigError(`${name} is not set.${CONFIG_HELP}`);
+  return value;
+}
+
+function boolean(name: string, fallback = false): boolean {
+  const value = env(name);
+  if (value === undefined) return fallback;
+  const parsed = z.enum(['true', 'false']).safeParse(value);
+  if (!parsed.success) throw new McpConfigError(`${name} must be true or false.${CONFIG_HELP}`);
+  return parsed.data === 'true';
+}
+
+function allowedHosts(): Set<string> {
+  const extra = env('SAFETRUST_MCP_ALLOWED_HOSTS')
+    ?.split(',')
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean) ?? [];
+
+  for (const host of extra) {
+    if (!/^[a-z0-9][a-z0-9.-]*$/i.test(host)) {
+      throw new McpConfigError(`SAFETRUST_MCP_ALLOWED_HOSTS contains an invalid host.${CONFIG_HELP}`);
+    }
+  }
+
+  return new Set([...DEFAULT_LOCAL_HOSTS, ...extra]);
+}
+
+function localServiceUrl(variable: 'HASURA_GRAPHQL_URL' | 'SAFETRUST_API_URL'): string {
+  const value = required(variable);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new McpConfigError(`${variable} must be an absolute http(s) URL.${CONFIG_HELP}`);
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new McpConfigError(`${variable} must use http or https.${CONFIG_HELP}`);
+  }
+  if (url.username || url.password) {
+    throw new McpConfigError(`${variable} must not include URL credentials.${CONFIG_HELP}`);
+  }
+  if (!boolean('SAFETRUST_MCP_ALLOW_REMOTE') && !allowedHosts().has(url.hostname.toLowerCase())) {
+    throw new McpConfigError('Remote hosts are disabled for the MCP.');
+  }
+
+  return url.toString().replace(/\/$/, '');
+}
+
+/** Returns the locally validated Hasura endpoint, without requiring a secret. */
+export function getHasuraUrl(): string {
+  return localServiceUrl('HASURA_GRAPHQL_URL');
+}
+
+/** Returns the locally validated apps/api endpoint. */
+export function getSafetrustApiUrl(): string {
+  return localServiceUrl('SAFETRUST_API_URL');
+}
+
+/**
+ * Hasura requests require both the local URL and explicit admin-secret config.
+ * apps/api reads HASURA_ADMIN_SECRET while the root .env.example names it
+ * HASURA_GRAPHQL_ADMIN_SECRET, so either is accepted — but there is no default.
+ */
+export function getHasuraConfig(): { url: string; adminSecret: string } {
+  const url = getHasuraUrl();
+  const adminSecret = env('HASURA_ADMIN_SECRET') ?? env('HASURA_GRAPHQL_ADMIN_SECRET');
+  if (!adminSecret) {
+    throw new McpConfigError(
+      `HASURA_ADMIN_SECRET is not set (HASURA_GRAPHQL_ADMIN_SECRET is accepted as an alias).${CONFIG_HELP}`,
+    );
+  }
+  return { url, adminSecret };
+}
+
+/** Protected API mutations are disabled unless explicitly enabled locally. */
+export function mutationsEnabled(): boolean {
+  return boolean('SAFETRUST_MCP_ALLOW_MUTATIONS');
+}
+
+/** The arbitrary GraphQL escape hatch is off unless explicitly enabled locally. */
+export function rawHasuraQueryEnabled(): boolean {
+  return boolean('SAFETRUST_MCP_ENABLE_RAW_HASURA');
+}
+
+export function showFullIds(): boolean {
+  return boolean('SAFETRUST_MCP_SHOW_FULL_IDS');
+}
+
+export function remoteHostsAllowed(): boolean {
+  return boolean('SAFETRUST_MCP_ALLOW_REMOTE');
+}
+
+export type FirebaseTestUserCredentials = { apiKey: string; email: string; password: string };
+
+/** Resolve local-only Firebase credentials only when a protected call needs them. */
+export function getFirebaseTestUserCredentials(): FirebaseTestUserCredentials {
+  return {
+    apiKey: required('SAFETRUST_MCP_FIREBASE_API_KEY'),
+    email: required('SAFETRUST_MCP_TEST_EMAIL'),
+    password: required('SAFETRUST_MCP_TEST_PASSWORD'),
+  };
+}
+
+/** SafeTrust platform wallet — public configuration, not a secret. */
+export function platformAddress(): string | null {
+  return env('PLATFORM_STELLAR_ADDRESS') ?? env('NEXT_PUBLIC_PLATFORM_ADDRESS') ?? null;
+}
+
+/**
+ * USDC issuer on Stellar testnet; this public reference has a documented default.
+ * apps/api builds the escrow trustline from USDC_TRUSTLINE_ADDRESS, so that name
+ * wins; NEXT_PUBLIC_USDC_ADDRESS is the frontend's name for the same issuer.
+ */
+export function usdcAddress(): string {
+  return (
+    env('USDC_TRUSTLINE_ADDRESS') ??
+    env('NEXT_PUBLIC_USDC_ADDRESS') ??
+    'GBBD47IF6LWK7P7MDEVSCWR2JQTMZ35MIFUQ5IQSQ9CQBZ8JMXKDPE'
+  );
+}
+
+/** Safe startup diagnostics: URLs/status only, never secrets. */
+export function configurationSummary(): string {
+  const hasura = env('HASURA_GRAPHQL_URL');
+  const api = env('SAFETRUST_API_URL');
+  const mutations = env('SAFETRUST_MCP_ALLOW_MUTATIONS') === 'true' ? 'enabled' : 'disabled';
+  const remote = env('SAFETRUST_MCP_ALLOW_REMOTE') === 'true';
+  const describe = (value: string | undefined) => (value ? `configured (${safeUrlForLog(value)})` : 'missing');
+  return `hasura: ${describe(hasura)} · api: ${describe(api)} · mutations: ${mutations}${remote ? ' · WARNING remote hosts enabled' : ''}`;
+}
+
+function safeUrlForLog(value: string): string {
+  try {
+    const url = new URL(value);
+    url.username = '';
+    url.password = '';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return 'invalid URL';
+  }
+}
 
 /**
  * Stellar Horizon used for read-only wallet readiness and transaction lookups.
  * Testnet only: see assertTestnetHorizon().
  */
-export const STELLAR_HORIZON_URL =
-  process.env.STELLAR_HORIZON_URL?.trim() || 'https://horizon-testnet.stellar.org';
+export function stellarHorizonUrl(): string {
+  return env('STELLAR_HORIZON_URL') ?? 'https://horizon-testnet.stellar.org';
+}
 
 /** The MCP only ever reads Testnet (or a local quickstart node). */
-export function assertTestnetHorizon(url: string = STELLAR_HORIZON_URL): string {
-  const host = new URL(url).hostname;
+export function assertTestnetHorizon(url: string = stellarHorizonUrl()): string {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    throw new McpConfigError(`STELLAR_HORIZON_URL must be an absolute http(s) URL.${CONFIG_HELP}`);
+  }
   if (!/testnet/i.test(host) && host !== 'localhost' && host !== '127.0.0.1') {
-    throw new Error(
+    throw new McpConfigError(
       `[safetrust-mcp] Refusing to read ${url}: STELLAR_HORIZON_URL must be a Testnet or local Horizon.`,
     );
   }
@@ -57,15 +225,9 @@ export const REQUEST_TIMEOUT_MS = 15_000;
 /** Stellar ed25519 public key. */
 export const STELLAR_ADDRESS_REGEX = /^G[A-Z2-7]{55}$/;
 
-const moduleDir = dirname(fileURLToPath(import.meta.url));
-
-/**
- * Absolute path to the monorepo root. Walks up from this module — src/ under tsx,
- * dist/ after a build — until the workspace manifest shows up, so the server works
- * no matter which cwd the editor launches it from. SAFETRUST_REPO_ROOT overrides.
- */
+/** Resolve the monorepo root without requiring any service configuration. */
 export function repoRoot(): string {
-  const override = process.env.SAFETRUST_REPO_ROOT;
+  const override = env('SAFETRUST_REPO_ROOT');
   if (override) return resolve(override);
 
   let current = moduleDir;
@@ -75,6 +237,5 @@ export function repoRoot(): string {
     if (parent === current) break;
     current = parent;
   }
-
   return resolve(moduleDir, '../..');
 }

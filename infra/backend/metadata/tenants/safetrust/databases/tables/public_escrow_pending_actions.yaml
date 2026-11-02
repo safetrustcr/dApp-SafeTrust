@@ -1,6 +1,18 @@
-# Tracked for apps/api (admin secret) only.
-# No client-role permissions: browsers never read or write pending actions.
-# A participant-only select permission can be added with the reconciliation UI work.
+# Tracked for apps/api (admin secret) writes. The mcp_reader role may select only
+# action/status/hash/timestamp metadata; unsigned XDRs and payloads stay private.
 table:
   name: escrow_pending_actions
   schema: public
+select_permissions:
+  - role: mcp_reader
+    permission:
+      columns:
+        - id
+        - action
+        - status
+        - tx_hash
+        - created_at
+        - expires_at
+        - submitted_at
+        - confirmed_at
+      filter: {}

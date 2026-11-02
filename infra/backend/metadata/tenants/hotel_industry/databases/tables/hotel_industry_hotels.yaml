@@ -86,3 +86,11 @@ select_permissions:
               - role:
                   _eq: STAFF
       allow_aggregations: true
+  - role: mcp_reader
+    permission:
+      columns:
+        - id
+        - name
+        - created_at
+        - updated_at
+      filter: {}

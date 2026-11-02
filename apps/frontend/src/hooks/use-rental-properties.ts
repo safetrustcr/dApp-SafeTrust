@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import type { PropertyFilter, PublicRentalProperty } from '@safetrust/types';
-import { API_BASE_URL } from '@/lib/api/client';
+import { fetchPublicListings } from '@/lib/api/listings';
 
 export function useRentalProperties(kind: PropertyFilter) {
   const [properties, setProperties] = useState<PublicRentalProperty[]>([]);
@@ -16,9 +16,7 @@ export function useRentalProperties(kind: PropertyFilter) {
     setLoading(true); setError('');
     async function load() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/listings?kind=${kind}&limit=50&offset=${page * 50}`, { signal: controller.signal, cache: 'no-store' });
-        if (!response.ok) throw new Error('Unable to load registered properties. Check that both tenants are ready.');
-        const data: { properties: PublicRentalProperty[]; hasMore: boolean } = await response.json();
+        const data = await fetchPublicListings(kind, 50, page * 50, controller.signal);
         if (controller.signal.aborted) return;
         setProperties((previous) => page === 0 ? data.properties : Array.from(new Map([...previous, ...data.properties].map((property) => [`${property.kind}:${property.id}`, property])).values()));
         setHasMore(data.hasMore);

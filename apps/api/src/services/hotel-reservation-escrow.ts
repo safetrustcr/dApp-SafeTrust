@@ -12,6 +12,7 @@ export type HotelReservation = {
   total_amount: number | string | null;
   check_in: string | null;
   check_out: string | null;
+  hold_expires_at: string | null;
   room: {
     room_id: string;
     room_number: string;
@@ -40,7 +41,7 @@ export async function getHotelReservation(id: string): Promise<HotelReservation>
   const data = await hasuraRequest<{ reservations_by_pk: HotelReservation | null }>(
     `query HotelReservationEscrow($id: uuid!) {
       reservations_by_pk(id: $id) {
-        id wallet_address reservation_status total_amount check_in check_out
+        id wallet_address reservation_status total_amount check_in check_out hold_expires_at
         room {
           room_id room_number room_images: images { image_url }
           hotel {
@@ -67,6 +68,12 @@ export async function getHotelReservationEscrowTerms(id: string, uid: string, se
   }
   if (!['PENDING', 'CONFIRMED'].includes(reservation.reservation_status)) {
     throw new ApiError(409, 'RESERVATION_NOT_PAYABLE', 'This reservation is no longer payable.');
+  }
+  // Reject expired holds at deploy time
+  if (reservation.reservation_status === 'PENDING' && reservation.hold_expires_at) {
+    if (new Date(reservation.hold_expires_at) < new Date()) {
+      throw new ApiError(409, 'RESERVATION_HOLD_EXPIRED', 'This reservation hold has expired. Please create a new reservation.');
+    }
   }
   const room = reservation.room;
   if (!room) throw new ApiError(409, 'RESERVATION_ROOM_MISSING', 'This reservation has no room.');

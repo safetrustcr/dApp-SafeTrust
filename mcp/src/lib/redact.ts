@@ -1,18 +1,69 @@
 /**
- * Output hygiene for every read tool.
+ * Output hygiene for every tool.
  *
  * - Unsigned XDRs are only ever returned by the build tools (deploy-escrow,
  *   fund-escrow). Everything else replaces them, so a signable transaction
  *   cannot leak into a chat transcript through a status or diagnostic read.
- * - Wallet addresses in booking context are shortened: enough to recognise a
- *   wallet, not enough to copy it into a payment.
+ * - Wallet addresses are shortened: enough to recognise a wallet, not enough
+ *   to copy it into a payment. Emails and phone numbers are masked.
  */
+import { showFullIds } from '../config.js';
+
+export type RedactOptions = {
+  /** Only deploy/fund tools may deliberately return an unsigned XDR. */
+  allowUnsignedXdr?: boolean;
+};
+
+const STELLAR_ADDRESS = /\bG[A-Z2-7]{55}\b/g;
+const EMAIL = /\b([A-Z0-9._%+-])(?:[A-Z0-9._%+-]*)@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi;
+const PHONE = /(?<![\w])(?:\+?\d[\d .()\-]{5,}\d)(?![\w])/g;
+const BASE64_BLOB = /\b[A-Za-z0-9+/]{200,}={0,2}\b/g;
 
 const XDR_KEY = /xdr|unsigned_?transaction/i;
 /** Base64 transaction envelopes start with AAAA and are long. */
 const XDR_VALUE = /^AAAA[A-Za-z0-9+/]{40,}={0,2}$/;
 
 export const REDACTED_XDR = '[unsigned XDR withheld — only the build tools return it]';
+
+function abbreviatedStellarAddress(address: string): string {
+  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
+
+/** PHONE also matches dates and amounts; only digit runs shaped like a phone number are masked. */
+function looksLikePhone(value: string): boolean {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15) return false;
+  if (/^\d{4}-\d{2}(-\d{2})?$/.test(value)) return false;
+  return !/^\d+\.\d+$/.test(value);
+}
+
+function maskedPhone(value: string): string {
+  if (!looksLikePhone(value)) return value;
+  const digits = value.replace(/\D/g, '');
+  return `***${digits.slice(-4)}`;
+}
+
+function xdrPlaceholder(value: string): string {
+  return `<xdr ${(Buffer.byteLength(value, 'utf8') / 1024).toFixed(1)} KB>`;
+}
+
+/** Redacts sensitive values before MCP text is added to model context/logs. */
+export function redactText(value: string, options: RedactOptions = {}): string {
+  let result = value;
+
+  if (!showFullIds()) {
+    result = result.replace(STELLAR_ADDRESS, abbreviatedStellarAddress);
+  }
+
+  result = result.replace(EMAIL, (_match, first: string, domain: string) => `${first}***@${domain}`);
+  result = result.replace(PHONE, maskedPhone);
+
+  if (!options.allowUnsignedXdr) {
+    result = result.replace(BASE64_BLOB, xdrPlaceholder);
+  }
+
+  return result;
+}
 
 export function looksLikeXdr(value: unknown): boolean {
   return typeof value === 'string' && XDR_VALUE.test(value.trim());
@@ -34,7 +85,7 @@ export function redactXdr<T>(value: T): T {
 /** `GABC…WXYZ` — first 4 and last 4 characters of a Stellar public key. */
 export function redactWallet(address: string | null | undefined): string | null {
   if (!address) return null;
-  return address.length > 10 ? `${address.slice(0, 4)}…${address.slice(-4)}` : address;
+  return address.length > 10 ? abbreviatedStellarAddress(address) : address;
 }
 
 /** Short form of a transaction hash for prose (`abcd1234…`). */

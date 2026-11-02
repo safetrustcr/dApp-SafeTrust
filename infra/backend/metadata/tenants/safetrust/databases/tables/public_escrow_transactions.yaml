@@ -1,6 +1,19 @@
 # Append-only escrow lifecycle audit log. Written by apps/api with the Hasura
-# admin secret (single mutation documents alongside the status transitions).
-# No client role permissions — end users never touch this table directly.
+# admin secret. The mcp_reader role receives only the safe status/hash metadata.
 table:
   name: escrow_transactions
   schema: public
+select_permissions:
+  - role: mcp_reader
+    permission:
+      columns:
+        - id
+        - engagement_id
+        - contract_id
+        - to_status
+        - tx_hash
+        - source
+        - created_at
+      filter:
+        tenant_id:
+          _eq: safetrust

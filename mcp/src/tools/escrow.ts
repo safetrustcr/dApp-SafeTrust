@@ -1,15 +1,31 @@
+import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { SAFETRUST_API_URL, STELLAR_ADDRESS_REGEX } from '../config.js';
+import { getSafetrustApiUrl, mutationsEnabled, STELLAR_ADDRESS_REGEX } from '../config.js';
 import { apiRequest } from '../lib/api.js';
 import { routeUrl } from '../lib/api-contract.js';
+import { auditToolCall } from '../lib/audit.js';
 import { escrowRolesDoc } from '../lib/escrow-roles.js';
-import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
+import { describeError, errorResult, jsonBlock, textResult, textResultWithOptions } from '../lib/response.js';
 
 const stellarAddress = z
   .string()
   .regex(STELLAR_ADDRESS_REGEX, 'Must be a Stellar public key (G…, 56 chars)');
+
+async function mutationGuard(): Promise<string | undefined> {
+  if (!mutationsEnabled()) {
+    return 'Escrow mutations are disabled. Set SAFETRUST_MCP_ALLOW_MUTATIONS=true to enable them for a Testnet test user.';
+  }
+
+  const health = await apiRequest<{ stellarNetwork?: string }>(routeUrl('health'));
+  if (!health.ok) {
+    return `Cannot verify the API network (HTTP ${health.status}); escrow mutations are refused.`;
+  }
+  if (health.data.stellarNetwork !== 'TESTNET') {
+    return 'Escrow mutations require apps/api to report stellarNetwork=TESTNET; no mutation was sent.';
+  }
+}
 
 /**
  * apps/api answers errors as RFC 7807 problem details ({ type, title, detail })
@@ -17,76 +33,95 @@ const stellarAddress = z
  */
 export type ApiFailure = { error?: string; code?: string; detail?: string; title?: string; type?: string };
 
-export function apiFailure(action: string, status: number, data: ApiFailure) {
+export function apiFailure(action: string, status: number, data: ApiFailure, idempotencyKey?: string) {
   const code = data.code ?? data.type?.split('/').pop()?.replace(/-/g, '_').toUpperCase();
   const message = data.detail ?? data.error ?? data.title ?? 'unknown error';
   const lines = [`${action} failed (HTTP ${status}${code ? ` ${code}` : ''}): ${message}`];
+  if (idempotencyKey) lines.push(`idempotencyKey: ${idempotencyKey}`);
   if (status === 401) {
     lines.push(
       '',
-      'apps/api build routes require a signed-in user and an Idempotency-Key. The MCP does not sign in',
-      'as the Testnet test user yet (#528), so build through the app in the browser for now, and use',
-      'get-booking-context, get-wallet-readiness and diagnose-escrow to see where a booking stands.',
+      'apps/api rejected the configured Firebase test user. Check SAFETRUST_MCP_FIREBASE_API_KEY,',
+      'SAFETRUST_MCP_TEST_EMAIL and SAFETRUST_MCP_TEST_PASSWORD (mcp/README.md#configuration).',
     );
   }
   return errorResult(...lines);
 }
 
-/** Show enough of an unsigned XDR to recognise it; signing happens in the browser wallet. */
-const preview = (xdr: string | undefined | null) =>
-  xdr ? `${xdr.slice(0, 48)}… (${xdr.length} chars, unsigned)` : 'none returned';
-
 export function registerEscrowTools(server: McpServer) {
   /**
-   * Deploy — POST /api/escrow/deploy. apps/api derives the host wallet and the
-   * amount from the apartment or reservation, and the engagement id from the
-   * booking, so the MCP only passes the booking and the guest wallet.
+   * Deploy — POST /api/escrow/deploy, signed in as the local test user. apps/api
+   * derives the host wallet and the amount from the apartment or reservation,
+   * and the engagement id from the booking, so the MCP only passes the booking
+   * and the guest wallet. The TrustlessWork API key stays server-side.
    */
   server.registerTool(
     'deploy-escrow',
     {
       title: 'Deploy escrow',
       description:
-        'Build the unsigned deploy (initialize) transaction for an apartment deposit or a hotel reservation ' +
-        'through apps/api POST /api/escrow/deploy. Pass exactly one of apartmentId or reservationId, plus ' +
-        "the guest's registered wallet. Returns an unsigned XDR only; the guest signs it in their wallet.",
+        'Build the unsigned Testnet deploy (initialize) transaction for an apartment deposit or a hotel ' +
+        'reservation through apps/api POST /api/escrow/deploy, as the configured local test user. Pass ' +
+        "exactly one of apartmentId or reservationId, plus the guest's registered wallet. Returns an " +
+        'unsigned XDR only. Disabled unless SAFETRUST_MCP_ALLOW_MUTATIONS=true.',
       inputSchema: {
         apartmentId: z.string().uuid().optional().describe('Apartment being rented (deposit escrow)'),
         reservationId: z.string().uuid().optional().describe('Hotel reservation being paid'),
         senderAddress: stellarAddress.describe("Guest's registered Stellar wallet (approver and release signer)"),
+        idempotencyKey: z.string().uuid().optional().describe('UUID reused to safely retry this request'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ apartmentId, reservationId, senderAddress }) => {
+    async ({ apartmentId, reservationId, senderAddress, idempotencyKey }) => {
+      auditToolCall('deploy-escrow');
       if (Boolean(apartmentId) === Boolean(reservationId)) {
         return errorResult('Provide exactly one of apartmentId or reservationId.');
       }
       try {
+        const blocked = await mutationGuard();
+        if (blocked) return errorResult(blocked);
+
+        const key = idempotencyKey ?? randomUUID();
         const { ok, status, data } = await apiRequest<
-          { status?: string; engagementId?: string; contractId?: string; unsignedXDR?: string; cached?: boolean } & ApiFailure
+          {
+            status?: string;
+            engagementId?: string;
+            contractId?: string;
+            unsignedXDR?: string;
+            pendingActionId?: string;
+            cached?: boolean;
+          } & ApiFailure
         >(routeUrl('deploy'), {
           method: 'POST',
           body: apartmentId ? { apartmentId, senderAddress } : { reservationId, senderAddress },
+          auth: 'required',
+          idempotencyKey: key,
         });
-        if (!ok) return apiFailure('Deploy', status, data);
+        if (!ok) return apiFailure('Deploy', status, data, key);
 
         if (data.cached && !data.unsignedXDR) {
           return textResult(
             'Already deployed for this booking (idempotent replay).',
+            `idempotencyKey: ${key}`,
             `engagementId: ${data.engagementId}`,
             `contractId: ${data.contractId ?? 'unknown'}`,
             '',
             'Next: diagnose-escrow with this engagementId.',
           );
         }
-        return textResult(
-          data.cached ? 'Deploy transaction already built and still waiting for a signature.' : 'Deploy transaction built.',
-          `status: ${data.status}`,
-          `engagementId: ${data.engagementId}`,
+        return textResultWithOptions(
+          { allowUnsignedXdr: true },
+          data.cached
+            ? 'Deploy transaction already built and still waiting for a signature.'
+            : 'Unsigned Testnet escrow deployment built.',
+          `idempotencyKey: ${key}`,
+          `status: ${data.status ?? 'not returned'}`,
+          `engagementId: ${data.engagementId ?? 'not returned'}`,
           `contractId: ${data.contractId ?? '(assigned on chain)'}`,
-          `unsignedXDR: ${preview(data.unsignedXDR)}`,
+          `pendingActionId: ${data.pendingActionId ?? 'not returned'}`,
+          `unsignedXDR: ${data.unsignedXDR ?? 'not returned'}`,
           '',
-          'Next: the guest signs it in their wallet in the app; the frontend submits it to',
+          'Next: the guest signs it in their wallet; the frontend submits it to',
           'POST /api/escrow/send-transaction, which only accepts the hash apps/api recorded.',
         );
       } catch (error) {
@@ -101,37 +136,55 @@ export function registerEscrowTools(server: McpServer) {
     {
       title: 'Fund escrow',
       description:
-        'Build the unsigned fund transaction for a deployed escrow through apps/api POST /api/escrow/fund. ' +
-        "apps/api takes the signer (the guest's approver wallet) and the amount from the escrow record. " +
-        'Returns an unsigned XDR only.',
+        'Build the unsigned Testnet fund transaction for a deployed escrow through apps/api ' +
+        "POST /api/escrow/fund, as the configured local test user. apps/api takes the signer (the guest's " +
+        'approver wallet) and the amount from the escrow record. Returns an unsigned XDR only. ' +
+        'Disabled unless SAFETRUST_MCP_ALLOW_MUTATIONS=true.',
       inputSchema: {
         engagementId: z.string().min(1).describe('rental:<apartmentId>:<guestUid> or hotel:<reservationId>'),
+        idempotencyKey: z.string().uuid().optional().describe('UUID reused to safely retry this request'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ engagementId }) => {
+    async ({ engagementId, idempotencyKey }) => {
+      auditToolCall('fund-escrow');
       try {
+        const blocked = await mutationGuard();
+        if (blocked) return errorResult(blocked);
+
+        const key = idempotencyKey ?? randomUUID();
         const { ok, status, data } = await apiRequest<
           {
             unsignedXdr?: string;
+            pendingActionId?: string;
             txHash?: string;
             engagementId?: string;
             contractId?: string | null;
             expiresAt?: string;
             reused?: boolean;
           } & ApiFailure
-        >(routeUrl('fund'), { method: 'POST', body: { engagementId } });
-        if (!ok) return apiFailure('Fund', status, data);
+        >(routeUrl('fund'), {
+          method: 'POST',
+          body: { engagementId },
+          auth: 'required',
+          idempotencyKey: key,
+        });
+        if (!ok) return apiFailure('Fund', status, data, key);
 
-        return textResult(
-          data.reused ? 'Fund transaction already built (reused, still unsigned).' : 'Fund transaction built.',
-          `engagementId: ${data.engagementId}`,
+        return textResultWithOptions(
+          { allowUnsignedXdr: true },
+          data.reused
+            ? 'Fund transaction already built (reused, still unsigned).'
+            : 'Unsigned Testnet funding transaction built.',
+          `idempotencyKey: ${key}`,
+          `engagementId: ${data.engagementId ?? engagementId}`,
           `contractId: ${data.contractId ?? '(none)'}`,
-          `txHash: ${data.txHash}`,
-          `expiresAt: ${data.expiresAt}`,
-          `unsignedXdr: ${preview(data.unsignedXdr)}`,
+          `pendingActionId: ${data.pendingActionId ?? 'not returned'}`,
+          `txHash: ${data.txHash ?? 'not returned'}`,
+          `expiresAt: ${data.expiresAt ?? 'not returned'}`,
+          `unsignedXDR: ${data.unsignedXdr ?? 'not returned'}`,
           '',
-          'Next: the guest signs it in their wallet in the app. Then diagnose-escrow shows confirmation.',
+          'Next: the guest signs it in their wallet. Then diagnose-escrow shows confirmation.',
         );
       } catch (error) {
         return errorResult(describeError(error));
@@ -160,6 +213,7 @@ export function registerEscrowTools(server: McpServer) {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ step, apartmentId, reservationId, senderAddress, engagementId }) => {
+      auditToolCall('orchestrate-escrow');
       switch (step) {
         case 'start': {
           if (Boolean(apartmentId) === Boolean(reservationId) || !senderAddress) {
@@ -173,7 +227,7 @@ export function registerEscrowTools(server: McpServer) {
             '2. deploy-escrow with:',
             jsonBlock({ ...booking, senderAddress }),
             '',
-            'The guest signs the returned transaction in their wallet in the app.',
+            'The guest signs the returned transaction in their wallet.',
             'Then call orchestrate-escrow with step="after-deploy" and the engagementId.',
           );
         }
@@ -183,7 +237,7 @@ export function registerEscrowTools(server: McpServer) {
             '── Step 2: Fund ──────────────────────────────────────────',
             `1. diagnose-escrow { engagementId: "${engagementId}" } must report the escrow as created.`,
             `2. fund-escrow { engagementId: "${engagementId}" } builds the fund transaction.`,
-            '3. The guest signs it in their wallet in the app.',
+            '3. The guest signs it in their wallet.',
             'Then call orchestrate-escrow with step="after-fund".',
           );
         case 'after-fund':
@@ -215,6 +269,13 @@ export function registerEscrowTools(server: McpServer) {
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async () => textResult(escrowRolesDoc(), '', `apps/api base URL: ${SAFETRUST_API_URL}`),
+    async () => {
+      auditToolCall('explain-escrow-roles');
+      try {
+        return textResult(escrowRolesDoc(), '', `apps/api base URL: ${getSafetrustApiUrl()}`);
+      } catch (error) {
+        return errorResult(describeError(error));
+      }
+    },
   );
 }

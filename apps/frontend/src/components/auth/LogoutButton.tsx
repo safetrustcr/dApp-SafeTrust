@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { auth } from "@/lib/firebase";
+import { disablePush } from "@/lib/push";
 
 interface LogoutButtonProps {
   /**
@@ -27,6 +28,11 @@ export function LogoutButton({ variant = "sidebar" }: LogoutButtonProps) {
     setIsLoggingOut(true);
 
     try {
+      // Must register the DELETE before the Firebase token is cleared.
+      // Failures are ignored so logout is never blocked.
+      // Must register the DELETE before the Firebase token is cleared.
+      // Failures are ignored so logout is never blocked.
+      await disablePush().catch(() => {});
       await signOut(auth);
     } finally {
       Cookies.remove("firebase-token");

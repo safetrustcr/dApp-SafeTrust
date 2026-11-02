@@ -21,6 +21,40 @@ export const GET_HOTEL_ROOMS = gql`
   }
 `;
 
+// ── Listing feed (issue #521) ──────────────────────────────────────────────
+// Selects only the fields in docs/frontend-migration/listing-fields.md.
+// Rooted at `rooms` because `hotels → rooms` is declared as an object
+// relationship on a non-unique FK (see public_hotels.yaml); `rooms.hotel` is
+// the safe FK direction. One listing card per room, priced per night.
+
+export const GET_HOTEL_LISTINGS = gql`
+  query GetHotelListings($limit: Int!, $offset: Int!) {
+    rooms(limit: $limit, offset: $offset, order_by: { created_at: desc }) {
+      room_id
+      price_night
+      hotel {
+        name
+        address
+        coordinates
+      }
+    }
+  }
+`;
+
+export const GET_HOTEL_LISTING_BY_ID = gql`
+  query GetHotelListingById($id: uuid!) {
+    rooms(where: { room_id: { _eq: $id } }, limit: 1) {
+      room_id
+      price_night
+      hotel {
+        name
+        address
+        coordinates
+      }
+    }
+  }
+`;
+
 export const GET_ACTIVE_RESERVATIONS = gql`
   query GetActiveReservations {
     reservations(

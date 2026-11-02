@@ -7,7 +7,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { STELLAR_ADDRESS_REGEX, USDC_ADDRESS } from '../config.js';
+import { STELLAR_ADDRESS_REGEX, usdcAddress } from '../config.js';
 import {
   apartmentContext,
   presentContext,
@@ -33,6 +33,7 @@ import { apiRequest } from '../lib/api.js';
 import { routeUrl } from '../lib/api-contract.js';
 import { formatApiReadiness, isApiReadiness } from '../lib/readiness.js';
 import { apiFailure, type ApiFailure } from './escrow.js';
+import { auditToolCall } from '../lib/audit.js';
 import { redactWallet } from '../lib/redact.js';
 import { describeError, errorResult, jsonBlock, textResult } from '../lib/response.js';
 
@@ -44,9 +45,9 @@ const booking = {
 async function loadContext(apartmentId?: string, reservationId?: string): Promise<BookingContext | string> {
   if (Boolean(apartmentId) === Boolean(reservationId)) return 'Provide exactly one of apartmentId or reservationId.';
   if (apartmentId) {
-    return apartmentContext(apartmentId, await getApartmentTerms(apartmentId), USDC_ADDRESS) ?? `Apartment ${apartmentId} not found.`;
+    return apartmentContext(apartmentId, await getApartmentTerms(apartmentId), usdcAddress()) ?? `Apartment ${apartmentId} not found.`;
   }
-  return reservationContext(await getHotelReservation(reservationId!), USDC_ADDRESS) ?? `Hotel reservation ${reservationId} not found.`;
+  return reservationContext(await getHotelReservation(reservationId!), usdcAddress()) ?? `Hotel reservation ${reservationId} not found.`;
 }
 
 export async function collectDiagnosis(engagementId: string, now = new Date()): Promise<DiagnosisSnapshot> {
@@ -78,6 +79,7 @@ export function registerEscrowDiagnosticsTools(server: McpServer) {
       annotations: { readOnlyHint: true },
     },
     async ({ apartmentId, reservationId }) => {
+      auditToolCall('get-booking-context');
       try {
         const context = await loadContext(apartmentId, reservationId);
         if (typeof context === 'string') return errorResult(context);
@@ -110,8 +112,12 @@ export function registerEscrowDiagnosticsTools(server: McpServer) {
       annotations: { readOnlyHint: true },
     },
     async ({ engagementId, contractId }) => {
-      if (Boolean(engagementId) === Boolean(contractId)) {
-        return errorResult('Provide exactly one of engagementId or contractId.');
+      auditToolCall('get-escrow-status');
+      if (!engagementId && !contractId) {
+        return errorResult('Provide either contractId or engagementId — not both, not neither.');
+      }
+      if (engagementId && contractId) {
+        return errorResult('Provide only one identifier. Supplying both contractId and engagementId is ambiguous.');
       }
       try {
         const escrow = await getEscrow({ engagementId, contractId });
@@ -160,6 +166,7 @@ export function registerEscrowDiagnosticsTools(server: McpServer) {
       annotations: { readOnlyHint: true },
     },
     async ({ engagementId, action }) => {
+      auditToolCall('get-pending-action');
       try {
         const rows = await getPendingActions(engagementId, action);
         if (rows.length === 0) return textResult(`No built transactions for ${engagementId}${action ? ` (${action})` : ''}.`);
@@ -209,6 +216,7 @@ export function registerEscrowDiagnosticsTools(server: McpServer) {
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ apartmentId, reservationId, guestAddress }) => {
+      auditToolCall('get-wallet-readiness');
       if (Boolean(apartmentId) === Boolean(reservationId)) {
         return errorResult('Provide exactly one of apartmentId or reservationId.');
       }
@@ -246,8 +254,8 @@ export function registerEscrowDiagnosticsTools(server: McpServer) {
             : await isWalletRegistered(context.guestWallet)
           : null;
         const [guest, host] = await Promise.all([
-          context.guestWallet ? getAccount(context.guestWallet, USDC_ADDRESS) : null,
-          context.hostWallet ? getAccount(context.hostWallet, USDC_ADDRESS) : null,
+          context.guestWallet ? getAccount(context.guestWallet, usdcAddress()) : null,
+          context.hostWallet ? getAccount(context.hostWallet, usdcAddress()) : null,
         ]);
         const checks = readinessChecks({ context, guestRegistered, guest, host });
         const failing = checks.filter((c) => c.result === 'fail');
@@ -255,7 +263,7 @@ export function registerEscrowDiagnosticsTools(server: McpServer) {
           failing.length === 0
             ? `Ready: ${checks.filter((c) => c.result === 'pass').length} checks pass.`
             : `Not ready: ${failing.length} check(s) fail.`,
-          `source: MCP read-only checks (Hasura + Testnet Horizon), not apps/api — ${fallbackReason}.`,
+          `source: MCP read-only checks (Hasura + Testnet Horizon), not apps/api — ${fallbackReason.replace(/[.?!]$/, '')}.`,
           ...checks.map((c) => `${c.result === 'pass' ? '✅' : c.result === 'fail' ? '❌' : '➖'} ${c.id}: ${c.detail}${c.fix ? `\n   fix: ${c.fix}` : ''}`),
         );
       } catch (error) {
@@ -278,6 +286,7 @@ export function registerEscrowDiagnosticsTools(server: McpServer) {
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ engagementId }) => {
+      auditToolCall('diagnose-escrow');
       try {
         const result = diagnose(await collectDiagnosis(engagementId));
         return textResult(

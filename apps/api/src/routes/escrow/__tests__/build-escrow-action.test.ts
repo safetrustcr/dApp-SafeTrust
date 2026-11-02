@@ -70,7 +70,12 @@ describe('buildEscrowAction', () => {
 
     const result = await buildEscrowAction({ uid: 'uid-guest', engagementId: 'eng-1', action: 'release_funds', request });
 
-    expect(result).toMatchObject({ unsignedXdr: xdr, txHash: transactionHash(xdr), reused: false });
+    expect(result).toMatchObject({
+      pendingActionId: 'pa-1',
+      unsignedXdr: xdr,
+      txHash: transactionHash(xdr),
+      reused: false,
+    });
     expect(insertPendingAction).toHaveBeenCalledWith(
       expect.objectContaining({
         tx_hash: transactionHash(xdr),

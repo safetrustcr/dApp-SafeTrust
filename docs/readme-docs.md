@@ -10,6 +10,14 @@ transactions built on the Stellar blockchain via TrustlessWork API.
 - [Data Model](./architecture/data-model.md)
 - [Escrow Lifecycle](./architecture/escrow-lifecycle.md)
 - [Multi-Tenant Design](./architecture/multi-tenant.md)
+- [Applied Patterns, Layers, and Decision Filters](./architecture/design-pattern-filters.md)
+
+The pattern guide maps observed SafeTrust implementations to their reasons and
+data layers, distinguishes GoF categories from architectural orchestration, and
+explains booking conditionals, test coverage, and compute consolidation.
+Mermaid diagrams show [pattern ownership across layers](./architecture/design-pattern-filters.md#architecture-and-pattern-ownership),
+the [booking orchestration flow](./architecture/design-pattern-filters.md#booking-orchestrator-scope-and-data-flow),
+and the [pattern selection filters](./architecture/design-pattern-filters.md#applying-the-selection-filters).
 
 ### Stellar Integration
 - [TrustlessWork API](./stellar/trustlesswork.md)

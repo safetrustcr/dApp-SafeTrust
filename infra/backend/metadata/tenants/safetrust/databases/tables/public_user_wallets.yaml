@@ -34,6 +34,15 @@ select_permissions:
       filter:
         user_id:
           _eq: X-Hasura-User-Id
+  - role: mcp_reader
+    permission:
+      columns:
+        - user_id
+        - wallet_address
+        - is_primary
+      filter:
+        chain_type:
+          _eq: STELLAR
 insert_permissions:
   - role: tenant
     permission:

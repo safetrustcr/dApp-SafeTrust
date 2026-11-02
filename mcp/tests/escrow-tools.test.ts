@@ -15,6 +15,13 @@ process.env.HASURA_ADMIN_SECRET ??= 'test-secret';
 process.env.HASURA_GRAPHQL_URL = 'http://localhost:8080/v1/graphql';
 process.env.SAFETRUST_API_URL = 'http://localhost:3002';
 process.env.STELLAR_HORIZON_URL = 'https://horizon-testnet.stellar.org';
+// Build tools are off by default and act as the Firebase test user when on.
+process.env.SAFETRUST_MCP_ALLOW_MUTATIONS = 'true';
+process.env.SAFETRUST_MCP_FIREBASE_API_KEY = 'test-api-key';
+process.env.SAFETRUST_MCP_TEST_EMAIL = 'mcp-guest@test.safetrust.dev';
+process.env.SAFETRUST_MCP_TEST_PASSWORD = 'test-password';
+// Registered only on opt-in; on here so the XDR leak test covers it.
+process.env.SAFETRUST_MCP_ENABLE_RAW_HASURA = 'true';
 
 const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
 const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
@@ -211,7 +218,11 @@ before(() => {
       const { query, variables } = JSON.parse(String(init?.body));
       return json({ data: hasura(query, variables ?? {}) });
     }
-    if (url === 'http://localhost:8080/healthz' || url === 'http://localhost:3002/health') return json({ status: 'ok' });
+    if (url === 'http://localhost:8080/healthz') return json({ status: 'ok' });
+    if (url === 'http://localhost:3002/health') return json({ status: 'ok', stellarNetwork: 'TESTNET' });
+    if (url.startsWith('https://identitytoolkit.googleapis.com/')) {
+      return json({ idToken: 'test-id-token', refreshToken: 'test-refresh', expiresIn: '3600' });
+    }
     if (url === 'http://localhost:3002/api/escrow/deploy') {
       return json({ status: 'SUCCESS', engagementId: `rental:${APARTMENT}:guest-uid`, contractId: 'CNEW', unsignedXDR: XDR });
     }
@@ -464,7 +475,7 @@ describe('get-wallet-readiness asks apps/api first', () => {
       throw new TypeError('fetch failed');
     };
     const { text } = await call('get-wallet-readiness', { reservationId: RESERVATION });
-    assert.match(text, /source: MCP read-only checks .*Cannot reach apps\/api/);
+    assert.match(text, /source: MCP read-only checks .*Cannot reach local apps\/api/);
   });
 });
 

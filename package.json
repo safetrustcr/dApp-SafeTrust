@@ -8,6 +8,7 @@
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "testnet:provision": "tsx scripts/testnet/provision.ts",
+    "security:guard": "node scripts/security/repository-security-guard.mjs",
     "codegen": "turbo run codegen",
     "dev:full": "turbo run dev",
     "dev:mcp": "turbo run dev --filter=@safetrust/mcp"

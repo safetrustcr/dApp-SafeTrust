@@ -31,12 +31,15 @@ Wallet signing, submitting and payments: browser + wallet only, never the MCP
   HTTP need full authorization. SafeTrust stays on stdio, so there is no listening
   port and no authorization layer to get wrong. _(tested: `src/` imports only
   `StdioServerTransport`)_
-- **Reads.** Hasura on your machine. Today every Hasura read uses the **admin
-  secret** — row permissions are bypassed and every table is readable. With
-  [#530](https://github.com/safetrustcr/dApp-SafeTrust/issues/530) the reads move to
-  allow-listed queries under a least-privilege `mcp_reader` role.
-- **Build-only.** `deploy-escrow` and `fund-escrow` ask the local `apps/api` to
-  build a Testnet transaction and return the **unsigned XDR**. They never sign,
+- **Reads.** Hasura on your machine. Every Hasura read authenticates with the
+  admin secret and assumes the select-only `mcp_reader` role
+  ([#530](https://github.com/safetrustcr/dApp-SafeTrust/issues/530)): messages,
+  conversations, push devices and idempotency keys are not readable, and the
+  arbitrary `hasura-query` tool is off unless `SAFETRUST_MCP_ENABLE_RAW_HASURA=true`.
+- **Build-only, opt-in.** With `SAFETRUST_MCP_ALLOW_MUTATIONS=true`,
+  `deploy-escrow` and `fund-escrow` sign in as the Firebase test user and ask the
+  local `apps/api` (which must report `stellarNetwork=TESTNET`) to build a Testnet
+  transaction and return the **unsigned XDR**. They never sign,
   never submit and never move funds. A human signs in the browser wallet
   (Freighter) and the frontend submits. _(tested: no MCP code calls a submit
   route or touches a secret key)_
@@ -49,11 +52,7 @@ Wallet signing, submitting and payments: browser + wallet only, never the MCP
 | submits a transaction on its own | Every on-chain step needs a human signature in the wallet | every `apps/api` call goes through the route table, which holds only the two build routes and read-only `GET`s; no Stellar SDK in `mcp/` _(tested)_ |
 | holds or uses wallet private keys | Keys stay in the wallet; the MCP only sees public `G…` addresses | no secret keys or signing code in `mcp/` _(tested)_ |
 | ships an end-user UI | It is contributor tooling, not product surface | the package is `private` and has no UI _(tested)_ |
-| points at production URLs | Its credentials are admin-level; production data must never reach an AI client | localhost defaults for every credentialed endpoint _(tested)_; the one remote default is the public, read-only Testnet Horizon, and a non-Testnet Horizon is refused at runtime _(tested)_; runtime refusal of other remote hosts arrives with [#529](https://github.com/safetrustcr/dApp-SafeTrust/issues/529) |
-| submits a transaction on its own | Every on-chain step needs a human signature in the wallet | no submit route or Stellar SDK in `mcp/` _(tested)_ |
-| holds or uses wallet private keys | Keys stay in the wallet; the MCP only sees public `G…` addresses | no secret keys or signing code in `mcp/` _(tested)_ |
-| ships an end-user UI | It is contributor tooling, not product surface | the package is `private` and has no UI _(tested)_ |
-| points at production URLs | Its credentials are admin-level; production data must never reach an AI client | localhost defaults _(tested)_; runtime refusal of remote hosts arrives with [#529](https://github.com/safetrustcr/dApp-SafeTrust/issues/529) |
+| points at production URLs | Its credentials are admin-level; production data must never reach an AI client | no default for any credentialed endpoint, and non-local hosts are refused at runtime unless `SAFETRUST_MCP_ALLOW_REMOTE=true` ([#529](https://github.com/safetrustcr/dApp-SafeTrust/issues/529)); the one remote default is the public, read-only Testnet Horizon, and a non-Testnet Horizon is refused at runtime _(tested)_ |
 
 If a change would break any row above, it needs its own design issue first — do
 not add an HTTP transport, a signing step or a remote default in a feature PR.
@@ -75,9 +74,17 @@ every variable `mcp/src` reads is listed)_
 <!-- env-table:begin (generated from mcp/.env.example by `pnpm --filter @safetrust/mcp docs:env`) -->
 | Variable | Required | Default | What it grants |
 |---|---|---|---|
-| `HASURA_GRAPHQL_URL` | no | http://localhost:8080/v1/graphql | Where every Hasura read goes (get-booking-context, get-escrow-status, get-pending-action, diagnose-escrow, get-apartment, list-apartments, query-*, hasura-query, and get-wallet-readiness's fallback). Must be the local Hasura from infra/backend/bin/start. |
-| `HASURA_ADMIN_SECRET` | yes, for every Hasura tool | none (local stack uses myadminsecretkey) | Hasura ADMIN access: every table, every row, row permissions bypassed. Treat all tool output as privileged. Local stack only; rotate per "Incident response" if exposed. HASURA_GRAPHQL_ADMIN_SECRET alone is not enough: the Hasura client reads HASURA_ADMIN_SECRET. |
-| `SAFETRUST_API_URL` | no | http://localhost:3002 | Where deploy-escrow and fund-escrow send POST /api/escrow/* (unsigned XDR only), where get-wallet-readiness reads GET /api/escrow/readiness, and where check-stack-health pings. Must be the local apps/api. |
+| `HASURA_GRAPHQL_URL` | yes, for every Hasura tool | none | Where every Hasura read goes (get-booking-context, get-escrow-status, get-pending-action, diagnose-escrow, get-apartment, list-apartments, query-*, hasura-query, and get-wallet-readiness's fallback). Must be the local Hasura from infra/backend/bin/start; non-local hosts are refused. |
+| `HASURA_ADMIN_SECRET` | yes, for every Hasura tool | none (local stack uses myadminsecretkey) | Hasura ADMIN access, narrowed to the select-only mcp_reader role on every request. Local stack only; rotate per "Incident response" if exposed. HASURA_GRAPHQL_ADMIN_SECRET is accepted as an alias. |
+| `SAFETRUST_API_URL` | yes, for apps/api tools | none | Where deploy-escrow and fund-escrow send POST /api/escrow/* (unsigned XDR only), where get-wallet-readiness reads GET /api/escrow/readiness, and where check-stack-health pings. Must be the local apps/api; non-local hosts are refused. |
+| `SAFETRUST_MCP_ALLOW_MUTATIONS` | no | false | Lets deploy-escrow and fund-escrow call apps/api as the Firebase test user. Even when true, they refuse unless apps/api reports stellarNetwork=TESTNET. |
+| `SAFETRUST_MCP_FIREBASE_API_KEY` | yes, when SAFETRUST_MCP_ALLOW_MUTATIONS=true | none | Firebase Web API key used to sign the local test user in. |
+| `SAFETRUST_MCP_TEST_EMAIL` | yes, when SAFETRUST_MCP_ALLOW_MUTATIONS=true | none | Email of the Testnet-only Firebase test user the build tools act as. |
+| `SAFETRUST_MCP_TEST_PASSWORD` | yes, when SAFETRUST_MCP_ALLOW_MUTATIONS=true | none | Password of that test user. Never a real person's account. |
+| `SAFETRUST_MCP_ENABLE_RAW_HASURA` | no | false | Registers hasura-query: arbitrary read-only GraphQL under the mcp_reader role. |
+| `SAFETRUST_MCP_ALLOW_REMOTE` | no | false | Allows HASURA_GRAPHQL_URL and SAFETRUST_API_URL to point at non-local hosts. Leave off. |
+| `SAFETRUST_MCP_ALLOWED_HOSTS` | no | localhost, 127.0.0.1, host.docker.internal | Extra comma-separated hostnames treated as local. |
+| `SAFETRUST_MCP_SHOW_FULL_IDS` | no | false | Prints full Stellar addresses instead of the GABC…WXYZ short form. |
 | `PLATFORM_STELLAR_ADDRESS` | no | unset | Nothing: a public key shown by explain-escrow-roles. NEXT_PUBLIC_PLATFORM_ADDRESS is accepted as an alias. |
 | `USDC_TRUSTLINE_ADDRESS` | no | Testnet USDC issuer | Nothing: the public USDC issuer used for trustline and balance checks; the same variable apps/api deploys with. NEXT_PUBLIC_USDC_ADDRESS is accepted as an alias. |
 | `STELLAR_HORIZON_URL` | no | https://horizon-testnet.stellar.org | Read-only Horizon lookups (accounts, transactions) for get-wallet-readiness and diagnose-escrow. Refused unless it is a Testnet or localhost Horizon. |
@@ -102,11 +109,12 @@ It creates `guest@safetrust.local`, `host@safetrust.local` and
 wallets and seeds a host-owned apartment. See
 [`docs/contributing/setup.md`](../contributing/setup.md#provision-isolated-stellar-testnet-accounts).
 
-> **Status:** the MCP does not sign in as the test user yet, so `deploy-escrow`
-> and `fund-escrow` currently get `401` from `apps/api`.
-> [#528](https://github.com/safetrustcr/dApp-SafeTrust/issues/528) adds the
-> test-user sign-in and the `Idempotency-Key` header; until then use the read
-> tools and `orchestrate-escrow`.
+To let `deploy-escrow` and `fund-escrow` act as one of these users, set
+`SAFETRUST_MCP_ALLOW_MUTATIONS=true` and the `SAFETRUST_MCP_FIREBASE_API_KEY`,
+`SAFETRUST_MCP_TEST_EMAIL` and `SAFETRUST_MCP_TEST_PASSWORD` variables in the
+gitignored `mcp/.env`
+([#528](https://github.com/safetrustcr/dApp-SafeTrust/issues/528)). Each call sends
+the test user's ID token and a UUID `Idempotency-Key`.
 
 ## 3. Set it up
 
@@ -210,19 +218,19 @@ marked ✅)_
 | `check-stack-health` | ✅ safe | yes | `apps/api` `/health`, Hasura `/healthz` | — | Liveness only; no data returned. Never calls Trustless Work |
 | `explain-escrow-roles` | ✅ safe | yes | — | — | Static role-mapping reference |
 | `orchestrate-escrow` | ✅ safe | yes | — | — | Stateless lifecycle guide; calls nothing |
-| `get-booking-context` | ✅ safe | yes | Hasura (admin) apartment terms or `reservations`, `escrows` | — | Wallets shortened (`GABC…WXYZ`); lists what `apps/api` would refuse a deploy with |
-| `get-escrow-status` | ✅ safe | yes | Hasura (admin) `escrows`, `escrow_transactions`, `trustless_work_escrows` | — | Last 10 transitions; unsigned XDRs withheld |
-| `get-pending-action` | ✅ safe | yes | Hasura (admin) `escrow_pending_actions` | — | Status, tx hash, signer, expiry — never the XDR |
-| `get-wallet-readiness` | ✅ safe | yes | `apps/api` `GET /api/escrow/readiness`; fallback Hasura (admin) + Testnet Horizon | — | Each failing check with its fix; wallets shortened |
-| `diagnose-escrow` | ✅ safe | yes | Hasura (admin), Testnet Horizon | — | Plain-language state and next step; unsigned XDRs withheld |
-| `get-apartment` | ✅ safe | yes | Hasura (admin) `apartments`, owner name and wallet | — | |
-| `list-apartments` | ✅ safe | yes | Hasura (admin) `apartments` | — | |
-| `query-escrows` | ✅ safe | yes | Hasura (admin) `escrows` | — | Filtered, max 50 rows |
-| `query-trustless-work-escrows` | ✅ safe | yes | Hasura (admin) `trustless_work_escrows` | — | Filtered, max 50 rows |
-| `query-user-wallets` | ✅ safe | yes | Hasura (admin) `user_wallets`, `users` | — | Returns user e-mail addresses: privileged |
-| `deploy-escrow` | ⚠️ guarded | yes | `apps/api` | `escrows` row + pending action (local), Testnet escrow via TrustlessWork | Unsigned XDR only; `401` until [#528](https://github.com/safetrustcr/dApp-SafeTrust/issues/528) |
-| `fund-escrow` | ⚠️ guarded | yes | `apps/api` | Pending action (local) | Unsigned XDR only; `401` until [#528](https://github.com/safetrustcr/dApp-SafeTrust/issues/528) |
-| `hasura-query` | ❌ unsafe | yes | Hasura (admin): **any table** | — | Mutations refused, but every table is readable; replaced by allow-listed reads and off by default with [#530](https://github.com/safetrustcr/dApp-SafeTrust/issues/530) |
+| `get-booking-context` | ✅ safe | yes | Hasura (`mcp_reader`) apartment terms or `reservations`, `escrows` | — | Wallets shortened (`GABC…WXYZ`); lists what `apps/api` would refuse a deploy with |
+| `get-escrow-status` | ✅ safe | yes | Hasura (`mcp_reader`) `escrows`, `escrow_transactions`, `trustless_work_escrows` | — | Last 10 transitions; unsigned XDRs withheld |
+| `get-pending-action` | ✅ safe | yes | Hasura (`mcp_reader`) `escrow_pending_actions` | — | Status, tx hash, signer, expiry — never the XDR |
+| `get-wallet-readiness` | ✅ safe | yes | `apps/api` `GET /api/escrow/readiness`; fallback Hasura (`mcp_reader`) + Testnet Horizon | — | Each failing check with its fix; wallets shortened |
+| `diagnose-escrow` | ✅ safe | yes | Hasura (`mcp_reader`), Testnet Horizon | — | Plain-language state and next step; unsigned XDRs withheld |
+| `get-apartment` | ✅ safe | yes | Hasura (`mcp_reader`) `apartments`, owner name and wallet | — | |
+| `list-apartments` | ✅ safe | yes | Hasura (`mcp_reader`) `apartments` | — | |
+| `query-escrows` | ✅ safe | yes | Hasura (`mcp_reader`) `escrows` | — | Filtered, max 50 rows |
+| `query-trustless-work-escrows` | ✅ safe | yes | Hasura (`mcp_reader`) `trustless_work_escrows` | — | Filtered, max 50 rows |
+| `query-user-wallets` | ✅ safe | yes | Hasura (`mcp_reader`) `user_wallets`, `users` | — | Returns user e-mail addresses: privileged |
+| `deploy-escrow` | ⚠️ guarded | yes | `apps/api` | `escrows` row + pending action (local), Testnet escrow via TrustlessWork | Unsigned XDR only; refuses unless `SAFETRUST_MCP_ALLOW_MUTATIONS=true` and apps/api is on Testnet |
+| `fund-escrow` | ⚠️ guarded | yes | `apps/api` | Pending action (local) | Unsigned XDR only; refuses unless `SAFETRUST_MCP_ALLOW_MUTATIONS=true` and apps/api is on Testnet |
+| `hasura-query` | ❌ unsafe | no — `SAFETRUST_MCP_ENABLE_RAW_HASURA=true` | Hasura (`mcp_reader`): any table that role can select | — | Arbitrary read-only GraphQL; off by default ([#530](https://github.com/safetrustcr/dApp-SafeTrust/issues/530)) |
 <!-- tool-catalogue:end -->
 
 ## 5. Incident response
@@ -244,8 +252,7 @@ non-local URL, or Hasura port `8080` was reachable from your network.
    ```
 
    Then put the new value in `apps/api/.env` and in the MCP client's `env`, and
-   restart both. Once [#530](https://github.com/safetrustcr/dApp-SafeTrust/issues/530)
-   lands, rotate the `mcp_reader` credential the same way.
+   restart both.
 3. **Rotate the Testnet test user.** `pnpm testnet:provision` does not change the
    password of a user that already exists, so delete the users first, then
    re-provision with fresh keys and a new password:
@@ -270,9 +277,9 @@ non-local URL, or Hasura port `8080` was reachable from your network.
 
 - [`mcp/README.md`](../../mcp/README.md): tool and resource reference for
   contributors extending the server.
-- Hardening this page depends on: [#528](https://github.com/safetrustcr/dApp-SafeTrust/issues/528)
+- Hardening this page came from: [#528](https://github.com/safetrustcr/dApp-SafeTrust/issues/528)
   (API auth as the test user), [#529](https://github.com/safetrustcr/dApp-SafeTrust/issues/529)
   (fail-closed config, refuse remote hosts),
   [#530](https://github.com/safetrustcr/dApp-SafeTrust/issues/530) (allow-listed
-  reads under `mcp_reader`). Each of them updates the rows here that it changes;
-  the trust-boundary test fails until it does.
+  reads under `mcp_reader`). The trust-boundary test fails when the catalogue
+  drifts from the server's `tools/list`.

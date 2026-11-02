@@ -38,6 +38,11 @@ select_permissions:
       filter:
         id:
           _eq: X-Hasura-User-Id
+  - role: mcp_reader
+    permission:
+      columns:
+        - id
+      filter: {}
 update_permissions:
   - role: tenant
     permission:
