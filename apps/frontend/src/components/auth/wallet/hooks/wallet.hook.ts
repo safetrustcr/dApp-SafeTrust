@@ -6,7 +6,7 @@ import { getWalletKit } from "../constants/wallet-kit.constant";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
-import { useMultiWallet } from "./useMultiWallet";
+import { useMultiWallet } from "./multi-wallet.hook";
 import { WalletInfo } from "../types/wallet.types";
 import { signTransaction } from "@stellar/freighter-api";
 import { usePollarWallet } from "@/components/auth/pollar/PollarProvider";

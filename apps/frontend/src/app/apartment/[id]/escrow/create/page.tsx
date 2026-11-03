@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 /** @deprecated Booking escrow now has one canonical orchestrator route. */
-export default function LegacyApartmentEscrowCreatePage({ params }: { params: { id: string } }) {
-  redirect(`/escrow/${params.id}/escrow/create`);
+export default async function LegacyApartmentEscrowCreatePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  redirect(`/escrow/${id}/escrow/create`);
 }

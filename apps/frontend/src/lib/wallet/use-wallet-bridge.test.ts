@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
-// Mock values hoisted for vitest
+// vi.mock factories are hoisted above these consts, so factories must read them lazily.
 const mockFreighter = { address: null as string | null, signAndSubmit: vi.fn() };
 const mockPollar = { isAuthenticated: false, wallet: { address: null as string | null }, login: vi.fn() };
 const mockActiveWallet = { address: null as string | null, walletType: null as string | null, isReady: false, signAndSubmit: vi.fn() };
@@ -27,7 +27,7 @@ const mockKit = {
   getAddress: vi.fn(async () => ({ address: 'GKITWALLET123' })),
   signTransaction: vi.fn(async () => ({ signedTxXdr: 'SIGNED_TX_XDR_KIT' })),
 };
-const mockSignTransaction = vi.fn(async () => ({ signedTransaction: 'SIGNED_TX_XDR_FREIGHTER', signedTxXdr: 'SIGNED_TX_XDR_FREIGHTER' }));
+const mockSignTransaction = vi.fn(async (..._args: unknown[]) => ({ signedTransaction: 'SIGNED_TX_XDR_FREIGHTER', signedTxXdr: 'SIGNED_TX_XDR_FREIGHTER' }));
 const mockGetAuthenticatedApi = vi.fn();
 const mockAuth = {
   currentUser: { uid: 'user-123', getIdToken: vi.fn(async () => 'mock-token') } as any,
@@ -58,7 +58,9 @@ vi.mock('@/lib/api/client', () => ({
 }));
 
 vi.mock('@/lib/firebase', () => ({
-  auth: mockAuth,
+  get auth() {
+    return mockAuth;
+  },
 }));
 
 vi.mock('@stellar/freighter-api', () => ({

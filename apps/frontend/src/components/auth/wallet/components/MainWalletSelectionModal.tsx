@@ -8,10 +8,13 @@ import { X, ExternalLink, Loader2, AlertCircle, CheckCircle2 } from "lucide-reac
 import { useWalletBridge, WalletRejectedError } from "@/lib/wallet/use-wallet-bridge";
 import { toast } from "sonner";
 
+/** Wallet family picked in this modal; the specific wallet is chosen in the next step. */
+export type WalletType = "stellar" | "metamask" | "walletconnect";
+
 interface MainWalletSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onWalletTypeSelected?: (walletType: any) => void;
+  onWalletTypeSelected?: (walletType: WalletType) => void;
   onWalletConnected?: (address: string) => void;
   stellarOnly?: boolean;
 }

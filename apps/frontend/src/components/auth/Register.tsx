@@ -287,7 +287,7 @@ export default function Register() {
 
         <AuthMotionPanel className="hidden md:flex md:w-1/2 bg-zinc-50 dark:bg-zinc-900/40 items-center justify-center p-8 border-l border-zinc-200/60 dark:border-zinc-800/60">
           <AuthMotionItem className="w-full max-w-md">
-            <Illustration className="w-full h-auto" />
+            <Illustration />
           </AuthMotionItem>
         </AuthMotionPanel>
       </div>

@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
-import { useState, type CSSProperties } from "react";
+import { use, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 
 import { useAuthUser } from "@/components/auth/hooks/auth.hook";
@@ -120,9 +120,10 @@ function formatAmount(amount: number): string {
 export default function ApartmentDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const listing = useListing("apartment", params.id);
+  const { id } = use(params);
+  const listing = useListing("apartment", id);
   const router = useRouter();
   const { user, loading: authLoading } = useAuthUser();
   const [isMessaging, setIsMessaging] = useState(false);
@@ -246,7 +247,7 @@ export default function ApartmentDetailPage({
 
           <div style={styles.actions}>
             <Link
-              href={`/apartment/${params.id}/escrow/create`}
+              href={`/apartment/${id}/escrow/create`}
               style={styles.button}
             >
               BOOK
