@@ -3,9 +3,7 @@
  *
  * Mirrors public.escrow_status_transitions (see the canonical
  * escrow-transition matrix migration) so the same rules apply in the
- * application and in the database triggers. The parity test
- * (escrow-transitions-parity.test.ts) reads the migration SQL and
- * asserts the pairs match this map.
+ * application and in the database triggers.
  */
 
 export type EscrowStatus =
@@ -41,9 +39,6 @@ export const ESCROW_TRANSITIONS: Record<EscrowStatus, readonly EscrowStatus[]> =
   completed: [],
   cancelled: [],
 };
-
-/** Backwards-compatible alias for the transition matrix. */
-export const TRANSITIONS: Record<EscrowStatus, readonly EscrowStatus[]> = ESCROW_TRANSITIONS;
 
 /** Thrown when a status change is not allowed by the transition table. */
 export class InvalidTransitionError extends Error {
@@ -93,14 +88,14 @@ export function canTransition(from: string, to: string): boolean {
 }
 
 export function assertTransition(from: EscrowStatus, to: EscrowStatus): void {
-  if (!ESCROW_TRANSITIONS[from].includes(to)) {
+  if (!canTransition(from, to)) {
     throw new InvalidTransitionError(from, to);
   }
 }
 
-/** Same as assertTransition but tolerates raw (possibly unknown) status strings from the DB. */
+/** Same as assertTransition but accepts raw (possibly unknown) status strings from the DB. */
 export function assertStatusTransition(from: string, to: EscrowStatus): void {
-  if (!isEscrowStatus(from) || !ESCROW_TRANSITIONS[from].includes(to)) {
+  if (!canTransition(from, to)) {
     throw new InvalidTransitionError(from, to);
   }
 }
@@ -108,20 +103,19 @@ export function assertStatusTransition(from: string, to: EscrowStatus): void {
 /**
  * Computes the steps needed to get from `from` to `to` using only legal
  * transitions. Returns the intermediate states including `to` but excluding
- * `from`. Throws InvalidTransitionError when no path exists.
+ * `from`. Returns null when no legal path exists.
  */
-export function pathTo(from: EscrowStatus, to: EscrowStatus): EscrowStatus[] {
+export function pathTo(from: EscrowStatus, to: EscrowStatus): EscrowStatus[] | null {
   if (from === to) {
     return [];
   }
   if (!isEscrowStatus(from) || !isEscrowStatus(to)) {
-    throw new InvalidTransitionError(from, to);
+    return null;
   }
 
   // Breadth-first search over the directed graph.
   const queue: EscrowStatus[] = [from];
   const prev = new Map<EscrowStatus, EscrowStatus | null>([[from, null]]);
-
 
   while (queue.length > 0) {
     const current = queue.shift() as EscrowStatus;
@@ -137,7 +131,7 @@ export function pathTo(from: EscrowStatus, to: EscrowStatus): EscrowStatus[] {
   }
 
   if (!prev.has(to)) {
-    throw new InvalidTransitionError(from, to);
+    return null;
   }
 
   const path: EscrowStatus[] = [];

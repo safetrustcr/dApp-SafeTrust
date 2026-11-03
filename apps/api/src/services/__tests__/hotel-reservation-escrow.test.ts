@@ -10,7 +10,7 @@ let reservation: HotelReservation;
 let wallets: string[];
 beforeEach(() => {
   wallets = [GUEST];
-  reservation = { id: ID, wallet_address: GUEST, reservation_status: 'PENDING', total_amount: '240.00', check_in: '2026-11-01T15:00:00Z', check_out: '2026-11-03T11:00:00Z', room: { room_id: ID, room_number: '201', room_images: [{ image_url: '/room.jpg' }], hotel: { id: ID, name: 'Hotel', address: 'San José', description: 'A room', owner: { firebase_uid: 'host', first_name: 'Owner', last_name: null, email: 'owner@example.com', wallets: [{ wallet_address: HOST }] } } } };
+  reservation = { id: ID, wallet_address: GUEST, reservation_status: 'PENDING', total_amount: '240.00', check_in: '2026-11-01T15:00:00Z', check_out: '2026-11-03T11:00:00Z', hold_expires_at: null, room: { room_id: ID, room_number: '201', room_images: [{ image_url: '/room.jpg' }], hotel: { id: ID, name: 'Hotel', address: 'San José', description: 'A room', owner: { firebase_uid: 'host', first_name: 'Owner', last_name: null, email: 'owner@example.com', wallets: [{ wallet_address: HOST }] } } } };
   vi.mocked(hasuraRequest).mockImplementation(async (query) => {
     if (query.includes('HotelCallerWallets')) return { users_wallets: wallets.map((wallet_address) => ({ wallet_address })) } as never;
     return { reservations_by_pk: reservation } as never;

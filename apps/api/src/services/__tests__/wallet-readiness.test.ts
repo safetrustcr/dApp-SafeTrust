@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Networks } from '@stellar/stellar-sdk';
+import { Keypair, Networks } from '@stellar/stellar-sdk';
 
 vi.mock('../hasura.js', () => ({
   hasuraRequest: vi.fn(),
@@ -35,10 +35,10 @@ import {
   XLM_FEE_BUFFER,
 } from '../wallet-readiness.js';
 
-const GUEST_WALLET = `G${'A'.repeat(55)}`;
-const HOST_WALLET = `G${'B'.repeat(55)}`;
-const PLATFORM_WALLET = `G${'C'.repeat(55)}`;
-const USDC_ISSUER = `G${'D'.repeat(55)}`;
+const GUEST_WALLET = Keypair.random().publicKey();
+const HOST_WALLET = Keypair.random().publicKey();
+const PLATFORM_WALLET = Keypair.random().publicKey();
+const USDC_ISSUER = Keypair.random().publicKey();
 const WRONG_ISSUER = `G${'E'.repeat(55)}`;
 
 describe('wallet-readiness service', () => {

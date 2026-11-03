@@ -1,9 +1,9 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { authenticateFirebase } from '../../middleware/auth.middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.middleware.js';
 import { recoverFromTxhashHandler } from './recover-from-txhash.handler.js';
-import { pendingActionsService } from '../../services/pending-actions.js';
-import { trustlessWorkService } from '../../services/trustlesswork.js';
+
+type AuthedRequest = Request & { user?: { uid: string } };
 
 const router = Router();
 
@@ -12,19 +12,10 @@ const router = Router();
 const recoverRateLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
-  keyGenerator: (req) => req.user?.uid ?? req.ip,
+  keyGenerator: (req) => (req as AuthedRequest).user?.uid ?? req.ip,
   message: 'TOO_MANY_RECOVERY_REQUESTS',
 });
 
-router.post(
-  '/recover-from-txhash',
-  authenticateFirebase,
-  recoverRateLimit,
-  (req, res, next) => {
-    req.services = { pendingActions: pendingActionsService, trustlessWork: trustlessWorkService };
-    next();
-  },
-  recoverFromTxhashHandler,
-);
+router.post('/recover-from-txhash', authenticateFirebase, recoverRateLimit, recoverFromTxhashHandler);
 
 export default router;

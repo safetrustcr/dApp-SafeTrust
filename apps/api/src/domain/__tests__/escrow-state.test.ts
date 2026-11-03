@@ -4,9 +4,10 @@ import {
   assertTransition,
   assertStatusTransition,
   assertActionTransition,
-  isESCrowStatus,
+  isEscrowStatus,
   pathTo,
   InvalidTransitionError,
+  type EscrowStatus,
 } from '../escrow-state.js';
 
 describe('ESCROW_TRANSITIONS', () => {
@@ -36,8 +37,9 @@ describe('ESCROW_TRANSITIONS', () => {
   });
 
   it('rejects removed states pending_funding and active', () => {
-    expect(() => assertTransition('pending_funding', 'created')).toThrow(InvalidTransitionError);
-    expect(() => assertTransition('active', 'funded')).toThrow(InvalidTransitionError);
+    // Old rows in the DB can still carry these values.
+    expect(() => assertTransition('pending_funding' as EscrowStatus, 'created')).toThrow(InvalidTransitionError);
+    expect(() => assertTransition('active' as EscrowStatus, 'funded')).toThrow(InvalidTransitionError);
   });
 
   it('rejects any transition out of terminal states', () => {
@@ -133,7 +135,7 @@ describe('assertActionTransition', () => {
       assertActionTransition('mark_milestone_completed', 'completed');
       throw new Error('should have thrown');
     } catch (error) {
-      expect(error).toBeInctanceOf(InvalidTransitionError);
+      expect(error).toBeInstanceOf(InvalidTransitionError);
       expect((error as InvalidTransitionError).message).toContain('does not allow');
       expect((error as InvalidTransitionError).message).toContain('expected: funded');
     }
@@ -149,9 +151,9 @@ describe('assertActionTransition', () => {
 
 describe('isEscrowStatus', () => {
   it('recognizes known statuses only', () => {
-    expect(isESCrowStatus('created')).toBe(true);
-    expect(isESCrowStatus('pending_signature')).toBe(true);
-    expect(isESCrowStatus('nonsense')).toBe(false);
-    expect(isESCrowStatus(undefined)).toBe(false);
+    expect(isEscrowStatus('created')).toBe(true);
+    expect(isEscrowStatus('pending_signature')).toBe(true);
+    expect(isEscrowStatus('nonsense')).toBe(false);
+    expect(isEscrowStatus(undefined)).toBe(false);
   });
 });

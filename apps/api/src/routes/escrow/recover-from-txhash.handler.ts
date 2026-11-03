@@ -1,4 +1,17 @@
-import type { Request, Response } from 'express'; import { updateIndexerFromTxHash } from '../../services/trustlesswork(js)'; import { findByTxHash, markPendingActionFailed } from '../../services/pending-actions.js'; import { assertEscrowParticipant } from '../../services/escrow-access.js'; import { applySubmittedAction } from '../../services/submitted-effects.js'; import { confirmStellarTransaction } from '../../services/stellar-confirm.js'; import { ApiError } from '../../http/api-error.js'; import { asyncHandler } from '../../http/async-handler.js'; import { getAuthenticatedUser } from '../../http/auth.js';
+import type { Request, Response } from 'express';
+import { updateIndexerFromTxHash } from '../../services/trustlesswork.js';
+import {
+  claimForSubmission,
+  getPendingActionByHash,
+  markConfirmed,
+  markFailed,
+  type PendingAction,
+} from '../../services/pending-actions.js';
+import { assertEscrowParticipant, EscrowAccessError } from '../../services/escrow-authz.js';
+import { confirmTransaction } from '../../services/stellar-confirm.js';
+import { ApiError } from '../../http/api-error.js';
+import { asyncHandler } from '../../http/async-handler.js';
+import { applySubmittedAction } from './submitted-effects.js';
 
 const TX_HASH_REGEX = /^[0-9a-f]{64}$/i;
 
@@ -20,6 +33,8 @@ const FORBIDDEN_FIELDS = [
   'resolver',
 ] as const;
 
+type AuthedRequest = Request & { user?: { uid: string } };
+
 type RecoverRequestBody = {
   txHash?: string;
   [key: string]: unknown;
@@ -28,7 +43,7 @@ type RecoverRequestBody = {
 type RecoverResponse = {
   recovered: boolean;
   action: string;
-  contractId: string;
+  contractId: string | null;
   txHash: string;
   status: string;
 };
@@ -38,10 +53,20 @@ type PendingResponse = {
   txHash: string;
 };
 
+/**
+ * POST /api/escrow/recover-from-txhash  { txHash }
+ *
+ * For a transaction the user signed and submitted, but whose result SafeTrust
+ * never recorded (closed tab, dropped connection). The ledger decides whether
+ * it happened; the action and parameters come from the pending-action row.
+ */
 export const recoverFromTxhashHandler = asyncHandler(async (
-  req: Request<{}, RecoverResponse | PendingResponse | { error: string }, RecoverRequestBody>,
-  res: Response<RecoverResponse | PendingResponse | { error: string }>,
+  req: AuthedRequest,
+  res: Response<RecoverResponse | PendingResponse>,
 ) => {
+  const uid = req.user?.uid;
+  if (!uid) throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in first.');
+
   const body = (req.body || {}) as RecoverRequestBody;
 
   // 1. Reject any client-supplied transition input.
@@ -52,67 +77,72 @@ export const recoverFromTxhashHandler = asyncHandler(async (
   }
 
   const txHash = typeof body.txHash === 'string' ? body.txHash.trim() : '';
-  if (!TX_HASH_REGEX.exec(txHash)) {
+  if (!TX_HASH_REGEX.test(txHash)) {
     throw new ApiError(400, 'INVALID_TX_HASH', 'txHash must be 64 hex characters');
   }
 
-  const user = getAuthenticatedUser(req);
-
   // 2. Load the pending action SafeTrust built for this hash.
-  const pendingAction = await findByTxHash(txHash);
+  const pendingAction = await getPendingActionByHash(txHash);
   if (!pendingAction) {
     throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash');
   }
 
   // 3. Authorize: built_for_uid OR this escrow's participant. Return 404
   // (not 403) so callers can't probe which hashes exist.
-  const isBuiltForCaller = pendingAction.built_for_uid === user.uid;
-  if (!isBuiltForCaller) {
+  if (pendingAction.built_for_uid !== uid) {
     try {
-      await assertEscrowParticipant(pendingAction.contract_id, user.uid);
-    } catch {
-      throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash');
+      await assertEscrowParticipant(uid, pendingAction.engagement_id);
+    } catch (err) {
+      if (err instanceof EscrowAccessError) {
+        throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash');
+      }
+      throw err;
     }
   }
 
-  // 4. Idempotent: already confirmed -> return current escrow status.
-  if (pendingAction.status === 'confirmed') {
-    return res.status(200).json({
-      recovered: true,
-      action: pendingAction.action,
-      contractId: pendingAction.contract_id,
-      txHash,
-      status: pendingAction.resulting_status ?? pendingAction.target_status,
-    });
+  // 4. Idempotent: effects were already applied at submit time.
+  if (pendingAction.status === 'submitted' || pendingAction.status === 'confirmed') {
+    return res.status(200).json(recoveredBody(pendingAction, txHash));
   }
-
-  // 5. Confirm on the ledger.
-  const confirmation = await confirmStellarTransaction(txHash);
-
-  if (confirmation.status === 'not_found') {
-    // Still pending on the ledger. Client retries; cron reconciler also picks it up.
-    return res.status(202).json({ status: 'PENDING', txHash });
-  }
-
-  if (confirmation.status === 'failed') {
-    await markPendingActionFailed(pendingAction.id);
+  if (pendingAction.status === 'failed') {
     throw new ApiError(409, 'TRANSACTION_FAILED', 'Transaction failed on the ledger');
   }
 
-  // 6. Apply the guarded transition via the shared effects path.
-  const applied = await applySubmittedAction(pendingAction, txHash, {
-    source: 'submit',
-    actorUid: user.uid,
-  });
+  // 5. Confirm on the ledger.
+  const confirmation = await confirmTransaction(txHash);
+
+  if (confirmation === 'unknown') {
+    // Not on the ledger yet (or Horizon unreachable). Client retries.
+    return res.status(202).json({ status: 'PENDING', txHash });
+  }
+
+  if (confirmation === 'failed') {
+    await markFailed(pendingAction.id);
+    throw new ApiError(409, 'TRANSACTION_FAILED', 'Transaction failed on the ledger');
+  }
+
+  // 6. Claim so a concurrent send-transaction can't apply the same effects twice.
+  const claimed = await claimForSubmission(pendingAction.id);
+  if (!claimed) {
+    const latest = await getPendingActionByHash(txHash);
+    return res.status(200).json(recoveredBody(latest ?? pendingAction, txHash));
+  }
+
+  await applySubmittedAction(pendingAction, { txHash, contractId: pendingAction.contract_id, twResult: null });
+  await markConfirmed(pendingAction.id);
 
   // 7. Best-effort: tell Trustless Work's indexer about the transaction.
   await updateIndexerFromTxHash(txHash);
 
-  return res.status(200).json({
-    recovered: true,
-    action: pendingAction.action,
-    contractId: pendingAction.contract_id,
-    txHash,
-    status: applied.status,
-  });
+  return res.status(200).json({ ...recoveredBody(pendingAction, txHash), status: 'confirmed' });
 });
+
+function recoveredBody(row: Pick<PendingAction, 'action' | 'contract_id' | 'status'>, txHash: string): RecoverResponse {
+  return {
+    recovered: true,
+    action: row.action,
+    contractId: row.contract_id,
+    txHash,
+    status: row.status,
+  };
+}

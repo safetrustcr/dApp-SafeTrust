@@ -5,7 +5,6 @@
  * this row, never from the request body.
  */
 import { hasuraRequest } from './hasura.js';
-const { hasuraRequest } = await import('./hasura.js');
 import type { EscrowAction } from './escrow-authz.js';
 
 export type PendingStatus = 'built' | 'submitted' | 'confirmed' | 'failed' | 'expired';
@@ -98,9 +97,6 @@ export async function getPendingActionByHash(txHash: string): Promise<PendingAct
   return data.escrow_pending_actions[0] ?? null;
 }
 
-/** Alias for the recovery handler: look a pending action up by transaction hash. */
-export const findByTxHash = getPendingActionByHash;
-
 /**
  * Atomically claims a built row for submission (built → submitted).
  * Returns false when another request already claimed it.
@@ -167,6 +163,3 @@ export async function markFailed(id: string): Promise<void> {
     { id },
   );
 }
-
-/** Alias for the recovery handler: mark a pending action as failed. */
-export const markPendingActionFailed = markFailed;

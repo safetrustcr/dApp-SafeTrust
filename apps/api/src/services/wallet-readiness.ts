@@ -49,7 +49,7 @@ export function isTestnet(): boolean {
 }
 
 type CachedAccount = {
-  data: Horizon.ServerApi.AccountRecord | null;
+  data: Horizon.AccountResponse | null;
   expiresAt: number;
 };
 
@@ -67,7 +67,7 @@ export async function loadAccountWithCache(
   server: Horizon.Server,
   address: string,
   options?: { skipCache?: boolean },
-): Promise<Horizon.ServerApi.AccountRecord | null> {
+): Promise<Horizon.AccountResponse | null> {
   const now = Date.now();
   if (!options?.skipCache) {
     const cached = horizonAccountCache.get(address);
@@ -106,7 +106,7 @@ export async function loadAccountWithCache(
 }
 
 export function hasUsdcTrustline(
-  account: Horizon.ServerApi.AccountRecord | null,
+  account: Horizon.AccountResponse | null,
   assetCode: string,
   assetIssuer: string,
 ): boolean {
@@ -122,7 +122,7 @@ export function hasUsdcTrustline(
 }
 
 export function getUsdcBalance(
-  account: Horizon.ServerApi.AccountRecord | null,
+  account: Horizon.AccountResponse | null,
   assetCode: string,
   assetIssuer: string,
 ): string {
@@ -139,7 +139,7 @@ export function getUsdcBalance(
 }
 
 export function getNativeXlmBalance(
-  account: Horizon.ServerApi.AccountRecord | null,
+  account: Horizon.AccountResponse | null,
 ): string {
   if (!account || !Array.isArray(account.balances)) return '0';
   const native = account.balances.find((b) => b.asset_type === 'native');
@@ -180,7 +180,7 @@ export type WalletReadinessResponse = {
 };
 
 export function evaluateGuestChecks(
-  account: Horizon.ServerApi.AccountRecord | null,
+  account: Horizon.AccountResponse | null,
   amount: number | string,
   assetIssuer: string,
   isTestnetNetwork: boolean,
@@ -412,7 +412,7 @@ export async function buildChangeTrustXdr(
   assetIssuer: string,
   passphrase = NETWORK_PASSPHRASE,
 ): Promise<string> {
-  let accountRecord: Horizon.ServerApi.AccountRecord | null;
+  let accountRecord: Horizon.AccountResponse;
   try {
     accountRecord = await server.loadAccount(callerWallet);
   } catch (err: unknown) {
