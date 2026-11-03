@@ -1,13 +1,15 @@
 "use client";
 
+import { use } from "react";
 import { HotelForm } from "@/components/dashboard/hotels/HotelForm";
 
 interface EditHotelPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function EditHotelPage({ params }: EditHotelPageProps) {
-  return <HotelForm mode="edit" hotelId={params.id} />;
+  const { id } = use(params);
+  return <HotelForm mode="edit" hotelId={id} />;
 }

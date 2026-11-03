@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { canonicalApartmentRouteId } from "@/lib/stub-apartments";
 
-export default function RemovedHotelEscrowDetailRoutePage({
+export default async function RemovedHotelEscrowDetailRoutePage({
   params,
 }: {
-  params: { id: string; escrowId: string };
+  params: Promise<{ id: string; escrowId: string }>;
 }) {
-  const apartmentId = canonicalApartmentRouteId(params.id);
-  redirect(apartmentId ? `/escrow/${apartmentId}/escrow/${params.escrowId}` : "/rent");
+  const { id, escrowId } = await params;
+  const apartmentId = canonicalApartmentRouteId(id);
+  redirect(apartmentId ? `/escrow/${apartmentId}/escrow/${escrowId}` : "/rent");
 }

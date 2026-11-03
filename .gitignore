@@ -48,3 +48,6 @@ coverage/
 mcp/.env
 mcp/.env.*
 !mcp/.env.example
+
+# pnpm workspace: npm lockfiles are never used
+package-lock.json

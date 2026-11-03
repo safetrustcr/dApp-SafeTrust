@@ -2,7 +2,7 @@
 
 import { useQuery } from "@apollo/client";
 import { notFound } from "next/navigation";
-import type { CSSProperties } from "react";
+import { use, type CSSProperties } from "react";
 
 import { ApartmentPropertyCard } from "@/components/escrow/ApartmentPropertyCard";
 import { EscrowDetailLayout } from "@/components/escrow/EscrowDetailLayout";
@@ -62,15 +62,16 @@ function resolveOwnerWallet(apartment: ApartmentData): string | null {
 export default function EscrowCreatePage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  if (!UUID_RE.test(params.id)) {
+  const { id } = use(params);
+  if (!UUID_RE.test(id)) {
     notFound();
   }
 
   const { data, loading, error } = useQuery<{ apartments: ApartmentData[] }>(
     GET_APARTMENT_BY_ID,
-    { variables: { id: params.id } }
+    { variables: { id } }
   );
 
   const apartment = data?.apartments[0] ?? null;
@@ -99,7 +100,7 @@ export default function EscrowCreatePage({
               paySlot={
                 ownerWallet ? (
                   <EscrowPayFlow
-                    apartmentId={params.id}
+                    apartmentId={id}
                     apartmentName={apartment.name}
                     ownerAddress={ownerWallet}
                     amount={apartment.price}

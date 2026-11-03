@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import { useQuery } from '@apollo/client';
 import { useAuthUser } from '@/components/auth/hooks/auth.hook';
 import { GET_CONVERSATIONS } from '@/graphql/queries/messages-queries';
@@ -10,8 +11,9 @@ import Link from 'next/link';
 export default function ConversationThreadPage({ 
   params 
 }: { 
-  params: { conversationId: string } 
+  params: Promise<{ conversationId: string }> 
 }) {
+  const { conversationId } = use(params);
   const { user } = useAuthUser();
 
   // We fetch conversations to get the apartment details and other party info
@@ -21,7 +23,7 @@ export default function ConversationThreadPage({
   });
 
   const conversation = data?.conversations?.find(
-    (c: any) => c.id === params.conversationId
+    (c: any) => c.id === conversationId
   );
 
   if (loading) {
@@ -63,7 +65,7 @@ export default function ConversationThreadPage({
       
       <div className="flex-1 overflow-hidden">
         <ConversationThread 
-          conversationId={params.conversationId} 
+          conversationId={conversationId} 
           apartmentId={conversation.apartment.id} 
         />
       </div>
