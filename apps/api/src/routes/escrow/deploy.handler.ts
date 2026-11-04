@@ -1,16 +1,13 @@
 import type { Request, Response } from 'express';
-import { createHash } from 'node:crypto';
 import { checkIdempotency } from '../../services/idempotency.js';
 import { hasuraRequest } from '../../services/hasura.js';
 import { trustlessWorkRequest } from '../../services/trustlesswork.js';
 import { ApiError } from '../../http/api-error.js';
 import { asyncHandler } from '../../http/async-handler.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
-import { getApartmentEscrowTerms, ApartmentTermsError } from '../../services/apartment-escrow-terms.js';
-import { getUserWallets } from '../../services/escrow-authz.js';
 import { findLiveAction, insertPendingAction } from '../../services/pending-actions.js';
-import { getHotelReservationEscrowTerms } from '../../services/hotel-reservation-escrow.js';
 import { transactionExpiry, transactionHash } from '../../lib/stellar-xdr.js';
+import { toBookingReference, resolveBookingEscrowTerms } from '../../services/booking-escrow-terms.js';
 
 type DeployRequestBody = {
   apartmentId?: string;
@@ -32,41 +29,34 @@ export const deployEscrowHandler = asyncHandler(async (
   req: AuthenticatedRequest & Request<Record<string, never>, DeployResponse | { error: string }, DeployRequestBody>,
   res: Response<DeployResponse | { error: string }>,
 ) => {
-  const { apartmentId, reservationId, senderAddress } = req.body;
+  const { senderAddress } = req.body;
   const uid = req.user?.uid;
 
-  if ((!apartmentId && !reservationId) || (apartmentId && reservationId) || !senderAddress) {
+  if (!senderAddress) {
     res.status(400).json({
       error: 'Provide exactly one apartmentId or reservationId, and senderAddress',
     });
     return;
   }
+
+  let bookingRef;
+  try {
+    bookingRef = toBookingReference(req.body);
+  } catch {
+    res.status(400).json({
+      error: 'Provide exactly one apartmentId or reservationId, and senderAddress',
+    });
+    return;
+  }
+
   if (!uid) {
     throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in first.');
   }
 
-  const hotelTerms = reservationId ? await getHotelReservationEscrowTerms(reservationId, uid, senderAddress) : null;
-  let terms;
-  if (hotelTerms) {
-    terms = hotelTerms;
-  } else {
-    const callerWallets = await getUserWallets(uid);
-    if (!callerWallets.includes(senderAddress)) {
-      throw new ApiError(403, 'WALLET_NOT_REGISTERED', 'Connect and register the Stellar wallet that will sign this escrow.');
-    }
-    try {
-      terms = await getApartmentEscrowTerms(apartmentId!);
-    } catch (error) {
-      if (error instanceof ApartmentTermsError) throw new ApiError(error.status, error.code, error.message);
-      throw error;
-    }
-    if (terms.ownerUserId === uid) throw new ApiError(409, 'SELF_ESCROW_NOT_ALLOWED', 'You cannot create a rental escrow for your own apartment.');
-  }
-  const resolvedEngagementId =
-    hotelTerms?.engagementId ??
-    `rental:${apartmentId}:${uid}`;
-  const propertyId = reservationId ?? apartmentId!;
-  const tenantId = hotelTerms ? 'hotel_industry' : 'safetrust';
+  const terms = await resolveBookingEscrowTerms(bookingRef, uid, senderAddress);
+  const resolvedEngagementId = terms.engagementId;
+  const propertyId = terms.bookingId;
+  const tenantId = terms.tenantId;
 
   // ── Idempotency check ──────────────────────────────────────────────────
   const idempotencyResult = await checkIdempotency(resolvedEngagementId);
@@ -116,8 +106,8 @@ export const deployEscrowHandler = asyncHandler(async (
     method: 'POST',
     body: {
       engagementId: resolvedEngagementId,
-      title: hotelTerms ? `SafeTrust Hotel — ${reservationId}` : `SafeTrust Rental — ${apartmentId}`,
-      description: hotelTerms ? `Payment for hotel reservation ${reservationId}` : `Security deposit for apartment ${apartmentId}`,
+      title: terms.title,
+      description: terms.description,
       signer: senderAddress,
       amount: terms.amount,
       platformFee: 0,
@@ -129,7 +119,7 @@ export const deployEscrowHandler = asyncHandler(async (
         releaseSigner: senderAddress,
         disputeResolver: platformAddress,
       },
-      milestones: [{ description: hotelTerms ? 'Hotel reservation payment' : 'Rental security deposit' }],
+      milestones: [{ description: terms.milestoneDescription }],
       trustline: {
         symbol: 'USDC',
         address: usdcIssuer,
@@ -146,7 +136,6 @@ export const deployEscrowHandler = asyncHandler(async (
   } catch {
     throw new ApiError(502, 'TRUSTLESS_WORK_INVALID_XDR', 'The escrow provider returned an unreadable transaction.', { retryable: true });
   }
-
 
   // Persist pending escrow to DB — HasuraRequestError thrown on failure,
   // errorMiddleware maps it to DATABASE_ERROR automatically.
@@ -178,7 +167,7 @@ export const deployEscrowHandler = asyncHandler(async (
     {
       contractId: twData.contractId ?? resolvedEngagementId,
       engagementId: resolvedEngagementId,
-      apartmentId: apartmentId ?? null,
+      apartmentId: bookingRef.kind === 'apartment' ? bookingRef.apartmentId : null,
       propertyId,
       tenantId,
       senderAddress,
@@ -187,7 +176,6 @@ export const deployEscrowHandler = asyncHandler(async (
       unsignedXdr: twData.unsignedTransaction ?? '',
     },
   );
-
 
   const pendingAction = await insertPendingAction({
     engagement_id: resolvedEngagementId,
@@ -198,9 +186,9 @@ export const deployEscrowHandler = asyncHandler(async (
     built_for_uid: uid,
     signer_address: senderAddress,
     payload: {
-      apartmentId,
+      ...(bookingRef.kind === 'apartment' ? { apartmentId: bookingRef.apartmentId } : {}),
       tenantId,
-      ...(hotelTerms ? { reservationId, booking: hotelTerms.reservation } : {}),
+      ...(bookingRef.kind === 'hotel-reservation' ? { reservationId: bookingRef.reservationId, booking: terms.reservation } : {}),
       receiverAddress: terms.receiverAddress,
       amount: terms.amount,
       releaser: senderAddress,
