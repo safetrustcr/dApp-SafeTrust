@@ -59,6 +59,22 @@ describe('booking-escrow-terms service', () => {
     it('throws 400 if body is null or not an object', () => {
       expect(() => toBookingReference(null)).toThrow(ApiError);
     });
+
+    it.each([
+      ['non-string reservationId', { apartmentId: 'apt-1', reservationId: 123 }],
+      ['blank reservationId', { apartmentId: 'apt-1', reservationId: '   ' }],
+      ['non-string apartmentId', { apartmentId: false, reservationId: 'res-1' }],
+      ['blank apartmentId', { apartmentId: '', reservationId: 'res-1' }],
+    ])('throws 400 for a malformed extra identifier (%s)', (_label, body) => {
+      expect(() => toBookingReference(body)).toThrow(ApiError);
+    });
+
+    it('treats null identifiers as absent', () => {
+      expect(toBookingReference({ apartmentId: 'apt-1', reservationId: null })).toEqual({
+        kind: 'apartment',
+        apartmentId: 'apt-1',
+      });
+    });
   });
 
   describe('resolveBookingEscrowTerms', () => {
@@ -87,6 +103,26 @@ describe('booking-escrow-terms service', () => {
         description: 'Security deposit for apartment apt-999',
         milestoneDescription: 'Rental security deposit',
       });
+    });
+
+    it('keys the engagement on the canonical apartment id, not the caller spelling', async () => {
+      vi.mocked(getUserWallets).mockResolvedValueOnce(['G_SENDER_WALLET']);
+      vi.mocked(getApartmentEscrowTerms).mockResolvedValueOnce({
+        apartmentId: 'aaaaaaaa-0000-0000-0000-00000000000a',
+        ownerUserId: 'owner-uid',
+        receiverAddress: 'G_HOST_RECEIVER',
+        amount: 850,
+      });
+
+      const terms = await resolveBookingEscrowTerms(
+        { kind: 'apartment', apartmentId: 'AAAAAAAA-0000-0000-0000-00000000000A' },
+        'tenant-uid',
+        'G_SENDER_WALLET',
+      );
+
+      expect(terms.bookingId).toBe('aaaaaaaa-0000-0000-0000-00000000000a');
+      expect(terms.engagementId).toBe('rental:aaaaaaaa-0000-0000-0000-00000000000a:tenant-uid');
+      expect(terms).not.toHaveProperty('legacyEngagementIds');
     });
 
     it('throws 409 if tenant is the apartment owner', async () => {
