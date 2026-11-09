@@ -18,7 +18,10 @@ import { ACTION_SIGNER_ROLE, DEPLOY_ROLES } from '../../../mcp/src/lib/escrow-ro
 
 vi.mock('../src/services/trustlesswork.js', () => ({ trustlessWorkRequest: vi.fn() }));
 vi.mock('../src/services/hasura.js', () => ({ hasuraRequest: vi.fn() }));
-vi.mock('../src/services/idempotency.js', () => ({ checkIdempotency: vi.fn() }));
+vi.mock('../src/services/idempotency.js', () => ({
+  checkIdempotency: vi.fn(),
+  findRentalEscrowForUser: vi.fn().mockResolvedValue({ exists: false }),
+}));
 vi.mock('../src/services/hotel-reservation-escrow.js', () => ({
   getHotelReservationEscrowTerms: vi.fn(),
   getHotelUserWallets: vi.fn(),

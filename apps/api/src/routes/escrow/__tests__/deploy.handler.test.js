@@ -9,6 +9,7 @@ vi.mock('../../../services/hotel-reservation-escrow.js', () => ({ getHotelReserv
 
 vi.mock('../../../services/idempotency.js', () => ({
   checkIdempotency: vi.fn(),
+  findRentalEscrowForUser: vi.fn(),
 }));
 
 vi.mock('../../../services/hasura.js', () => ({
@@ -29,7 +30,7 @@ vi.mock('../../../lib/stellar-xdr.js', () => ({
 }));
 
 import { getHotelReservationEscrowTerms } from '../../../services/hotel-reservation-escrow.js';
-import { checkIdempotency } from '../../../services/idempotency.js';
+import { checkIdempotency, findRentalEscrowForUser } from '../../../services/idempotency.js';
 import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
 import { hasuraRequest } from '../../../services/hasura.js';
 import { getApartmentEscrowTerms } from '../../../services/apartment-escrow-terms.js';
@@ -47,6 +48,7 @@ describe('deployEscrowHandler', () => {
     });
     vi.mocked(getUserWallets).mockResolvedValue(['GTENANT111']);
     vi.mocked(findLiveAction).mockResolvedValue(null);
+    vi.mocked(findRentalEscrowForUser).mockResolvedValue({ exists: false });
     vi.mocked(insertPendingAction).mockResolvedValue({});
     vi.mocked(transactionHash).mockReturnValue('transaction-hash');
     vi.mocked(transactionExpiry).mockReturnValue(new Date('2030-01-01T00:00:00.000Z'));
@@ -120,14 +122,16 @@ describe('deployEscrowHandler', () => {
     }));
   });
 
-  it('resumes an escrow stored under a non-canonical apartment id instead of deploying again', async () => {
+  it('resumes an escrow stored under a differently-cased apartment id instead of deploying again', async () => {
+    // Request uses one casing, the legacy row another, the canonical id a third.
+    const legacyId = 'rental:AaAaAaAa-0000-0000-0000-00000000000A:guest-uid';
     vi.mocked(getApartmentEscrowTerms).mockResolvedValueOnce({
-      apartmentId: 'apt001', ownerUserId: 'host-uid', receiverAddress: 'GOWNER111', amount: 1200,
+      apartmentId: 'aaaaaaaa-0000-0000-0000-00000000000a', ownerUserId: 'host-uid', receiverAddress: 'GOWNER111', amount: 1200,
     });
-    vi.mocked(checkIdempotency).mockImplementation(async (engagementId) =>
-      engagementId === 'rental:APT001:guest-uid'
-        ? { exists: true, result: { engagement_id: engagementId, contract_id: null, status: 'pending_signature' } }
-        : { exists: false });
+    vi.mocked(checkIdempotency).mockResolvedValueOnce({ exists: false });
+    vi.mocked(findRentalEscrowForUser).mockResolvedValueOnce({
+      exists: true, result: { engagement_id: legacyId, contract_id: null, status: 'pending_signature' },
+    });
     vi.mocked(findLiveAction).mockResolvedValueOnce({
       id: 'pending-1', status: 'built', contract_id: null, unsigned_xdr: 'LEGACY_XDR',
     });
@@ -135,19 +139,37 @@ describe('deployEscrowHandler', () => {
     const res = mockRes();
     const next = mockNext();
     await deployEscrowHandler(
-      { ...mockReq({ apartmentId: 'APT001', senderAddress: 'GTENANT111' }), user: { uid: 'guest-uid' } },
+      { ...mockReq({ apartmentId: 'AAAAAAAA-0000-0000-0000-00000000000A', senderAddress: 'GTENANT111' }), user: { uid: 'guest-uid' } },
       res,
       next,
     );
     if (next.error != null) throw next.error;
 
-    expect(checkIdempotency).toHaveBeenNthCalledWith(1, 'rental:apt001:guest-uid');
-    expect(checkIdempotency).toHaveBeenNthCalledWith(2, 'rental:APT001:guest-uid');
-    expect(findLiveAction).toHaveBeenCalledWith('rental:APT001:guest-uid', 'initialize');
+    expect(checkIdempotency).toHaveBeenCalledWith('rental:aaaaaaaa-0000-0000-0000-00000000000a:guest-uid');
+    expect(findRentalEscrowForUser).toHaveBeenCalledWith('aaaaaaaa-0000-0000-0000-00000000000a', 'guest-uid');
+    expect(findLiveAction).toHaveBeenCalledWith(legacyId, 'initialize');
     expect(trustlessWorkRequest).not.toHaveBeenCalled();
     expect(res._body).toMatchObject({
-      status: 'PENDING_SIGNATURE', engagementId: 'rental:APT001:guest-uid', unsignedXDR: 'LEGACY_XDR',
+      status: 'PENDING_SIGNATURE', engagementId: legacyId, unsignedXDR: 'LEGACY_XDR',
     });
+  });
+
+  it('does not run the legacy lookup for hotel reservations', async () => {
+    vi.mocked(getHotelReservationEscrowTerms).mockResolvedValueOnce({
+      amount: 240, receiverAddress: 'GHOTEL', engagementId: 'hotel:res-1', reservation: { id: 'res-1' },
+    });
+    vi.mocked(checkIdempotency).mockResolvedValueOnce({ exists: false });
+    vi.mocked(trustlessWorkRequest).mockResolvedValueOnce({ status: 'SUCCESS', contractId: 'C', unsignedTransaction: 'XDR' });
+
+    const next = mockNext();
+    await deployEscrowHandler(
+      { ...mockReq({ reservationId: 'res-1', senderAddress: 'GGUEST' }), user: { uid: 'guest' } },
+      mockRes(),
+      next,
+    );
+    if (next.error != null) throw next.error;
+
+    expect(findRentalEscrowForUser).not.toHaveBeenCalled();
   });
 });
 

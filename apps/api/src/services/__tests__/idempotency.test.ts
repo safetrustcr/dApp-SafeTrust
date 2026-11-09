@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checkIdempotency } from '../idempotency.js';
+import { checkIdempotency, findRentalEscrowForUser } from '../idempotency.js';
 
 vi.mock('../hasura.js', () => ({
   hasuraRequest: vi.fn(),
@@ -53,6 +53,43 @@ describe('checkIdempotency', () => {
     vi.mocked(hasuraRequest).mockResolvedValueOnce({});
 
     const result = await checkIdempotency('engagement-broken');
+    expect(result.exists).toBe(false);
+  });
+});
+describe('findRentalEscrowForUser', () => {
+  const apt = 'aaaaaaaa-0000-0000-0000-00000000000a';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('queries by the uuid apartment_id column', async () => {
+    vi.mocked(hasuraRequest).mockResolvedValueOnce({ escrows: [] });
+
+    await findRentalEscrowForUser(apt, 'tenant-uid');
+
+    expect(hasuraRequest).toHaveBeenCalledWith(expect.stringContaining('apartment_id: { _eq: $apartmentId }'), { apartmentId: apt });
+  });
+
+  it('finds a legacy escrow stored under mixed-case apartment id', async () => {
+    const row = { engagement_id: 'rental:AaAaAaAa-0000-0000-0000-00000000000A:tenant-uid', contract_id: null, status: 'pending_signature' };
+    vi.mocked(hasuraRequest).mockResolvedValueOnce({ escrows: [row] });
+
+    const result = await findRentalEscrowForUser(apt, 'tenant-uid');
+
+    expect(result).toEqual({ exists: true, result: row });
+  });
+
+  it('matches the uid exactly (Firebase uids are case-sensitive)', async () => {
+    vi.mocked(hasuraRequest).mockResolvedValueOnce({
+      escrows: [
+        { engagement_id: `rental:${apt}:TENANT-UID`, contract_id: null, status: 'created' },
+        { engagement_id: `rental:${apt}:tenant-uid-2`, contract_id: null, status: 'created' },
+      ],
+    });
+
+    const result = await findRentalEscrowForUser(apt, 'tenant-uid');
+
     expect(result.exists).toBe(false);
   });
 });

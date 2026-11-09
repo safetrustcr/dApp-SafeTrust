@@ -105,7 +105,7 @@ describe('booking-escrow-terms service', () => {
       });
     });
 
-    it('keys the engagement on the canonical apartment id and keeps the caller spelling as legacy', async () => {
+    it('keys the engagement on the canonical apartment id, not the caller spelling', async () => {
       vi.mocked(getUserWallets).mockResolvedValueOnce(['G_SENDER_WALLET']);
       vi.mocked(getApartmentEscrowTerms).mockResolvedValueOnce({
         apartmentId: 'aaaaaaaa-0000-0000-0000-00000000000a',
@@ -122,7 +122,7 @@ describe('booking-escrow-terms service', () => {
 
       expect(terms.bookingId).toBe('aaaaaaaa-0000-0000-0000-00000000000a');
       expect(terms.engagementId).toBe('rental:aaaaaaaa-0000-0000-0000-00000000000a:tenant-uid');
-      expect(terms.legacyEngagementIds).toEqual(['rental:AAAAAAAA-0000-0000-0000-00000000000A:tenant-uid']);
+      expect(terms).not.toHaveProperty('legacyEngagementIds');
     });
 
     it('throws 409 if tenant is the apartment owner', async () => {

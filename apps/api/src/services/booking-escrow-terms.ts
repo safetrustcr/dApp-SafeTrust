@@ -11,8 +11,6 @@ export type ResolvedEscrowTerms = {
   bookingId: string;
   tenantId: 'safetrust' | 'hotel_industry';
   engagementId: string;
-  /** Older engagement ids for the same booking, checked when `engagementId` has no escrow yet. */
-  legacyEngagementIds?: string[];
   amount: number | string;
   receiverAddress: string;
   title: string;
@@ -74,16 +72,14 @@ export const apartmentEscrowTermsResolver: EscrowTermsResolver<{ kind: 'apartmen
     }
 
     // Key the engagement on the database's canonical id so different casings of the
-    // same UUID can't open a second escrow. Escrows created before this change may
-    // carry the caller's spelling, so that id stays available as a legacy lookup.
+    // same UUID can't open a second escrow. Escrows created earlier under another
+    // casing are found by deploy.handler via findRentalEscrowForUser.
     const apartmentId = terms.apartmentId;
-    const legacyEngagementIds = ref.apartmentId !== apartmentId ? [`rental:${ref.apartmentId}:${uid}`] : [];
 
     return {
       bookingId: apartmentId,
       tenantId: 'safetrust',
       engagementId: `rental:${apartmentId}:${uid}`,
-      ...(legacyEngagementIds.length > 0 ? { legacyEngagementIds } : {}),
       amount: terms.amount,
       receiverAddress: terms.receiverAddress,
       title: `SafeTrust Rental — ${apartmentId}`,

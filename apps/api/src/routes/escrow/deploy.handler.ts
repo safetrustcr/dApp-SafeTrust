@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { checkIdempotency } from '../../services/idempotency.js';
+import { checkIdempotency, findRentalEscrowForUser } from '../../services/idempotency.js';
 import { hasuraRequest } from '../../services/hasura.js';
 import { trustlessWorkRequest } from '../../services/trustlesswork.js';
 import { ApiError } from '../../http/api-error.js';
@@ -60,12 +60,11 @@ export const deployEscrowHandler = asyncHandler(async (
 
   // ── Idempotency check ──────────────────────────────────────────────────
   let idempotencyResult = await checkIdempotency(resolvedEngagementId);
-  // An escrow created under an older (non-canonical) engagement id is still the
-  // same booking: resume it instead of opening a second one.
-  for (const legacyId of terms.legacyEngagementIds ?? []) {
-    if (idempotencyResult.exists) break;
-    idempotencyResult = await checkIdempotency(legacyId);
-    if (idempotencyResult.exists) resolvedEngagementId = legacyId;
+  // An escrow created under an older engagement id (any casing of the apartment
+  // UUID) is still the same booking: resume it instead of opening a second one.
+  if (!idempotencyResult.exists && bookingRef.kind === 'apartment') {
+    idempotencyResult = await findRentalEscrowForUser(terms.bookingId, uid);
+    if (idempotencyResult.exists) resolvedEngagementId = idempotencyResult.result.engagement_id;
   }
 
   if (idempotencyResult.exists) {
