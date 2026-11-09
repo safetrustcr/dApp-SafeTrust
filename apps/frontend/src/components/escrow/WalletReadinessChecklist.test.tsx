@@ -6,6 +6,12 @@ import { WalletReadinessChecklist } from './WalletReadinessChecklist';
 const mockReadiness = vi.hoisted(() => vi.fn());
 const mockBuildTrustline = vi.hoisted(() => vi.fn());
 const mockPostAuth = vi.hoisted(() => vi.fn());
+const mockSign = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/wallet/use-wallet-bridge', async () => {
+  const errors = await import('@/lib/wallet/errors');
+  return { ...errors, useWalletBridge: () => ({ address: mockWallet.address, sign: mockSign }) };
+});
 
 vi.mock('@/lib/api/escrow', () => ({
   getReadiness: mockReadiness,
@@ -43,9 +49,63 @@ describe('WalletReadinessChecklist', () => {
     vi.clearAllMocks();
     mockWallet.address = GUEST;
     mockWallet.isReady = true;
+    mockSign.mockReset();
+    mockSign.mockResolvedValue('SIGNED_TRUSTLINE');
   });
 
   afterEach(cleanup);
+
+  function needsTrustline() {
+    mockReadiness.mockResolvedValue({
+      ready: false, network: 'testnet', asset: { code: 'USDC', issuer: ISSUER }, amount: '150',
+      guest: { wallet: GUEST, checks: {
+        registeredWallet: { ok: true }, accountExists: { ok: true },
+        xlmForFees: { ok: true }, trustline: { ok: false, fix: 'ADD_TRUSTLINE' },
+        assetBalance: { ok: true },
+      } },
+      counterparties: { hostCanReceive: { ok: true }, platformCanReceive: { ok: true } },
+    });
+    mockBuildTrustline.mockResolvedValue({ unsignedXdr: 'UNSIGNED_TRUSTLINE' });
+  }
+
+  it('signs trustlines through the bridge and submits the signed XDR only to Horizon', async () => {
+    needsTrustline();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true } as Response);
+    render(<WalletReadinessChecklist apartmentId="apt-1" />);
+    fireEvent.click(await screen.findByText('Add USDC trustline'));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    expect(mockSign).toHaveBeenCalledWith('UNSIGNED_TRUSTLINE');
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://horizon-testnet.stellar.org/transactions',
+      expect.objectContaining({ method: 'POST', body: 'tx=SIGNED_TRUSTLINE' }),
+    );
+    expect(mockPostAuth).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('shows the explicit Pollar message and never submits an unsupported signature', async () => {
+    needsTrustline();
+    const { PollarSigningUnsupportedError } = await import('@/lib/wallet/errors');
+    mockSign.mockRejectedValue(new PollarSigningUnsupportedError());
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    render(<WalletReadinessChecklist apartmentId="apt-1" />);
+    fireEvent.click(await screen.findByText('Add USDC trustline'));
+    await screen.findByText("Signing with Pollar isn't available yet. Connect Freighter to sign this transaction.");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('shows cancellation without submitting a trustline', async () => {
+    needsTrustline();
+    const { WalletRejectedError } = await import('@/lib/wallet/errors');
+    mockSign.mockRejectedValue(new WalletRejectedError());
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    render(<WalletReadinessChecklist apartmentId="apt-1" />);
+    fireEvent.click(await screen.findByText('Add USDC trustline'));
+    await screen.findByText('Trustline transaction signing was cancelled.');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
 
   it('renders loading state initially', () => {
     mockReadiness.mockReturnValue(new Promise(() => {}));
