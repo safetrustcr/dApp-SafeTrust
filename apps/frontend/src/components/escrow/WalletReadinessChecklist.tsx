@@ -129,7 +129,8 @@ export function WalletReadinessChecklist({
       const { unsignedXdr } = await buildTrustlineXdr(targetAddress);
 
       if (targetAddress !== bridge.address) {
-        throw new Error('Connect the wallet that needs this trustline before signing.');
+        setError('Connect the registered wallet that needs this trustline before signing.');
+        return;
       }
       const signedXdr = await bridge.sign(unsignedXdr);
 
