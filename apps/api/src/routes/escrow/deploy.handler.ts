@@ -54,12 +54,19 @@ export const deployEscrowHandler = asyncHandler(async (
   }
 
   const terms = await resolveBookingEscrowTerms(bookingRef, uid, senderAddress);
-  const resolvedEngagementId = terms.engagementId;
+  let resolvedEngagementId = terms.engagementId;
   const propertyId = terms.bookingId;
   const tenantId = terms.tenantId;
 
   // ── Idempotency check ──────────────────────────────────────────────────
-  const idempotencyResult = await checkIdempotency(resolvedEngagementId);
+  let idempotencyResult = await checkIdempotency(resolvedEngagementId);
+  // An escrow created under an older (non-canonical) engagement id is still the
+  // same booking: resume it instead of opening a second one.
+  for (const legacyId of terms.legacyEngagementIds ?? []) {
+    if (idempotencyResult.exists) break;
+    idempotencyResult = await checkIdempotency(legacyId);
+    if (idempotencyResult.exists) resolvedEngagementId = legacyId;
+  }
 
   if (idempotencyResult.exists) {
     const pending = await findLiveAction(resolvedEngagementId, 'initialize');
@@ -167,7 +174,7 @@ export const deployEscrowHandler = asyncHandler(async (
     {
       contractId: twData.contractId ?? resolvedEngagementId,
       engagementId: resolvedEngagementId,
-      apartmentId: bookingRef.kind === 'apartment' ? bookingRef.apartmentId : null,
+      apartmentId: bookingRef.kind === 'apartment' ? terms.bookingId : null,
       propertyId,
       tenantId,
       senderAddress,
@@ -186,7 +193,7 @@ export const deployEscrowHandler = asyncHandler(async (
     built_for_uid: uid,
     signer_address: senderAddress,
     payload: {
-      ...(bookingRef.kind === 'apartment' ? { apartmentId: bookingRef.apartmentId } : {}),
+      ...(bookingRef.kind === 'apartment' ? { apartmentId: terms.bookingId } : {}),
       tenantId,
       ...(bookingRef.kind === 'hotel-reservation' ? { reservationId: bookingRef.reservationId, booking: terms.reservation } : {}),
       receiverAddress: terms.receiverAddress,

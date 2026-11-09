@@ -119,6 +119,36 @@ describe('deployEscrowHandler', () => {
       action: 'initialize', built_for_uid: 'guest-uid', signer_address: 'GTENANT111',
     }));
   });
+
+  it('resumes an escrow stored under a non-canonical apartment id instead of deploying again', async () => {
+    vi.mocked(getApartmentEscrowTerms).mockResolvedValueOnce({
+      apartmentId: 'apt001', ownerUserId: 'host-uid', receiverAddress: 'GOWNER111', amount: 1200,
+    });
+    vi.mocked(checkIdempotency).mockImplementation(async (engagementId) =>
+      engagementId === 'rental:APT001:guest-uid'
+        ? { exists: true, result: { engagement_id: engagementId, contract_id: null, status: 'pending_signature' } }
+        : { exists: false });
+    vi.mocked(findLiveAction).mockResolvedValueOnce({
+      id: 'pending-1', status: 'built', contract_id: null, unsigned_xdr: 'LEGACY_XDR',
+    });
+
+    const res = mockRes();
+    const next = mockNext();
+    await deployEscrowHandler(
+      { ...mockReq({ apartmentId: 'APT001', senderAddress: 'GTENANT111' }), user: { uid: 'guest-uid' } },
+      res,
+      next,
+    );
+    if (next.error != null) throw next.error;
+
+    expect(checkIdempotency).toHaveBeenNthCalledWith(1, 'rental:apt001:guest-uid');
+    expect(checkIdempotency).toHaveBeenNthCalledWith(2, 'rental:APT001:guest-uid');
+    expect(findLiveAction).toHaveBeenCalledWith('rental:APT001:guest-uid', 'initialize');
+    expect(trustlessWorkRequest).not.toHaveBeenCalled();
+    expect(res._body).toMatchObject({
+      status: 'PENDING_SIGNATURE', engagementId: 'rental:APT001:guest-uid', unsignedXDR: 'LEGACY_XDR',
+    });
+  });
 });
 
 
@@ -150,6 +180,13 @@ describe('hotel deployment', () => {
     vi.mocked(trustlessWorkRequest).mockClear();
     const res = mockRes();
     await deployEscrowHandler({ ...mockReq({ reservationId: 'reservation', apartmentId: 'apartment', senderAddress: 'GGUEST' }), user: { uid: 'guest' } }, res, mockNext());
+    expect(res._status).toBe(400);
+    expect(trustlessWorkRequest).not.toHaveBeenCalled();
+  });
+  it('rejects a valid apartmentId paired with a malformed reservationId', async () => {
+    vi.mocked(trustlessWorkRequest).mockClear();
+    const res = mockRes();
+    await deployEscrowHandler({ ...mockReq({ apartmentId: 'apartment', reservationId: 123, senderAddress: 'GGUEST' }), user: { uid: 'guest' } }, res, mockNext());
     expect(res._status).toBe(400);
     expect(trustlessWorkRequest).not.toHaveBeenCalled();
   });

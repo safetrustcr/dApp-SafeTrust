@@ -11,6 +11,8 @@ export type ResolvedEscrowTerms = {
   bookingId: string;
   tenantId: 'safetrust' | 'hotel_industry';
   engagementId: string;
+  /** Older engagement ids for the same booking, checked when `engagementId` has no escrow yet. */
+  legacyEngagementIds?: string[];
   amount: number | string;
   receiverAddress: string;
   title: string;
@@ -28,8 +30,17 @@ export function toBookingReference(body: unknown): BookingReference {
     throw new ApiError(400, 'INVALID_BODY', 'Provide exactly one apartmentId or reservationId, and senderAddress');
   }
   const { apartmentId, reservationId } = body as { apartmentId?: unknown; reservationId?: unknown };
-  const hasApt = typeof apartmentId === 'string' && apartmentId.trim().length > 0;
-  const hasRes = typeof reservationId === 'string' && reservationId.trim().length > 0;
+  const isValidId = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+  const isSupplied = (value: unknown) => value !== undefined && value !== null;
+
+  // An identifier that is present but malformed is rejected, never ignored:
+  // { apartmentId: 'valid', reservationId: 123 } must not fall back to an apartment escrow.
+  if ((isSupplied(apartmentId) && !isValidId(apartmentId)) || (isSupplied(reservationId) && !isValidId(reservationId))) {
+    throw new ApiError(400, 'INVALID_BOOKING_REFERENCE', 'Provide exactly one apartmentId or reservationId, and senderAddress');
+  }
+
+  const hasApt = isValidId(apartmentId);
+  const hasRes = isValidId(reservationId);
 
   if ((!hasApt && !hasRes) || (hasApt && hasRes)) {
     throw new ApiError(400, 'INVALID_BOOKING_REFERENCE', 'Provide exactly one apartmentId or reservationId, and senderAddress');
@@ -62,14 +73,21 @@ export const apartmentEscrowTermsResolver: EscrowTermsResolver<{ kind: 'apartmen
       throw new ApiError(409, 'SELF_ESCROW_NOT_ALLOWED', 'You cannot create a rental escrow for your own apartment.');
     }
 
+    // Key the engagement on the database's canonical id so different casings of the
+    // same UUID can't open a second escrow. Escrows created before this change may
+    // carry the caller's spelling, so that id stays available as a legacy lookup.
+    const apartmentId = terms.apartmentId;
+    const legacyEngagementIds = ref.apartmentId !== apartmentId ? [`rental:${ref.apartmentId}:${uid}`] : [];
+
     return {
-      bookingId: ref.apartmentId,
+      bookingId: apartmentId,
       tenantId: 'safetrust',
-      engagementId: `rental:${ref.apartmentId}:${uid}`,
+      engagementId: `rental:${apartmentId}:${uid}`,
+      ...(legacyEngagementIds.length > 0 ? { legacyEngagementIds } : {}),
       amount: terms.amount,
       receiverAddress: terms.receiverAddress,
-      title: `SafeTrust Rental — ${ref.apartmentId}`,
-      description: `Security deposit for apartment ${ref.apartmentId}`,
+      title: `SafeTrust Rental — ${apartmentId}`,
+      description: `Security deposit for apartment ${apartmentId}`,
       milestoneDescription: 'Rental security deposit',
     };
   },
