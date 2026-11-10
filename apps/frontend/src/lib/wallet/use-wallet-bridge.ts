@@ -23,12 +23,15 @@ export type WalletBridge = {
   sign(xdr: string, networkPassphrase?: string): Promise<string>; // throws WalletRejectedError on cancel
 };
 
+/** Resolve the selected signing transport without falling back to another wallet. */
 export function useWalletBridge(): WalletBridge {
   const freighter = useFreighter();
   const pollar = usePollarWallet();
   const storedAddress = useGlobalAuthenticationStore((state) => state.address);
   const stellarWalletId = useGlobalAuthenticationStore((state) => state.stellarWalletId);
   const storedWalletType = useGlobalAuthenticationStore((state) => state.walletType);
+  const storedProvider = useGlobalAuthenticationStore((state) => state.walletProvider);
+  const selectWalletProvider = useGlobalAuthenticationStore((state) => state.selectWalletProvider);
   const connectWalletStore = useGlobalAuthenticationStore((state) => state.connectWalletStore);
   const disconnectWalletStore = useGlobalAuthenticationStore((state) => state.disconnectWalletStore);
 
@@ -39,15 +42,19 @@ export function useWalletBridge(): WalletBridge {
   // A stored selection is authoritative. An installed extension or a second
   // logged-in wallet must never change the signer for that selected account.
   const { address: resolvedAddress, provider: resolvedProvider } = useMemo(() => {
+    // OAuth login returns before the SDK publishes the new address. Never keep
+    // signing with a previous wallet while that explicit Pollar selection waits.
+    if (storedProvider === 'pollar') {
+      return { address: pollar.address || storedAddress || undefined, provider: 'pollar' as const };
+    }
     if (storedAddress) {
       const type = storedWalletType?.toLowerCase();
-      const provider: WalletProvider | undefined = type === 'pollar'
-        ? 'pollar'
-        : stellarWalletId
-          ? 'wallets-kit'
-          : type === 'freighter'
-            ? 'freighter'
-            : undefined;
+      // Older persisted sessions have no transport field; retain their previous
+      // resolution until the user explicitly selects a provider again.
+      const legacyProvider = type === 'pollar' ? 'pollar'
+        : stellarWalletId ? 'wallets-kit'
+          : type === 'freighter' ? 'freighter' : undefined;
+      const provider: WalletProvider | undefined = storedProvider ?? legacyProvider;
       return { address: storedAddress, provider };
     }
     if (pollar.address) {
@@ -57,7 +64,15 @@ export function useWalletBridge(): WalletBridge {
       address: freighter?.address || undefined,
       provider: freighter?.address ? 'freighter' as const : undefined,
     };
-  }, [storedAddress, storedWalletType, stellarWalletId, pollar.address, freighter?.address]);
+  }, [storedAddress, storedWalletType, storedProvider, stellarWalletId, pollar.address, freighter?.address]);
+
+  // Commit the SDK's asynchronously provisioned address only while Pollar is
+  // still selected. A later Freighter/Kit connection must not be overwritten.
+  useEffect(() => {
+    if (storedProvider === 'pollar' && pollar.address && storedAddress !== pollar.address) {
+      connectWalletStore(pollar.address, 'Pollar', undefined, 'pollar');
+    }
+  }, [storedProvider, pollar.address, storedAddress, connectWalletStore]);
 
   // Overall status resolution
   const status: WalletBridge['status'] = useMemo(() => {
@@ -126,9 +141,10 @@ export function useWalletBridge(): WalletBridge {
             throw new WalletRejectedError('Wallet connection was cancelled');
           }
 
-          connectWalletStore(publicKey, 'Freighter', 'freighter');
+          connectWalletStore(publicKey, 'Freighter', 'freighter', 'freighter');
         } else if (targetProvider === 'pollar') {
           if (pollar?.login) {
+            selectWalletProvider('pollar');
             await pollar.login({ provider: 'google' });
           } else {
             throw new Error('Pollar is not configured in this environment');
@@ -172,7 +188,7 @@ export function useWalletBridge(): WalletBridge {
         setConnecting(false);
       }
     },
-    [connectWalletStore, pollar],
+    [connectWalletStore, selectWalletProvider, pollar],
   );
 
   // Disconnect handler
@@ -200,7 +216,9 @@ export function useWalletBridge(): WalletBridge {
       }
       return signer.sign(unsignedXdr, {
         address: resolvedAddress,
-        networkPassphrase: networkPassphrase || process.env.NEXT_PUBLIC_STELLAR_NETWORK || WalletNetwork.TESTNET,
+        networkPassphrase: networkPassphrase || (process.env.NEXT_PUBLIC_STELLAR_NETWORK === 'PUBLIC'
+          ? WalletNetwork.PUBLIC : process.env.NEXT_PUBLIC_STELLAR_NETWORK === 'TESTNET'
+            ? WalletNetwork.TESTNET : process.env.NEXT_PUBLIC_STELLAR_NETWORK) || WalletNetwork.TESTNET,
       });
     },
     [resolvedAddress, resolvedProvider, stellarWalletId],

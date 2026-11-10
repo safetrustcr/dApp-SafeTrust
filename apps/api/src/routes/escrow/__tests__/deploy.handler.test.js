@@ -25,6 +25,7 @@ vi.mock('../../../services/pending-actions.js', () => ({
   insertPendingAction: vi.fn(),
 }));
 vi.mock('../../../lib/stellar-xdr.js', () => ({
+  NETWORK_PASSPHRASE: 'API_TEST_NETWORK',
   transactionHash: vi.fn(),
   transactionExpiry: vi.fn(),
 }));

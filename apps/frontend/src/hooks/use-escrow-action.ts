@@ -50,7 +50,7 @@ export function useEscrowAction() {
     attemptRef.current = attempt;
 
     try {
-      const built = await postEscrowApi<{ unsignedXdr?: string }>(
+      const built = await postEscrowApi<{ unsignedXdr?: string; networkPassphrase?: string }>(
         config.apiRoute,
         config.apiBody,
         { idempotencyKey: attempt.build },
@@ -59,7 +59,7 @@ export function useEscrowAction() {
       if (!unsignedXdr) throw new Error('No unsigned XDR returned from API');
 
       setPhase('signing');
-      const signedXdr = await signXDR(unsignedXdr);
+      const signedXdr = await signXDR(unsignedXdr, built.networkPassphrase);
 
       setPhase('submitting');
       const result = await postEscrowApi<Record<string, unknown>>(

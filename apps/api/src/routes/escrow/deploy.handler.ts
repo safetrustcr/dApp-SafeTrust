@@ -6,7 +6,7 @@ import { ApiError } from '../../http/api-error.js';
 import { asyncHandler } from '../../http/async-handler.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { findLiveAction, insertPendingAction } from '../../services/pending-actions.js';
-import { transactionExpiry, transactionHash } from '../../lib/stellar-xdr.js';
+import { transactionExpiry, transactionHash, NETWORK_PASSPHRASE } from '../../lib/stellar-xdr.js';
 import { toBookingReference, resolveBookingEscrowTerms } from '../../services/booking-escrow-terms.js';
 
 type DeployRequestBody = {
@@ -20,6 +20,7 @@ type DeployResponse = {
   status: string;
   contractId?: string;
   unsignedXDR: string;
+  networkPassphrase?: string;
   engagementId: string;
   pendingActionId?: string;
   cached?: boolean;
@@ -75,6 +76,7 @@ export const deployEscrowHandler = asyncHandler(async (
         engagementId: resolvedEngagementId,
         contractId: pending.contract_id ?? undefined,
         unsignedXDR: pending.unsigned_xdr,
+        networkPassphrase: NETWORK_PASSPHRASE,
         pendingActionId: pending.id,
         cached: true,
       });
@@ -206,6 +208,7 @@ export const deployEscrowHandler = asyncHandler(async (
     status: twData.status,
     contractId: twData.contractId,
     unsignedXDR: unsignedXdr,
+    networkPassphrase: NETWORK_PASSPHRASE,
     engagementId: resolvedEngagementId,
     pendingActionId: pendingAction.id,
   });

@@ -11,13 +11,24 @@ const mockStore = {
   address: null as string | null,
   walletType: null as string | null,
   stellarWalletId: null as string | null,
-  connectWalletStore: vi.fn((addr, name) => {
+  walletProvider: null as string | null,
+  selectWalletProvider: vi.fn((provider: string) => {
+    mockStore.walletProvider = provider;
+    mockStore.address = null;
+    mockStore.walletType = null;
+    mockStore.stellarWalletId = null;
+  }),
+  connectWalletStore: vi.fn((addr, name, id?: string, provider?: string) => {
     mockStore.address = addr;
     mockStore.walletType = name;
+    mockStore.stellarWalletId = id ?? null;
+    mockStore.walletProvider = provider ?? (id ? 'wallets-kit' : null);
   }),
   disconnectWalletStore: vi.fn(() => {
     mockStore.address = null;
     mockStore.walletType = null;
+    mockStore.stellarWalletId = null;
+    mockStore.walletProvider = null;
   }),
 };
 const mockKit = {
@@ -74,6 +85,7 @@ describe('useWalletBridge', () => {
     mockStore.address = null;
     mockStore.walletType = null;
     mockStore.stellarWalletId = null;
+    mockStore.walletProvider = null;
     mockAuth.currentUser = { uid: 'user-123' };
     delete (window as any).freighterApi;
   });
@@ -111,13 +123,13 @@ describe('useWalletBridge', () => {
       getPublicKey: vi.fn(async () => ({ publicKey: 'GFREIGHTER_PUBKEY' })),
     };
 
-    const { result } = renderHook(() => useWalletBridge());
-
-    await act(async () => {
-      await result.current.connect('freighter');
-    });
-
-    expect(mockStore.connectWalletStore).toHaveBeenCalledWith('GFREIGHTER_PUBKEY', 'Freighter', 'freighter');
+    const { result, rerender } = renderHook(() => useWalletBridge());
+    await act(async () => { await result.current.connect('freighter'); });
+    rerender();
+    expect(result.current.provider).toBe('freighter');
+    await result.current.sign('XDR', 'network');
+    expect(mockSignTransaction).toHaveBeenCalledWith('XDR', { address: 'GFREIGHTER_PUBKEY', networkPassphrase: 'network' });
+    expect(mockKit.signTransaction).not.toHaveBeenCalled();
   });
 
   it('sets status to unsupported when freighter is requested but extension is missing', async () => {
@@ -254,5 +266,54 @@ describe('useWalletBridge', () => {
     await expect(result.current.sign('XDR')).rejects.toThrow('No supported wallet');
     expect(mockSignTransaction).not.toHaveBeenCalled();
     expect(mockKit.signTransaction).not.toHaveBeenCalled();
+  });
+
+  it('replaces a Kit selection when asynchronous Pollar login completes', async () => {
+    Object.assign(mockStore, { address: 'GKIT', walletType: 'xBull', stellarWalletId: 'xbull', walletProvider: 'wallets-kit' });
+    mockFreighter.address = 'GFREIGHTER';
+    const { result, rerender } = renderHook(() => useWalletBridge());
+    await act(async () => { await result.current.connect('pollar'); });
+    rerender();
+    expect(result.current.address).toBeUndefined();
+    await expect(result.current.sign('XDR')).rejects.toThrow();
+    mockPollar.isAuthenticated = true;
+    mockPollar.wallet.address = 'GPOLLAR';
+    rerender();
+    expect(result.current.provider).toBe('pollar');
+    expect(result.current.address).toBe('GPOLLAR');
+    expect(mockStore.stellarWalletId).toBeNull();
+    await expect(result.current.sign('XDR')).rejects.toThrow(PollarSigningUnsupportedError);
+    expect(mockKit.signTransaction).not.toHaveBeenCalled();
+    expect(mockSignTransaction).not.toHaveBeenCalled();
+  });
+
+  it('keeps Freighter selected through the Kit on the Kit adapter', async () => {
+    Object.assign(mockStore, { address: 'GKIT', walletType: 'Freighter', stellarWalletId: 'freighter', walletProvider: 'wallets-kit' });
+    const { result } = renderHook(() => useWalletBridge());
+    await result.current.sign('XDR', 'network');
+    expect(result.current.provider).toBe('wallets-kit');
+    expect(mockKit.setWallet).toHaveBeenCalledWith('freighter');
+    expect(mockKit.signTransaction).toHaveBeenCalled();
+    expect(mockSignTransaction).not.toHaveBeenCalled();
+  });
+
+  it('does not let a delayed Pollar login overwrite a later Kit connection', async () => {
+    Object.assign(mockStore, { address: 'GKIT', walletType: 'xBull', stellarWalletId: 'xbull', walletProvider: 'wallets-kit' });
+    mockPollar.isAuthenticated = true;
+    mockPollar.wallet.address = 'GPOLLAR';
+    const { result } = renderHook(() => useWalletBridge());
+    expect(result.current.address).toBe('GKIT');
+    expect(mockStore.connectWalletStore).not.toHaveBeenCalled();
+    await result.current.sign('XDR', 'API_NETWORK');
+    expect(mockKit.signTransaction).toHaveBeenCalledWith('XDR', { address: 'GKIT', networkPassphrase: 'API_NETWORK' });
+  });
+
+  it('normalizes a public network label for callers without API metadata', async () => {
+    vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK', 'PUBLIC');
+    Object.assign(mockStore, { address: 'GFREIGHTER', walletType: 'Freighter', walletProvider: 'freighter' });
+    const { result } = renderHook(() => useWalletBridge());
+    await result.current.sign('XDR');
+    expect(mockSignTransaction).toHaveBeenCalledWith('XDR', { address: 'GFREIGHTER', networkPassphrase: 'Public Global Stellar Network ; September 2015' });
+    vi.unstubAllEnvs();
   });
 });

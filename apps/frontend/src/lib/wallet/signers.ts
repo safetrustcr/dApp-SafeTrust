@@ -8,8 +8,7 @@ export interface WalletSigner {
   sign(unsignedXdr: string, opts: { address: string; networkPassphrase: string }): Promise<string>;
 }
 
-// The SDKs can reject promises OR return errors. Normalize cancellation only;
-// preserve other failures so callers can distinguish them and offer a retry.
+/** Normalize SDK cancellation while preserving other signing failures for callers. */
 async function signedXdr(call: () => Promise<{ signedTxXdr?: string; error?: unknown }>): Promise<string> {
   try {
     const result = await call();
@@ -43,6 +42,7 @@ const signers: Partial<Record<WalletProvider, WalletSigner>> = {
   'wallets-kit': walletsKitSigner,
 };
 
+/** Return the requested adapter; unsupported providers never invoke a different SDK. */
 export function signerFor(provider: WalletProvider): WalletSigner {
   if (provider === 'pollar') throw new PollarSigningUnsupportedError();
   const signer = signers[provider];

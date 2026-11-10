@@ -172,4 +172,13 @@ describe('useEscrowAction', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.current.phase).toBe(null);
   });
+
+  it('uses the API passphrase even when the browser configuration differs', async () => {
+    vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK', 'PUBLIC');
+    fetchMock.mockResolvedValueOnce(jsonResponse({ unsignedXdr: 'XDR-1', networkPassphrase: 'server network' }));
+    const { result } = renderHook(() => useEscrowAction());
+    await act(async () => { await result.current.execute(CONFIG); });
+    expect(signXDR).toHaveBeenCalledWith('XDR-1', 'server network');
+    vi.unstubAllEnvs();
+  });
 });

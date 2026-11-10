@@ -1171,7 +1171,7 @@ export default function EscrowDetailView({
     setErrorMessages([]);
 
     try {
-      const payload = await postEscrowApi<{ unsignedXdr?: string }>('/api/escrow/resolve-dispute', {
+      const payload = await postEscrowApi<{ unsignedXdr?: string; networkPassphrase?: string }>('/api/escrow/resolve-dispute', {
         contractId: escrow.contract_id,
         engagementId: escrow.engagement_id,
         disputeResolver: address,
@@ -1189,6 +1189,7 @@ export default function EscrowDetailView({
 
       setLoadingMessage('Awaiting wallet signature...');
       await signAndSubmit(unsignedXdr, {
+        networkPassphrase: payload.networkPassphrase,
         action: 'resolve_dispute',
         contractId: escrow.contract_id,
         engagementId: escrow.engagement_id,

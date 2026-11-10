@@ -25,7 +25,7 @@ beforeEach(() => {
   mocks.sign.mockResolvedValue({ signedTxXdr: 'SIGNED_ESCROW' });
 });
 
-const submission = { contractId: 'contract', engagementId: 'engagement', senderAddress: 'GKIT', receiverAddress: 'GHOST' };
+const submission = { contractId: 'contract', engagementId: 'engagement', senderAddress: 'GKIT', receiverAddress: 'GHOST', networkPassphrase: 'API_NETWORK' };
 
 it('signs escrow through the real bridge and submits only to the verification API', async () => {
   const fetchSpy = vi.spyOn(globalThis, 'fetch');
@@ -34,7 +34,7 @@ it('signs escrow through the real bridge and submits only to the verification AP
   expect(result.current.isReady).toBe(true);
   await result.current.signAndSubmit('UNSIGNED', submission);
   expect(mocks.setWallet).toHaveBeenCalledWith('xbull');
-  expect(mocks.sign).toHaveBeenCalledWith('UNSIGNED', expect.objectContaining({ address: 'GKIT' }));
+  expect(mocks.sign).toHaveBeenCalledWith('UNSIGNED', { address: 'GKIT', networkPassphrase: 'API_NETWORK' });
   expect(mocks.post).toHaveBeenCalledWith('/api/escrow/send-transaction', { signedXdr: 'SIGNED_ESCROW' });
   expect(fetchSpy).not.toHaveBeenCalled();
   fetchSpy.mockRestore();

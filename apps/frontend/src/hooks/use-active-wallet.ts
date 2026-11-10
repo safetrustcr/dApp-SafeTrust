@@ -56,6 +56,8 @@ function useE2EWallet() {
 export type WalletType = 'stellar-kit' | 'freighter' | 'pollar' | null;
 
 export type TransactionSubmission = {
+  /** Network returned alongside this XDR by the API that verifies it. */
+  networkPassphrase?: string;
   contractId: string;
   engagementId: string;
   senderAddress: string;
@@ -86,8 +88,8 @@ export function useActiveWallet(): ActiveWallet {
   const { sign } = bridge;
   const e2e = useE2EWallet();
   const signAndSubmit = useCallback<SignAndSubmit>(
-    async (unsignedXDR) => {
-      const signedXdr = await sign(unsignedXDR);
+    async (unsignedXDR, submission) => {
+      const signedXdr = await sign(unsignedXDR, submission.networkPassphrase);
       await postEscrowApi('/api/escrow/send-transaction', { signedXdr });
     },
     [sign],
