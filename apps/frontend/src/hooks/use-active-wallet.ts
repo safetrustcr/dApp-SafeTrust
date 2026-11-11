@@ -1,12 +1,5 @@
-// apps/frontend/src/hooks/use-active-wallet.ts
-// Fix: react-hooks/rules-of-hooks — usePollar cannot be called inside a callback.
-// Solution: call usePollar at the top level of the hook, not conditionally.
-
 import { useCallback } from 'react';
-import { useFreighter } from '@/hooks/use-freighter'; // adjust import if needed
-import { usePollar } from '@/hooks/use-pollar';       // adjust import if needed
-import { getWalletKit } from '@/components/auth/wallet/constants/wallet-kit.constant';
-import { useGlobalAuthenticationStore } from '@/core/store/data';
+import { useWalletBridge } from '@/lib/wallet/use-wallet-bridge';
 import { postEscrowApi } from '@/lib/api/escrow';
 
 // ---------------------------------------------------------------------------
@@ -63,6 +56,8 @@ function useE2EWallet() {
 export type WalletType = 'stellar-kit' | 'freighter' | 'pollar' | null;
 
 export type TransactionSubmission = {
+  /** Network returned alongside this XDR by the API that verifies it. */
+  networkPassphrase?: string;
   contractId: string;
   engagementId: string;
   senderAddress: string;
@@ -87,70 +82,17 @@ export type ActiveWallet = {
   signAndSubmit: SignAndSubmit;
 };
 
-/**
- * Returns the active Stellar wallet — Freighter or Pollar — whichever is connected.
- * Freighter takes priority when both are available.
- *
- * FIX: usePollar is now called unconditionally at the top level (rules-of-hooks).
- * Previously it was called inside a conditional branch which violates the Rules of Hooks.
- */
+/** Escrow XDR always goes through the server's pending-action verification. */
 export function useActiveWallet(): ActiveWallet {
-  const freighter = useFreighter();
-  // ✅ Called unconditionally at hook top level — not inside a callback or condition
-  const pollar = usePollar();
-  // ✅ E2E provider called unconditionally; IS_E2E gates whether it is actually used
+  const bridge = useWalletBridge();
+  const { sign } = bridge;
   const e2e = useE2EWallet();
-  const stellarWalletId = useGlobalAuthenticationStore((state) => state.stellarWalletId);
-  const connectedAddress = useGlobalAuthenticationStore((state) => state.address);
-
-  const isFreighterReady = Boolean(freighter?.address);
-  const isKitWalletReady = Boolean(stellarWalletId && connectedAddress);
-  const activeAddress = isKitWalletReady ? connectedAddress : freighter?.address ?? pollar?.address ?? null;
-  const activeWalletType: WalletType = isKitWalletReady
-    ? 'stellar-kit'
-    : isFreighterReady
-      ? 'freighter'
-      : pollar?.address
-        ? 'pollar'
-        : null;
-
-  const signWithKitAndSubmit = useCallback(
-    async (unsignedXDR: string): Promise<void> => {
-      if (!stellarWalletId || !connectedAddress) {
-        throw new Error('Connect a Stellar wallet before signing this escrow transaction.');
-      }
-
-      const kit = getWalletKit();
-      kit.setWallet(stellarWalletId);
-      const { signedTxXdr } = await kit.signTransaction(unsignedXDR, {
-        address: connectedAddress,
-        networkPassphrase: process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'Test SDF Network ; September 2015',
-      });
-
-      // The backend verifies the exact XDR it created, verifies the wallet
-      // signature, and submits it with the Trustless Work secret held server-side.
-      await postEscrowApi('/api/escrow/send-transaction', { signedXdr: signedTxXdr });
+  const signAndSubmit = useCallback<SignAndSubmit>(
+    async (unsignedXDR, submission) => {
+      const signedXdr = await sign(unsignedXDR, submission.networkPassphrase);
+      await postEscrowApi('/api/escrow/send-transaction', { signedXdr });
     },
-    [connectedAddress, stellarWalletId],
-  );
-
-  // ✅ useCallback must run before any early return (rules-of-hooks).
-  const signAndSubmit = useCallback(
-    async (unsignedXDR: string, submission: TransactionSubmission): Promise<void> => {
-      if (isKitWalletReady) {
-        await signWithKitAndSubmit(unsignedXDR);
-      } else if (isFreighterReady && freighter?.signAndSubmit) {
-        await freighter.signAndSubmit(unsignedXDR, submission);
-      } else if (pollar?.address) {
-        // Pollar's current browser SDK submits directly and does not expose the
-        // signed XDR.  SafeTrust must submit through its API to validate the
-        // pending action and record lifecycle state, so do not bypass it.
-        throw new Error('Pollar cannot sign SafeTrust escrow transactions yet. Connect a Stellar wallet such as Here Wallet, Freighter, Albedo, or xBull.');
-      } else {
-        throw new Error('No wallet available to sign transaction');
-      }
-    },
-    [isKitWalletReady, signWithKitAndSubmit, isFreighterReady, freighter, pollar?.address],
+    [sign],
   );
 
   // Short-circuit to the e2e provider when the flag is set.
@@ -165,11 +107,11 @@ export function useActiveWallet(): ActiveWallet {
   }
 
   return {
-    address: activeAddress,
-    walletType: activeWalletType,
+    address: bridge.address ?? null,
+    walletType: bridge.provider === 'wallets-kit' ? 'stellar-kit' : bridge.provider ?? null,
     // Pollar may provision a G-address, but its SDK currently cannot return a
     // signed XDR for SafeTrust's server-verified submission path.
-    isReady: Boolean(activeAddress) && activeWalletType !== 'pollar',
+    isReady: bridge.status === 'connected' && Boolean(bridge.provider) && bridge.provider !== 'pollar',
     signAndSubmit,
   };
 }

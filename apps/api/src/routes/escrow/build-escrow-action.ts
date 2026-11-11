@@ -23,7 +23,7 @@ import {
   type PendingAction,
 } from '../../services/pending-actions.js';
 import { trustlessWorkRequest } from '../../services/trustlesswork.js';
-import { transactionExpiry, transactionHash } from '../../lib/stellar-xdr.js';
+import { transactionExpiry, transactionHash, NETWORK_PASSPHRASE } from '../../lib/stellar-xdr.js';
 
 export type BuildContext = { signer: string; escrow: EscrowRecord; roles: EscrowRoles };
 
@@ -37,6 +37,7 @@ export type BuildRequest = {
 export type BuildResult = {
   pendingActionId: string;
   unsignedXdr: string;
+  networkPassphrase: string;
   txHash: string;
   engagementId: string;
   contractId: string | null;
@@ -62,6 +63,7 @@ function fromRow(row: PendingAction, reused: boolean): BuildResult {
   return {
     pendingActionId: row.id,
     unsignedXdr: row.unsigned_xdr,
+    networkPassphrase: NETWORK_PASSPHRASE,
     txHash: row.tx_hash,
     engagementId: row.engagement_id,
     contractId: row.contract_id,

@@ -29,6 +29,7 @@ const STELLAR_ADDRESS_RE = /^G[A-Z2-7]{55}$/;
 type DeployResponse = {
   contractId: string;
   unsignedXDR: string;
+  networkPassphrase?: string;
   engagementId: string;
   status: string;
   message?: string;
@@ -130,6 +131,7 @@ export function EscrowPayFlow({
     setErrorMessages([]);
     try {
       await signAndSubmit(deployState.unsignedXDR, {
+        networkPassphrase: deployState.networkPassphrase,
         action: 'initialize',
         // Legacy Freighter/Pollar implementations still accept this typed
         // context. The API intentionally ignores it and uses its pending

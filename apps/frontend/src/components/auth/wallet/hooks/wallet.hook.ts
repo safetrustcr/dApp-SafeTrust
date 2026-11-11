@@ -1,6 +1,5 @@
 import {
   ISupportedWallet,
-  WalletNetwork,
 } from "@creit.tech/stellar-wallets-kit";
 import { getWalletKit } from "../constants/wallet-kit.constant";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
@@ -8,12 +7,13 @@ import { useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
 import { useMultiWallet } from "./multi-wallet.hook";
 import { WalletInfo } from "../types/wallet.types";
-import { signTransaction } from "@stellar/freighter-api";
+import { useWalletBridge } from "@/lib/wallet/use-wallet-bridge";
 import { usePollarWallet } from "@/components/auth/pollar/PollarProvider";
 import { postAuthenticatedApi } from "@/lib/api/client";
 
 export const useWallet = () => {
   const router = useRouter();
+  const bridge = useWalletBridge();
   const { connectWalletStore, disconnectWalletStore, address, name } =
     useGlobalAuthenticationStore();
   const { address: pollarAddress } = usePollarWallet();
@@ -96,27 +96,8 @@ export const useWallet = () => {
     }
   };
 
-  const signXDR = async (unsignedXDR: string, networkPassphrase?: string): Promise<string> => {
-    try {
-      if (!address) {
-        throw new Error(
-          pollarAddress
-            ? "Pollar can provision the guest G-address. TrustlessWork XDR signing still uses Freighter until Pollar exposes sign-only XDR."
-            : "No wallet connected",
-        );
-      }
-
-      const { signedTxXdr } = await signTransaction(unsignedXDR, {
-        address,
-        networkPassphrase: networkPassphrase || WalletNetwork.TESTNET,
-      });
-
-      return signedTxXdr;
-    } catch (error) {
-      console.error("Error signing XDR:", error);
-      throw error;
-    }
-  };
+  const signXDR = (unsignedXDR: string, networkPassphrase?: string): Promise<string> =>
+    bridge.sign(unsignedXDR, networkPassphrase);
 
   return {
     getKit: getWalletKit,

@@ -43,7 +43,10 @@ vi.mock('../src/services/pending-actions.js', async (importOriginal) => ({
   findLiveAction: vi.fn(),
   insertPendingAction: vi.fn(),
 }));
-vi.mock('../src/lib/stellar-xdr.js', () => ({ transactionHash: vi.fn(), transactionExpiry: vi.fn() }));
+vi.mock('../src/lib/stellar-xdr.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  transactionHash: vi.fn(), transactionExpiry: vi.fn(),
+}));
 
 import deployRouter from '../src/routes/escrow/deploy.route.js';
 import fundRouter from '../src/routes/escrow/fund.route.js';
