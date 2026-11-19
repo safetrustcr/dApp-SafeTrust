@@ -100,7 +100,7 @@ export const deployEscrowHandler = asyncHandler(async (
   const platformAddress = process.env.PLATFORM_STELLAR_ADDRESS;
   const usdcIssuer = process.env.USDC_TRUSTLINE_ADDRESS;
   if (!platformAddress || !usdcIssuer) {
-    throw new ApiError(503, 'AUTH_NOT_CONFIGURED', 'Authentication is temporarily unavailable.', { retryable: true });
+    throw new ApiError(503, 'ESCROW_NOT_CONFIGURED', 'Escrow payments are not configured on this server.', { retryable: true });
   }
 
   // trustlessWorkRequest throws TrustlessWorkRequestError on failure —
