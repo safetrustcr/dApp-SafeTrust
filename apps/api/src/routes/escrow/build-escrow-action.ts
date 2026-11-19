@@ -6,6 +6,12 @@
  *   → reuse the live unsigned XDR for this escrow + action, if any
  *   → otherwise ask Trustless Work to build one
  *   → record it in escrow_pending_actions under its tx hash
+ *
+ * Trustless Work response contract (checked against the testnet Swagger at
+ * https://dev.api.trustlesswork.com, verified 2025-01): build endpoints return the
+ * unsigned transaction XDR under `unsignedTransaction`. `unsignedXdr` is accepted as
+ * a fallback for older responses; whichever is present is used, and an empty response
+ * fails closed below.
  */
 import { ApiError } from '../../http/api-error.js';
 import {
@@ -109,7 +115,7 @@ export async function buildEscrowAction(opts: {
     method: 'POST',
     body,
   });
-  const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
+  const unsignedXdr = result.unsignedTransaction ?? result.unsignedXdr;
   if (!unsignedXdr) {
     throw new ApiError(502, 'TRUSTLESS_WORK_EMPTY_RESPONSE', 'Unable to build the transaction. Try again.', {
       retryable: true,

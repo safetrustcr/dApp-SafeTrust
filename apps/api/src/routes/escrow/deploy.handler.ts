@@ -109,6 +109,7 @@ export const deployEscrowHandler = asyncHandler(async (
     status: string;
     contractId?: string;
     unsignedTransaction?: string;
+    unsignedXdr?: string;
     message?: string;
   }>('/deployer/single-release', {
     method: 'POST',
@@ -135,7 +136,7 @@ export const deployEscrowHandler = asyncHandler(async (
     },
   });
 
-  const unsignedXdr = twData.unsignedTransaction ?? '';
+  const unsignedXdr = twData.unsignedTransaction ?? twData.unsignedXdr ?? '';
   let txHash: string;
   let expiresAt: Date;
   try {
@@ -181,7 +182,7 @@ export const deployEscrowHandler = asyncHandler(async (
       senderAddress,
       receiverAddress: terms.receiverAddress,
       amount: terms.amount,
-      unsignedXdr: twData.unsignedTransaction ?? '',
+      unsignedXdr,
     },
   );
 
