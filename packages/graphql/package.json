@@ -8,7 +8,7 @@
     ".": "./generated/index.ts"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node init && tsc -p tsconfig.json",
     "lint": "echo \"no lint configured\"",
     "test": "echo \"no tests\"",
     "codegen": "echo \"no codegen\""

@@ -132,6 +132,9 @@ export const recoverFromTxhashHandler = asyncHandler(async (
   await markConfirmed(pendingAction.id);
 
   // 7. Best-effort: tell Trustless Work's indexer about the transaction.
+  // Endpoint and body verified against the Trustless Work testnet Swagger
+  // (https://dev.api.trustlesswork.com), checked 2025-01 — update the date
+  // if the schema is re-verified.
   await updateIndexerFromTxHash(txHash);
 
   return res.status(200).json({ ...recoveredBody(pendingAction, txHash), status: 'confirmed' });
