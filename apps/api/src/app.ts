@@ -12,6 +12,7 @@ import fundEscrowRouter from './routes/escrow/fund.route.js';
 import milestoneStatusRouter from './routes/escrow/milestone-status.route.js';
 import releaseFundsRouter from './routes/escrow/release-funds.route.js';
 import resolveDisputeRouter from './routes/escrow/resolve-dispute.route.js';
+import disputeRouter from './routes/escrow/dispute.route.js';
 import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.js';
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
@@ -64,6 +65,7 @@ export function createApp(): express.Express {
   app.use('/api/escrow', milestoneStatusRouter);
   app.use('/api/escrow', releaseFundsRouter);
   app.use('/api/escrow', resolveDisputeRouter);
+  app.use('/api/escrow', disputeRouter);
   app.use('/api/escrow', recoverFromTxhashRouter);
   app.use('/api/escrow', sendTransactionRouter);
   app.use('/api/escrow', statusStreamRouter);

@@ -27,6 +27,7 @@ export const ACTION_SIGNER_ROLE = {
   mark_milestone_completed: 'serviceProvider',
   approve_milestone: 'approver',
   release_funds: 'releaseSigner',
+  dispute: ['approver', 'serviceProvider'],
   resolve_dispute: 'disputeResolver',
 } as const;
 
@@ -36,6 +37,7 @@ const ACTION_ROUTE: Record<keyof typeof ACTION_SIGNER_ROLE, string> = {
   mark_milestone_completed: 'POST /api/escrow/milestone-status',
   approve_milestone: 'POST /api/escrow/approve-milestone',
   release_funds: 'POST /api/escrow/release-funds',
+  dispute: 'POST /api/escrow/dispute',
   resolve_dispute: 'POST /api/escrow/resolve-dispute',
 };
 
