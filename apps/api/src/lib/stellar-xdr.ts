@@ -14,8 +14,25 @@ import {
   TransactionBuilder,
 } from '@stellar/stellar-sdk';
 
-export const NETWORK_PASSPHRASE =
-  process.env.STELLAR_NETWORK_PASSPHRASE ?? Networks.TESTNET;
+/**
+ * The one network setting for apps/api (#550): STELLAR_NETWORK_PASSPHRASE,
+ * the full passphrase (e.g. "Test SDF Network ; September 2015"). Defaults to
+ * testnet. Shorthand labels such as "TESTNET" are rejected: Stellar hashes the
+ * passphrase into every transaction, so a label would build XDR that no
+ * network accepts.
+ */
+export function networkPassphraseFromEnv(env: NodeJS.ProcessEnv = process.env): string {
+  const value = env.STELLAR_NETWORK_PASSPHRASE?.trim();
+  if (!value) return Networks.TESTNET;
+  if (/^(testnet|public|mainnet|futurenet|standalone)$/i.test(value)) {
+    throw new Error(
+      `STELLAR_NETWORK_PASSPHRASE must be the full network passphrase (e.g. "${Networks.TESTNET}"), not "${value}".`,
+    );
+  }
+  return value;
+}
+
+export const NETWORK_PASSPHRASE = networkPassphraseFromEnv();
 
 /** Default lifetime for a built transaction that carries no time bounds. */
 export const DEFAULT_TTL_MS = 10 * 60_000;

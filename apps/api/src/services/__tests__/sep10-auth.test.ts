@@ -82,8 +82,8 @@ describe('SEP-10 wallet authentication', () => {
         SEP10_SIGNING_SEED: Keypair.random().secret(),
         SEP10_HOME_DOMAIN: 'safetrust.example',
         SEP10_WEB_AUTH_DOMAIN: 'auth.safetrust.example',
-        STELLAR_NETWORK: 'INVALID',
+        STELLAR_NETWORK_PASSPHRASE: 'TESTNET',
       }),
-    ).toThrow(/SEP-10 requires/);
+    ).toThrow(/full network passphrase/);
   });
 });
