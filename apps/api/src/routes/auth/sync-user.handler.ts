@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { getAuth } from 'firebase-admin/auth';
 
 import { ensureUserRole, syncUserProfile } from '../../services/user-provisioning.js';
+import { ensureHotelUser } from '../../services/hotel-provisioning.js';
 
 interface SyncUserBody {
   first_name?: string;
@@ -62,6 +63,24 @@ export const syncUserHandler = async (
       location: req.body.location,
     });
     await ensureUserRole(decodedToken.uid, 'guest');
+
+    // Mirror the identity into the hotel tenant so the new guest can book
+    // and pay for hotel reservations. Best-effort: public.users is the source
+    // of truth for sign-up, so a hotel-tenant failure must not break it.
+    try {
+      await ensureHotelUser({
+        firebaseUid: decodedToken.uid,
+        email: decodedToken.email,
+        firstName,
+        lastName,
+        phoneNumber: req.body.phone_number,
+      });
+    } catch (hotelError) {
+      console.warn(
+        '[sync-user] hotel tenant mirror failed — continuing with public user only:',
+        hotelError instanceof Error ? hotelError.message : hotelError,
+      );
+    }
 
     console.log(`[sync-user] ✅ user synced — uid: ${decodedToken.uid}`);
     return res.status(200).json({ success: true, user });
