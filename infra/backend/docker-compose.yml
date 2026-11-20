@@ -30,6 +30,8 @@ services:
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
       HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:-myadminsecretkey}
       HASURA_GRAPHQL_JWT_SECRET: ${HASURA_GRAPHQL_JWT_SECRET}
+      # Requests without a JWT (signed-out pages) run as this role (#553).
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: anonymous
       WEBHOOK_URL: ${WEBHOOK_URL:-http://host.docker.internal:3002}
       HASURA_EVENT_SECRET: ${HASURA_EVENT_SECRET:-myhasuraeventsecret}
       WEBHOOK_ADMIN_SECRET: ${WEBHOOK_ADMIN_SECRET:-mywebhookadminsecret}

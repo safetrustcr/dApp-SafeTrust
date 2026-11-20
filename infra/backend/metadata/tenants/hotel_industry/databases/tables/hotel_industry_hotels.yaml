@@ -94,3 +94,29 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
+  # Public listing feed (#553): signed-out visitors and SafeTrust guests/hosts
+  # read listing fields only; no staff, owner or reservation data.
+  - role: anonymous
+    permission:
+      columns:
+        - id
+        - name
+        - address
+        - coordinates
+      filter: {}
+  - role: guest
+    permission:
+      columns:
+        - id
+        - name
+        - address
+        - coordinates
+      filter: {}
+  - role: host
+    permission:
+      columns:
+        - id
+        - name
+        - address
+        - coordinates
+      filter: {}

@@ -93,3 +93,38 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
+  # Public listing feed (#553): signed-out visitors and SafeTrust guests/hosts
+  # read listing fields only; no staff, owner or reservation data.
+  - role: anonymous
+    permission:
+      columns:
+        - room_id
+        - hotel_id
+        - room_type_id
+        - price_night
+        - capacity
+        - is_available
+        - created_at
+      filter: {}
+  - role: guest
+    permission:
+      columns:
+        - room_id
+        - hotel_id
+        - room_type_id
+        - price_night
+        - capacity
+        - is_available
+        - created_at
+      filter: {}
+  - role: host
+    permission:
+      columns:
+        - room_id
+        - hotel_id
+        - room_type_id
+        - price_night
+        - capacity
+        - is_available
+        - created_at
+      filter: {}

@@ -43,6 +43,34 @@ select_permissions:
       columns:
         - id
       filter: {}
+  - role: guest
+    permission:
+      columns:
+        - id
+        - email
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
+        - last_seen
+      filter:
+        id:
+          _eq: X-Hasura-User-Id
+  - role: host
+    permission:
+      columns:
+        - id
+        - email
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
+        - last_seen
+      filter:
+        id:
+          _eq: X-Hasura-User-Id
 update_permissions:
   - role: tenant
     permission:
@@ -59,6 +87,34 @@ update_permissions:
         id:
           _eq: X-Hasura-User-Id
   - role: landlord
+    permission:
+      columns:
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
+      filter:
+        id:
+          _eq: X-Hasura-User-Id
+      check:
+        id:
+          _eq: X-Hasura-User-Id
+  - role: guest
+    permission:
+      columns:
+        - first_name
+        - last_name
+        - phone_number
+        - country_code
+        - location
+      filter:
+        id:
+          _eq: X-Hasura-User-Id
+      check:
+        id:
+          _eq: X-Hasura-User-Id
+  - role: host
     permission:
       columns:
         - first_name
