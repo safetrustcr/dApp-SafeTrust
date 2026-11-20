@@ -78,7 +78,12 @@ only accepts a signed XDR whose hash matches a row built for the same user.
 | Action | Signing role | Signer | Build route |
 |---|---|---|---|
 ${Object.entries(ACTION_SIGNER_ROLE)
-  .map(([action, role]) => `| \`${action}\` | \`${role}\` | ${ACTOR[roleOf(role)].split(' — ')[0]} | ${ACTION_ROUTE[action as keyof typeof ACTION_ROUTE]} |`)
+  .map(([action, role]) => {
+    const roles = Array.isArray(role) ? role : [role];
+    const roleText = roles.map((r) => `\`${r}\``).join(' or ');
+    const actorText = roles.map((r) => ACTOR[roleOf(r)].split(' — ')[0]).join(' or ');
+    return `| \`${action}\` | ${roleText} | ${actorText} | ${ACTION_ROUTE[action as keyof typeof ACTION_ROUTE]} |`;
+  })
   .join('\n')}
 
 \`resolve_dispute\` also requires the admin role at the route.
