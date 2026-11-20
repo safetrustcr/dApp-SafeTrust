@@ -12,6 +12,10 @@ import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient } from "graphql-ws";
 import { getMainDefinition } from "@apollo/client/utilities";
 
+// The browser authenticates to Hasura only with the user's Firebase ID token.
+// Hasura (JWT mode) applies role permissions from its claims; signed-out
+// requests fall back to HASURA_GRAPHQL_UNAUTHORIZED_ROLE (anonymous). Never
+// send x-hasura-admin-secret from here — see scripts/check-client-secrets.sh.
 const authLink = setContext(async (_, { headers }) => {
   const currentUser = auth.currentUser;
   const token = currentUser ? await currentUser.getIdToken() : null;
@@ -26,10 +30,6 @@ const authLink = setContext(async (_, { headers }) => {
 
 const httpLink = new HttpLink({
   uri: process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL ?? "http://localhost:8080/v1/graphql",
-  headers: {
-    // TODO: wire in Batch N replace with JWT role claim for production
-    "x-hasura-admin-secret": process.env.NEXT_PUBLIC_HASURA_ADMIN_SECRET ?? "myadminsecretkey",
-  },
 });
 
 const wsLink = typeof window !== "undefined"
@@ -42,7 +42,6 @@ const wsLink = typeof window !== "undefined"
           return {
             headers: {
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              "x-hasura-admin-secret": process.env.NEXT_PUBLIC_HASURA_ADMIN_SECRET ?? "myadminsecretkey",
             },
           };
         },
