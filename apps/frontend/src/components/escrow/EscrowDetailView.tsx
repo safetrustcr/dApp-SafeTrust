@@ -1137,7 +1137,7 @@ export default function EscrowDetailView({
 
     setErrorMessages([]);
     const result = await execute({
-      apiRoute: '/api/escrow/release',
+      apiRoute: '/api/escrow/release-funds',
       apiBody: {
         contractId: escrow.contract_id,
         releaseSigner: address,
