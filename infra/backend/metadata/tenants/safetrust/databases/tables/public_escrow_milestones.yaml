@@ -29,7 +29,7 @@ object_relationships:
     using:
       foreign_key_constraint_on: escrow_id
 select_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
@@ -55,7 +55,7 @@ select_permissions:
               guest_id:
                 _eq: X-Hasura-User-Id
     comment: Guests can read milestones of the escrows they are the guest on
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id
@@ -82,7 +82,7 @@ select_permissions:
                 _eq: X-Hasura-User-Id
     comment: Hosts can read milestones of the escrows they marked
 insert_permissions:
-  - role: landlord
+  - role: host
     permission:
       check:
         _and:
@@ -103,7 +103,7 @@ insert_permissions:
         tenant_id: safetrust
     comment: Hosts define the milestones of the escrows they marked
 update_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - status
@@ -123,7 +123,7 @@ update_permissions:
               guest_id:
                 _eq: X-Hasura-User-Id
     comment: Guests can approve milestones on their own escrows
-  - role: landlord
+  - role: host
     permission:
       columns:
         - status

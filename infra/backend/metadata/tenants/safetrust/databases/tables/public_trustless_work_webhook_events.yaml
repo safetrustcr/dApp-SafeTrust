@@ -39,7 +39,7 @@ object_relationships:
 # user roles get read access only — `signature` is withheld from both because it
 # is the HMAC used to verify inbound webhooks.
 select_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
@@ -62,7 +62,7 @@ select_permissions:
               guest_id:
                 _eq: X-Hasura-User-Id
     comment: Guests can read webhook events of the escrows they are the guest on
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id

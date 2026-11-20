@@ -40,3 +40,7 @@ select_permissions:
                     _eq: X-Hasura-User-Id
                 - role:
                     _eq: STAFF
+  - role: guest
+    permission:
+      columns: [id, hotel_id, image_url, position, uploaded_at]
+      filter: {}

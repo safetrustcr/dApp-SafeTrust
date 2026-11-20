@@ -10,14 +10,14 @@ array_relationships:
           name: user_roles
           schema: public
 select_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
         - name
         - description
       filter: {}
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id

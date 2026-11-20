@@ -30,56 +30,6 @@ computed_fields:
         schema: public
       session_argument: hasura_session
 select_permissions:
-  - role: tenant
-    permission:
-      columns:
-        - id
-        - apartment_id
-        - host_id
-        - guest_id
-        - escrow_id
-        - status
-        - last_message_at
-        - host_last_read_at
-        - guest_last_read_at
-        - created_at
-      computed_fields:
-        - unread_count
-      filter:
-        _and:
-          - tenant_id:
-              _eq: safetrust
-          - _or:
-              - host_id:
-                  _eq: X-Hasura-User-Id
-              - guest_id:
-                  _eq: X-Hasura-User-Id
-      allow_aggregations: true
-  - role: landlord
-    permission:
-      columns:
-        - id
-        - apartment_id
-        - host_id
-        - guest_id
-        - escrow_id
-        - status
-        - last_message_at
-        - host_last_read_at
-        - guest_last_read_at
-        - created_at
-      computed_fields:
-        - unread_count
-      filter:
-        _and:
-          - tenant_id:
-              _eq: safetrust
-          - _or:
-              - host_id:
-                  _eq: X-Hasura-User-Id
-              - guest_id:
-                  _eq: X-Hasura-User-Id
-      allow_aggregations: true
   - role: guest
     permission:
       columns:

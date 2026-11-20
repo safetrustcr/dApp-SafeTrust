@@ -46,19 +46,25 @@ select_permissions:
                       _eq: X-Hasura-User-Id
                   - role:
                       _eq: STAFF
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
         - room_id
         - image_url
         - uploaded_at
-      filter: {}
-  - role: landlord
+      filter:
+        room:
+          is_available:
+            _eq: true
+  - role: host
     permission:
       columns:
         - id
         - room_id
         - image_url
         - uploaded_at
-      filter: {}
+      filter:
+        room:
+          is_available:
+            _eq: true

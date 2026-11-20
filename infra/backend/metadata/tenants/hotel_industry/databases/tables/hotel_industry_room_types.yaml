@@ -42,7 +42,7 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
@@ -51,7 +51,7 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id
