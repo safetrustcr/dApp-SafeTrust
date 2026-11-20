@@ -6,7 +6,7 @@ object_relationships:
     using:
       foreign_key_constraint_on: owner_id
 select_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
@@ -29,7 +29,7 @@ select_permissions:
               _is_null: true
           - is_available:
               _eq: true
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id
@@ -66,3 +66,42 @@ select_permissions:
       filter:
         deleted_at:
           _is_null: true
+insert_permissions:
+  - role: host
+    permission:
+      check:
+        owner_id:
+          _eq: X-Hasura-User-Id
+      columns:
+        - owner_id
+        - name
+        - description
+        - price
+        - warranty_deposit
+        - coordinates
+        - address
+        - is_available
+        - available_from
+        - available_until
+        - image_urls
+update_permissions:
+  - role: host
+    permission:
+      columns:
+        - name
+        - description
+        - price
+        - warranty_deposit
+        - coordinates
+        - address
+        - is_available
+        - available_from
+        - available_until
+        - image_urls
+        - deleted_at
+      filter:
+        owner_id:
+          _eq: X-Hasura-User-Id
+      check:
+        owner_id:
+          _eq: X-Hasura-User-Id

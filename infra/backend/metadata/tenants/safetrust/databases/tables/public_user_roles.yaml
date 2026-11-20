@@ -11,7 +11,7 @@ object_relationships:
 select_permissions:
   # Users may read their own role assignments only. Role *writes* go through
   # the admin-secret path in apps/api (promote-to-host), never from the client.
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
@@ -21,7 +21,7 @@ select_permissions:
       filter:
         user_id:
           _eq: X-Hasura-User-Id
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id
