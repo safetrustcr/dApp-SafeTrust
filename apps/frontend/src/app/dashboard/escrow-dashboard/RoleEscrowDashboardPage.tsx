@@ -3,13 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@apollo/client";
 import { RoleEscrowDashboard } from "@/components/dashboard/RoleEscrowDashboard";
-import type {
-  EscrowData,
-  NotificationData,
-} from "@/components/dashboard/RoleEscrowDashboard";
-import {
-  generateMockNotifications,
-} from "@/lib/mockData";
+import type { EscrowData } from "@/components/dashboard/RoleEscrowDashboard";
+import { useNotifications } from "@/hooks/use-notifications";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { getUserRole } from "@/utils/role-utils";
 import { mapDbStatusToDashboardStatus } from "@/utils/escrow-utils";
@@ -189,44 +184,6 @@ const mapEscrows = (
   });
 };
 
-const notificationTypeByStatus: Record<DashboardEscrowStatus, NotificationData["type"]> = {
-  pending: "alert",
-  funded: "payment",
-  check_in_approved: "milestone",
-  check_out_approved: "milestone",
-  completed: "milestone",
-  cancelled: "alert",
-};
-
-const notificationMessageByStatus: Record<DashboardEscrowStatus, string> = {
-  pending: "is pending signature",
-  funded: "has been funded",
-  check_in_approved: "has check-in approved",
-  check_out_approved: "has check-out approved",
-  completed: "has been completed",
-  cancelled: "was cancelled",
-};
-
-const deriveNotifications = (escrows: EscrowData[]): NotificationData[] => {
-  const now = Date.now();
-
-  return escrows
-    .filter((escrow) => {
-      const updatedAt = new Date(escrow.updatedAt).getTime();
-      return !Number.isNaN(updatedAt) && now - updatedAt <= ONE_DAY_IN_MS;
-    })
-    .map((escrow) => ({
-      id: `${escrow.id}-${escrow.status}-${escrow.updatedAt}`,
-      type: notificationTypeByStatus[escrow.status],
-      message: `Escrow ${escrow.metadata?.bookingId ?? escrow.id} ${
-        notificationMessageByStatus[escrow.status]
-      }`,
-      timestamp: escrow.updatedAt,
-      read: false,
-      escrowId: escrow.id,
-    }));
-};
-
 export function RoleEscrowDashboardPage() {
   const [userRole, setUserRole] = useState<"guest" | "hotel" | "admin">("guest");
 
@@ -278,6 +235,10 @@ export function RoleEscrowDashboardPage() {
     updatedAt: e.updated_at ?? e.created_at,
   }));
 
+  // Notifications are the user's real lifecycle events and pending actions,
+  // served by GET /api/notifications (see apps/api/src/services/notifications.ts).
+  const { notifications, error: notificationsError } = useNotifications();
+
   // NOTE: Data Source Reconciliation
   // - GET_ESCROWS (from public.escrows): Retrieves the detailed list of user-relevant escrow records
   //   for the table, recent activity, and notifications.
@@ -285,8 +246,6 @@ export function RoleEscrowDashboardPage() {
   //   statistics. This is required because public.escrows only tracks security deposits, while
   //   trustless_work_escrows contains the authoritative full value and status breakdown.
   // Both sources are required and distinct; counts/totals differ because GET_ESCROWS is user-scoped.
-  const notifications = generateMockNotifications(escrows);
-
   const dashboardStats = statsData ? {
     total: statsData.total?.aggregate?.count ?? 0,
     active: statsData.active?.aggregate?.count ?? 0,
@@ -303,6 +262,7 @@ export function RoleEscrowDashboardPage() {
       escrows={escrows}
       totalEscrows={escrowsData?.escrows_aggregate?.aggregate?.count ?? escrows.length}
       notifications={notifications}
+      notificationsError={notificationsError}
       isLoading={escrowsLoading && !escrowsData}
       error={errorMsg}
       statsError={statsErrorMsg}
