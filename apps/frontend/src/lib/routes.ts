@@ -14,6 +14,9 @@ export const routes = {
   suggestions: (query?: URLSearchParams) =>
     withQuery('/dashboard/guest/suggestions', query),
   conversation: (id: string) => `/dashboard/messages/${id}`,
+  escrowDetail: (apartmentId: string, escrowId: string) =>
+    `/escrow/${encodeURIComponent(apartmentId)}/escrow/${encodeURIComponent(escrowId)}`,
+  escrowList: () => '/dashboard/escrow',
   login: (next?: string) =>
     next ? withQuery('/login', new URLSearchParams({ next })) : '/login',
 };
