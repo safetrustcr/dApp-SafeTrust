@@ -108,7 +108,9 @@ export const recoverFromTxhashHandler = asyncHandler(async (
     throw new ApiError(409, 'TRANSACTION_FAILED', 'Transaction failed on the ledger');
   }
 
-  // 5. Confirm on the ledger.
+  // 5. Confirm on the ledger. A submit that timed out or dropped may still have
+  // landed; confirmation is decided by the ledger, not by the client's report.
+
   const confirmation = await confirmTransaction(txHash);
 
   if (confirmation === 'unknown') {
@@ -138,6 +140,7 @@ export const recoverFromTxhashHandler = asyncHandler(async (
 });
 
 function recoveredBody(row: Pick<PendingAction, 'action' | 'contract_id' | 'status'>, txHash: string): RecoverResponse {
+  // Caller-facing shape is unchanged; the ledger result determines status.
   return {
     recovered: true,
     action: row.action,
