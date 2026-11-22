@@ -191,4 +191,17 @@ describe('POST /api/escrow/send-transaction', () => {
     const { error } = await call({ signedXdr: 'x' }, null);
     expect(error?.status).toBe(401);
   });
+
+  it('includes txHash in the error body when Trustless Work times out after acceptance', async () => {
+    const { signedXdr, txHash } = signedFixture();
+    vi.mocked(getPendingActionByHash).mockResolvedValue(pendingRow({ tx_hash: txHash }) as never);
+    vi.mocked(claimForSubmission).mockResolvedValue(true);
+    const timeout = Object.assign(new Error('TW timeout'), { code: 'ETIMEDOUT' });
+    vi.mocked(trustlessWorkRequest).mockRejectedValue(timeout);
+
+    const { error } = await call({ signedXdr });
+    expect(error).toBeDefined();
+    expect((error as { payload?: { txHash?: string } }).payload?.txHash).toBe(txHash);
+    expect(releaseClaim).toHaveBeenCalledWith('pa-1');
+  });
 });

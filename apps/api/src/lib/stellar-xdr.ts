@@ -48,6 +48,22 @@ export function transactionHash(xdr: string, passphrase = NETWORK_PASSPHRASE): s
 }
 
 /**
+ * Best-effort hash extraction for client-side recovery. Returns null instead of
+ * throwing, so a malformed or missing XDR never blocks the recovery path.
+ */
+export function tryTransactionHash(
+  xdr: string | null | undefined,
+  passphrase = NETWORK_PASSPHRASE,
+): string | null {
+  if (!xdr) return null;
+  try {
+    return transactionHash(xdr, passphrase);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Expiry for a built transaction: the XDR's maxTime when set, otherwise
  * now + DEFAULT_TTL_MS.
  */
