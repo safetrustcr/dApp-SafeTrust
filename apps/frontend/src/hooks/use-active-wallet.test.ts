@@ -5,7 +5,7 @@ import { useActiveWallet } from './use-active-wallet';
 
 const mocks = vi.hoisted(() => ({
   store: { address: 'GKIT', walletType: 'xBull', stellarWalletId: 'xbull' as string | null },
-  sign: vi.fn(), post: vi.fn(), setWallet: vi.fn(),
+  sign: vi.fn(), post: vi.fn(), setWallet: vi.fn(), pollar: vi.fn(),
 }));
 vi.mock('@/core/store/data', () => ({
   useGlobalAuthenticationStore: (selector: (state: typeof mocks.store) => unknown) => selector(mocks.store),
@@ -15,6 +15,9 @@ vi.mock('@/components/auth/pollar/PollarProvider', () => ({ usePollarWallet: () 
 vi.mock('@/components/auth/wallet/constants/wallet-kit.constant', () => ({
   getWalletKit: () => ({ setWallet: mocks.setWallet, signTransaction: mocks.sign }),
 }));
+vi.mock('@pollar/core', () => ({
+  signTx: mocks.pollar,
+}));
 vi.mock('@/lib/api/escrow', () => ({ postEscrowApi: mocks.post }));
 vi.mock('@/lib/api/client', () => ({ getAuthenticatedApi: vi.fn() }));
 vi.mock('@/lib/firebase', () => ({ auth: { currentUser: null } }));
@@ -23,6 +26,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   Object.assign(mocks.store, { address: 'GKIT', walletType: 'xBull', stellarWalletId: 'xbull' });
   mocks.sign.mockResolvedValue({ signedTxXdr: 'SIGNED_ESCROW' });
+  mocks.pollar.mockResolvedValue({ status: 'signed', signedXdr: 'SIGNED_POLLAR' });
 });
 
 const submission = { contractId: 'contract', engagementId: 'engagement', senderAddress: 'GKIT', receiverAddress: 'GHOST', networkPassphrase: 'API_NETWORK' };
@@ -40,13 +44,15 @@ it('signs escrow through the real bridge and submits only to the verification AP
   fetchSpy.mockRestore();
 });
 
-it('never submits when Pollar is selected, even with Freighter available', async () => {
+it('submits signed transaction when Pollar is selected', async () => {
   Object.assign(mocks.store, { address: 'GPOLLAR', walletType: 'Pollar', stellarWalletId: null });
   const { result } = renderHook(() => useActiveWallet());
-  expect(result.current.isReady).toBe(false);
-  await expect(result.current.signAndSubmit('UNSIGNED', submission)).rejects.toThrow("Signing with Pollar isn't available yet.");
+  expect(result.current.walletType).toBe('pollar');
+  expect(result.current.isReady).toBe(true);
+  await result.current.signAndSubmit('UNSIGNED', submission);
+  expect(mocks.pollar).toHaveBeenCalledWith('UNSIGNED');
   expect(mocks.sign).not.toHaveBeenCalled();
-  expect(mocks.post).not.toHaveBeenCalled();
+  expect(mocks.post).toHaveBeenCalledWith('/api/escrow/send-transaction', { signedXdr: 'SIGNED_POLLAR' });
 });
 
 it('does not submit escrow after a signing rejection', async () => {

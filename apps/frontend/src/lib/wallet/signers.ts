@@ -1,6 +1,7 @@
 import { signTransaction } from '@stellar/freighter-api';
 import { getWalletKit } from '@/components/auth/wallet/constants/wallet-kit.constant';
-import { PollarSigningUnsupportedError, WalletRejectedError } from './errors';
+import { signTx } from '@pollar/core';
+import { WalletRejectedError } from './errors';
 
 export type WalletProvider = 'freighter' | 'wallets-kit' | 'pollar';
 
@@ -37,14 +38,42 @@ export const walletsKitSigner: WalletSigner = {
   sign: (xdr, opts) => signedXdr(() => getWalletKit().signTransaction(xdr, opts)),
 };
 
-const signers: Partial<Record<WalletProvider, WalletSigner>> = {
+export const pollarSigner: WalletSigner = {
+  sign: async (xdr) => {
+    try {
+      const outcome = await signTx(xdr);
+      if (outcome.status === 'signed') {
+        if (!outcome.signedXdr) throw new WalletRejectedError();
+        return outcome.signedXdr;
+      }
+      const message = outcome.message || outcome.details || outcome.code || 'Pollar signing failed';
+      if (/cancel|declin|reject|denied|user refused/i.test(message)) {
+        throw new WalletRejectedError();
+      }
+      throw new Error(message);
+    } catch (error) {
+      if (error instanceof WalletRejectedError) throw error;
+      const message = error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null && 'message' in error
+          ? String(error.message)
+          : String(error);
+      if (/cancel|declin|reject|denied|user refused/i.test(message)) {
+        throw new WalletRejectedError();
+      }
+      throw error;
+    }
+  },
+};
+
+const signers: Record<WalletProvider, WalletSigner> = {
   freighter: freighterSigner,
   'wallets-kit': walletsKitSigner,
+  pollar: pollarSigner,
 };
 
 /** Return the requested adapter; unsupported providers never invoke a different SDK. */
 export function signerFor(provider: WalletProvider): WalletSigner {
-  if (provider === 'pollar') throw new PollarSigningUnsupportedError();
   const signer = signers[provider];
   if (!signer) throw new Error('No supported wallet connected to sign transaction');
   return signer;
