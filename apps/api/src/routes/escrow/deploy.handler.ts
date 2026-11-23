@@ -7,6 +7,7 @@ import { asyncHandler } from '../../http/async-handler.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { findLiveAction, insertPendingAction } from '../../services/pending-actions.js';
 import { transactionExpiry, transactionHash, NETWORK_PASSPHRASE } from '../../lib/stellar-xdr.js';
+import { requireEscrowStellarConfig } from '../../lib/escrow-config.js';
 import { toBookingReference, resolveBookingEscrowTerms } from '../../services/booking-escrow-terms.js';
 
 type DeployRequestBody = {
@@ -97,11 +98,7 @@ export const deployEscrowHandler = asyncHandler(async (
   }
   // ── End idempotency check ──────────────────────────────────────────────
 
-  const platformAddress = process.env.PLATFORM_STELLAR_ADDRESS;
-  const usdcIssuer = process.env.USDC_TRUSTLINE_ADDRESS;
-  if (!platformAddress || !usdcIssuer) {
-    throw new ApiError(503, 'AUTH_NOT_CONFIGURED', 'Authentication is temporarily unavailable.', { retryable: true });
-  }
+  const { platformAddress, usdcIssuer } = requireEscrowStellarConfig();
 
   // trustlessWorkRequest throws TrustlessWorkRequestError on failure —
   // errorMiddleware maps those automatically; no catch needed here.
