@@ -1,0 +1,33 @@
+# Return type of the get_escrow_analytics_by_day function. It holds no rows and
+# is only reachable through getEscrowAnalyticsByDay: the empty root field lists
+# keep it out of query_root and subscription_root.
+# The values are daily totals for the tenant (no ids or personal data), shown
+# on the escrow dashboard to the roles its users hold.
+table:
+  name: escrow_analytics_daily
+  schema: public
+configuration:
+  custom_name: escrowAnalyticsDaily
+select_permissions:
+  - role: guest
+    permission:
+      columns:
+        - day
+        - page_views
+        - clicks
+        - users
+      filter: {}
+      query_root_fields: []
+      subscription_root_fields: []
+    comment: Read through getEscrowAnalyticsByDay only
+  - role: host
+    permission:
+      columns:
+        - day
+        - page_views
+        - clicks
+        - users
+      filter: {}
+      query_root_fields: []
+      subscription_root_fields: []
+    comment: Read through getEscrowAnalyticsByDay only

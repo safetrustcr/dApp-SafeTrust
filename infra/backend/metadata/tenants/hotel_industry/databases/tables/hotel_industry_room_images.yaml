@@ -62,3 +62,19 @@ select_permissions:
         - image_url
         - uploaded_at
       filter: {}
+  - role: guest
+    permission:
+      columns:
+        - id
+        - room_id
+        - image_url
+        - uploaded_at
+      filter: {}
+  - role: host
+    permission:
+      columns:
+        - id
+        - room_id
+        - image_url
+        - uploaded_at
+      filter: {}

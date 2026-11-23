@@ -12,6 +12,7 @@ import { getApartmentEscrowTerms, ApartmentTermsError } from './apartment-escrow
 import { getHotelReservationEscrowTerms } from './hotel-reservation-escrow.js';
 import { getUserWallets } from './escrow-authz.js';
 import { NETWORK_PASSPHRASE } from '../lib/stellar-xdr.js';
+import { requireEscrowStellarConfig } from '../lib/escrow-config.js';
 
 export const XLM_BASE_RESERVE = 0.5;
 export const XLM_FEE_BUFFER = 1.0;
@@ -31,21 +32,13 @@ export function getHorizonServerUrl(): string {
   if (process.env.STELLAR_HORIZON_URL?.trim()) {
     return process.env.STELLAR_HORIZON_URL.trim().replace(/\/+$/, '');
   }
-  const isPublic =
-    process.env.STELLAR_NETWORK === 'PUBLIC' ||
-    process.env.STELLAR_NETWORK_PASSPHRASE === Networks.PUBLIC;
-  return isPublic
+  return NETWORK_PASSPHRASE === Networks.PUBLIC
     ? 'https://horizon.stellar.org'
     : 'https://horizon-testnet.stellar.org';
 }
 
 export function isTestnet(): boolean {
-  const network = (process.env.STELLAR_NETWORK || '').toLowerCase();
-  const passphrase = process.env.STELLAR_NETWORK_PASSPHRASE || '';
-  if (network === 'public' || network === 'mainnet' || passphrase === Networks.PUBLIC) {
-    return false;
-  }
-  return true;
+  return NETWORK_PASSPHRASE !== Networks.PUBLIC;
 }
 
 type CachedAccount = {
@@ -270,13 +263,7 @@ export async function checkWalletReadiness({
   reservationId,
   server,
 }: EscrowReadinessParams): Promise<WalletReadinessResponse> {
-  const platformAddress = process.env.PLATFORM_STELLAR_ADDRESS;
-  const usdcIssuer = process.env.USDC_TRUSTLINE_ADDRESS;
-  if (!platformAddress || !usdcIssuer) {
-    throw new ApiError(503, 'AUTH_NOT_CONFIGURED', 'Authentication is temporarily unavailable.', {
-      retryable: true,
-    });
-  }
+  const { platformAddress, usdcIssuer } = requireEscrowStellarConfig();
 
   // Resolve terms via server resolvers
   let amount = 0;

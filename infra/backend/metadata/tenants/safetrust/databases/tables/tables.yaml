@@ -12,3 +12,4 @@
 - "!include public_push_devices.yaml"
 - "!include public_conversations.yaml"
 - "!include public_messages.yaml"
+- "!include public_escrow_analytics_daily.yaml"
