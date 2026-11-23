@@ -192,6 +192,54 @@ describe('wallet-readiness service', () => {
       expect(checks.assetBalance?.ok).toBe(true);
       expect(checks.assetBalance?.fix).toBeUndefined();
     });
+
+    it('returns SDK_WALLET_NOT_READY and marks fees sponsored for unactivated Pollar wallet', () => {
+      const checks = evaluateGuestChecks(null, 150, USDC_ISSUER, true, {
+        walletProvider: 'pollar',
+      });
+
+      expect(checks.accountExists?.ok).toBe(false);
+      expect(checks.accountExists?.code).toBe('SDK_WALLET_NOT_READY');
+      expect(checks.accountExists?.fix).toBe('WAIT_FOR_ACTIVATION');
+      expect(checks.accountExists?.message).toBe('Wallet still activating on-chain.');
+
+      expect(checks.xlmForFees?.ok).toBe(true);
+      expect(checks.xlmForFees?.sponsored).toBe(true);
+      expect(checks.xlmForFees?.feeCovered).toBe(true);
+      expect(checks.xlmForFees?.fix).toBeUndefined();
+
+      expect(checks.trustline?.ok).toBe(false);
+      expect(checks.trustline?.fix).toBe('ADD_TRUSTLINE');
+      expect(checks.assetBalance?.ok).toBe(false);
+      expect(checks.assetBalance?.fix).toBe('GET_TEST_USDC');
+    });
+
+    it('treats sponsored Pollar wallet with 0 XLM as fee-covered when account exists', () => {
+      const account = {
+        subentry_count: 1,
+        balances: [
+          { asset_type: 'native', balance: '0.0000000' },
+          {
+            asset_type: 'credit_alphanum4',
+            asset_code: 'USDC',
+            asset_issuer: USDC_ISSUER,
+            balance: '200.0000000',
+          },
+        ],
+      } as any;
+
+      const checks = evaluateGuestChecks(account, 150, USDC_ISSUER, true, {
+        walletProvider: 'pollar',
+      });
+
+      expect(checks.accountExists?.ok).toBe(true);
+      expect(checks.xlmForFees?.ok).toBe(true);
+      expect(checks.xlmForFees?.sponsored).toBe(true);
+      expect(checks.xlmForFees?.feeCovered).toBe(true);
+      expect(checks.xlmForFees?.fix).toBeUndefined();
+      expect(checks.trustline?.ok).toBe(true);
+      expect(checks.assetBalance?.ok).toBe(true);
+    });
   });
 
   describe('Horizon caching', () => {
@@ -371,6 +419,53 @@ describe('wallet-readiness service', () => {
       expect(result.guest.checks.assetBalance?.ok).toBe(true);
       expect(result.counterparties.hostCanReceive.ok).toBe(true);
       expect(result.counterparties.platformCanReceive.ok).toBe(true);
+    });
+
+    it('reports activating state and sponsored fee coverage when guest has pollar provider', async () => {
+      vi.mocked(hasuraRequest).mockResolvedValue({
+        user_wallets: [{ wallet_address: GUEST_WALLET, provider: 'pollar' }],
+      });
+      vi.mocked(getApartmentEscrowTerms).mockResolvedValue({
+        apartmentId: 'apt-1',
+        ownerUserId: 'host-uid',
+        receiverAddress: HOST_WALLET,
+        amount: 150,
+      });
+
+      const mockServer = {
+        loadAccount: vi.fn().mockImplementation((addr: string) => {
+          if (addr === GUEST_WALLET) {
+            return Promise.reject({ response: { status: 404 } });
+          }
+          return Promise.resolve({
+            subentry_count: 1,
+            balances: [
+              {
+                asset_type: 'credit_alphanum4',
+                asset_code: 'USDC',
+                asset_issuer: USDC_ISSUER,
+                balance: '100',
+              },
+            ],
+          });
+        }),
+      } as any;
+
+      const result = await checkWalletReadiness({
+        uid: 'guest-uid',
+        apartmentId: 'apt-1',
+        server: mockServer,
+      });
+
+      expect(result.ready).toBe(false);
+      expect(result.guest.wallet).toBe(GUEST_WALLET);
+      expect(result.guest.provider).toBe('pollar');
+      expect(result.guest.sponsored).toBe(true);
+      expect(result.guest.checks.accountExists?.ok).toBe(false);
+      expect(result.guest.checks.accountExists?.code).toBe('SDK_WALLET_NOT_READY');
+      expect(result.guest.checks.accountExists?.fix).toBe('WAIT_FOR_ACTIVATION');
+      expect(result.guest.checks.xlmForFees?.ok).toBe(true);
+      expect(result.guest.checks.xlmForFees?.sponsored).toBe(true);
     });
   });
 

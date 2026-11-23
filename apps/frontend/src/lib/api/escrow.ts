@@ -115,6 +115,10 @@ export type ReadinessCheck = {
   balance?: string;
   required?: string;
   fix?: string;
+  code?: string;
+  message?: string;
+  sponsored?: boolean;
+  feeCovered?: boolean;
 };
 
 export type GuestChecks = {
@@ -135,6 +139,8 @@ export type WalletReadiness = {
   amount: string;
   guest: {
     wallet: string | null;
+    provider?: string | null;
+    sponsored?: boolean;
     checks: GuestChecks;
   };
   counterparties: {
