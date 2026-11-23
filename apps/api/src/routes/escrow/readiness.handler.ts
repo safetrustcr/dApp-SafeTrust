@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { Horizon } from '@stellar/stellar-sdk';
 import { ApiError } from '../../http/api-error.js';
+import { requireUsdcIssuer } from '../../lib/escrow-config.js';
 import { asyncHandler } from '../../http/async-handler.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import {
@@ -65,12 +66,7 @@ export const buildTrustlineHandler = asyncHandler(
       throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in first.');
     }
 
-    const usdcIssuer = process.env.USDC_TRUSTLINE_ADDRESS;
-    if (!usdcIssuer) {
-      throw new ApiError(503, 'AUTH_NOT_CONFIGURED', 'Authentication is temporarily unavailable.', {
-        retryable: true,
-      });
-    }
+    const usdcIssuer = requireUsdcIssuer();
 
     const callerWallets = await getUserWallets(uid);
     let wallet = req.body?.walletAddress;

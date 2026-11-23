@@ -1,9 +1,5 @@
 import { Keypair, Networks, WebAuth } from '@stellar/stellar-sdk';
-
-const NETWORKS: Record<string, string> = {
-  TESTNET: Networks.TESTNET,
-  PUBLIC: Networks.PUBLIC,
-};
+import { networkPassphraseFromEnv } from '../lib/stellar-xdr.js';
 
 export interface Sep10Config {
   serverKeypair: Keypair;
@@ -23,12 +19,10 @@ export function getSep10Config(env: NodeJS.ProcessEnv = process.env): Sep10Confi
   const secret = env.SEP10_SIGNING_SEED;
   const homeDomain = env.SEP10_HOME_DOMAIN;
   const webAuthDomain = env.SEP10_WEB_AUTH_DOMAIN;
-  const networkName = env.STELLAR_NETWORK || 'TESTNET';
-  const networkPassphrase = NETWORKS[networkName];
-
-  if (!secret || !homeDomain || !webAuthDomain || !networkPassphrase) {
+  if (!secret || !homeDomain || !webAuthDomain) {
     throw new Error('SEP-10 requires a signing seed, home domain, web auth domain, and valid network');
   }
+  const networkPassphrase = networkPassphraseFromEnv(env);
 
   let serverKeypair: Keypair;
   try {

@@ -37,15 +37,8 @@ function useE2EWallet() {
       const signed = win.__e2eSign(unsignedXDR);
       // Store the last signed XDR so the idempotency test (step 9) can re-submit it.
       win.__e2eLastSignedXDR = signed;
-      // Submit through the app's existing API route
-      const res = await fetch('/api/escrow/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signedXDR: signed }),
-      });
-      if (!res.ok) {
-        throw new Error(`[e2e] submit failed: ${res.status}`);
-      }
+      // Submit through the same server-verified path real wallets use.
+      await postEscrowApi('/api/escrow/send-transaction', { signedXdr: signed });
     },
     [win],
   );
