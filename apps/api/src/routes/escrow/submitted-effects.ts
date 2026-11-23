@@ -79,7 +79,13 @@ export async function applySubmittedAction(pending: PendingAction, ctx: SubmitCo
       await dbReleaseFunds(contractId, String(p.releaseSigner));
       break;
     case 'dispute':
-      await dbDisputeEscrow(contractId, pending.engagement_id, ctx.txHash);
+      await dbDisputeEscrow(
+        contractId,
+        pending.engagement_id,
+        ctx.txHash,
+        typeof p.reason === 'string' ? p.reason : undefined,
+        typeof p.description === 'string' ? p.description : undefined,
+      );
       break;
     case 'resolve_dispute':
       await dbResolveDispute(contractId);

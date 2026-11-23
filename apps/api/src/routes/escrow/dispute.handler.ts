@@ -16,6 +16,7 @@ export const disputeHandler = asyncHandler(async (req: AuthedRequest, res: Respo
   const uid = req.user?.uid;
   if (!uid) throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in first.');
   const engagementId = requireEngagementId(req.body?.engagementId);
+  const { reason, description } = req.body ?? {};
 
   const result = await buildEscrowAction({
     uid,
@@ -24,7 +25,11 @@ export const disputeHandler = asyncHandler(async (req: AuthedRequest, res: Respo
     request: ({ signer, escrow }) => ({
       path: '/escrow/single-release/dispute-escrow',
       body: { contractId: escrow.contract_id, signer },
-      payload: { signer },
+      payload: {
+        signer,
+        ...(typeof reason === 'string' && reason.trim() ? { reason: reason.trim() } : {}),
+        ...(typeof description === 'string' && description.trim() ? { description: description.trim() } : {}),
+      },
     }),
   });
 

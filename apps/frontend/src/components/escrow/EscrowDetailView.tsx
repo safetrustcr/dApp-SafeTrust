@@ -26,6 +26,9 @@ import {
 } from 'lucide-react';
 import { EscrowPendingView } from '@/components/escrow/views/EscrowPendingView';
 import { EscrowStatusView } from '@/components/escrow/views/EscrowStatusView';
+import { OpenDisputeModal } from '@/components/escrow/OpenDisputeModal';
+import { ResolverView } from '@/components/escrow/ResolverView';
+import { isSplitValid } from '@/utils/escrow-utils';
 
 type InvoiceApartment = {
   name: string | null;
@@ -644,7 +647,15 @@ function ErrorAlert({ messages }: { messages: string[] }) {
   );
 }
 
-function DisputedView({ escrow }: { escrow?: EscrowRecord | null }) {
+function DisputedView({
+  escrow,
+  disputeReason,
+  disputeDescription,
+}: {
+  escrow?: EscrowRecord | null;
+  disputeReason?: string | null;
+  disputeDescription?: string | null;
+}) {
   const createdAt = escrow?.created_at
     ? formatDate(escrow.created_at)
     : '25 January 2025';
@@ -661,11 +672,45 @@ function DisputedView({ escrow }: { escrow?: EscrowRecord | null }) {
         <InfoPair label="Amount blocked" value={deposit} />
       </div>
 
-      <div>
-        <h3 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '1rem' }}>
-          Escrow Description
+      <div
+        style={{
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: '0.75rem',
+          padding: '1rem',
+        }}
+      >
+        <h3 style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: '1rem', color: '#991b1b', fontWeight: 700 }}>
+          Dispute Details
         </h3>
-        <textarea style={styles.input} placeholder="Description..." />
+        <div style={{ display: 'grid', gap: '0.5rem' }}>
+          <div>
+            <span style={{ fontSize: '0.85rem', color: '#7f1d1d', fontWeight: 600 }}>Reason: </span>
+            <span style={{ fontSize: '0.9rem', color: '#991b1b', fontWeight: 700 }} data-testid="dispute-reason-text">
+              {disputeReason || escrow?.resolution_notes || 'Dispute opened — pending platform resolution'}
+            </span>
+          </div>
+          {disputeDescription && (
+            <div>
+              <span style={{ fontSize: '0.85rem', color: '#7f1d1d', fontWeight: 600 }}>Description: </span>
+              <p
+                style={{
+                  margin: '0.25rem 0 0 0',
+                  fontSize: '0.875rem',
+                  color: '#450a0a',
+                  whiteSpace: 'pre-wrap',
+                  backgroundColor: '#ffffff',
+                  padding: '0.6rem',
+                  borderRadius: '0.4rem',
+                  border: '1px solid #fecaca',
+                }}
+                data-testid="dispute-description-text"
+              >
+                {disputeDescription}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div
@@ -951,6 +996,8 @@ export default function EscrowDetailView({
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [approverFunds, setApproverFunds] = useState(0);
   const [receiverFunds, setReceiverFunds] = useState(0);
+  const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
+  const [activeDisputeData, setActiveDisputeData] = useState<{ reason: string; description: string } | null>(null);
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.escrowId);
 
@@ -1040,8 +1087,11 @@ export default function EscrowDetailView({
   const showApproveButton = canMarkMilestone && isApprover && checkInMilestone?.status === 'completed';
   const showReleaseButton = canRelease && isReleaseSigner;
   // Either party may open a dispute; the resolver (platform) never may.
-  const showDisputeButton = canDispute && (isApprover || isMarker);
+  const showDisputeButton = canDispute && (isApprover || isMarker) && !isResolver;
   const showResolveButton = canResolve && isResolver;
+
+  const disputeReason = activeDisputeData?.reason || escrow?.resolution_notes || null;
+  const disputeDescription = activeDisputeData?.description || null;
 
   const phaseMessage = phase === 'building'
     ? 'Building transaction...'
@@ -1160,79 +1210,73 @@ export default function EscrowDetailView({
     if (result) await refetch();
   }, [escrow, address, execute, refetch]);
 
-  const handleOpenDispute = useCallback(async () => {
-    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
-      setErrorMessages(['Missing required escrow data to open a dispute.']);
-      return;
-    }
-
-    setErrorMessages([]);
-    const result = await execute({
-      apiRoute: '/api/escrow/dispute',
-      apiBody: {
-        engagementId: escrow.engagement_id,
-      },
-      sendTransactionBody: {
-        action: 'dispute',
-        contractId: escrow.contract_id,
-        engagementId: escrow.engagement_id,
-        senderAddress: escrow.sender_address,
-        receiverAddress: escrow.receiver_address,
-      },
-    });
-    if (result) await refetch();
-  }, [escrow, address, execute, refetch]);
-
-  const handleResolveDispute = useCallback(async () => {
-    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
-      setErrorMessages(['Missing required escrow data for dispute resolution.']);
-      return;
-    }
-
-    if (approverFunds + receiverFunds !== escrow.amount) {
-      setErrorMessages([`Approver funds + receiver funds must equal the escrow amount (${escrow.amount}).`]);
-      return;
-    }
-
-    setActionLoading('resolve');
-    setLoadingMessage('Building resolution transaction...');
-    setErrorMessages([]);
-
-    try {
-      const payload = await postEscrowApi<{ unsignedXdr?: string; networkPassphrase?: string }>('/api/escrow/resolve-dispute', {
-        contractId: escrow.contract_id,
-        engagementId: escrow.engagement_id,
-        disputeResolver: address,
-        distributions: [
-          { address: escrow.sender_address, amount: approverFunds },
-          { address: escrow.receiver_address, amount: receiverFunds },
-        ],
-      });
-
-      const unsignedXdr = payload.unsignedXdr as string | undefined;
-      if (!unsignedXdr) {
-        setErrorMessages(['No unsigned XDR returned from API']);
+  const handleOpenDispute = useCallback(
+    async (disputeData: { reason: string; description: string }) => {
+      if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
+        setErrorMessages(['Missing required escrow data to open a dispute.']);
         return;
       }
 
-      setLoadingMessage('Awaiting wallet signature...');
-      await signAndSubmit(unsignedXdr, {
-        networkPassphrase: payload.networkPassphrase,
-        action: 'resolve_dispute',
-        contractId: escrow.contract_id,
-        engagementId: escrow.engagement_id,
-        senderAddress: escrow.sender_address,
-        receiverAddress: escrow.receiver_address,
+      setErrorMessages([]);
+      const result = await execute({
+        apiRoute: '/api/escrow/dispute',
+        apiBody: {
+          engagementId: escrow.engagement_id,
+          reason: disputeData.reason,
+          description: disputeData.description,
+        },
+        sendTransactionBody: {
+          action: 'dispute',
+          contractId: escrow.contract_id,
+          engagementId: escrow.engagement_id,
+          senderAddress: escrow.sender_address,
+          receiverAddress: escrow.receiver_address,
+        },
       });
+      if (result) {
+        setActiveDisputeData(disputeData);
+        setIsDisputeModalOpen(false);
+        await refetch();
+      }
+    },
+    [escrow, address, execute, refetch],
+  );
+
+  const handleResolveDispute = useCallback(
+    async (distributions: [
+      { role: 'approver'; amount: number },
+      { role: 'serviceProvider'; amount: number }
+    ]) => {
+      if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
+        setErrorMessages(['Missing required escrow data for dispute resolution.']);
+        return;
+      }
+
+      const escrowBalance = Number(escrow.amount ?? 0);
+      if (!isSplitValid(distributions[0].amount, distributions[1].amount, escrowBalance)) {
+        setErrorMessages([`Approver funds + receiver funds must equal the escrow balance (${escrowBalance}).`]);
+        return;
+      }
 
       setErrorMessages([]);
-    } catch (err) {
-      setErrorMessages(getErrorMessages(err, 'Failed to complete dispute resolution flow.'));
-    } finally {
-      setActionLoading(null);
-      setLoadingMessage('');
-    }
-  }, [escrow, address, signAndSubmit, approverFunds, receiverFunds]);
+      const result = await execute({
+        apiRoute: '/api/escrow/resolve-dispute',
+        apiBody: {
+          engagementId: escrow.engagement_id,
+          distributions,
+        },
+        sendTransactionBody: {
+          action: 'resolve_dispute',
+          contractId: escrow.contract_id,
+          engagementId: escrow.engagement_id,
+          senderAddress: escrow.sender_address,
+          receiverAddress: escrow.receiver_address,
+        },
+      });
+      if (result) await refetch();
+    },
+    [escrow, address, execute, refetch],
+  );
 
   if (loading && !escrow) {
     return (
@@ -1351,7 +1395,13 @@ export default function EscrowDetailView({
             {view.label === 'pending' && <EscrowPendingView escrow={escrow as any} showDeploy={status === "pending_signature"} bookingKind={bookingKind} />}
             {view.label === 'paid' && <PaidStubView escrow={escrow} bookingKind={bookingKind} />}
             {view.label === 'blocked' && <BlockedStubView escrow={escrow} />}
-            {view.label === 'disputed' && <DisputedView escrow={escrow} />}
+            {view.label === 'disputed' && (
+              <DisputedView
+                escrow={escrow}
+                disputeReason={disputeReason}
+                disputeDescription={disputeDescription}
+              />
+            )}
             {view.label === 'released' && <ReleasedView escrow={escrow} />}
 
             {showFundButton && (
@@ -1400,42 +1450,31 @@ export default function EscrowDetailView({
                 status={status}
                 isLoading={actioning}
                 loadingMessage={phaseMessage}
-                onClick={handleOpenDispute}
+                onClick={() => setIsDisputeModalOpen(true)}
               />
             )}
 
             {showResolveButton && (
-              <EscrowActionButton
-                action="resolve"
-                status={status}
-                isLoading={actionLoading === 'resolve'}
-                loadingMessage={loadingMessage}
-                onClick={handleResolveDispute}
-              >
-                <div style={{ display: 'grid', gap: '0.6rem', marginBottom: '0.9rem' }}>
-                  <label style={{ fontSize: '0.82rem', color: '#374151' }}>
-                    Approver funds
-                    <input
-                      type="number"
-                      min={0}
-                      value={approverFunds}
-                      onChange={(event) => setApproverFunds(Number(event.target.value))}
-                      style={{ ...styles.input, minHeight: 'auto', marginTop: '0.3rem' }}
-                    />
-                  </label>
-                  <label style={{ fontSize: '0.82rem', color: '#374151' }}>
-                    Receiver funds
-                    <input
-                      type="number"
-                      min={0}
-                      value={receiverFunds}
-                      onChange={(event) => setReceiverFunds(Number(event.target.value))}
-                      style={{ ...styles.input, minHeight: 'auto', marginTop: '0.3rem' }}
-                    />
-                  </label>
-                </div>
-              </EscrowActionButton>
+              <ResolverView
+                escrowBalance={Number(escrow?.amount ?? 0)}
+                approverAddress={escrow?.sender_address}
+                receiverAddress={escrow?.receiver_address}
+                disputeReason={disputeReason}
+                disputeDescription={disputeDescription}
+                isLoading={actioning}
+                loadingMessage={phaseMessage}
+                onResolve={handleResolveDispute}
+              />
             )}
+
+            <OpenDisputeModal
+              isOpen={isDisputeModalOpen}
+              onClose={() => setIsDisputeModalOpen(false)}
+              onSubmit={handleOpenDispute}
+              isLoading={actioning}
+              loadingMessage={phaseMessage}
+              escrowAmount={escrow?.amount}
+            />
 
             {!isReady && (canFund || canMarkMilestone || canRelease || canDispute || canResolve) && (
               <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: '0.5rem', border: '1px solid #fcd34d' }}>
