@@ -31,3 +31,23 @@ select_permissions:
       filter:
         user_id:
           _eq: X-Hasura-User-Id
+  - role: guest
+    permission:
+      columns:
+        - id
+        - user_id
+        - role_id
+        - created_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: host
+    permission:
+      columns:
+        - id
+        - user_id
+        - role_id
+        - created_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

@@ -66,3 +66,74 @@ select_permissions:
       filter:
         deleted_at:
           _is_null: true
+  - role: guest
+    permission:
+      columns:
+        - id
+        - owner_id
+        - name
+        - description
+        - price
+        - warranty_deposit
+        - coordinates
+        - address
+        - is_available
+        - available_from
+        - available_until
+        - image_urls
+        - created_at
+        - updated_at
+      filter:
+        _and:
+          - deleted_at:
+              _is_null: true
+          - is_available:
+              _eq: true
+      allow_aggregations: true
+  - role: host
+    permission:
+      columns:
+        - id
+        - owner_id
+        - name
+        - description
+        - price
+        - warranty_deposit
+        - coordinates
+        - address
+        - is_available
+        - available_from
+        - available_until
+        - image_urls
+        - created_at
+        - updated_at
+        - deleted_at
+      filter:
+        owner_id:
+          _eq: X-Hasura-User-Id
+  # Signed-out visitors (HASURA_GRAPHQL_UNAUTHORIZED_ROLE=anonymous, #553):
+  # the public listing feed only. No owner relationship access — the listing
+  # adapter falls back to "Host" when owner is not visible.
+  - role: anonymous
+    permission:
+      columns:
+        - id
+        - owner_id
+        - name
+        - description
+        - price
+        - warranty_deposit
+        - coordinates
+        - address
+        - is_available
+        - available_from
+        - available_until
+        - image_urls
+        - created_at
+      filter:
+        _and:
+          - deleted_at:
+              _is_null: true
+          - is_available:
+              _eq: true
+      allow_aggregations: true
