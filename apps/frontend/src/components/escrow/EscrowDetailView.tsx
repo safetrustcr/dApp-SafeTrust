@@ -866,7 +866,7 @@ function ReleasedView({ escrow }: { escrow?: EscrowRecord | null }) {
   );
 }
 
-type EscrowAction = 'fund' | 'milestone' | 'approve' | 'release' | 'resolve';
+type EscrowAction = 'fund' | 'milestone' | 'approve' | 'release' | 'dispute' | 'resolve';
 
 function EscrowActionButton({
   action,
@@ -888,6 +888,7 @@ function EscrowActionButton({
     milestone: { label: 'Mark Completed', color: '#22c55e', hoverColor: '#16a34a' },
     approve: { label: 'Approve Milestone', color: '#0ea5e9', hoverColor: '#0284c7' },
     release: { label: 'Release Funds', color: '#6366f1', hoverColor: '#4f46e5' },
+    dispute: { label: 'Open Dispute', color: '#dc2626', hoverColor: '#b91c1c' },
     resolve: { label: 'Resolve Dispute', color: '#dc2626', hoverColor: '#b91c1c' },
   };
 
@@ -900,6 +901,7 @@ function EscrowActionButton({
         {action === 'milestone' && 'Mark the milestone as completed to proceed with fund release.'}
         {action === 'approve' && 'Approve the completed milestone to authorize release of the deposit.'}
         {action === 'release' && 'Release the escrowed funds to the service provider.'}
+        {action === 'dispute' && 'Raise a dispute to freeze the escrow while the platform reviews it. The platform can then resolve it.'}
         {action === 'resolve' && 'Split the deposit between the tenant (approver) and the owner (receiver) to close the dispute.'}
       </p>
       {children}
@@ -1029,6 +1031,7 @@ export default function EscrowDetailView({
   const canFund = status === 'created';
   const canMarkMilestone = status === 'funded';
   const canRelease = status === 'milestone_approved';
+  const canDispute = status === 'funded' || status === 'milestone_approved';
   const canResolve = status === 'disputed';
   const checkInMilestone = trustlessWorkEscrow?.milestones?.find((milestone) => milestone.milestoneId === 'check_in');
 
@@ -1036,6 +1039,8 @@ export default function EscrowDetailView({
   const showMilestoneButton = canMarkMilestone && isMarker && checkInMilestone?.status === 'pending';
   const showApproveButton = canMarkMilestone && isApprover && checkInMilestone?.status === 'completed';
   const showReleaseButton = canRelease && isReleaseSigner;
+  // Either party may open a dispute; the resolver (platform) never may.
+  const showDisputeButton = canDispute && (isApprover || isMarker);
   const showResolveButton = canResolve && isResolver;
 
   const phaseMessage = phase === 'building'
@@ -1137,7 +1142,7 @@ export default function EscrowDetailView({
 
     setErrorMessages([]);
     const result = await execute({
-      apiRoute: '/api/escrow/release',
+      apiRoute: '/api/escrow/release-funds',
       apiBody: {
         contractId: escrow.contract_id,
         releaseSigner: address,
@@ -1150,6 +1155,29 @@ export default function EscrowDetailView({
         senderAddress: escrow.sender_address,
         receiverAddress: escrow.receiver_address,
         releaseSigner: address,
+      },
+    });
+    if (result) await refetch();
+  }, [escrow, address, execute, refetch]);
+
+  const handleOpenDispute = useCallback(async () => {
+    if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
+      setErrorMessages(['Missing required escrow data to open a dispute.']);
+      return;
+    }
+
+    setErrorMessages([]);
+    const result = await execute({
+      apiRoute: '/api/escrow/dispute',
+      apiBody: {
+        engagementId: escrow.engagement_id,
+      },
+      sendTransactionBody: {
+        action: 'dispute',
+        contractId: escrow.contract_id,
+        engagementId: escrow.engagement_id,
+        senderAddress: escrow.sender_address,
+        receiverAddress: escrow.receiver_address,
       },
     });
     if (result) await refetch();
@@ -1366,6 +1394,16 @@ export default function EscrowDetailView({
               />
             )}
 
+            {showDisputeButton && (
+              <EscrowActionButton
+                action="dispute"
+                status={status}
+                isLoading={actioning}
+                loadingMessage={phaseMessage}
+                onClick={handleOpenDispute}
+              />
+            )}
+
             {showResolveButton && (
               <EscrowActionButton
                 action="resolve"
@@ -1399,7 +1437,7 @@ export default function EscrowDetailView({
               </EscrowActionButton>
             )}
 
-            {!isReady && (canFund || canMarkMilestone || canRelease || canResolve) && (
+            {!isReady && (canFund || canMarkMilestone || canRelease || canDispute || canResolve) && (
               <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#fef3c7', borderRadius: '0.5rem', border: '1px solid #fcd34d' }}>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#92400e' }}>
                   Connect your Stellar wallet to perform this action.

@@ -42,7 +42,6 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
           NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:placeholder"
           NEXT_PUBLIC_HASURA_GRAPHQL_URL: "http://localhost:8080/v1/graphql"
-          NEXT_PUBLIC_HASURA_ADMIN_SECRET: "placeholder_admin_secret"
           HASURA_GRAPHQL_URL: "http://localhost:8080/v1/graphql"
           HASURA_ADMIN_SECRET: "placeholder_admin_secret"
           NEXT_PUBLIC_USE_HOTEL_MOCKS: "true"
@@ -52,6 +51,11 @@ jobs:
           TRUSTLESS_WORK_API_KEY: "placeholder_tw_key"
           NEXT_PUBLIC_POLLAR_PUBLISHABLE_KEY: "placeholder_pollar_key"
           NEXT_PUBLIC_E2E_WALLET: "false"
+
+      - name: Check client bundle for secrets
+        run: bash scripts/check-client-secrets.sh
+        env:
+          HASURA_ADMIN_SECRET: "placeholder_admin_secret"
 
   mcp-trust-boundary:
     name: MCP trust boundary docs

@@ -27,6 +27,7 @@ export const ACTION_SIGNER_ROLE = {
   mark_milestone_completed: 'serviceProvider',
   approve_milestone: 'approver',
   release_funds: 'releaseSigner',
+  dispute: ['approver', 'serviceProvider'],
   resolve_dispute: 'disputeResolver',
 } as const;
 
@@ -36,6 +37,7 @@ const ACTION_ROUTE: Record<keyof typeof ACTION_SIGNER_ROLE, string> = {
   mark_milestone_completed: 'POST /api/escrow/milestone-status',
   approve_milestone: 'POST /api/escrow/approve-milestone',
   release_funds: 'POST /api/escrow/release-funds',
+  dispute: 'POST /api/escrow/dispute',
   resolve_dispute: 'POST /api/escrow/resolve-dispute',
 };
 
@@ -76,7 +78,12 @@ only accepts a signed XDR whose hash matches a row built for the same user.
 | Action | Signing role | Signer | Build route |
 |---|---|---|---|
 ${Object.entries(ACTION_SIGNER_ROLE)
-  .map(([action, role]) => `| \`${action}\` | \`${role}\` | ${ACTOR[roleOf(role)].split(' — ')[0]} | ${ACTION_ROUTE[action as keyof typeof ACTION_ROUTE]} |`)
+  .map(([action, role]) => {
+    const roles = Array.isArray(role) ? role : [role];
+    const roleText = roles.map((r) => `\`${r}\``).join(' or ');
+    const actorText = roles.map((r) => ACTOR[roleOf(r)].split(' — ')[0]).join(' or ');
+    return `| \`${action}\` | ${roleText} | ${actorText} | ${ACTION_ROUTE[action as keyof typeof ACTION_ROUTE]} |`;
+  })
   .join('\n')}
 
 \`resolve_dispute\` also requires the admin role at the route.
