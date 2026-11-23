@@ -49,6 +49,34 @@ describe('disputeHandler', () => {
     });
   });
 
+  it('builds a dispute action with reason and description stored in payload', async () => {
+    const result = { unsignedXdr: 'DISPUTE_XDR_002', txHash: 'hash-789' };
+    mockBuildEscrowAction.mockResolvedValueOnce(result);
+
+    const res = mockRes();
+    await disputeHandler(
+      authedReq({
+        engagementId: 'eng-1',
+        reason: 'Property not as described',
+        description: 'Listing mentioned AC but none was installed.',
+      }),
+      res,
+      mockNext(),
+    );
+
+    expect(res._status).toBe(200);
+    const [options] = mockBuildEscrowAction.mock.calls[0];
+    expect(options.request({ signer: 'GUEST_WALLET', escrow: { contract_id: 'CAZT001' } })).toEqual({
+      path: '/escrow/single-release/dispute-escrow',
+      body: { contractId: 'CAZT001', signer: 'GUEST_WALLET' },
+      payload: {
+        signer: 'GUEST_WALLET',
+        reason: 'Property not as described',
+        description: 'Listing mentioned AC but none was installed.',
+      },
+    });
+  });
+
   it('forwards action errors to the global error middleware', async () => {
     const error = new ApiError(409, 'INVALID_ESCROW_STATE', 'Escrow is not funded.');
     mockBuildEscrowAction.mockRejectedValueOnce(error);

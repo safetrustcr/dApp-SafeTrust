@@ -7,23 +7,30 @@ type AuthedRequest = Request & { user?: { uid: string } };
 
 type Share = { role: 'approver' | 'serviceProvider'; amount: number };
 
-function parseShares(value: unknown, total: number): Share[] {
+const toStroops = (v: number) => Math.round(v * 1e7);
+
+export function parseShares(value: unknown, total: number): Share[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new ApiError(400, 'INVALID_DISTRIBUTIONS', 'distributions must be a non-empty list.');
   }
   const shares = value.map((item) => {
     const role = (item as Share)?.role;
     const amount = Number((item as Share)?.amount);
-    if ((role !== 'approver' && role !== 'serviceProvider') || !Number.isFinite(amount) || amount <= 0) {
-      throw new ApiError(400, 'INVALID_DISTRIBUTIONS', 'Each distribution needs role "approver" or "serviceProvider" and a positive amount.');
+    if ((role !== 'approver' && role !== 'serviceProvider') || !Number.isFinite(amount) || amount < 0) {
+      throw new ApiError(400, 'INVALID_DISTRIBUTIONS', 'Each distribution needs role "approver" or "serviceProvider" and a non-negative amount.');
     }
     return { role, amount };
   });
-  const sum = shares.reduce((acc, s) => acc + s.amount, 0);
-  if (Math.abs(sum - total) > 1e-7) {
+  const sumStroops = shares.reduce((acc, s) => acc + toStroops(s.amount), 0);
+  const totalStroops = toStroops(total);
+  if (sumStroops !== totalStroops) {
     throw new ApiError(400, 'DISTRIBUTION_MISMATCH', `Distributions must add up to the escrow amount (${total}).`);
   }
-  return shares;
+  const nonZeroShares = shares.filter((s) => toStroops(s.amount) > 0);
+  if (nonZeroShares.length === 0) {
+    throw new ApiError(400, 'INVALID_DISTRIBUTIONS', 'At least one distribution must have a positive amount.');
+  }
+  return nonZeroShares;
 }
 
 /**

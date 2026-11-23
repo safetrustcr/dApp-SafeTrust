@@ -80,10 +80,18 @@ export const sendTransactionHandler = asyncHandler(async (req: AuthedRequest, re
     // the user can retry or recover via the tx hash, and surface txHash in the
     // Problem Details body so the client can run recover-from-txhash.
     await releaseClaim(pending.id);
-    if (err instanceof ApiError) {
-      err.details = { ...(err.details ?? {}), txHash };
-    } else if (err && typeof err === 'object') {
+    if (err && typeof err === 'object') {
       (err as Record<string, unknown>).txHash = txHash;
+      (err as Record<string, unknown>).payload = {
+        ...((err as Record<string, unknown>).payload as object || {}),
+        txHash,
+      };
+      if (err instanceof ApiError) {
+        (err as unknown as { details?: Record<string, unknown> }).details = {
+          ...((err as unknown as { details?: Record<string, unknown> }).details ?? {}),
+          txHash,
+        };
+      }
     }
     throw err;
   }
