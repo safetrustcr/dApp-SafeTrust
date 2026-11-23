@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { postEscrowApi, EscrowApiError, recoverEscrowFromTxHash } from '@/lib/api/escrow';
+import { Transaction, TransactionBuilder } from '@stellar/stellar-sdk';
 
 export type EscrowActionPhase = 'building' | 'signing' | 'submitting' | null;
 
@@ -46,8 +47,12 @@ export function useEscrowAction() {
     const attempt =
       attemptRef.current && attemptRef.current.route === config.apiRoute
         ? attemptRef.current
-        : { route: config.apiRoute, build: crypto.randomUUID(), submit: crypto.randomUUID()};
+        : { route: config.apiRoute, build: crypto.randomUUID(), submit: crypto.randomUUID() };
     attemptRef.current = attempt;
+
+    // Hash of the signed XDR, computed client-side as soon as we have it, so
+    // recovery works even when the submit response never arrives.
+    let localTxHash: string | null = null;
 
     try {
       const built = await postEscrowApi<{ unsignedXdr?: string; networkPassphrase?: string }>(
@@ -60,6 +65,7 @@ export function useEscrowAction() {
 
       setPhase('signing');
       const signedXdr = await signXDR(unsignedXdr, built.networkPassphrase);
+      localTxHash = computeTxHash(signedXdr, built.networkPassphrase);
 
       setPhase('submitting');
       const result = await postEscrowApi<Record<string, unknown>>(
@@ -75,7 +81,7 @@ export function useEscrowAction() {
       // network dropped), the transaction may still be on the ledger. Recover
       // it from the tx hash so the escrow moves forward. The server derives
       // everything from the pending action; we only send the hash.
-      const txHash = extractTxHash(error);
+      const txHash = extractTxHash(error) ?? localTxHash;
       if (txHash) {
         const recovered = await recoverWithBackoff(txHash);
         if (recovered) {
@@ -101,6 +107,19 @@ export function useEscrowAction() {
   }, [signXDR]);
 
   return { execute, actioning, phase, actionError, conflict };
+}
+
+/**
+ * Compute the 64-hex transaction hash from a signed XDR. The hash excludes
+ * signatures, so it matches the hash the API recorded for the unsigned XDR.
+ */
+function computeTxHash(signedXdr: string, networkPassphrase?: string): string | null {
+  try {
+    const tx = TransactionBuilder.fromXDR(signedXdr, networkPassphrase ?? '') as Transaction;
+    return Array.from(tx.hash(), (b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -137,6 +156,7 @@ async function recoverWithBackoff(
         }
         return null;
       }
+      if (error instanceof EscrowApiError && error.status === 404) return null;
       throw error;
     }
   }
