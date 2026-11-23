@@ -1,6 +1,6 @@
 /**
  * Shared flow for every build endpoint (fund, milestone-status, approve-milestone,
- * release-funds, resolve-dispute):
+ * release-funds, dispute, resolve-dispute):
  *
  *   authorize caller wallet + role
  *   → reuse the live unsigned XDR for this escrow + action, if any
