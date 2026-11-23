@@ -216,9 +216,9 @@ export function useWalletBridge(): WalletBridge {
       }
       return signer.sign(unsignedXdr, {
         address: resolvedAddress,
-        networkPassphrase: networkPassphrase || (process.env.NEXT_PUBLIC_STELLAR_NETWORK === 'PUBLIC'
-          ? WalletNetwork.PUBLIC : process.env.NEXT_PUBLIC_STELLAR_NETWORK === 'TESTNET'
-            ? WalletNetwork.TESTNET : process.env.NEXT_PUBLIC_STELLAR_NETWORK) || WalletNetwork.TESTNET,
+        // The API returns the passphrase it built with; STELLAR_NETWORK_PASSPHRASE
+        // (inlined by next.config.mjs, same name as apps/api) is the fallback.
+        networkPassphrase: networkPassphrase || process.env.STELLAR_NETWORK_PASSPHRASE || WalletNetwork.TESTNET,
       });
     },
     [resolvedAddress, resolvedProvider, stellarWalletId],

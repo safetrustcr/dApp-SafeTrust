@@ -174,7 +174,7 @@ describe('useEscrowAction', () => {
   });
 
   it('uses the API passphrase even when the browser configuration differs', async () => {
-    vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK', 'PUBLIC');
+    vi.stubEnv('STELLAR_NETWORK_PASSPHRASE', 'Public Global Stellar Network ; September 2015');
     fetchMock.mockResolvedValueOnce(jsonResponse({ unsignedXdr: 'XDR-1', networkPassphrase: 'server network' }));
     const { result } = renderHook(() => useEscrowAction());
     await act(async () => { await result.current.execute(CONFIG); });

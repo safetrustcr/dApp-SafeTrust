@@ -22,8 +22,26 @@ variable or commit them:
 TRUSTLESS_WORK_API_URL=https://dev.api.trustlesswork.com
 TRUSTLESS_WORK_API_KEY=your-testnet-secret-key
 PLATFORM_STELLAR_ADDRESS=G...
-USDC_TRUSTLINE_ADDRESS=G...
+USDC_TRUSTLINE_ADDRESS=GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+STELLAR_NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+RECONCILIATION_SECRET=same-value-as-infra/backend/.env
 ```
+
+- `TRUSTLESS_WORK_API_KEY`: a real Trustless Work testnet key. It belongs only in `apps/api/.env`; `apps/frontend` never calls Trustless Work.
+- `USDC_TRUSTLINE_ADDRESS`: the issuer of the USDC asset escrows use. The value above is Circle's testnet issuer; confirm it against [Circle's USDC addresses](https://developers.circle.com/stablecoins/usdc-contract-addresses).
+- `PLATFORM_STELLAR_ADDRESS`: a funded testnet account with a USDC trustline. If it or `USDC_TRUSTLINE_ADDRESS` is missing, deploy and readiness return `503 ESCROW_NOT_CONFIGURED` and the API log names the missing variable.
+- `STELLAR_NETWORK_PASSPHRASE`: the one network setting, read by `apps/api` and `apps/frontend` under the same name. Use the full passphrase; the API refuses to start on a label such as `TESTNET`.
+- `RECONCILIATION_SECRET`: must equal the value Hasura's reconciliation cron sends (`infra/backend/.env`). Docker Compose falls back to `myreconciliationsecret` for both containers when it is unset.
+
+### Test accounts
+
+Before booking on testnet:
+
+1. **Guest and host**: fund each with testnet XLM from Friendbot and add a USDC trustline for `USDC_TRUSTLINE_ADDRESS`.
+2. **Guest**: also needs testnet USDC (Circle faucet, below) to fund the escrow.
+3. **Platform** (`PLATFORM_STELLAR_ADDRESS`): fund with Friendbot and add the USDC trustline.
+
+`pnpm testnet:provision` does steps 1 and 3 for the e2e accounts.
 
 `FIREBASE_*` admin credentials must also be configured for the API so it can verify browser ID tokens. The escrow detail stream is currently a read-only development endpoint; do not expose it beyond local development until it authenticates a participant for the requested escrow.
 
