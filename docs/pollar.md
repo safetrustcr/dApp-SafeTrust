@@ -102,3 +102,4 @@ Account creation on-chain is asynchronous. If an escrow readiness check or trans
 ### 4. `SDK_WALLET_NOT_READY`
 - **Cause**: An escrow action was initiated before Pollar completed account activation and trustline setup on the ledger.
 - **Fix**: Wait 2–5 seconds for ledger confirmation; the readiness checklist will automatically transition to ready.
+
