@@ -10,3 +10,4 @@
 - "!include hotel_industry_room_images.yaml"
 - "!include hotel_industry_pricing_rules.yaml"
 - "!include hotel_industry_hotel_images.yaml"
+- "!include hotel_industry_top_room_reservations.yaml"
