@@ -1,0 +1,72 @@
+table:
+  name: bid_requests
+  schema: public
+object_relationships:
+  - name: apartment
+    using:
+      foreign_key_constraint_on: apartment_id
+  - name: tenant
+    using:
+      foreign_key_constraint_on: tenant_id
+array_relationships:
+  - name: bid_status_histories
+    using:
+      foreign_key_constraint_on:
+        column: bid_request_id
+        table:
+          name: bid_status_histories
+          schema: public
+select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - tenant_id
+        - current_status
+        - proposed_price
+        - desired_move_in
+        - created_at
+        - updated_at
+      filter:
+        tenant_id:
+          _eq: X-Hasura-User-Id
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - tenant_id
+        - current_status
+        - proposed_price
+        - desired_move_in
+        - created_at
+        - updated_at
+      filter:
+        apartment:
+          owner_id:
+            _eq: X-Hasura-User-Id
+insert_permissions:
+  - role: tenant
+    permission:
+      check:
+        tenant_id:
+          _eq: X-Hasura-User-Id
+      columns:
+        - apartment_id
+        - tenant_id
+        - proposed_price
+        - desired_move_in
+update_permissions:
+  - role: landlord
+    permission:
+      check:
+        apartment:
+          owner_id:
+            _eq: X-Hasura-User-Id
+      columns:
+        - current_status
+      filter:
+        apartment:
+          owner_id:
+            _eq: X-Hasura-User-Id

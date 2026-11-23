@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useAuthUser } from "@/components/auth/hooks/auth.hook";
 import { useListing } from "@/features/listings/use-listings";
 import { startConversation } from "@/lib/api/messages";
+import { MakeOfferDialog } from "@/components/dashboard/apartments/MakeOfferDialog";
 
 const styles = {
   page: {
@@ -252,6 +253,13 @@ export default function ApartmentDetailPage({
             >
               BOOK
             </Link>
+            {user && (
+              <MakeOfferDialog
+                apartmentId={id}
+                tenantId={user.uid}
+                onSuccess={() => {}}
+              />
+            )}
             {canMessageHost && (
               <button
                 onClick={handleMessageHost}

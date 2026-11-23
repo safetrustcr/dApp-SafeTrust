@@ -2,73 +2,43 @@
 
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-// import { useSuspenseQuery } from "@apollo/client";
+import { useSuspenseQuery } from "@apollo/client";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PropertySummaryHeader } from "@/components/dashboard/apartments/PropertySummaryHeader";
 import { InterestedPeopleTable } from "@/components/dashboard/apartments/InterestedPeopleTable";
-// TODO: Uncomment after running `npm run codegen` with Hasura running
-// import {
-//   GET_APARTMENT_BY_ID,
-//   GET_RENTAL_OFFERS,
-// } from "@/graphql/queries/apartment-queries";
+import {
+  GET_APARTMENT_BY_ID,
+} from "@/graphql/queries/apartment-queries";
+import {
+  GET_RENTAL_OFFERS,
+} from "@/graphql/queries/bid-queries";
 import type { RentalOffer } from "@/components/dashboard/apartments/InterestedPeopleTable";
 
 export default function InterestedPeoplePage() {
   const params = useParams();
   const router = useRouter();
-  const apartmentId = Number(params.id);
+  const apartmentId = params.id as string;
 
-  // TODO: Replace with actual GraphQL queries once codegen is run
-  // const { data: apartmentData } = useSuspenseQuery(GET_APARTMENT_BY_ID, {
-  //   variables: { id: apartmentId },
-  // });
-  // const { data: offersData } = useSuspenseQuery(GET_RENTAL_OFFERS, {
-  //   variables: { apartment_id: apartmentId, order_by: [{ offer_date: "desc" }] },
-  // });
+  const { data: apartmentData } = useSuspenseQuery(GET_APARTMENT_BY_ID, {
+    variables: { id: apartmentId },
+  });
+  const { data: offersData } = useSuspenseQuery(GET_RENTAL_OFFERS, {
+    variables: { apartment_id: apartmentId, order_by: [{ created_at: "desc" }] },
+  });
 
-  // Temporary stub data until GraphQL is set up
-  const apartmentData = {
-    apartments_by_pk: {
-      id: apartmentId,
-      name: "La sabana house",
-      location: "San José",
-      address: "329 Calle Santos, Paseo Colón, San José",
-      bedrooms: 2,
-      bathrooms: 1,
-      price: 4058.0,
-      status: "not_inhabited",
-      promoted: true,
-    },
-  };
-
-  const offersData = {
-    rental_offers: Array(10)
-      .fill(null)
-      .map((_, i) => ({
-        id: i + 1,
-        tenant_name: "Diego Duarte Fernández",
-        tenant_phone: "+506 6483252",
-        tenant_wallet_address: "XR6...32D",
-        offer_date: new Date(2024, 8, 12 + i).toISOString(),
-        bid_status: i === 1 ? "accepted" : i === 5 ? "rejected" : "pending",
-      })),
-    rental_offers_aggregate: { aggregate: { count: 10 } },
-  };
+  const apartment = apartmentData?.apartments?.[0];
+  const offers = offersData?.bid_requests || [];
+  const totalCount = offersData?.bid_requests_aggregate?.aggregate?.count || 0;
 
   const apartmentLoading = false;
   const offersLoading = false;
   const apartmentError = null;
   const offersError = null;
 
-  const apartment = apartmentData?.apartments_by_pk;
-  const offers = offersData?.rental_offers || [];
-  const totalCount =
-    offersData?.rental_offers_aggregate?.aggregate?.count || 0;
-
   // Handle invalid apartment ID
   useEffect(() => {
-    if (isNaN(apartmentId) || apartmentId < 1) {
+    if (!apartmentId) {
       router.push("/dashboard/apartments");
     }
   }, [apartmentId, router]);
@@ -114,11 +84,11 @@ export default function InterestedPeoplePage() {
 
   const mappedOffers: RentalOffer[] = offers.map((offer: any) => ({
     id: offer.id,
-    tenant_name: offer.tenant_name,
-    tenant_phone: offer.tenant_phone,
-    tenant_wallet_address: offer.tenant_wallet_address,
-    offer_date: offer.offer_date,
-    bid_status: offer.bid_status,
+    tenant_name: offer.tenant?.name || "Unknown",
+    tenant_phone: offer.tenant?.phone || "N/A",
+    tenant_wallet_address: offer.tenant?.id || "N/A", // Using tenant_id as wallet address placeholder if not available
+    offer_date: offer.created_at,
+    bid_status: offer.current_status.toLowerCase(),
   }));
 
   return (
@@ -139,9 +109,9 @@ export default function InterestedPeoplePage() {
 
       <PropertySummaryHeader
         name={apartment.name}
-        address={apartment.address || apartment.location}
-        bedrooms={apartment.bedrooms || 0}
-        bathrooms={apartment.bathrooms || 0}
+        address={apartment.address || ""}
+        bedrooms={0} // TODO: Add bedrooms to apartment query/type if needed
+        bathrooms={0} // TODO: Add bathrooms to apartment query/type if needed
         price={apartment.price}
       />
 
