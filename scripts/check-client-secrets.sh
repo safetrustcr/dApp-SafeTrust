@@ -33,5 +33,38 @@ else
   echo "⚠️ Bundle key scan skipped: TRUSTLESS_WORK_API_KEY is unavailable (expected for pull requests)" >&2
 fi
 
-[[ $fail -eq 0 ]] && echo "✅ No Trustless Work source leaks detected${TRUSTLESS_WORK_API_KEY:+; trusted bundle scan passed}"
+# ── Hasura admin secret (#553) ───────────────────────────────────────────────
+# The browser authenticates to Hasura with the Firebase ID token only. Any
+# NEXT_PUBLIC_* value is inlined into client JS, so an admin secret there gives
+# every visitor full database access.
+
+if [[ -n "${NEXT_PUBLIC_HASURA_ADMIN_SECRET:-}" ]]; then
+  echo "❌ NEXT_PUBLIC_HASURA_ADMIN_SECRET is set in the build environment" >&2
+  fail=1
+fi
+
+if grep -rnE "NEXT_PUBLIC_HASURA_ADMIN_SECRET" "$src"; then
+  echo "❌ NEXT_PUBLIC_HASURA_ADMIN_SECRET referenced in frontend source" >&2
+  fail=1
+fi
+
+if grep -rnE "NEXT_PUBLIC_HASURA_ADMIN_SECRET" apps/frontend/.env* turbo.json 2>/dev/null; then
+  echo "❌ NEXT_PUBLIC_HASURA_ADMIN_SECRET declared in env/turbo config" >&2
+  fail=1
+fi
+
+if [[ -d "$bundle" ]]; then
+  if grep -rliE "x-hasura-admin-secret|myadminsecretkey" "$bundle"; then
+    echo "❌ Hasura admin secret header or default secret found in the client bundle" >&2
+    fail=1
+  fi
+  if [[ -n "${HASURA_ADMIN_SECRET:-}" ]] && grep -rlF "$HASURA_ADMIN_SECRET" "$bundle"; then
+    echo "❌ HASURA_ADMIN_SECRET value found in the client bundle" >&2
+    fail=1
+  fi
+else
+  echo "⚠️ Hasura bundle scan skipped: $bundle not found (run after next build)" >&2
+fi
+
+[[ $fail -eq 0 ]] && echo "✅ No client secret leaks detected${TRUSTLESS_WORK_API_KEY:+; trusted bundle scan passed}"
 exit $fail
