@@ -17,6 +17,7 @@ import type { PendingAction } from '../../services/pending-actions.js';
 import { setPendingContractId } from '../../services/pending-actions.js';
 import {
   dbApproveMilestone,
+  dbDisputeEscrow,
   dbFundEscrow,
   dbInitializeEscrow,
   dbMarkMilestoneCompleted,
@@ -77,12 +78,15 @@ export async function applySubmittedAction(pending: PendingAction, ctx: SubmitCo
     case 'release_funds':
       await dbReleaseFunds(contractId, String(p.releaseSigner));
       break;
+    case 'dispute':
+      await dbDisputeEscrow(contractId, pending.engagement_id, ctx.txHash);
+      break;
     case 'resolve_dispute':
       await dbResolveDispute(contractId);
       break;
   }
   if (pending.engagement_id.startsWith('hotel:')) {
-    const status = { initialize: 'created', fund: 'funded', mark_milestone_completed: 'funded', approve_milestone: 'milestone_approved', release_funds: 'completed', resolve_dispute: 'resolved' }[pending.action];
+    const status = { initialize: 'created', fund: 'funded', mark_milestone_completed: 'funded', approve_milestone: 'milestone_approved', release_funds: 'completed', dispute: 'disputed', resolve_dispute: 'resolved' }[pending.action];
     await syncHotelEscrowTransaction(pending.engagement_id.slice('hotel:'.length), contractId, pending.signer_address, status);
   }
 }

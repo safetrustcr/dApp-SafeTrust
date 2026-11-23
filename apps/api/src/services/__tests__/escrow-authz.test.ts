@@ -31,12 +31,14 @@ const escrow = {
 const roles = rolesFor(escrow, PLATFORM);
 
 // Who may build each action — every row of ACTION_ROLE is covered.
-const TABLE: Array<[EscrowAction, string, string[]]> = [
+const TABLE: Array<[EscrowAction, string | string[], string[]]> = [
   ['initialize', GUEST, [HOST, PLATFORM, STRANGER]],
   ['fund', GUEST, [HOST, PLATFORM, STRANGER]],
   ['mark_milestone_completed', HOST, [GUEST, PLATFORM, STRANGER]],
   ['approve_milestone', GUEST, [HOST, PLATFORM, STRANGER]],
   ['release_funds', GUEST, [HOST, PLATFORM, STRANGER]],
+  // Either party may open a dispute; the platform resolver never may.
+  ['dispute', [GUEST, HOST], [PLATFORM, STRANGER]],
   ['resolve_dispute', PLATFORM, [GUEST, HOST, STRANGER]],
 ];
 
@@ -46,8 +48,11 @@ describe('ACTION_ROLE table', () => {
   });
 
   it.each(TABLE)('%s: allowed wallet resolves as signer, others get 403', (action, allowed, denied) => {
-    expect(resolveSigner([allowed], roles, action)).toBe(allowed);
-    expect(resolveSigner([STRANGER, allowed], roles, action)).toBe(allowed); // multiple wallets
+    const allowedWallets = Array.isArray(allowed) ? allowed : [allowed];
+    for (const wallet of allowedWallets) {
+      expect(resolveSigner([wallet], roles, action)).toBe(wallet);
+      expect(resolveSigner([STRANGER, wallet], roles, action)).toBe(wallet); // multiple wallets
+    }
     for (const wallet of denied) {
       expect(() => resolveSigner([wallet], roles, action)).toThrow(EscrowAccessError);
       try {
