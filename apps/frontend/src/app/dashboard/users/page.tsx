@@ -30,6 +30,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE_FORM);
   const [creating, setCreating] = useState(false);
@@ -88,11 +89,22 @@ export default function UsersPage() {
     finally { setCreating(false); }
   };
 
+  const deleteUser = async (managedUser: ManagedUser) => {
+    if (!window.confirm(`Delete ${displayName(managedUser)}? This removes their Firebase account, roles, and linked SafeTrust data.`)) return;
+    setDeletingUserId(managedUser.id); setError(null); setNotice(null);
+    try {
+      await request(`/users/${managedUser.id}`, { method: "DELETE" });
+      setUsers((current) => current.filter((entry) => entry.id !== managedUser.id));
+      setNotice(`${displayName(managedUser)} was deleted.`);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to delete the user."); }
+    finally { setDeletingUserId(null); }
+  };
+
   if (authLoading) return <p className="p-6 text-sm text-muted-foreground">Checking your access…</p>;
   return (
     <div className="mx-auto max-w-7xl space-y-5 p-2">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h1 className="text-xl font-semibold">Super host · User management</h1></div><p className="mt-1 text-sm text-muted-foreground">Create accounts and control guest, host, and controller access.</p></div>
+        <div><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h1 className="text-xl font-semibold">Super user · User management</h1></div><p className="mt-1 text-sm text-muted-foreground">Create accounts and control guest, host, and administrator access.</p></div>
         <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => void loadUsers()} disabled={loading}><RefreshCw className={loading ? "animate-spin" : ""} />Refresh</Button><Button size="sm" onClick={() => setCreateOpen(true)}><Plus />Add user</Button></div>
       </div>
       {error && <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
@@ -101,7 +113,7 @@ export default function UsersPage() {
       <div className="rounded-lg border bg-card"><Table><TableHeader><TableRow><TableHead>User</TableHead><TableHead>Location</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Access</TableHead></TableRow></TableHeader><TableBody>
         {loading && <TableRow><TableCell colSpan={4} className="py-10 text-center text-muted-foreground">Loading users…</TableCell></TableRow>}
         {!loading && filteredUsers.length === 0 && <TableRow><TableCell colSpan={4} className="py-10 text-center text-muted-foreground">No users found.</TableCell></TableRow>}
-        {!loading && filteredUsers.map((managedUser) => { const currentRole = roleFor(managedUser); const isSelf = managedUser.id === user?.uid; return <TableRow key={managedUser.id}><TableCell><p className="font-medium">{displayName(managedUser)} {isSelf && <span className="text-xs text-muted-foreground">(you)</span>}</p><p className="text-xs text-muted-foreground">{managedUser.email}</p></TableCell><TableCell className="text-muted-foreground">{managedUser.location || "—"}</TableCell><TableCell><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium capitalize">{currentRole}</span></TableCell><TableCell><div className="ml-auto flex max-w-48 items-center gap-2"><Select value={currentRole} onValueChange={(value) => void saveRole(managedUser, value as Role)} disabled={savingUserId === managedUser.id || isSelf}><SelectTrigger aria-label={`Change ${displayName(managedUser)} role`}><SelectValue /></SelectTrigger><SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role} className="capitalize">{role}</SelectItem>)}</SelectContent></Select>{isSelf && <span className="text-xs text-muted-foreground">Protected</span>}</div></TableCell></TableRow>; })}
+        {!loading && filteredUsers.map((managedUser) => { const currentRole = roleFor(managedUser); const isSelf = managedUser.id === user?.uid; return <TableRow key={managedUser.id}><TableCell><p className="font-medium">{displayName(managedUser)} {isSelf && <span className="text-xs text-muted-foreground">(you)</span>}</p><p className="text-xs text-muted-foreground">{managedUser.email}</p></TableCell><TableCell className="text-muted-foreground">{managedUser.location || "—"}</TableCell><TableCell><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium capitalize">{currentRole}</span></TableCell><TableCell><div className="ml-auto flex items-center justify-end gap-2"><Select value={currentRole} onValueChange={(value) => void saveRole(managedUser, value as Role)} disabled={savingUserId === managedUser.id || deletingUserId === managedUser.id || isSelf}><SelectTrigger aria-label={`Change ${displayName(managedUser)} role`} className="max-w-32"><SelectValue /></SelectTrigger><SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role} className="capitalize">{role}</SelectItem>)}</SelectContent></Select>{isSelf ? <span className="text-xs text-muted-foreground">Protected</span> : <Button variant="destructive" size="sm" onClick={() => void deleteUser(managedUser)} disabled={deletingUserId === managedUser.id || savingUserId === managedUser.id}>{deletingUserId === managedUser.id ? "Deleting…" : "Delete"}</Button>}</div></TableCell></TableRow>; })}
       </TableBody></Table></div>
       <Dialog open={isCreateOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Add a managed user</DialogTitle><DialogDescription>The account is created in Firebase and assigned the selected SafeTrust role.</DialogDescription></DialogHeader><form className="space-y-4" onSubmit={(event) => void createUser(event)}><div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-2"><Label htmlFor="first-name">First name</Label><Input id="first-name" value={createForm.firstName} onChange={(event) => setCreateForm({ ...createForm, firstName: event.target.value })} /></div><div className="grid gap-2"><Label htmlFor="last-name">Last name</Label><Input id="last-name" value={createForm.lastName} onChange={(event) => setCreateForm({ ...createForm, lastName: event.target.value })} /></div></div><div className="grid gap-2"><Label htmlFor="managed-email">Email</Label><Input id="managed-email" type="email" required value={createForm.email} onChange={(event) => setCreateForm({ ...createForm, email: event.target.value })} /></div><div className="grid gap-2"><Label htmlFor="managed-password">Temporary password</Label><Input id="managed-password" type="password" minLength={6} required value={createForm.password} onChange={(event) => setCreateForm({ ...createForm, password: event.target.value })} /></div><div className="grid gap-2"><Label>Initial role</Label><Select value={createForm.role} onValueChange={(value) => setCreateForm({ ...createForm, role: value as Role })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role} className="capitalize">{role}</SelectItem>)}</SelectContent></Select></div><DialogFooter><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button><Button type="submit" disabled={creating}>{creating ? "Creating…" : "Create user"}</Button></DialogFooter></form></DialogContent></Dialog>
     </div>

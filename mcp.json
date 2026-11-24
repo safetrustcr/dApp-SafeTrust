@@ -21,7 +21,8 @@
       "args": ["mcp/dist/index.js"],
       "env": {
         "HASURA_GRAPHQL_URL": "http://localhost:8080/v1/graphql",
-        "SAFETRUST_API_URL": "http://localhost:3002"
+        "SAFETRUST_API_URL": "http://localhost:3002",
+        "SAFETRUST_MCP_ENABLE_RAW_HASURA": "false"
       }
     }
   }

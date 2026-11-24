@@ -1,12 +1,16 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { useActiveWallet } from '@/hooks/use-active-wallet';
+import { useMultiWallet } from '@/components/auth/wallet/hooks/multi-wallet.hook';
+import { MainWalletSelectionModal } from '@/components/auth/wallet/components/MainWalletSelectionModal';
+import { WalletSelectionModal } from '@/components/auth/wallet/components/WalletSelectionModal';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { truncateStellarAddress } from '@/lib/utils';
-import { postEscrowApi } from '@/lib/api/escrow';
+import { postEscrowApi, getReadiness } from '@/lib/api/escrow';
+import { WalletReadinessChecklist } from './WalletReadinessChecklist';
 
 type EscrowPayFlowProps = {
   apartmentId: string;
@@ -14,6 +18,10 @@ type EscrowPayFlowProps = {
   /** Stellar G-address of the apartment owner — receiver role in the escrow. */
   ownerAddress: string;
   amount: number;
+  bookingKind?: "apartment" | "hotel-room";
+  expectedSenderAddress?: string;
+  isReadinessReady?: boolean;
+  showChecklist?: boolean;
 };
 
 const STELLAR_ADDRESS_RE = /^G[A-Z2-7]{55}$/;
@@ -21,9 +29,11 @@ const STELLAR_ADDRESS_RE = /^G[A-Z2-7]{55}$/;
 type DeployResponse = {
   contractId: string;
   unsignedXDR: string;
+  networkPassphrase?: string;
   engagementId: string;
   status: string;
   message?: string;
+  cached?: boolean;
 };
 
 export function EscrowPayFlow({
@@ -31,65 +41,113 @@ export function EscrowPayFlow({
   apartmentName,
   ownerAddress,
   amount,
+  bookingKind = "apartment",
+  expectedSenderAddress,
+  isReadinessReady,
+  showChecklist = true,
 }: EscrowPayFlowProps) {
   const router = useRouter();
   const { address, isReady, signAndSubmit } = useActiveWallet();
+  const {
+    handleConnect,
+    isMainModalOpen,
+    isStellarModalOpen,
+    closeMainModal,
+    closeStellarModal,
+    handleWalletTypeSelected,
+    handleStellarWalletSelected,
+    error: walletError,
+  } = useMultiWallet();
   const [deploying, setDeploying] = useState(false);
   const [signing, setSigning] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [deployState, setDeployState] = useState<DeployResponse | null>(null);
+  const [readinessReady, setReadinessReady] = useState<boolean | null>(null);
+  // Synchronous double-click guard — a second click in the same tick is
+  // ignored so Trustless Work is only called once per PAY press.
+  const deployInFlightRef = useRef(false);
+  const signInFlightRef = useRef(false);
+  // Reused across retries of the same deploy attempt; cleared on success.
+  const deployKeyRef = useRef<string | null>(null);
 
+  const walletMatchesReservation = !expectedSenderAddress || address === expectedSenderAddress;
   const hasOwnerWallet = STELLAR_ADDRESS_RE.test(ownerAddress);
-  const canPay = isReady && hasOwnerWallet;
-
   const payButtonLabel = useMemo(() => {
     if (deploying) return 'Deploying…';
     if (signing) return 'Signing…';
     if (deployState) return 'Sign & Send';
-    return 'PAY';
+    return 'Create escrow';
   }, [deploying, signing, deployState]);
 
   const handleDeploy = async () => {
     if (!address) {
-      setErrorMessages(['Connect your Stellar wallet before paying.']);
+      handleConnect();
       return;
     }
+    if (!hasOwnerWallet || !walletMatchesReservation) return;
+    if (deployInFlightRef.current) return;
+    deployInFlightRef.current = true;
     setDeploying(true);
     setDeployState(null);
     setErrorMessages([]);
     try {
+      deployKeyRef.current = deployKeyRef.current ?? crypto.randomUUID();
       const payload = await postEscrowApi<DeployResponse>('/api/escrow/deploy', {
-        apartmentId,
+        ...(bookingKind === "hotel-room" ? { reservationId: apartmentId } : { apartmentId }),
         senderAddress: address,
-        receiverAddress: ownerAddress,
-        amount,
-      });
+      }, { idempotencyKey: deployKeyRef.current });
+      deployKeyRef.current = null;
+      if (payload.cached && !payload.unsignedXDR) {
+        router.push(`/escrow/${apartmentId}/escrow/${encodeURIComponent(payload.engagementId)}${bookingKind === "hotel-room" ? "?kind=hotel-room" : ""}`);
+        return;
+      }
       setDeployState(payload);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to deploy escrow.'));
     } finally {
+      deployInFlightRef.current = false;
       setDeploying(false);
+    }
+  };
+
+  const handlePayClick = () => {
+    if (!isReady) {
+      setErrorMessages([]);
+      handleConnect();
+      return;
+    }
+    if (deployState) {
+      void handleSignAndSend();
+    } else {
+      void handleDeploy();
     }
   };
 
   const handleSignAndSend = async () => {
     if (!deployState || !address) return;
+    if (signInFlightRef.current) return;
+    signInFlightRef.current = true;
     setSigning(true);
     setErrorMessages([]);
     try {
       await signAndSubmit(deployState.unsignedXDR, {
+        networkPassphrase: deployState.networkPassphrase,
         action: 'initialize',
-        contractId: deployState.contractId,
+        // Legacy Freighter/Pollar implementations still accept this typed
+        // context. The API intentionally ignores it and uses its pending
+        // action record instead, so browser values cannot alter the escrow.
+        contractId: deployState.contractId ?? '',
         engagementId: deployState.engagementId,
-        propertyId: apartmentId,
         senderAddress: address,
         receiverAddress: ownerAddress,
         amount,
+        propertyId: apartmentId,
       });
-      router.push(`/apartment/${apartmentId}/escrow/${deployState.engagementId}`);
+      router.push(`/escrow/${apartmentId}/escrow/${encodeURIComponent(deployState.engagementId)}${bookingKind === "hotel-room" ? "?kind=hotel-room" : ""}`);
     } catch (error) {
       setErrorMessages(getErrorMessages(error, 'Failed to sign escrow.'));
     } finally {
+      signInFlightRef.current = false;
       setSigning(false);
     }
   };
@@ -98,50 +156,44 @@ export function EscrowPayFlow({
   // The button sits inline in ApartmentPropertyCard's header row.
   // Error messages render below the button, inside the card header area.
 
-  if (!hasOwnerWallet) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-        <span
-          title="Owner wallet not available"
-          style={{ display: 'inline-block', cursor: 'not-allowed' }}
-        >
-          <button
-            type="button"
-            disabled
-            style={{
-              ...buttonStyle,
-              opacity: 0.45,
-              cursor: 'not-allowed',
-            }}
-          >
-            PAY
-          </button>
-        </span>
-        {!isReady && (
-          <p role="status" style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280', textAlign: 'right' }}>
-            Connect your Stellar wallet to continue.
-          </p>
-        )}
-      </div>
-    );
-  }
+
+  const isReadinessBlocking =
+    isReadinessReady !== undefined
+      ? !isReadinessReady
+      : readinessReady !== null
+        ? !readinessReady
+        : false;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
       <button
         type="button"
-        onClick={deployState ? handleSignAndSend : handleDeploy}
-        disabled={!canPay || deploying || signing}
+        onClick={handlePayClick}
+        disabled={deploying || signing || (isReady && (!hasOwnerWallet || !walletMatchesReservation || isReadinessBlocking))}
         style={{
           ...buttonStyle,
-          opacity: !canPay || deploying || signing ? 0.65 : 1,
-          cursor: deploying || signing ? 'wait' : !canPay ? 'not-allowed' : 'pointer',
-          minWidth: '5.5rem',
+          opacity: deploying || signing ? 0.65 : 1,
+          cursor: deploying || signing ? 'wait' : 'pointer',
+          minWidth: isReady ? '5.5rem' : '10.5rem',
         }}
       >
-        {payButtonLabel}
+        {isReady ? payButtonLabel : 'Connect wallet'}
       </button>
 
+      {isReady && !deployState && showChecklist !== false && (
+        <div className="w-full min-w-[280px] max-w-sm text-left mt-2">
+          <WalletReadinessChecklist
+            apartmentId={bookingKind === "hotel-room" ? undefined : apartmentId}
+            reservationId={bookingKind === "hotel-room" ? apartmentId : undefined}
+            bookingKind={bookingKind}
+            onReadyChange={setReadinessReady}
+          />
+        </div>
+      )}
+
+      {isReady && !walletMatchesReservation && <p role="alert" className="max-w-60 text-xs text-orange-600">Switch to the wallet used for this reservation.</p>}
+      {isReady && address && <p className="text-xs text-muted-foreground" title={address}>Wallet: {truncateStellarAddress(address)}</p>}
+      {isReady && !hasOwnerWallet && <p role="status" className="max-w-60 text-xs text-orange-600">Owner wallet not available. Deployment is disabled.</p>}
       {!isReady && (
         <p role="status" style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280', textAlign: 'right' }}>
           Connect your Stellar wallet to continue.
@@ -162,6 +214,24 @@ export function EscrowPayFlow({
           {errorMessages.map((msg, i) => <li key={i}>{msg}</li>)}
         </ul>
       )}
+
+      {walletError && (
+        <p role="alert" style={{ margin: 0, color: '#b91c1c', fontSize: '0.8rem', textAlign: 'left' }}>
+          {walletError}
+        </p>
+      )}
+
+      <MainWalletSelectionModal
+        isOpen={isMainModalOpen}
+        onClose={closeMainModal}
+        onWalletTypeSelected={handleWalletTypeSelected}
+        stellarOnly
+      />
+      <WalletSelectionModal
+        isOpen={isStellarModalOpen}
+        onClose={closeStellarModal}
+        onWalletSelected={handleStellarWalletSelected}
+      />
     </div>
   );
 }

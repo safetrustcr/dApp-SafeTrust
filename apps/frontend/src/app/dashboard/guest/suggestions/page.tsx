@@ -1,154 +1,131 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import { useQuery } from "@apollo/client";
-import { ArrowUpDown, ChevronDown, Loader2 } from "lucide-react";
-import { ApartmentCard } from "@/components/guest/ApartmentCard";
-import { BedroomTabs } from "@/components/guest/BedroomTabs";
-import { CategoryFilter } from "@/components/guest/CategoryFilter";
-import { LocationFilter } from "@/components/guest/LocationFilter";
-import { PriceRangeFilter } from "@/components/guest/PriceRangeFilter";
-import { GET_ALL_APARTMENTS } from "@/graphql/queries/apartment-queries";
-
-interface Apartment {
-  id: string;
-  name: string;
-  description?: string | null;
-  price: number;
-  warranty_deposit: number;
-  is_available: boolean;
-  image_urls?: string[] | null;
-  address: {
-    street?: string;
-    neighborhood?: string;
-    city?: string;
-    country?: string;
-  };
-  owner_id: string;
-}
-
-const FALLBACK_IMAGE = "/img/room1.png";
-
-function toApartmentCardProps(apt: Apartment, index: number) {
-  return {
-    id: apt.id,
-    name: apt.name,
-    address: [apt.address?.street, apt.address?.neighborhood, apt.address?.city]
-      .filter(Boolean)
-      .join(", ") || "San José, Costa Rica",
-    price: apt.price,
-    beds: 2,
-    baths: 1,
-    petFriendly: true,
-    isPromoted: index === 0 || index === 3,
-    imageSrc: apt.image_urls?.[0] || FALLBACK_IMAGE,
-  };
-}
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo } from 'react';
+import { Image } from '@/components/ui/image';
+import { useAuthUser } from '@/components/auth/hooks/auth.hook';
+import { useListings } from '@/hooks/use-listings';
+import { routes } from '@/lib/routes';
 
 export default function SuggestionsPage() {
-  const [categories, setCategories] = useState<string[]>(["Family", "Students"]);
-  const [locations, setLocations] = useState<string[]>(["San Jose", "Heredia"]);
-  const [bedrooms, setBedrooms] = useState("all");
-  const [favorites, setFavorites] = useState<string[]>([]);
-
-  const { data, loading, error } = useQuery(GET_ALL_APARTMENTS, {
-    variables: { limit: 24, offset: 0 },
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { properties, loading, error, refetch } = useListings({
+    limit: 24,
+    kind: 'apartment',
   });
-
-  const rawApartments: Apartment[] = useMemo(
-    () => data?.apartments ?? [],
-    [data]
+  const { user, loading: authLoading } = useAuthUser();
+  const selectedId = searchParams.get('selected');
+  const selected = useMemo(
+    () => properties.find((property) => property.id === selectedId) ?? properties[0],
+    [properties, selectedId],
   );
 
-  const total = data?.apartments_aggregate?.aggregate?.count ?? rawApartments.length;
+  useEffect(() => {
+    if (loading || error || !selected || selected.id === selectedId) return;
+    const query = new URLSearchParams(searchParams.toString());
+    query.set('selected', selected.id);
+    router.replace(routes.suggestions(query), { scroll: false });
+  }, [error, loading, router, searchParams, selected, selectedId]);
 
-  const apartments = useMemo(() => {
-    if (bedrooms === "all") return rawApartments;
-    return rawApartments.filter((_, i) => {
-      const beds = toApartmentCardProps(_, i).beds;
-      return beds === Number(bedrooms);
-    });
-  }, [rawApartments, bedrooms]);
-
-  const toggleFavorite = (id: string) => {
-    setFavorites((curr) =>
-      curr.includes(id) ? curr.filter((f) => f !== id) : [...curr, id]
-    );
+  const selectListing = (id: string) => {
+    const query = new URLSearchParams(searchParams.toString());
+    query.set('selected', id);
+    router.push(routes.suggestions(query), { scroll: false });
   };
 
   return (
-    <div className="min-h-full bg-background text-foreground">
-      <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
-        {/* ── Filters sidebar ── */}
-        <aside className="space-y-8 rounded-lg border border-border bg-card p-5 lg:min-h-[calc(100vh-10rem)]">
-          <CategoryFilter selected={categories} onChange={setCategories} />
-          <PriceRangeFilter minPrice={900} maxPrice={20000} />
-          <LocationFilter selected={locations} onChange={setLocations} />
-        </aside>
+    <main className="min-h-screen bg-background text-foreground">
+      <header className="border-b">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5">
+          <Link href={routes.home()} className="text-xl font-bold">SafeTrust</Link>
+          <Link href={routes.rent()} className="text-sm font-semibold text-orange-700 hover:underline dark:text-orange-300">
+            Browse all stays
+          </Link>
+        </div>
+      </header>
 
-        {/* ── Main content ── */}
-        <main className="space-y-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold md:text-3xl">
-                Available for rent in{" "}
-                <span className="font-extrabold">Costa Rica, San José</span>
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {total} unit{total !== 1 ? "s" : ""} available
-              </p>
-            </div>
+      <div className="mx-auto grid max-w-7xl gap-8 px-5 py-8 lg:grid-cols-[minmax(18rem,.8fr)_minmax(0,1.2fr)]">
+        <section aria-label="Suggested stays" className="min-w-0">
+          <h1 className="text-3xl font-bold tracking-tight">Suggestions</h1>
+          <p className="mt-2 text-muted-foreground">Explore available apartments selected from current listings.</p>
 
-            <button
-              type="button"
-              className="flex w-fit items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm hover:bg-muted transition-colors"
-            >
-              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-              <span>Sort by:</span>
-              <span className="font-medium text-orange-500">Relevance</span>
-              <ChevronDown className="h-4 w-4 text-orange-500" />
-            </button>
-          </div>
-
-          <BedroomTabs selected={bedrooms} onChange={setBedrooms} />
-
-          {/* States */}
           {loading && (
-            <div className="flex items-center justify-center py-24">
-              <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+            <div role="status" aria-label="Loading suggestions" className="mt-6 space-y-3">
+              {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-xl border bg-muted" />)}
             </div>
           )}
-
           {error && (
-            <p className="py-12 text-center text-sm text-destructive">
-              Failed to load apartments — {error.message}
-            </p>
-          )}
-
-          {!loading && !error && apartments.length === 0 && (
-            <div className="py-24 text-center space-y-2">
-              <p className="text-lg font-semibold">No apartments found</p>
-              <p className="text-sm text-muted-foreground">
-                Try adjusting the filters or check back later.
-              </p>
+            <div role="alert" className="mt-6 rounded-2xl border border-destructive/30 p-6">
+              <p>We couldn&apos;t load stays. Try again.</p>
+              <button type="button" onClick={refetch} className="mt-3 font-semibold text-orange-700 underline dark:text-orange-300">Try again</button>
             </div>
           )}
-
-          {/* Apartment grid */}
-          {!loading && !error && apartments.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {apartments.map((apt, index) => (
-                <ApartmentCard
-                  key={apt.id}
-                  {...toApartmentCardProps(apt, index)}
-                  isFavorite={favorites.includes(apt.id)}
-                  onFavoriteToggle={toggleFavorite}
-                />
+          {!loading && !error && properties.length === 0 && (
+            <p className="mt-6 rounded-2xl border p-8 text-center text-muted-foreground">No stays are available right now.</p>
+          )}
+          {!loading && !error && properties.length > 0 && (
+            <ul className="mt-6 space-y-3">
+              {properties.map((property) => (
+                <li key={property.id}>
+                  <button
+                    type="button"
+                    aria-pressed={selected?.id === property.id}
+                    onClick={() => selectListing(property.id)}
+                    className={`flex w-full min-w-0 items-center gap-4 rounded-xl border p-3 text-left transition hover:border-orange-400 ${selected?.id === property.id ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30' : 'bg-card'}`}
+                  >
+                    <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
+                      {property.images[0] ? <Image src={property.images[0]} alt="" fill sizes="96px" className="object-cover" /> : null}
+                    </div>
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold">{property.name}</span>
+                      <span className="mt-1 block truncate text-sm text-muted-foreground">
+                        {[property.address, property.city].filter(Boolean).join(', ') || 'Location not provided'}
+                      </span>
+                      <span className="mt-2 block text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                        {property.price === null ? 'Rate unavailable' : `$${property.price.toLocaleString()} per month`}
+                      </span>
+                    </span>
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </main>
+        </section>
+
+        {!loading && !error && selected && (
+          <article className="min-w-0 overflow-hidden rounded-2xl border bg-card">
+            <div className="relative aspect-[16/9] bg-muted">
+              {selected.images[0] ? <Image src={selected.images[0]} alt={selected.name} fill sizes="(max-width: 1024px) 100vw, 60vw" className="object-cover" /> : null}
+            </div>
+            <div className="space-y-5 p-6">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wider text-orange-700 dark:text-orange-300">Apartment</p>
+                <h2 className="mt-2 text-2xl font-bold">{selected.name}</h2>
+                <p className="mt-2 text-muted-foreground">{[selected.address, selected.city].filter(Boolean).join(', ') || 'Location not provided'}</p>
+              </div>
+              <p className="text-2xl font-semibold text-emerald-700 dark:text-emerald-400">
+                {selected.price === null ? 'Rate unavailable' : `$${selected.price.toLocaleString()} per month`}
+              </p>
+              {selected.description && <p className="leading-7 text-muted-foreground">{selected.description}</p>}
+              <div className="flex flex-wrap gap-3">
+                <Link href={routes.listing({ kind: 'apartment', id: selected.id })} className="rounded-xl border px-5 py-3 text-center font-semibold hover:bg-muted">
+                  View listing
+                </Link>
+                {selected.price !== null && (
+                  <Link
+                    href={authLoading || user ? routes.bookApartment(selected.id) : routes.login(routes.bookApartment(selected.id))}
+                    className="rounded-xl bg-orange-600 px-5 py-3 text-center font-semibold text-white hover:bg-orange-700"
+                  >
+                    Book
+                  </Link>
+                )}
+              </div>
+            </div>
+          </article>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

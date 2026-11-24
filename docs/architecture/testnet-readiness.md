@@ -22,18 +22,47 @@ variable or commit them:
 TRUSTLESS_WORK_API_URL=https://dev.api.trustlesswork.com
 TRUSTLESS_WORK_API_KEY=your-testnet-secret-key
 PLATFORM_STELLAR_ADDRESS=G...
-USDC_TRUSTLINE_ADDRESS=G...
+USDC_TRUSTLINE_ADDRESS=GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+STELLAR_NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+RECONCILIATION_SECRET=same-value-as-infra/backend/.env
 ```
+
+- `TRUSTLESS_WORK_API_KEY`: a real Trustless Work testnet key. It belongs only in `apps/api/.env`; `apps/frontend` never calls Trustless Work.
+- `USDC_TRUSTLINE_ADDRESS`: the issuer of the USDC asset escrows use. The value above is Circle's testnet issuer; confirm it against [Circle's USDC addresses](https://developers.circle.com/stablecoins/usdc-contract-addresses).
+- `PLATFORM_STELLAR_ADDRESS`: a funded testnet account with a USDC trustline. If it or `USDC_TRUSTLINE_ADDRESS` is missing, deploy and readiness return `503 ESCROW_NOT_CONFIGURED` and the API log names the missing variable.
+- `STELLAR_NETWORK_PASSPHRASE`: the one network setting, read by `apps/api` and `apps/frontend` under the same name. Use the full passphrase; the API refuses to start on a label such as `TESTNET`.
+- `RECONCILIATION_SECRET`: must equal the value Hasura's reconciliation cron sends (`infra/backend/.env`). Docker Compose falls back to `myreconciliationsecret` for both containers when it is unset.
+
+### Test accounts
+
+Before booking on testnet:
+
+1. **Guest and host**: fund each with testnet XLM from Friendbot and add a USDC trustline for `USDC_TRUSTLINE_ADDRESS`.
+2. **Guest**: also needs testnet USDC (Circle faucet, below) to fund the escrow.
+3. **Platform** (`PLATFORM_STELLAR_ADDRESS`): fund with Friendbot and add the USDC trustline.
+
+`pnpm testnet:provision` does steps 1 and 3 for the e2e accounts.
 
 `FIREBASE_*` admin credentials must also be configured for the API so it can verify browser ID tokens. The escrow detail stream is currently a read-only development endpoint; do not expose it beyond local development until it authenticates a participant for the requested escrow.
 
-Before attempting a transaction, every wallet participating in the flow must:
+Before attempting a transaction, every wallet participating in the flow must meet the wallet readiness checks.
 
-1. Be on Stellar testnet.
-2. Hold test XLM for transaction fees.
-3. Have a trustline for the same testnet asset issuer configured above.
-4. Match the escrow role address: tenant/approver, host/service provider, or
-   platform/dispute resolver.
+## Wallet readiness requirements
+
+| Requirement | Why | Fix on Testnet | Mainnet behavior |
+| :--- | :--- | :--- | :--- |
+| **Connected wallet registered** | SafeTrust enforces caller authorization (#443) | "Link this wallet" (`/api/auth/sync-wallet`) or switch wallet | Switch or link wallet |
+| **Account exists + spare XLM** | Stellar base reserve (`(2 + subentries) × 0.5 XLM`) + 1.0 XLM fee buffer | "Fund with Friendbot" (`https://friendbot.stellar.org?addr=...`) | Deposit XLM to cover reserve & fees |
+| **USDC trustline** | Stellar accounts cannot hold custom assets without an explicit trustline for the configured issuer (`USDC_TRUSTLINE_ADDRESS`) | "Add USDC trustline" (sign unsigned `changeTrust` XDR from `/api/escrow/readiness/trustline` and submit to Horizon) | Sign `changeTrust` XDR |
+| **USDC balance ≥ amount** | The fund escrow transaction transfers the deposit/payment in USDC | Testnet faucet: [Circle USDC Testnet Faucet](https://faucet.circle.com/) | Deposit USDC |
+| **Host USDC trustline** | Release funds transfers deposit to host | Blocks guest until host completes wallet setup ("Message host") | Blocks guest until host completes wallet setup |
+| **Platform USDC trustline** | Platform fees transfer to `PLATFORM_STELLAR_ADDRESS` | Checked server-side | Checked server-side |
+
+### Testnet faucets
+
+- **XLM Faucet (Friendbot)**: `https://friendbot.stellar.org?addr={publicKey}`
+- **USDC Faucet**: For Circle's official Testnet USDC issuer (`GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`), obtain testnet USDC from [https://faucet.circle.com/](https://faucet.circle.com/).
+
 
 ## Verified API contract
 
@@ -52,9 +81,12 @@ a valid API key and a user-controlled funded wallet.
 
 1. **Configure the Trustless Work secret.** The current local API environment
    has an empty `TRUSTLESS_WORK_API_KEY`, so a live request must fail safely.
-2. **Resolve Hasura metadata inconsistency.** On the developer machine run:
-   `cd infra/backend && hasura metadata ic list --endpoint http://localhost:8080 --admin-secret "$HASURA_GRAPHQL_ADMIN_SECRET"`.
-   Fix every listed object before relying on production permissions.
+2. **Resolve Hasura metadata inconsistency.** [RESOLVED in #441, #493] Hasura metadata
+   is consistent on a fresh local stack (`make infra-reset`). Out-of-scope tenant
+   objects were removed from the safetrust metadata build, trigger/action
+   environment variables (`HASURA_EVENT_SECRET`, `WEBHOOK_ADMIN_SECRET`) were
+   configured in `.env.example` and `docker-compose.yml`, and `make metadata-check`
+   now runs in CI to prevent regressions.
 3. **Unify the two persistence projections.** `escrows` drives the apartment
    payment UI while `trustless_work_escrows` plus `escrow_milestones` drives the
    lifecycle state. Define one canonical escrow record and synchronize the
@@ -62,10 +94,12 @@ a valid API key and a user-controlled funded wallet.
 4. **Add integration tests.** Use a dedicated funded testnet wallet pair and
    test deploy → sign → submit → fund → milestone → release. Never use a
    production key, a production wallet, or real funds in CI.
-5. **Inbound webhooks are intentionally disabled.** No active metadata caller
-   points to the removed Next.js webhook. If Trustless Work webhooks are later
-   configured, add an `apps/api` endpoint with the provider's documented HMAC
-   signature and replay protection before enabling it.
+5. **Cron reconciliation is implemented and authenticated.** `POST /reconciliation/sync-escrows`
+   is mounted in `apps/api` and protected by `x-reconciliation-secret`, so the
+   Hasura cron can confirm submitted transaction hashes and reconcile forward-only
+   drift without a browser session. Inbound Trustless Work webhooks remain
+   disabled until the provider publishes an HMAC signature and replay-protection
+   contract for the endpoint.
 
 ## Non-blocking library note
 

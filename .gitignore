@@ -37,10 +37,17 @@ Thumbs.db
 coverage/
 
 # IDE (optional — remove if your team commits shared VS Code settings)
+.vscode/
 .idea/
 *.swp
 *.swo
 
 # Vercel
 .vercel
+# MCP server: local credentials only (issue #529)
 mcp/.env
+mcp/.env.*
+!mcp/.env.example
+
+# pnpm workspace: npm lockfiles are never used
+package-lock.json

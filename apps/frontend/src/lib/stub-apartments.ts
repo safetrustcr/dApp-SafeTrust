@@ -1,39 +1,23 @@
-export const STUB_APARTMENTS = [
-  {
-    id: "550e8400-e29b-41d4-a716-446655440001",
-    name: "La sabana sur",
-    address: "329 Calle santos, San Jose",
-    price: 4058,
-    bedrooms: 2,
-    bathrooms: 1,
-    petFriendly: true,
-    owner: {
-      name: "Alberto Casas",
-      email: "albertoCasas100@gmail.com",
-      phone: "+506 64852179",
-    },
-    description:
-      "Beautiful apartment in the heart of San José with modern amenities and stunning views.",
-  },
-  {
-    id: "550e8400-e29b-41d4-a716-446655440002",
-    name: "Los yoses",
-    address: "329 Calle santos, San Jose",
-    price: 4000,
-    bedrooms: 2,
-    bathrooms: 1,
-    petFriendly: true,
-    owner: {
-      name: "Maria Lopez",
-      email: "maria.lopez@example.com",
-      phone: "+506 64852180",
-    },
-    description: "Cozy apartment near Los Yoses with great transit access.",
-  },
-] as const;
+/**
+ * Routing compatibility for legacy mock-hotel links.
+ *
+ * The early hotel mock used numeric ids while the canonical apartment/escrow
+ * domain uses database UUIDs; this map keeps shared /hotel/:id links and old
+ * mock cards resolving to the canonical route.
+ *
+ * The demo apartment fixtures (STUB_APARTMENTS / getStubApartmentById) that
+ * used to live here were removed with the typed listing model (issue #521):
+ * stub data must never feed live pages, and no test in the repo imports them.
+ */
 
-export type StubApartment = (typeof STUB_APARTMENTS)[number];
+const LEGACY_HOTEL_APARTMENT_IDS: Readonly<Record<string, string>> = {
+  '1': '550e8400-e29b-41d4-a716-446655440001',
+  '2': '550e8400-e29b-41d4-a716-446655440002',
+};
 
-export function getStubApartmentById(id: string): StubApartment | undefined {
-  return STUB_APARTMENTS.find((apartment) => apartment.id === id);
+const KNOWN_CANONICAL_IDS = new Set(Object.values(LEGACY_HOTEL_APARTMENT_IDS));
+
+export function canonicalApartmentRouteId(id: string): string | null {
+  if (KNOWN_CANONICAL_IDS.has(id)) return id;
+  return LEGACY_HOTEL_APARTMENT_IDS[id] ?? null;
 }

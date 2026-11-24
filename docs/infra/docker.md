@@ -40,7 +40,7 @@ graph TD
 ### api (apps/api)
 - Built from `../../apps/api/Dockerfile` (Node 20 Alpine)
 - Port: `3002:3002`
-- Replaces the archived `services/webhook` process (Compute Resource Consolidation)
+- Replaces the archived `services/webhook` process, retired under the Compute Resource Consolidation pattern and removed in a later cleanup (see [docs/architecture/overview.md](../architecture/overview.md) — Retired services)
 
 ## Local dev vs Docker Compose
 

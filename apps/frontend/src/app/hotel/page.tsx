@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
 export default function RemovedHotelRoutePage() {
-  notFound();
+  // Legacy public URL kept for bookmarks and shared links.
+  redirect("/rent");
 }

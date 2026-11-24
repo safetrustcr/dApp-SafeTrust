@@ -82,6 +82,25 @@ at most one primary wallet per user. Both wallet upsert paths demote the user's
 current primary and promote the selected wallet in one Hasura mutation, so the
 change is atomic.
 
+## Signing transport and network
+
+`WalletBridge.sign` is the XDR signing entry point. The persisted
+`walletProvider` records the selected transport separately from the display name
+and `stellarWalletId`: direct Freighter uses its adapter, while Freighter chosen
+inside Stellar Wallets Kit stays on the Kit adapter. Older sessions without the
+transport field retain the legacy resolution until the user reconnects.
+
+Selecting Pollar clears the previous signing selection before starting its
+asynchronous login. Once the SDK supplies an address, the bridge stores it only
+if Pollar is still selected. Pollar XDR signing remains explicitly unsupported;
+neither an earlier Kit selection nor an installed extension is used as fallback.
+
+Escrow build/deploy responses include the API verifier's public
+`networkPassphrase`, including cached unsigned transactions. The frontend passes
+it to the selected signing adapter and still submits escrow XDR exclusively to
+`/api/escrow/send-transaction`. Client-side provider metadata never grants server
+authorization or changes the server's expected signer, pending action or network.
+
 ## Wallet address storage
 
 ```sql

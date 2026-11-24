@@ -1,1 +1,8 @@
-{}
+depth_limit:
+  global: 10
+  per_role:
+    mcp_reader: 5
+node_limit:
+  global: 1000
+  per_role:
+    mcp_reader: 100

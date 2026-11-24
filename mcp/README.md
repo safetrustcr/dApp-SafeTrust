@@ -1,10 +1,20 @@
 # @safetrust/mcp
 
-SafeTrust's own MCP server. It exposes escrow operations, live Hasura queries and
-SafeTrust architecture context to AI editors (Cursor, Claude Code), so a contributor
-can ask *"what is the owner wallet for apartment `<uuid>`?"* or *"deploy an escrow for
-apartment `<uuid>`, tenant `G…`, owner `G…`, 1200 USDC"* and get answers wired to this
-repo's real routes, tables and role mappings — not generic TrustlessWork advice.
+SafeTrust's own MCP server: local developer tooling that lets an AI client
+(Claude Code, Claude Desktop, Cursor, the MCP Inspector) read your local
+SafeTrust stack and explain where a booking's escrow stands. Ask it *"why is
+booking `hotel:<reservationId>` stuck?"* or *"can apartment `<uuid>` be escrowed
+for guest `G…`?"* and it answers from the same tables and rules `apps/api` uses.
+
+It never signs, submits or holds keys, and it never talks to Trustless Work:
+every transaction is built by `apps/api` and signed by a person in their wallet.
+
+> **Read [`docs/mcp/README.md`](../docs/mcp/README.md) first.** It states what this
+> server is and is not (local stdio tooling, never a public API, never holds keys or
+> submits transactions), how to connect Claude Code, Claude Desktop or the MCP
+> Inspector, the safety of every tool, and what to do if an AI client is exposed to
+> privileged data. It is also served as the resource
+> `safetrust://docs/safetrust-mcp-trust-boundary`.
 
 ## Setup
 
@@ -13,93 +23,176 @@ pnpm install
 pnpm --filter @safetrust/mcp build
 ```
 
-The root [`mcp.json`](../mcp.json) registers this server over stdio alongside the
-external TrustlessWork and Stellar Raven servers, so editors pick it up automatically.
-Its `args` are repo-root relative (`mcp/dist/index.js`), which means the build has to
-run before the editor connects. During development, `pnpm --filter @safetrust/mcp dev`
-runs the TypeScript sources directly through `tsx`.
+The root [`mcp.json`](../mcp.json) registers this server over stdio for editors
+that read it (Cursor). Claude Code and Claude Desktop need their own entry — see
+[client setup](../docs/mcp/README.md#3-set-it-up). Its `args` are repo-root
+relative (`mcp/dist/index.js`), so build before the editor connects;
+`pnpm --filter @safetrust/mcp dev` runs the TypeScript sources through `tsx`.
+Restart the client after a rebuild — stdio servers start once per session.
 
-Restart the MCP client after a rebuild — stdio servers are started once per session.
+## The flow these tools follow
 
-## Available tools
+Two booking kinds share one escrow model in `apps/api`:
 
-| Tool | What it does | Needs |
+| Booking | Engagement id | Terms come from |
 |---|---|---|
-| `check-stack-health` | Ping apps/api, Hasura, and TrustlessWork testnet and report their status | apps/api, Hasura, TrustlessWork |
-| `deploy-escrow` | Deploys a single-release escrow via `apps/api` `POST /api/escrow/deploy`, returns the unsigned XDR | `apps/api` |
-| `fund-escrow` | Builds the funding transaction via `POST /api/escrow/fund` | `apps/api` |
-| `orchestrate-escrow` | Stateless step-by-step guide through the whole deploy → sign → fund → release lifecycle | — |
-| `get-escrow-status` | Looks up `public.escrows` by `contractId` or `engagementId` | Hasura |
-| `explain-escrow-roles` | SafeTrust ↔ TrustlessWork role mapping reference | — |
-| `get-apartment` | Apartment details plus the owner's Stellar wallet | Hasura |
-| `list-apartments` | Search listings by name, price and availability | Hasura |
-| `query-escrows` | Filter `public.escrows` by status, apartment or wallet | Hasura |
-| `query-trustless-work-escrows` | Filter `public.trustless_work_escrows` (`marker`/`approver`/`releaser`/`resolver`) | Hasura |
-| `query-user-wallets` | Resolve wallets by user id, email or address | Hasura |
-| `hasura-query` | Escape hatch: any read-only GraphQL query. Mutations and subscriptions are refused | Hasura |
+| Apartment deposit | `rental:<apartmentId>:<guestFirebaseUid>` | `apartments.warranty_deposit` + the owner's primary wallet |
+| Hotel reservation | `hotel:<reservationId>` | `reservations.total_amount` + the hotel owner's primary wallet |
 
-`deploy-escrow` and `fund-escrow` never sign or submit anything — they return the
-unsigned XDR that a wallet (Freighter) has to sign, exactly like the HTTP routes do.
+1. **Build.** `POST /api/escrow/deploy` (`apartmentId` or `reservationId` + the
+   guest's registered wallet), then `/fund`, `/milestone-status`,
+   `/approve-milestone`, `/release-funds`, `/resolve-dispute`. Each checks that the
+   caller's registered wallet holds the signing role and records the unsigned XDR
+   in `escrow_pending_actions` under its hash (status `built`).
+2. **Sign and submit.** The signer signs in their wallet in the browser; the
+   frontend calls `POST /api/escrow/send-transaction`, which only accepts a signed
+   XDR whose hash matches a row built for that user (status `submitted`).
+3. **Transition.** Status changes follow `escrow_status_transitions`
+   (pending_signature → created → funded → milestone_approved → completed, plus
+   disputed/resolved/cancelled) and are logged, append-only, in
+   `escrow_transactions`.
+4. **Reconcile.** `POST /reconciliation/sync-escrows` (cron, secret header) asks
+   Horizon about submitted transactions and applies the ones that landed.
 
-## Orchestrating the lifecycle
+## Tools
 
-`orchestrate-escrow` walks a contributor through the full lifecycle without
-holding any state server-side. Call it with `step="start"` and the booking
-details, then feed each response's `engagementId`/`contractId` back into the
-next call to resume:
+| Tool | What it answers | Reads |
+|---|---|---|
+| `get-booking-context` | Property, dates, amount + asset, host/guest wallets (shortened), existing escrows, and anything that would make `apps/api` refuse to deploy | Hasura |
+| `get-wallet-readiness` | Can this booking be escrowed? The checks the app shows the guest — registered wallet, account, XLM for fees, USDC trustline and balance, host and platform can receive — each failing check with its fix | `apps/api` `GET /api/escrow/readiness`; fallback Hasura + Testnet Horizon |
+| `diagnose-escrow` | Plain-language status and next step: built-not-signed, expired, submitted-not-confirmed, lost, confirmed-but-DB-behind (reconciler), failed, synced | Hasura, Testnet Horizon |
+| `get-escrow-status` | The escrow row, its last 10 transitions and the Trustless Work mirror status | Hasura |
+| `get-pending-action` | Built transactions for an escrow: action, status, tx hash, signer, expiry — never the XDR | Hasura |
+| `deploy-escrow` | Builds the unsigned deploy transaction (`POST /api/escrow/deploy`) as the local test user; opt-in | `apps/api` |
+| `fund-escrow` | Builds the unsigned fund transaction (`POST /api/escrow/fund`) as the local test user; opt-in | `apps/api` |
+| `orchestrate-escrow` | Stateless step-by-step guide through the lifecycle | — |
+| `explain-escrow-roles` | Which wallet fills each Trustless Work role and which role signs each action | — |
+| `check-stack-health` | Are `apps/api` and Hasura up? | `apps/api`, Hasura |
+| `get-apartment`, `list-apartments` | Listings and owner wallets | Hasura |
+| `query-escrows`, `query-trustless-work-escrows`, `query-user-wallets` | Filtered table reads | Hasura |
+| `hasura-query` | Escape hatch: read-only GraphQL under the `mcp_reader` role; registered only when `SAFETRUST_MCP_ENABLE_RAW_HASURA=true` | Hasura |
 
-| Step | What it tells you to do |
-|---|---|
-| `start` | Call `deploy-escrow` with the apartment, both wallet addresses and the amount |
-| `after-deploy` | Sign the returned XDR in Freighter, then call `fund-escrow` with `contractId`, `signer`, `amount` |
-| `after-fund` | Lifecycle note — `milestone-status` by the host, then `release-funds` by the tenant |
-| `status` | Call `get-escrow-status` with `contractId` or `engagementId` |
+**Output rules.**
 
-Every step routes only through `apps/api` (`POST /api/escrow/…`) or the other
-MCP tools. `orchestrate-escrow` never calls TrustlessWork directly and no XDR is
-ever signed server-side — Freighter signing stays in the browser.
+- Only `deploy-escrow` and `fund-escrow` return an unsigned XDR. Every other tool
+  withholds XDRs, even if a query selects one.
+- Stellar addresses are shortened (`GABC…WXYZ`) unless
+  `SAFETRUST_MCP_SHOW_FULL_IDS=true`; emails and phone numbers are masked.
+- Each tool invocation writes a data-free audit line to stderr.
 
-## Available resources
+**Build tools are opt-in.** `deploy-escrow` and `fund-escrow` make no request
+unless `SAFETRUST_MCP_ALLOW_MUTATIONS=true`. When enabled, they verify
+`GET /health` reports `stellarNetwork=TESTNET`, sign in once as the configured
+Firebase test user, and refresh the cached ID token five minutes before expiry.
+Each call sends the bearer token and a UUID `Idempotency-Key`; the key is returned
+in the tool response for safe retries.
+
+**Readiness comes from `apps/api`.** `get-wallet-readiness` calls
+`GET /api/escrow/readiness`, so it reports exactly what the app's readiness
+checklist shows, and explains each fix code (`LINK_WALLET`, `FUND_XLM`,
+`ADD_TRUSTLINE`, `GET_TEST_USDC`). That route needs a signed-in user, so when it
+answers `401` — or when `apps/api` is not running — the tool falls back to its own
+read-only Hasura and Testnet Horizon checks and labels its answer as such. A real
+refusal from `apps/api` (for example `SELF_ESCROW_NOT_ALLOWED`) is shown as is.
+
+**Reads run as `mcp_reader`.** All Hasura reads authenticate locally with the
+admin secret and explicitly assume the `mcp_reader` role. Hasura enforces that
+role's select-only table and column permissions; messages, conversations, push
+devices and idempotency keys are not readable. Query depth and node limits are
+also enforced by Hasura, and each named list tool caps results at 100 rows.
+
+### Trying `diagnose-escrow` locally
+
+[`tests/fixtures/diagnose-cases.sql`](tests/fixtures/diagnose-cases.sql) seeds
+three escrows into a local database: built-but-unsigned, submitted-not-confirmed
+and confirmed-and-synced. The file header has the `psql` command.
+
+## Resources
 
 | URI | Contents |
 |---|---|
-| `safetrust://docs/architecture` | Escrow lifecycle, monorepo layout, Hasura tables, role mappings — generated at read time |
+| `safetrust://docs/architecture` | Escrow lifecycle, monorepo layout, tables and role mappings — generated at read time |
 | `safetrust://docs/safetrust-readme` | Root `README.md` |
 | `safetrust://docs/safetrust-mcp-readme` | This file |
+| `safetrust://docs/safetrust-mcp-trust-boundary` | `docs/mcp/README.md` — trust boundary, client setup, tool safety, incident response |
 | `safetrust://docs/safetrust-api-env-example` | `apps/api/.env.example` |
 | `safetrust://docs/safetrust-frontend-readme` | `apps/frontend/README.md`, when it exists |
 
-File-backed resources are read on each request, so edits show up without a restart.
-Missing files are skipped rather than failing startup.
+File-backed resources are read on each request; missing files are skipped.
 
-## Environment
+## Configuration
 
-Read from the `env` block in the root `mcp.json` — no `.env` file is needed for local
-development. All of them have defaults that match `bin/start`.
+Values come from the MCP client's `env` block or from the gitignored `mcp/.env`
+(copy [`.env.example`](.env.example)); the environment wins. Configuration fails
+closed: `HASURA_GRAPHQL_URL`, `HASURA_ADMIN_SECRET` and `SAFETRUST_API_URL` have no
+defaults, and non-local hosts are refused unless `SAFETRUST_MCP_ALLOW_REMOTE=true`.
+Never put the test password in `mcp.json`, tool arguments, or source control.
 
-| Variable | Default | Used by |
+Configuration is read when a tool runs, not at startup: the server starts, lists
+its tools and serves the docs resources with no variables set, and each tool that
+needs a missing or invalid value returns `isError` naming the variable (never its
+value). At startup one line goes to stderr, e.g.
+`hasura: configured (http://localhost:8080/v1/graphql) · api: missing · mutations: disabled`.
+
+| Variable | Default | When missing or invalid |
 |---|---|---|
-| `HASURA_GRAPHQL_URL` | `http://localhost:8080/v1/graphql` | every Hasura tool |
-| `HASURA_ADMIN_SECRET` | `myadminsecretkey` | every Hasura tool (`HASURA_GRAPHQL_ADMIN_SECRET` also accepted) |
-| `SAFETRUST_API_URL` | `http://localhost:3002` | `deploy-escrow`, `fund-escrow` |
-| `PLATFORM_STELLAR_ADDRESS` | unset | shown by `explain-escrow-roles` (`NEXT_PUBLIC_PLATFORM_ADDRESS` also accepted) |
-| `NEXT_PUBLIC_USDC_ADDRESS` | testnet USDC issuer | shown by `explain-escrow-roles` |
-| `SAFETRUST_REPO_ROOT` | auto-detected | overrides repo-root detection for the docs resources |
+| `HASURA_GRAPHQL_URL` | none | Hasura tools fail: `HASURA_GRAPHQL_URL is not set.` |
+| `HASURA_ADMIN_SECRET` (alias `HASURA_GRAPHQL_ADMIN_SECRET`) | none | Hasura tools fail: `HASURA_ADMIN_SECRET is not set …` |
+| `SAFETRUST_API_URL` | none | apps/api tools fail: `SAFETRUST_API_URL is not set.` |
+| `SAFETRUST_MCP_ALLOWED_HOSTS` | `localhost`, `127.0.0.1`, `host.docker.internal` | Extra comma-separated Docker service names treated as local. Any other host: `Remote hosts are disabled for the MCP.` |
+| `SAFETRUST_MCP_ALLOW_REMOTE` | `false` | `true` allows non-local hosts and logs a warning at startup. Leave off. |
+| `SAFETRUST_MCP_SHOW_FULL_IDS` | `false` | `true` prints full Stellar addresses instead of `GABC…WXYZ`. Local debugging only. |
+| `SAFETRUST_MCP_ALLOW_MUTATIONS` | `false` | Build tools return `isError` without calling apps/api. |
 
-Queries run with the Hasura **admin secret**, bypassing row-level permissions — this is
-a local developer tool, so treat its output as privileged and do not point it at a
-production Hasura instance.
+### Output redaction
+
+Every tool result goes through [`src/lib/redact.ts`](src/lib/redact.ts) before it
+reaches the client: Stellar addresses become `GABC…WXYZ`, emails `j***@example.com`,
+phone numbers `***1234`, base64 blobs over 200 characters `<xdr 1.2 KB>` (except the
+unsigned XDR that `deploy-escrow` and `fund-escrow` exist to return), and Hasura /
+apps/api errors keep their message only — no stack, SQL, `extensions` or headers.
+
+### Secrets in git
+
+`mcp/.env` and `mcp/.env.*` are gitignored (`.env.example` is not).
+`pnpm --filter @safetrust/mcp check:secrets` (run in CI) fails if a tracked file under
+`mcp/` contains an admin-secret value — the well-known local default, or the one in
+your environment, `infra/backend/.env` or `mcp/.env` — or if `mcp/src` falls back
+to a literal secret.
+
+The full list, with what each variable grants, is in
+[`docs/mcp/README.md`](../docs/mcp/README.md#configuration), generated from
+[`.env.example`](.env.example).
+
+## Tests
+
+| Suite | Command | Needs | Runs |
+|---|---|---|---|
+| Unit | `pnpm --filter @safetrust/mcp test` | nothing — every `fetch` is stubbed | every PR |
+| Contract | `pnpm --filter @safetrust/mcp test:contract` | nothing — apps/api is mounted in-process, Hasura and Firebase are mocked | PRs touching `mcp/**` or `apps/api/src/routes/**` |
+| Escrow tools | `pnpm --filter @safetrust/mcp test:escrow` | nothing — Hasura, `apps/api` and Horizon answered from fixtures | every PR |
+| Trust boundary | `pnpm --filter @safetrust/mcp test:boundary` | nothing | every PR |
+| Smoke | `MCP_TESTNET_SMOKE=true pnpm --filter @safetrust/mcp test:smoke` | local stack (`bin/start` + apps/api) with seeded data | manual / nightly |
+
+- `tests/unit/` drives the real MCP protocol over an in-memory transport and asserts
+  outbound requests: the `Authorization` header, the admin secret being required (no
+  fallback), which filters reach Hasura, and that `hasura-query` stays off by default.
+- `tests/contract/` starts `createApp()` from `apps/api/src/app.ts` on an ephemeral
+  port and asserts the exact status codes and response bodies the MCP tools depend on.
+- `tests/escrow-tools.test.ts` fails if any tool other than the build tools prints an
+  XDR, or if any MCP module imports a Trustless Work client or calls its URL.
+- `tests/trust-boundary.test.ts` checks `docs/mcp/README.md` against the server's
+  `tools/list`.
+- `apps/api/tests/mcp-contract.test.ts` runs the real `apps/api` routers and handlers
+  against [`src/lib/api-contract.ts`](src/lib/api-contract.ts) and
+  [`src/lib/escrow-roles.ts`](src/lib/escrow-roles.ts).
+- `tests/smoke/` is skipped unless `MCP_TESTNET_SMOKE=true` and only calls read-only
+  tools — it asserts that no transaction is ever built.
 
 ## Prerequisites
 
-- Hasura + PostgreSQL running (`infra/backend/bin/start`) for every read tool.
-- `apps/api` running (`pnpm --filter @safetrust/api dev`) for `deploy-escrow` and
-  `fund-escrow`. Both surface a clear "cannot reach" message when it is down.
-
-## Known divergence
-
-`apps/api` and `apps/frontend` build different TrustlessWork payloads for the same
-deploy step — `releaseSigner` is the tenant in `apps/api` and the platform wallet in
-the frontend, and only the frontend sends a USDC trustline block. `deploy-escrow`
-calls `apps/api`, so it inherits that behaviour; `explain-escrow-roles` spells the
-difference out. Worth resolving before either path is treated as canonical.
+- Hasura + PostgreSQL (`cd infra/backend && bin/start safetrust hotel_industry`)
+  for every read tool.
+- `apps/api` (`pnpm --filter @safetrust/api dev`) for the build tools.
+- Network access to Testnet Horizon for `get-wallet-readiness` and the on-chain
+  part of `diagnose-escrow`.

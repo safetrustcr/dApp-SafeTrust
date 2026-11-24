@@ -10,16 +10,31 @@
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
     "lint": "echo \"no lint configured\"",
-    "test": "vitest run",
-    "test:integration": "vitest run tests/integration"
+    "test": "vitest run tests/unit",
+    "test:watch": "vitest tests/unit",
+    "test:contract": "vitest run tests/contract",
+    "test:smoke": "vitest run tests/smoke",
+    "test:integration": "vitest run tests/smoke",
+    "test:escrow": "tsx --test tests/escrow-tools.test.ts",
+    "test:boundary": "tsx --test tests/trust-boundary.test.ts",
+    "docs:env": "node scripts/env-table.mjs --write",
+    "docs:env:check": "node scripts/env-table.mjs",
+    "check:secrets": "bash scripts/check-secrets.sh"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@safetrust/api": "workspace:*",
     "@types/node": "^20.0.0",
+    "express": "^4.22.2",
+    "firebase-admin": "^14.3.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.7"
+  },
+  "bin": {
+    "safetrust-mcp": "dist/index.js"
   }
 }

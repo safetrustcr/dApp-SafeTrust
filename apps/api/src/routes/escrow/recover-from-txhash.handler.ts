@@ -1,138 +1,151 @@
-import { Request, Response } from 'express';
-import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
-import { updateEscrowStatusByContractId } from '../../services/hasura.js';
+import type { Request, Response } from 'express';
+import { updateIndexerFromTxHash } from '../../services/trustlesswork.js';
+import {
+  claimForSubmission,
+  getPendingActionByHash,
+  markConfirmed,
+  markFailed,
+  type PendingAction,
+} from '../../services/pending-actions.js';
+import { assertEscrowParticipant, EscrowAccessError } from '../../services/escrow-authz.js';
+import { confirmTransaction } from '../../services/stellar-confirm.js';
+import { ApiError } from '../../http/api-error.js';
+import { asyncHandler } from '../../http/async-handler.js';
+import { applySubmittedAction } from './submitted-effects.js';
 
-type RecoverAction =
-  | 'initialize'
-  | 'fund'
-  | 'approve_milestone'
-  | 'release_funds'
-  | 'dispute'
-  | 'resolve_dispute';
+const TX_HASH_REGEX = /^[0-9a-f]{64}$/i;
+
+const FORBIDDEN_FIELDS = [
+  'action',
+  'status',
+  'amount',
+  'contractId',
+  'signer',
+  'engagementId',
+  'apartmentId',
+  'senderAddress',
+  'receiverAddress',
+  'releaser',
+  'milestoneId',
+  'approver',
+  'releaseSigner',
+  'disputer',
+  'resolver',
+] as const;
+
+type AuthedRequest = Request & { user?: { uid: string } };
 
 type RecoverRequestBody = {
   txHash?: string;
-  action?: RecoverAction;
-  contractId?: string;
-  engagementId?: string;
-  apartmentId?: string;
-  senderAddress?: string;
-  receiverAddress?: string;
-  releaser?: string;
-  amount?: number;
-  milestoneId?: string;
-  approver?: string;
-  releaseSigner?: string;
-};
-
-const VALID_ACTIONS: RecoverAction[] = [
-  'initialize',
-  'fund',
-  'approve_milestone',
-  'release_funds',
-  'dispute',
-  'resolve_dispute',
-];
-
-const ACTION_STATUS: Record<RecoverAction, string> = {
-  initialize: 'pending_signature',
-  fund: 'funded',
-  approve_milestone: 'funded',
-  release_funds: 'completed',
-  dispute: 'disputed',
-  resolve_dispute: 'resolved',
-};
-
-const REQUIRED_FIELDS: Record<RecoverAction, (keyof RecoverRequestBody)[]> = {
-  initialize: ['engagementId', 'apartmentId', 'senderAddress', 'receiverAddress', 'releaser', 'amount'],
-  fund: ['amount'],
-  approve_milestone: ['milestoneId', 'approver'],
-  release_funds: ['releaseSigner'],
-  dispute: [],
-  resolve_dispute: [],
+  [key: string]: unknown;
 };
 
 type RecoverResponse = {
   recovered: boolean;
-  action: RecoverAction;
-  contractId: string;
+  action: string;
+  contractId: string | null;
   txHash: string;
   status: string;
 };
 
-export const recoverFromTxhashHandler = async (
-  req: Request<{}, RecoverResponse | { error: string; messages?: string[]; payload?: unknown }, RecoverRequestBody>,
-  res: Response<RecoverResponse | { error: string; messages?: string[]; payload?: unknown }>
-): Promise<Response> => {
-  try {
-    const { txHash, action, contractId } = req.body || {};
-
-    if (!txHash) {
-      return res.status(400).json({ error: 'Missing required field: txHash' });
-    }
-    if (!action) {
-      return res.status(400).json({ error: 'Missing required field: action' });
-    }
-    if (!VALID_ACTIONS.includes(action)) {
-      return res.status(400).json({
-        error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`,
-      });
-    }
-    if (!contractId) {
-      return res.status(400).json({ error: 'Missing required field: contractId' });
-    }
-
-    const missing = REQUIRED_FIELDS[action].filter((field) => {
-      const value = req.body[field];
-      if (value == null) return true;
-      if (field === 'amount') return typeof value !== 'number' || !Number.isFinite(value) || value <= 0;
-      return typeof value !== 'string' || value.trim().length === 0;
-    });
-    if (missing.length > 0) {
-      return res.status(400).json({
-        error: `${action} action requires: contractId, ${missing.join(', ')}`,
-      });
-    }
-
-    try {
-      await trustlessWorkRequest('/indexer/update-from-txHash', {
-        method: 'POST',
-        body: { txHash },
-      });
-    } catch (error) {
-      console.error('[recover-from-txhash] TW indexer call failed:', error);
-      if (error instanceof TrustlessWorkRequestError) {
-        return res.status(error.statusCode).json({
-          error: error.message,
-          messages: error.messages,
-          payload: error.payload,
-        });
-      }
-      const messages = getErrorMessages(error, 'Failed to verify transaction with the indexer.');
-      return res.status(502).json({ error: messages[0], messages });
-    }
-
-    const status = ACTION_STATUS[action];
-    const result = await updateEscrowStatusByContractId(contractId, status);
-
-    if (result.update_escrows.affected_rows === 0) {
-      return res.status(404).json({
-        error: `No escrow record found for contractId: ${contractId}`,
-      });
-    }
-
-    return res.status(200).json({ recovered: true, action, contractId, txHash, status });
-  } catch (error) {
-    if (error instanceof TrustlessWorkRequestError) {
-      return res.status(error.statusCode).json({
-        error: error.message,
-        messages: error.messages,
-        payload: error.payload,
-      });
-    }
-
-    return res.status(500).json({
-      error: getErrorMessages(error, 'Recovery DB update failed.')[0],
-    });
-  }
+type PendingResponse = {
+  status: 'PENDING';
+  txHash: string;
 };
+
+/**
+ * POST /api/escrow/recover-from-txhash  { txHash }
+ *
+ * For a transaction the user signed and submitted, but whose result SafeTrust
+ * never recorded (closed tab, dropped connection). The ledger decides whether
+ * it happened; the action and parameters come from the pending-action row.
+ */
+export const recoverFromTxhashHandler = asyncHandler(async (
+  req: AuthedRequest,
+  res: Response<RecoverResponse | PendingResponse>,
+) => {
+  const uid = req.user?.uid;
+  if (!uid) throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in first.');
+
+  const body = (req.body || {}) as RecoverRequestBody;
+
+  // 1. Reject any client-supplied transition input.
+  for (const field of FORBIDDEN_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, field)) {
+      throw new ApiError(400, 'FORBIDDEN_FIELD', `Field '${field}' is not allowed; send only txHash`);
+    }
+  }
+
+  const txHash = typeof body.txHash === 'string' ? body.txHash.trim() : '';
+  if (!TX_HASH_REGEX.test(txHash)) {
+    throw new ApiError(400, 'INVALID_TX_HASH', 'txHash must be 64 hex characters');
+  }
+
+  // 2. Load the pending action SafeTrust built for this hash.
+  const pendingAction = await getPendingActionByHash(txHash);
+  if (!pendingAction) {
+    throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash');
+  }
+
+  // 3. Authorize: built_for_uid OR this escrow's participant. Return 404
+  // (not 403) so callers can't probe which hashes exist.
+  if (pendingAction.built_for_uid !== uid) {
+    try {
+      await assertEscrowParticipant(uid, pendingAction.engagement_id);
+    } catch (err) {
+      if (err instanceof EscrowAccessError) {
+        throw new ApiError(404, 'UNKNOWN_TRANSACTION', 'No pending action found for this transaction hash');
+      }
+      throw err;
+    }
+  }
+
+  // 4. Idempotent: effects were already applied at submit time.
+  if (pendingAction.status === 'submitted' || pendingAction.status === 'confirmed') {
+    return res.status(200).json(recoveredBody(pendingAction, txHash));
+  }
+  if (pendingAction.status === 'failed') {
+    throw new ApiError(409, 'TRANSACTION_FAILED', 'Transaction failed on the ledger');
+  }
+
+  // 5. Confirm on the ledger. A submit that timed out or dropped may still have
+  // landed; confirmation is decided by the ledger, not by the client's report.
+
+  const confirmation = await confirmTransaction(txHash);
+
+  if (confirmation === 'unknown') {
+    // Not on the ledger yet (or Horizon unreachable). Client retries.
+    return res.status(202).json({ status: 'PENDING', txHash });
+  }
+
+  if (confirmation === 'failed') {
+    await markFailed(pendingAction.id);
+    throw new ApiError(409, 'TRANSACTION_FAILED', 'Transaction failed on the ledger');
+  }
+
+  // 6. Claim so a concurrent send-transaction can't apply the same effects twice.
+  const claimed = await claimForSubmission(pendingAction.id);
+  if (!claimed) {
+    const latest = await getPendingActionByHash(txHash);
+    return res.status(200).json(recoveredBody(latest ?? pendingAction, txHash));
+  }
+
+  await applySubmittedAction(pendingAction, { txHash, contractId: pendingAction.contract_id, twResult: null });
+  await markConfirmed(pendingAction.id);
+
+  // 7. Best-effort: tell Trustless Work's indexer about the transaction.
+  await updateIndexerFromTxHash(txHash);
+
+  return res.status(200).json({ ...recoveredBody(pendingAction, txHash), status: 'confirmed' });
+});
+
+function recoveredBody(row: Pick<PendingAction, 'action' | 'contract_id' | 'status'>, txHash: string): RecoverResponse {
+  // Caller-facing shape is unchanged; the ledger result determines status.
+  return {
+    recovered: true,
+    action: row.action,
+    contractId: row.contract_id,
+    txHash,
+    status: row.status,
+  };
+}

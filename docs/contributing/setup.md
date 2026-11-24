@@ -26,13 +26,51 @@ git pull upstream consolidation-pattern
 pnpm install
 ```
 
+## Get Firebase service account
+
+1. Open Firebase Console → Project settings → Service accounts.
+2. Click Generate new private key.
+3. Download the JSON file and copy the values for `project_id`, `client_email`, and `private_key`.
+4. Add them to your local environment for the API:
+
+```bash
+FIREBASE_PROJECT_ID=replace-with-project-id
+FIREBASE_CLIENT_EMAIL=replace-with-service-account-email
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nreplace-with-your-private-key\n-----END PRIVATE KEY-----\n"
+```
+
+> Keep the `\n` escapes exactly as shown above so dotenv preserves the private key format. Do not start the value with `#`.
+
 ## Start infrastructure
 
+Using `make` (validates `TENANTS` before launching):
+```bash
+make infra TENANTS=safetrust
+make infra TENANTS=hotel_industry
+make infra TENANTS="safetrust hotel_industry"
+```
+*(Running `make infra` without `TENANTS` exits with code 2 and lists valid tenants).*
+
+Or directly using the backend script:
 ```bash
 cd infra/backend
 bin/start safetrust hotel_industry
 cd ../..
 ```
+
+## Provision isolated Stellar testnet accounts
+
+Use the repository-owned testnet bootstrap when you need the guest/host/admin demo identities, linked wallets, and seeded apartment for end-to-end verification.
+
+```bash
+# create or refresh the disposable Stellar + Firebase + Hasura fixtures
+pnpm testnet:provision
+
+# verify only; exits non-zero if anything is missing or mismatched
+pnpm testnet:provision --check
+```
+
+The script reads `.env.testnet.local` (gitignored) and refuses to run against mainnet. It creates or reuses disposable keypairs for the guest, host, and platform roles, funds them on Stellar testnet, ensures the USDC trustline and minimum balance, links each wallet to the matching SafeTrust user record, and seeds the host-owned apartment used by the demo flow.
 
 ## Run tests before opening a PR
 

@@ -44,7 +44,7 @@ export async function executeGraphQL<T>(
   variables: Record<string, unknown> = {},
 ): Promise<T> {
   const hasuraUrl    = process.env.HASURA_GRAPHQL_URL    ?? '';
-  const adminSecret  = process.env.HASURA_ADMIN_SECRET   ?? '';
+  const adminSecret  = process.env.HASURA_ADMIN_SECRET ?? process.env.HASURA_GRAPHQL_ADMIN_SECRET ?? '';
 
   if (!hasuraUrl || !adminSecret) {
     throw new Error(

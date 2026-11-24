@@ -5,6 +5,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { GET_USER_BY_WALLET_ADDRESS } from "@/graphql/queries/user-queries";
 import { truncateStellarAddress } from "@/lib/utils";
+import { Image } from "@/components/ui/image";
 
 const FALLBACK_IMAGE = "/img/room1.png";
 
@@ -297,16 +298,12 @@ export function PaidInvoiceView({ escrow }: PaidInvoiceViewProps) {
             <tr>
               <td style={styles.td}>
                 <div style={styles.productCell}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={apartmentThumb}
                     alt={apartmentName}
-                    style={styles.thumb}
-                    onError={(e) => {
-                      const img = e.target as HTMLImageElement;
-                      img.onerror = null;
-                      img.src = FALLBACK_IMAGE;
-                    }}
+                    width={48}
+                    height={48}
+                    className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
                   />
                   <span>{apartmentName}</span>
                 </div>
