@@ -84,6 +84,10 @@ export const sendTransactionHandler = asyncHandler(async (req: AuthedRequest, re
       err.details = { ...(err.details ?? {}), txHash };
     } else if (err && typeof err === 'object') {
       (err as Record<string, unknown>).txHash = txHash;
+      const rec = err as { payload?: unknown };
+      rec.payload = typeof rec.payload === 'object' && rec.payload !== null
+        ? { ...rec.payload, txHash }
+        : { txHash };
     }
     throw err;
   }

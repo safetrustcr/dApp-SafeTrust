@@ -19,6 +19,8 @@ async function prepareLifecycleMessage(params: {
   toStatus: string;
   txHash?: string;
   amount?: number;
+  reason?: string;
+  description?: string;
 }): Promise<{
   declaration: string;
   field: string;
@@ -579,8 +581,17 @@ export async function dbDisputeEscrow(
   contractId: string,
   engagementId?: string,
   txHash?: string,
+  reason?: string,
+  description?: string,
 ): Promise<void> {
-  const lifecycle = await prepareLifecycleMessage({ contractId, action: 'dispute', toStatus: 'disputed', txHash });
+  const lifecycle = await prepareLifecycleMessage({
+    contractId,
+    action: 'dispute',
+    toStatus: 'disputed',
+    txHash,
+    reason,
+    description,
+  });
   const result = await hasuraRequest<UpdateResult>(
     `mutation DisputeEscrow($contractId: String!, $log: escrow_transactions_insert_input!${lifecycle ? `, ${lifecycle.declaration}` : ''}) {
       update_trustless_work_escrows(

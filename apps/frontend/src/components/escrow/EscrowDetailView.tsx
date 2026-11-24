@@ -6,7 +6,8 @@ import { GET_ESCROW_BY_ANY_ID } from '@/graphql/queries/escrow-queries';
 import type { EscrowStatus } from '@/components/dashboard/EscrowStatusBadge';
 import { truncateStellarAddress } from '@/lib/utils';
 import { getErrorMessages } from '@/lib/trustlesswork-errors';
-import { postEscrowApi } from '@/lib/api/escrow';
+import { getEscrowApi } from '@/lib/api/escrow';
+import { isSplitValid, getSplitDetails, fromStroops } from '@/utils/escrow-utils';
 import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { useState, useCallback, useEffect, type CSSProperties, ReactNode } from 'react';
 import { useEscrowAction } from '@/hooks/use-escrow-action';
@@ -49,6 +50,8 @@ type TrustlessWorkEscrowRecord = {
   marker?: string | null;
   releaser?: string | null;
   resolver?: string | null;
+  amount?: number | string | null;
+  balance?: number | string | null;
   milestones?: Array<{ milestoneId?: string | null; status?: string | null }>;
 };
 
@@ -644,7 +647,13 @@ function ErrorAlert({ messages }: { messages: string[] }) {
   );
 }
 
-function DisputedView({ escrow }: { escrow?: EscrowRecord | null }) {
+function DisputedView({
+  escrow,
+  disputeInfo,
+}: {
+  escrow?: EscrowRecord | null;
+  disputeInfo?: { reason?: string; description?: string } | null;
+}) {
   const createdAt = escrow?.created_at
     ? formatDate(escrow.created_at)
     : '25 January 2025';
@@ -661,11 +670,27 @@ function DisputedView({ escrow }: { escrow?: EscrowRecord | null }) {
         <InfoPair label="Amount blocked" value={deposit} />
       </div>
 
-      <div>
-        <h3 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '1rem' }}>
-          Escrow Description
+      <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.75rem', padding: '1.25rem' }}>
+        <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 700, color: '#991b1b' }}>
+          Dispute Details
         </h3>
-        <textarea style={styles.input} placeholder="Description..." />
+        <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: '#7f1d1d' }}>
+          This escrow is frozen under dispute. Funds stay locked until the platform resolves it.
+        </p>
+        <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.875rem' }}>
+          <div>
+            <span style={{ fontWeight: 600, color: '#374151' }}>Reason: </span>
+            <span style={{ color: '#1f2937' }}>{disputeInfo?.reason || 'Disputed by participant'}</span>
+          </div>
+          {disputeInfo?.description && (
+            <div>
+              <span style={{ fontWeight: 600, color: '#374151' }}>Description: </span>
+              <p style={{ margin: '0.25rem 0 0', color: '#4b5563', whiteSpace: 'pre-wrap' }}>
+                {disputeInfo.description}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div
@@ -873,6 +898,7 @@ function EscrowActionButton({
   status,
   isLoading,
   loadingMessage,
+  disabled,
   onClick,
   children,
 }: {
@@ -880,6 +906,7 @@ function EscrowActionButton({
   status: EscrowStatus;
   isLoading: boolean;
   loadingMessage: string;
+  disabled?: boolean;
   onClick: () => void;
   children?: ReactNode;
 }) {
@@ -893,6 +920,7 @@ function EscrowActionButton({
   };
 
   const config = buttonConfig[action];
+  const isBtnDisabled = isLoading || disabled;
 
   return (
     <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
@@ -908,16 +936,16 @@ function EscrowActionButton({
       <button
         type="button"
         onClick={onClick}
-        disabled={isLoading}
+        disabled={isBtnDisabled}
         style={{
           border: 'none',
-          backgroundColor: isLoading ? '#9ca3af' : config.color,
+          backgroundColor: isBtnDisabled ? '#9ca3af' : config.color,
           color: '#ffffff',
           borderRadius: '0.5rem',
           padding: '0.75rem 1.5rem',
           fontWeight: 700,
           fontSize: '0.9rem',
-          cursor: isLoading ? 'not-allowed' : 'pointer',
+          cursor: isBtnDisabled ? 'not-allowed' : 'pointer',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '0.5rem',
@@ -946,11 +974,15 @@ export default function EscrowDetailView({
 }) {
   const { address, walletType, isReady, signAndSubmit } = useActiveWallet();
   const { execute, actioning, phase, actionError, conflict } = useEscrowAction();
-  const [actionLoading, setActionLoading] = useState<EscrowAction | null>(null);
-  const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
-  const [approverFunds, setApproverFunds] = useState(0);
-  const [receiverFunds, setReceiverFunds] = useState(0);
+  const [guestFundsInput, setGuestFundsInput] = useState('');
+  const [hostFundsInput, setHostFundsInput] = useState('');
+  const [isDisputeOpen, setIsDisputeOpen] = useState(false);
+  const [disputeStep, setDisputeStep] = useState<'form' | 'confirm'>('form');
+  const [disputeReasonSelect, setDisputeReasonSelect] = useState('');
+  const [disputeReasonCustom, setDisputeReasonCustom] = useState('');
+  const [disputeDescription, setDisputeDescription] = useState('');
+  const [disputeInfo, setDisputeInfo] = useState<{ reason?: string; description?: string } | null>(null);
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.escrowId);
 
@@ -1007,6 +1039,30 @@ export default function EscrowDetailView({
 
   const view = getEscrowViewConfig(status);
 
+  useEffect(() => {
+    if (status === 'disputed' && escrow?.engagement_id) {
+      let cancelled = false;
+      getEscrowApi<{ reason?: string; description?: string; dispute?: { reason?: string; description?: string } }>(
+        `/api/escrow/dispute?engagementId=${encodeURIComponent(escrow.engagement_id)}`
+      )
+        .then((res) => {
+          if (!cancelled && res) {
+            const info = res.dispute || res;
+            setDisputeInfo({
+              reason: info.reason,
+              description: info.description,
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn('Failed to load dispute details:', err);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [status, escrow?.engagement_id]);
+
   const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS || '';
 
   const ownerWalletAddress = escrow?.apartment?.owner?.user_wallets?.[0]?.wallet_address || '';
@@ -1040,8 +1096,15 @@ export default function EscrowDetailView({
   const showApproveButton = canMarkMilestone && isApprover && checkInMilestone?.status === 'completed';
   const showReleaseButton = canRelease && isReleaseSigner;
   // Either party may open a dispute; the resolver (platform) never may.
-  const showDisputeButton = canDispute && (isApprover || isMarker);
+  const showDisputeButton = canDispute && (isApprover || isMarker) && !isResolver;
   const showResolveButton = canResolve && isResolver;
+
+  const onChainBalance =
+    trustlessWorkEscrow?.balance != null && Number(trustlessWorkEscrow.balance) > 0
+      ? Number(trustlessWorkEscrow.balance)
+      : (escrow?.amount ?? 0);
+
+  const splitDetails = getSplitDetails(guestFundsInput, hostFundsInput, onChainBalance);
 
   const phaseMessage = phase === 'building'
     ? 'Building transaction...'
@@ -1160,9 +1223,22 @@ export default function EscrowDetailView({
     if (result) await refetch();
   }, [escrow, address, execute, refetch]);
 
+  const selectedDisputeReason = disputeReasonSelect === 'Other' ? disputeReasonCustom.trim() : disputeReasonSelect.trim();
+
   const handleOpenDispute = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
       setErrorMessages(['Missing required escrow data to open a dispute.']);
+      return;
+    }
+
+    const finalReason = disputeReasonSelect === 'Other' ? disputeReasonCustom.trim() : disputeReasonSelect.trim();
+    if (!finalReason) {
+      setErrorMessages(['Please select or enter a reason for the dispute.']);
+      return;
+    }
+
+    if (disputeDescription.length > 500) {
+      setErrorMessages(['Dispute description must not exceed 500 characters.']);
       return;
     }
 
@@ -1171,6 +1247,8 @@ export default function EscrowDetailView({
       apiRoute: '/api/escrow/dispute',
       apiBody: {
         engagementId: escrow.engagement_id,
+        reason: finalReason,
+        description: disputeDescription.trim(),
       },
       sendTransactionBody: {
         action: 'dispute',
@@ -1180,8 +1258,11 @@ export default function EscrowDetailView({
         receiverAddress: escrow.receiver_address,
       },
     });
-    if (result) await refetch();
-  }, [escrow, address, execute, refetch]);
+    if (result) {
+      setIsDisputeOpen(false);
+      await refetch();
+    }
+  }, [escrow, address, execute, refetch, disputeReasonSelect, disputeReasonCustom, disputeDescription]);
 
   const handleResolveDispute = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
@@ -1189,50 +1270,31 @@ export default function EscrowDetailView({
       return;
     }
 
-    if (approverFunds + receiverFunds !== escrow.amount) {
-      setErrorMessages([`Approver funds + receiver funds must equal the escrow amount (${escrow.amount}).`]);
+    if (!isSplitValid(guestFundsInput, hostFundsInput, onChainBalance)) {
+      setErrorMessages([`Guest funds + host funds must equal the on-chain balance (${onChainBalance}).`]);
       return;
     }
 
-    setActionLoading('resolve');
-    setLoadingMessage('Building resolution transaction...');
     setErrorMessages([]);
-
-    try {
-      const payload = await postEscrowApi<{ unsignedXdr?: string; networkPassphrase?: string }>('/api/escrow/resolve-dispute', {
-        contractId: escrow.contract_id,
+    const result = await execute({
+      apiRoute: '/api/escrow/resolve-dispute',
+      apiBody: {
         engagementId: escrow.engagement_id,
-        disputeResolver: address,
         distributions: [
-          { address: escrow.sender_address, amount: approverFunds },
-          { address: escrow.receiver_address, amount: receiverFunds },
+          { role: 'approver', amount: Number(guestFundsInput) },
+          { role: 'serviceProvider', amount: Number(hostFundsInput) },
         ],
-      });
-
-      const unsignedXdr = payload.unsignedXdr as string | undefined;
-      if (!unsignedXdr) {
-        setErrorMessages(['No unsigned XDR returned from API']);
-        return;
-      }
-
-      setLoadingMessage('Awaiting wallet signature...');
-      await signAndSubmit(unsignedXdr, {
-        networkPassphrase: payload.networkPassphrase,
+      },
+      sendTransactionBody: {
         action: 'resolve_dispute',
         contractId: escrow.contract_id,
         engagementId: escrow.engagement_id,
         senderAddress: escrow.sender_address,
         receiverAddress: escrow.receiver_address,
-      });
-
-      setErrorMessages([]);
-    } catch (err) {
-      setErrorMessages(getErrorMessages(err, 'Failed to complete dispute resolution flow.'));
-    } finally {
-      setActionLoading(null);
-      setLoadingMessage('');
-    }
-  }, [escrow, address, signAndSubmit, approverFunds, receiverFunds]);
+      },
+    });
+    if (result) await refetch();
+  }, [escrow, address, execute, refetch, guestFundsInput, hostFundsInput, onChainBalance]);
 
   if (loading && !escrow) {
     return (
@@ -1351,7 +1413,7 @@ export default function EscrowDetailView({
             {view.label === 'pending' && <EscrowPendingView escrow={escrow as any} showDeploy={status === "pending_signature"} bookingKind={bookingKind} />}
             {view.label === 'paid' && <PaidStubView escrow={escrow} bookingKind={bookingKind} />}
             {view.label === 'blocked' && <BlockedStubView escrow={escrow} />}
-            {view.label === 'disputed' && <DisputedView escrow={escrow} />}
+            {view.label === 'disputed' && <DisputedView escrow={escrow} disputeInfo={disputeInfo} />}
             {view.label === 'released' && <ReleasedView escrow={escrow} />}
 
             {showFundButton && (
@@ -1394,47 +1456,296 @@ export default function EscrowDetailView({
               />
             )}
 
-            {showDisputeButton && (
+            {showDisputeButton && !isDisputeOpen && (
               <EscrowActionButton
                 action="dispute"
                 status={status}
                 isLoading={actioning}
                 loadingMessage={phaseMessage}
-                onClick={handleOpenDispute}
+                onClick={() => {
+                  setIsDisputeOpen(true);
+                  setDisputeStep('form');
+                }}
               />
             )}
 
-            {showResolveButton && (
-              <EscrowActionButton
-                action="resolve"
-                status={status}
-                isLoading={actionLoading === 'resolve'}
-                loadingMessage={loadingMessage}
-                onClick={handleResolveDispute}
-              >
-                <div style={{ display: 'grid', gap: '0.6rem', marginBottom: '0.9rem' }}>
-                  <label style={{ fontSize: '0.82rem', color: '#374151' }}>
-                    Approver funds
-                    <input
-                      type="number"
-                      min={0}
-                      value={approverFunds}
-                      onChange={(event) => setApproverFunds(Number(event.target.value))}
-                      style={{ ...styles.input, minHeight: 'auto', marginTop: '0.3rem' }}
-                    />
-                  </label>
-                  <label style={{ fontSize: '0.82rem', color: '#374151' }}>
-                    Receiver funds
-                    <input
-                      type="number"
-                      min={0}
-                      value={receiverFunds}
-                      onChange={(event) => setReceiverFunds(Number(event.target.value))}
-                      style={{ ...styles.input, minHeight: 'auto', marginTop: '0.3rem' }}
-                    />
-                  </label>
+            {showDisputeButton && isDisputeOpen && (
+              <div style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: '#fff', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#dc2626' }}>
+                    {disputeStep === 'form' ? 'Open a Dispute' : 'Confirm Dispute Submission'}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDisputeOpen(false);
+                      setDisputeStep('form');
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '0.85rem' }}
+                  >
+                    Cancel
+                  </button>
                 </div>
-              </EscrowActionButton>
+
+                {disputeStep === 'form' ? (
+                  <div>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label htmlFor="dispute-reason-select" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '0.4rem' }}>
+                        Reason for Dispute <span style={{ color: '#dc2626' }}>*</span>
+                      </label>
+                      <select
+                        id="dispute-reason-select"
+                        value={disputeReasonSelect}
+                        onChange={(e) => setDisputeReasonSelect(e.target.value)}
+                        style={{ ...styles.input, minHeight: 'auto', padding: '0.6rem 0.75rem', width: '100%', borderRadius: '0.375rem' }}
+                      >
+                        <option value="">Select a reason...</option>
+                        <option value="Property not as described">Property not as described</option>
+                        <option value="Check-in or access issue">Check-in or access issue</option>
+                        <option value="Damages or property condition">Damages or property condition</option>
+                        <option value="Host or guest unresponsive">Host or guest unresponsive</option>
+                        <option value="Cancellation or refund disagreement">Cancellation or refund disagreement</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    {disputeReasonSelect === 'Other' && (
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label htmlFor="dispute-reason-custom" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '0.4rem' }}>
+                          Custom Reason <span style={{ color: '#dc2626' }}>*</span>
+                        </label>
+                        <input
+                          id="dispute-reason-custom"
+                          type="text"
+                          placeholder="Specify custom dispute reason..."
+                          value={disputeReasonCustom}
+                          onChange={(e) => setDisputeReasonCustom(e.target.value)}
+                          style={{ ...styles.input, minHeight: 'auto', padding: '0.6rem 0.75rem', width: '100%', borderRadius: '0.375rem' }}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <label htmlFor="dispute-description" style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
+                          Description (optional)
+                        </label>
+                        <span style={{ fontSize: '0.75rem', color: disputeDescription.length > 500 ? '#dc2626' : '#6b7280' }}>
+                          {disputeDescription.length}/500
+                        </span>
+                      </div>
+                      <textarea
+                        id="dispute-description"
+                        placeholder="Describe the issue in detail (up to 500 characters)..."
+                        value={disputeDescription}
+                        maxLength={500}
+                        onChange={(e) => setDisputeDescription(e.target.value)}
+                        style={{ ...styles.input, minHeight: '4.5rem', borderRadius: '0.375rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDisputeOpen(false);
+                          setDisputeStep('form');
+                        }}
+                        style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: '0.85rem' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        id="dispute-continue-btn"
+                        disabled={!selectedDisputeReason || disputeDescription.length > 500}
+                        onClick={() => setDisputeStep('confirm')}
+                        style={{
+                          padding: '0.5rem 1.25rem',
+                          border: 'none',
+                          borderRadius: '0.375rem',
+                          backgroundColor: (!selectedDisputeReason || disputeDescription.length > 500) ? '#9ca3af' : '#dc2626',
+                          color: '#fff',
+                          fontWeight: 600,
+                          cursor: (!selectedDisputeReason || disputeDescription.length > 500) ? 'not-allowed' : 'pointer',
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ padding: '0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.375rem', marginBottom: '1rem' }}>
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#991b1b', lineHeight: 1.4 }}>
+                        <strong>Notice:</strong> Once submitted, the escrow will be frozen. Funds stay locked in the smart contract until the platform dispute resolver reviews the case and executes a resolution split.
+                      </p>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem', fontSize: '0.85rem', display: 'grid', gap: '0.5rem' }}>
+                      <div>
+                        <span style={{ fontWeight: 600, color: '#374151' }}>Reason: </span>
+                        <span style={{ color: '#111827' }}>{selectedDisputeReason}</span>
+                      </div>
+                      {disputeDescription.trim() && (
+                        <div>
+                          <span style={{ fontWeight: 600, color: '#374151' }}>Description: </span>
+                          <p style={{ margin: '0.25rem 0 0', color: '#4b5563', whiteSpace: 'pre-wrap' }}>{disputeDescription.trim()}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                      <button
+                        type="button"
+                        disabled={actioning}
+                        onClick={() => setDisputeStep('form')}
+                        style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: '0.85rem' }}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        id="dispute-confirm-submit-btn"
+                        disabled={actioning}
+                        onClick={handleOpenDispute}
+                        style={{
+                          padding: '0.5rem 1.25rem',
+                          border: 'none',
+                          borderRadius: '0.375rem',
+                          backgroundColor: actioning ? '#9ca3af' : '#dc2626',
+                          color: '#fff',
+                          fontWeight: 600,
+                          cursor: actioning ? 'not-allowed' : 'pointer',
+                          fontSize: '0.85rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        {actioning ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            {phaseMessage}
+                          </>
+                        ) : (
+                          'Confirm & Open Dispute'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {showResolveButton && (
+              <div style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
+                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 700, color: '#dc2626' }}>
+                  Dispute Resolution (Platform Resolver)
+                </h3>
+                <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: '#374151' }}>
+                  Split the escrow balance between the guest (approver) and the host (service provider). The total split must equal the current escrow balance exactly ({fromStroops(splitDetails.totalStroops)}).
+                </p>
+
+                {disputeInfo && (disputeInfo.reason || disputeInfo.description) && (
+                  <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '0.375rem', marginBottom: '1rem' }}>
+                    <p style={{ margin: '0 0 0.25rem', fontSize: '0.8rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                      Dispute Claim
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#111827' }}>
+                      <strong>Reason:</strong> {disputeInfo.reason || 'None provided'}
+                    </p>
+                    {disputeInfo.description && (
+                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>
+                        <strong>Description:</strong> {disputeInfo.description}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(12rem, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label htmlFor="guest-split-input" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>
+                      Guest Amount (Approver)
+                    </label>
+                    <input
+                      id="guest-split-input"
+                      type="number"
+                      step="0.0000001"
+                      min="0"
+                      placeholder="0.00"
+                      value={guestFundsInput}
+                      onChange={(e) => setGuestFundsInput(e.target.value)}
+                      style={{ ...styles.input, minHeight: 'auto', padding: '0.5rem 0.75rem', width: '100%', borderRadius: '0.375rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="host-split-input" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>
+                      Host Amount (Service Provider)
+                    </label>
+                    <input
+                      id="host-split-input"
+                      type="number"
+                      step="0.0000001"
+                      min="0"
+                      placeholder="0.00"
+                      value={hostFundsInput}
+                      onChange={(e) => setHostFundsInput(e.target.value)}
+                      style={{ ...styles.input, minHeight: 'auto', padding: '0.5rem 0.75rem', width: '100%', borderRadius: '0.375rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ padding: '0.75rem', backgroundColor: '#fff', borderRadius: '0.375rem', border: '1px solid #e5e7eb', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                    <span style={{ color: '#6b7280' }}>Escrow Balance:</span>
+                    <span style={{ fontWeight: 600, color: '#111827' }}>{fromStroops(splitDetails.totalStroops)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                    <span style={{ color: '#6b7280' }}>Total Allocated:</span>
+                    <span style={{ fontWeight: 600, color: splitDetails.allocatedStroops > splitDetails.totalStroops ? '#dc2626' : '#111827' }}>
+                      {splitDetails.allocatedDisplay}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#6b7280' }}>Remaining to allocate:</span>
+                    <span style={{ fontWeight: 700, color: splitDetails.remainingStroops === BigInt(0) ? '#16a34a' : '#dc2626' }}>
+                      {splitDetails.remainingDisplay}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  id="resolve-dispute-submit-btn"
+                  onClick={handleResolveDispute}
+                  disabled={!splitDetails.isValid || actioning || !isReady}
+                  style={{
+                    border: 'none',
+                    backgroundColor: (!splitDetails.isValid || actioning || !isReady) ? '#9ca3af' : '#dc2626',
+                    color: '#ffffff',
+                    borderRadius: '0.5rem',
+                    padding: '0.75rem 1.5rem',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    cursor: (!splitDetails.isValid || actioning || !isReady) ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {actioning ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      {phaseMessage}
+                    </>
+                  ) : (
+                    'Resolve Dispute'
+                  )}
+                </button>
+              </div>
             )}
 
             {!isReady && (canFund || canMarkMilestone || canRelease || canDispute || canResolve) && (

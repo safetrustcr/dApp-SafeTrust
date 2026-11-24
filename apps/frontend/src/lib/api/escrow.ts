@@ -49,6 +49,25 @@ export async function postEscrowApi<T>(
   }
 }
 
+/**
+ * Sends an authenticated GET request to apps/api using a freshly verified Firebase ID token.
+ */
+export async function getEscrowApi<T>(path: string): Promise<T> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new EscrowApiError('Sign in before performing an escrow action.', 401, null);
+  }
+
+  try {
+    return await getAuthenticatedApi<T>(path);
+  } catch (error) {
+    if (error instanceof ApiClientError && !(error instanceof EscrowApiError)) {
+      throw new EscrowApiError(error.message, error.status, error.payload);
+    }
+    throw error;
+  }
+}
+
 export type RecoverFromTxHashResponse = {
   status?: string;
   escrowStatus?: string;
