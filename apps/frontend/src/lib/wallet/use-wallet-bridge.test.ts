@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 // vi.mock factories are hoisted above these consts, so factories must read them lazily.
-const mockFreighter = { address: null as string | null };
+const mockFreighter = { address: null as string | null, signAndSubmit: vi.fn() };
 const mockPollar = { isAuthenticated: false, wallet: { address: null as string | null }, login: vi.fn() };
 const mockStore = {
   address: null as string | null,
