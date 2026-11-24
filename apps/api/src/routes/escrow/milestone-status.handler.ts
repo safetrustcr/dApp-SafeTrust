@@ -3,6 +3,9 @@ import { asyncHandler } from '../../http/async-handler.js';
 import { ApiError } from '../../http/api-error.js';
 import { buildEscrowAction, requireEngagementId } from './build-escrow-action.js';
 import { milestoneIdFor, parseMilestoneIndex } from './milestones.js';
+import { getHotelReservation } from '../../services/hotel-reservation-escrow.js';
+
+export const STAY_NOT_FINISHED = 'STAY_NOT_FINISHED';
 
 type AuthedRequest = Request & { user?: { uid: string } };
 
@@ -21,6 +24,18 @@ export const milestoneStatusHandler = asyncHandler(async (req: AuthedRequest, re
     throw new ApiError(400, 'INVALID_EVIDENCE', 'newEvidence must be text up to 500 characters.');
   }
   const newEvidence = typeof evidence === 'string' ? evidence : '';
+
+  if (engagementId.startsWith('hotel:')) {
+    const reservationId = engagementId.slice('hotel:'.length);
+    const reservation = await getHotelReservation(reservationId);
+    if (reservation.check_out && new Date() < new Date(reservation.check_out)) {
+      throw new ApiError(
+        409,
+        STAY_NOT_FINISHED,
+        'The stay has not finished yet. Mark stay completed is only available after check-out.',
+      );
+    }
+  }
 
   const result = await buildEscrowAction({
     uid,
