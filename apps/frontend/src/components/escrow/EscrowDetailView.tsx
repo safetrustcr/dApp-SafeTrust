@@ -12,6 +12,7 @@ import { useState, useCallback, useEffect, type CSSProperties, ReactNode } from 
 import { useEscrowAction } from '@/hooks/use-escrow-action';
 import { useHotelEscrowResource } from '@/hooks/use-hotel-escrow-resource';
 import { useEscrowStream } from '@/hooks/use-escrow-stream';
+import { resolveEscrowWalletRoles } from '@/lib/escrow/roles';
 import Image from '@/components/ui/image';
 import {
   Bell,
@@ -1014,19 +1015,15 @@ export default function EscrowDetailView({
   const matches = (candidate?: string | null) =>
     Boolean(address && candidate && address.toLowerCase() === candidate.toLowerCase());
 
-  // Authoritative Trustless Work role wins; legacy address is only a fallback.
-  const isApprover = trustlessWorkEscrow?.approver
-    ? matches(trustlessWorkEscrow.approver)
-    : matches(escrow?.sender_address);
-  const isMarker = trustlessWorkEscrow?.marker
-    ? matches(trustlessWorkEscrow.marker)
-    : matches(escrow?.receiver_address);
-  const isReleaseSigner = trustlessWorkEscrow?.releaser
-    ? matches(trustlessWorkEscrow.releaser)
-    : matches(platformAddress);
-  const isResolver = trustlessWorkEscrow?.resolver
-    ? matches(trustlessWorkEscrow.resolver)
-    : isReleaseSigner;
+  const escrowRoleWallets = resolveEscrowWalletRoles(trustlessWorkEscrow, {
+    senderAddress: escrow?.sender_address,
+    receiverAddress: escrow?.receiver_address,
+    platformAddress,
+  });
+  const isApprover = matches(escrowRoleWallets.approver);
+  const isMarker = matches(escrowRoleWallets.serviceProvider);
+  const isReleaseSigner = matches(escrowRoleWallets.releaseSigner);
+  const isResolver = matches(escrowRoleWallets.disputeResolver);
 
   const canFund = status === 'created';
   const canMarkMilestone = status === 'funded';
