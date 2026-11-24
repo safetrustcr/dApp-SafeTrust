@@ -269,3 +269,22 @@ export const GET_ESCROW_DASHBOARD_STATS = gql`
     }
   }
 `;
+
+export const GET_ESCROW_TRANSACTIONS = gql`
+  query GetEscrowTransactions($engagement_id: String!) {
+    escrow_transactions(
+      where: { engagement_id: { _eq: $engagement_id } }
+      order_by: { created_at: asc }
+    ) {
+      action
+      from_status
+      to_status
+      tx_hash
+      actor_uid
+      created_at
+      source
+    }
+  }
+`;
+
+export const GetEscrowTransactions = GET_ESCROW_TRANSACTIONS;
