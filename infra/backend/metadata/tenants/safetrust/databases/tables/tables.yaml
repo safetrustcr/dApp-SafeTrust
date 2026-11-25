@@ -3,6 +3,8 @@
 - "!include public_roles.yaml"
 - "!include public_user_roles.yaml"
 - "!include public_apartments.yaml"
+- "!include public_bid_requests.yaml"
+- "!include public_bid_status_histories.yaml"
 - "!include public_escrows.yaml"
 - "!include public_trustless_work_escrows.yaml"
 - "!include public_escrow_milestones.yaml"

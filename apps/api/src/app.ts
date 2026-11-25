@@ -25,6 +25,7 @@ import { requestIdMiddleware, errorHandler } from './http/error-middleware.js';
 import listingsRouter from './routes/listings/listings.route.js';
 import hotelsRouter from './routes/hotels/hotels.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
+import bidsRouter from './routes/bids/bids.route.js';
 
 /**
  * Builds the apps/api Express app without binding a port.
@@ -73,6 +74,9 @@ export function createApp(): express.Express {
   // Messages routes
   app.use('/api/messages', conversationsRouter);
   app.use('/api/messages', messagesRouter);
+
+  // Bid / rental offer routes
+  app.use('/api/bids', bidsRouter);
 
   // Hotel routes
   app.use('/api/hotels', hotelsRouter);
