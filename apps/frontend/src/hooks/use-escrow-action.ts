@@ -14,6 +14,7 @@ type EscrowActionConfig = {
 
 type AttemptKeys = {
   route: string;
+  bodySignature: string;
   /** Idempotency-Key for the XDR build call. */
   build: string;
   /** Idempotency-Key for the matching send-transaction submit. */
@@ -44,10 +45,18 @@ export function useEscrowAction() {
     setConflict(false);
     setPhase('building');
 
+    const bodySignature = JSON.stringify(config.apiBody);
     const attempt =
-      attemptRef.current && attemptRef.current.route === config.apiRoute
+      attemptRef.current &&
+      attemptRef.current.route === config.apiRoute &&
+      attemptRef.current.bodySignature === bodySignature
         ? attemptRef.current
-        : { route: config.apiRoute, build: crypto.randomUUID(), submit: crypto.randomUUID() };
+        : {
+            route: config.apiRoute,
+            bodySignature,
+            build: crypto.randomUUID(),
+            submit: crypto.randomUUID(),
+          };
     attemptRef.current = attempt;
 
     // Hash of the signed XDR, computed client-side as soon as we have it, so

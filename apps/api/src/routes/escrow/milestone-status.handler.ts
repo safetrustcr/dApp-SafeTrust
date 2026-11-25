@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../../http/async-handler.js';
 import { ApiError } from '../../http/api-error.js';
@@ -37,10 +38,15 @@ export const milestoneStatusHandler = asyncHandler(async (req: AuthedRequest, re
     }
   }
 
+  const requestHash = createHash('sha256')
+    .update(JSON.stringify({ milestoneIndex, newEvidence }))
+    .digest('hex');
+
   const result = await buildEscrowAction({
     uid,
     engagementId,
     action: 'mark_milestone_completed',
+    requestHash,
     request: ({ signer, escrow }) => ({
       path: '/escrow/single-release/change-milestone-status',
       body: {

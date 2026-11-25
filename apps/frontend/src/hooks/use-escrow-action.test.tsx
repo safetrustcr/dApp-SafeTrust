@@ -181,4 +181,34 @@ describe('useEscrowAction', () => {
     expect(signXDR).toHaveBeenCalledWith('XDR-1', 'server network');
     vi.unstubAllEnvs();
   });
+
+  it('rotates the Idempotency-Key when apiBody changes on retry (e.g. edited newEvidence)', async () => {
+    const { result } = renderHook(() => useEscrowAction());
+
+    fetchMock.mockImplementationOnce(() => Promise.reject(new TypeError('network down')));
+
+    const firstConfig = {
+      apiRoute: '/api/escrow/milestone-status',
+      apiBody: { contractId: 'CA1', engagementId: 'eng-1', milestoneIndex: 0, newStatus: 'completed', newEvidence: 'First note' },
+      sendTransactionBody: { action: 'mark_milestone_completed', contractId: 'CA1', engagementId: 'eng-1' },
+    };
+
+    await act(async () => {
+      expect(await result.current.execute(firstConfig)).toBeNull();
+    });
+
+    const editedConfig = {
+      ...firstConfig,
+      apiBody: { ...firstConfig.apiBody, newEvidence: 'Edited note' },
+    };
+
+    await act(async () => {
+      await result.current.execute(editedConfig);
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const firstBuildKey = headerOf(0);
+    const editedBuildKey = headerOf(1);
+    expect(editedBuildKey).not.toBe(firstBuildKey);
+  });
 });

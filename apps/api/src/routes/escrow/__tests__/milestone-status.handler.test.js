@@ -151,4 +151,33 @@ describe('milestoneStatusHandler', () => {
 
     expect(next.error).toBe(error);
   });
+
+  it('passes a requestHash that changes when newEvidence changes and matches on identical retry', async () => {
+    mockBuildEscrowAction.mockResolvedValue({ unsignedXdr: 'XDR', txHash: 'h1' });
+
+    await milestoneStatusHandler(
+      authedReq({ engagementId: 'eng-1', milestoneIndex: 0, newEvidence: 'First note' }),
+      mockRes(),
+      mockNext(),
+    );
+    await milestoneStatusHandler(
+      authedReq({ engagementId: 'eng-1', milestoneIndex: 0, newEvidence: 'First note' }),
+      mockRes(),
+      mockNext(),
+    );
+    await milestoneStatusHandler(
+      authedReq({ engagementId: 'eng-1', milestoneIndex: 0, newEvidence: 'Edited note' }),
+      mockRes(),
+      mockNext(),
+    );
+
+    const hash1 = mockBuildEscrowAction.mock.calls[0][0].requestHash;
+    const hash2 = mockBuildEscrowAction.mock.calls[1][0].requestHash;
+    const hash3 = mockBuildEscrowAction.mock.calls[2][0].requestHash;
+
+    expect(typeof hash1).toBe('string');
+    expect(hash1).toHaveLength(64);
+    expect(hash2).toBe(hash1);
+    expect(hash3).not.toBe(hash1);
+  });
 });

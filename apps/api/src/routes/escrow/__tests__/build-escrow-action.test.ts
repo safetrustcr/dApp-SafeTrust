@@ -6,6 +6,7 @@ vi.mock('../../../services/escrow-authz.js', async (importOriginal) => {
   return { ...actual, authorizeEscrowAction: vi.fn() };
 });
 vi.mock('../../../services/pending-actions.js', () => ({
+  expirePendingAction: vi.fn(),
   expireStaleActions: vi.fn(),
   findLiveAction: vi.fn(),
   insertPendingAction: vi.fn(),
@@ -14,7 +15,7 @@ vi.mock('../../../services/pending-actions.js', () => ({
 vi.mock('../../../services/trustlesswork.js', () => ({ trustlessWorkRequest: vi.fn() }));
 
 import { authorizeEscrowAction, EscrowAccessError } from '../../../services/escrow-authz.js';
-import { findLiveAction, insertPendingAction } from '../../../services/pending-actions.js';
+import { expirePendingAction, findLiveAction, insertPendingAction } from '../../../services/pending-actions.js';
 import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
 import { buildEscrowAction } from '../build-escrow-action.js';
 import { transactionHash, NETWORK_PASSPHRASE } from '../../../lib/stellar-xdr.js';
@@ -46,6 +47,7 @@ const request = vi.fn(({ signer }: { signer: string }) => ({
 
 beforeEach(() => {
   vi.mocked(authorizeEscrowAction).mockReset();
+  vi.mocked(expirePendingAction).mockReset();
   vi.mocked(findLiveAction).mockReset();
   vi.mocked(insertPendingAction).mockReset();
   vi.mocked(trustlessWorkRequest).mockReset();
@@ -164,4 +166,98 @@ describe('buildEscrowAction', () => {
     ).rejects.toMatchObject({ status: 502 });
     expect(insertPendingAction).not.toHaveBeenCalled();
   });
+
+  it('invalidates and rebuilds a built action when requestHash differs (e.g. changed newEvidence)', async () => {
+    const xdr = unsignedXdr();
+    vi.mocked(authorizeEscrowAction).mockResolvedValue({ signer: GUEST, escrow, roles: {} as never });
+    vi.mocked(findLiveAction).mockResolvedValue({
+      id: 'pa-old',
+      engagement_id: 'eng-1',
+      contract_id: 'CCONTRACT',
+      unsigned_xdr: 'OLD_XDR',
+      tx_hash: 'old-hash',
+      built_for_uid: 'uid-guest',
+      status: 'built',
+      payload: { milestoneIndex: 0, _requestHash: 'hash-note-1' },
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    } as never);
+    vi.mocked(trustlessWorkRequest).mockResolvedValue({ unsignedTransaction: xdr });
+    vi.mocked(insertPendingAction).mockImplementation(async (row) => ({
+      ...row,
+      id: 'pa-new',
+      status: 'built',
+      created_at: '',
+      expires_at: row.expires_at.toISOString(),
+      submitted_at: null,
+      confirmed_at: null,
+    }) as never);
+
+    const result = await buildEscrowAction({
+      uid: 'uid-guest',
+      engagementId: 'eng-1',
+      action: 'mark_milestone_completed',
+      requestHash: 'hash-note-2',
+      request,
+    });
+
+    expect(expirePendingAction).toHaveBeenCalledWith('pa-old');
+    expect(trustlessWorkRequest).toHaveBeenCalledTimes(1);
+    expect(insertPendingAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ _requestHash: 'hash-note-2' }),
+      }),
+    );
+    expect(result).toMatchObject({ pendingActionId: 'pa-new', unsignedXdr: xdr, reused: false });
+  });
+
+  it('reuses a built action when requestHash matches (identical retry)', async () => {
+    vi.mocked(authorizeEscrowAction).mockResolvedValue({ signer: GUEST, escrow, roles: {} as never });
+    vi.mocked(findLiveAction).mockResolvedValue({
+      id: 'pa-same',
+      engagement_id: 'eng-1',
+      contract_id: 'CCONTRACT',
+      unsigned_xdr: 'SAME_XDR',
+      tx_hash: 'same-hash',
+      built_for_uid: 'uid-guest',
+      status: 'built',
+      payload: { milestoneIndex: 0, _requestHash: 'hash-note-1' },
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    } as never);
+
+    const result = await buildEscrowAction({
+      uid: 'uid-guest',
+      engagementId: 'eng-1',
+      action: 'mark_milestone_completed',
+      requestHash: 'hash-note-1',
+      request,
+    });
+
+    expect(expirePendingAction).not.toHaveBeenCalled();
+    expect(trustlessWorkRequest).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ pendingActionId: 'pa-same', unsignedXdr: 'SAME_XDR', reused: true });
+  });
+
+  it.each(['fund', 'release_funds', 'dispute'] as const)(
+    'keeps existing reuse behaviour unchanged for %s without requestHash',
+    async (action) => {
+      vi.mocked(authorizeEscrowAction).mockResolvedValue({ signer: GUEST, escrow, roles: {} as never });
+      vi.mocked(findLiveAction).mockResolvedValue({
+        id: `pa-${action}`,
+        engagement_id: 'eng-1',
+        contract_id: 'CCONTRACT',
+        unsigned_xdr: `EXISTING_${action}`,
+        tx_hash: `hash-${action}`,
+        built_for_uid: 'uid-guest',
+        status: 'built',
+        payload: {},
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      } as never);
+
+      const result = await buildEscrowAction({ uid: 'uid-guest', engagementId: 'eng-1', action, request });
+
+      expect(expirePendingAction).not.toHaveBeenCalled();
+      expect(trustlessWorkRequest).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ unsignedXdr: `EXISTING_${action}`, reused: true });
+    },
+  );
 });
