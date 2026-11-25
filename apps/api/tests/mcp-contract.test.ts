@@ -8,7 +8,7 @@
  * mount point, changing a response field or a role assignment fails here,
  * instead of in a contributor's chat.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -64,15 +64,8 @@ import { transactionExpiry, transactionHash } from '../src/lib/stellar-xdr.js';
 import { mockNext, mockRes } from '../src/routes/escrow/__tests__/helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const indexSource = readFileSync(join(here, '../src/index.ts'), 'utf8');
-
-/**
- * GET /api/escrow/readiness (#507) is on `main` but not yet on every branch
- * this test runs against. Where apps/api has it, the readiness contract is
- * enforced in full; where it does not, get-wallet-readiness falls back to its
- * own read-only checks, so there is no route to hold to a contract yet.
- */
-const HAS_READINESS = existsSync(join(here, '../src/routes/escrow/readiness.route.ts'));
+// createApp() in app.ts is the composition production serves (#554).
+const appSource = readFileSync(join(here, '../src/app.ts'), 'utf8');
 
 const GUEST = 'GGUEST1111111111111111111111111111111111111111111111111';
 const HOST = 'GHOST11111111111111111111111111111111111111111111111111';
@@ -105,13 +98,12 @@ function mcpRequest(route: keyof typeof API_CONTRACT, values: Record<string, unk
 describe('MCP ↔ apps/api contract: routes', () => {
   it('mounts every route the MCP calls where the MCP expects it', () => {
     for (const [name, route] of Object.entries(API_CONTRACT)) {
-      if (name === 'readiness' && !HAS_READINESS) continue;
       if (route.mount === '') {
-        expect(indexSource, `${name}: app.${route.method.toLowerCase()}('${route.path}')`).toContain(
+        expect(appSource, `${name}: app.${route.method.toLowerCase()}('${route.path}')`).toContain(
           `app.${route.method.toLowerCase()}('${route.path}'`,
         );
       } else {
-        expect(indexSource, `${name} must be mounted at ${route.mount}`).toMatch(
+        expect(appSource, `${name} must be mounted at ${route.mount}`).toMatch(
           new RegExp(`app\\.use\\('${route.mount}', ${route.router}\\)`),
         );
       }
@@ -123,7 +115,7 @@ describe('MCP ↔ apps/api contract: routes', () => {
     expect(hasRoute(fundRouter, API_CONTRACT.fund.method, API_CONTRACT.fund.path)).toBe(true);
   });
 
-  it.skipIf(!HAS_READINESS)('declares readiness with the method and path the MCP calls', async () => {
+  it('declares readiness with the method and path the MCP calls', async () => {
     const { default: readinessRouter } = await import('../src/routes/escrow/readiness.route.js');
     expect(hasRoute(readinessRouter, API_CONTRACT.readiness.method, API_CONTRACT.readiness.path)).toBe(true);
   });
@@ -194,7 +186,7 @@ describe('MCP ↔ apps/api contract: response shapes', () => {
   });
 });
 
-describe.skipIf(!HAS_READINESS)('MCP ↔ apps/api contract: wallet readiness', () => {
+describe('MCP ↔ apps/api contract: wallet readiness', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { clearHorizonCache } = await import('../src/services/wallet-readiness.js');
