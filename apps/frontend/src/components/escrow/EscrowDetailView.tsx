@@ -1195,7 +1195,7 @@ export default function EscrowDetailView({
 
     setErrorMessages([]);
     setActiveAction('resolve');
-    await execute({
+    const result = await execute({
       apiRoute: '/api/escrow/resolve-dispute',
       apiBody: {
         contractId: escrow.contract_id,
@@ -1214,7 +1214,8 @@ export default function EscrowDetailView({
         receiverAddress: escrow.receiver_address,
       },
     });
-  }, [escrow, address, execute, approverFunds, receiverFunds]);
+    if (result) await refetch();
+  }, [escrow, address, execute, refetch, approverFunds, receiverFunds]);
 
   // Retry repeats the last action with the same idempotency keys; refresh the
   // escrow on success exactly as the action handlers do. A dispute resolution

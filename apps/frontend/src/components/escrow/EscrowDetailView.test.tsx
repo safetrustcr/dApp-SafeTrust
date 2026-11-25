@@ -124,6 +124,7 @@ describe('EscrowDetailView signing status', () => {
     const [submitUrl, submitInit] = fetchMock.mock.calls[1] as [string, { body: string }];
     expect(submitUrl).toContain('/api/escrow/send-transaction');
     expect(JSON.parse(submitInit.body)).toMatchObject({ signedXdr: 'SIGNED_XDR', action: 'resolve_dispute' });
+    await waitFor(() => expect(mocks.refetch).toHaveBeenCalled());
   });
 
   it('shows the cancelled-signature message, focuses retry, and retries without a second build', async () => {
@@ -173,6 +174,8 @@ describe('EscrowDetailView signing status', () => {
       { address: RECEIVER, amount: 80 },
     ]);
     expect(builds[1][1].headers['Idempotency-Key']).not.toBe(builds[0][1].headers['Idempotency-Key']);
+    // A failed attempt does not refresh; the successful retry does, once.
+    await waitFor(() => expect(mocks.refetch).toHaveBeenCalledTimes(1));
   });
 
   it('retries an unchanged dispute resolution without a second build', async () => {
