@@ -1217,11 +1217,18 @@ export default function EscrowDetailView({
   }, [escrow, address, execute, approverFunds, receiverFunds]);
 
   // Retry repeats the last action with the same idempotency keys; refresh the
-  // escrow on success exactly as the action handlers do.
+  // escrow on success exactly as the action handlers do. A dispute resolution
+  // depends on the split inputs, so it is rebuilt from the current values and
+  // validated again: the hook reuses the cached XDR only when the split is
+  // unchanged, and a changed split never signs the old distribution.
   const handleRetry = useCallback(async () => {
+    if (activeAction === 'resolve') {
+      await handleResolveDispute();
+      return;
+    }
     const result = await retry();
-    if (result && activeAction !== 'resolve') await refetch();
-  }, [retry, refetch, activeAction]);
+    if (result) await refetch();
+  }, [retry, refetch, activeAction, handleResolveDispute]);
 
   if (loading && !escrow) {
     return (

@@ -186,7 +186,8 @@ function extractTxHash(error: unknown): string | null {
 /**
  * Retry recovery with exponential backoff while the ledger reports the
  * transaction as pending (202). Returns the recovered result, or null if the
- * transaction never lands within the retry budget.
+ * transaction never lands within the retry budget. A result that is still
+ * `{ pending: true }` is not confirmed, so it counts as not recovered.
  */
 async function recoverWithBackoff(
   txHash: string,
@@ -194,7 +195,8 @@ async function recoverWithBackoff(
   const delays = [1000, 2000, 4000, 8000];
   for (let i = 0; i <= delays.length; i++) {
     try {
-      return await recoverEscrowFromTxHash(txHash);
+      const recovered = await recoverEscrowFromTxHash(txHash);
+      return recovered.pending ? null : recovered;
     } catch (error) {
       if (error instanceof EscrowApiError && error.status === 202) {
         if (i < delays.length) {

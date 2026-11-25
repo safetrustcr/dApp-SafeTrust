@@ -146,6 +146,54 @@ describe('EscrowDetailView signing status', () => {
     expect(mocks.refetch).toHaveBeenCalled();
   });
 
+  it('retries a dispute resolution with the current split, not the cancelled one', async () => {
+    mocks.data = escrowData('disputed', { resolver: ADDRESS });
+    const { WalletRejectedError } = await import('@/lib/wallet/errors');
+    mocks.signXDR.mockRejectedValueOnce(new WalletRejectedError());
+
+    render(<EscrowDetailView params={params} />);
+    fireEvent.change(screen.getByLabelText('Approver funds'), { target: { value: '60' } });
+    fireEvent.change(screen.getByLabelText('Receiver funds'), { target: { value: '40' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Resolve Dispute' }));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('You cancelled the signature.'));
+
+    // Change the split, then retry: the new 20/80 split is built and signed.
+    fireEvent.change(screen.getByLabelText('Approver funds'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Receiver funds'), { target: { value: '80' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Resolving dispute: Done'));
+
+    const builds = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/escrow/resolve-dispute')) as [
+      string,
+      { headers: Record<string, string>; body: string },
+    ][];
+    expect(builds).toHaveLength(2);
+    expect(JSON.parse(builds[1][1].body).distributions).toEqual([
+      { address: SENDER, amount: 20 },
+      { address: RECEIVER, amount: 80 },
+    ]);
+    expect(builds[1][1].headers['Idempotency-Key']).not.toBe(builds[0][1].headers['Idempotency-Key']);
+  });
+
+  it('retries an unchanged dispute resolution without a second build', async () => {
+    mocks.data = escrowData('disputed', { resolver: ADDRESS });
+    const { WalletRejectedError } = await import('@/lib/wallet/errors');
+    mocks.signXDR.mockRejectedValueOnce(new WalletRejectedError());
+
+    render(<EscrowDetailView params={params} />);
+    fireEvent.change(screen.getByLabelText('Approver funds'), { target: { value: '60' } });
+    fireEvent.change(screen.getByLabelText('Receiver funds'), { target: { value: '40' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Resolve Dispute' }));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('You cancelled the signature.'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Resolving dispute: Done'));
+
+    const builds = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/escrow/resolve-dispute'));
+    expect(builds).toHaveLength(1);
+    expect(mocks.signXDR).toHaveBeenCalledTimes(2);
+  });
+
   it('shows the conflict message on a 409 and refetches the escrow', async () => {
     mocks.data = escrowData('created', { approver: ADDRESS });
     fetchMock.mockImplementation(async (url: string) =>

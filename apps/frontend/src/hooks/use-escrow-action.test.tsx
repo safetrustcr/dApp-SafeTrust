@@ -304,4 +304,46 @@ describe('useEscrowAction', () => {
     expect(signXDR).toHaveBeenLastCalledWith('XDR-1', undefined);
     errorSpy.mockRestore();
   });
+
+  it('does not report done while the recovered transaction is still pending', async () => {
+    const { result } = renderHook(() => useEscrowAction());
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const txHash = 'a'.repeat(64);
+    fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).includes('/recover-from-txhash')) return jsonResponse({ pending: true });
+      if (String(url).includes('/send-transaction')) {
+        return jsonResponse({ error: 'Confirmation timed out', txHash }, 504);
+      }
+      return jsonResponse({ unsignedXdr: 'XDR-1' });
+    });
+
+    await act(async () => {
+      expect(await result.current.execute(CONFIG)).toBeNull();
+    });
+
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/recover-from-txhash'))).toBe(true);
+    expect(result.current.status).toBe('failed');
+    expect(result.current.actionError).not.toBeNull();
+    errorSpy.mockRestore();
+  });
+
+  it('reports done once recovery confirms the transaction', async () => {
+    const { result } = renderHook(() => useEscrowAction());
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const txHash = 'b'.repeat(64);
+    fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).includes('/recover-from-txhash')) return jsonResponse({ status: 'confirmed', txHash });
+      if (String(url).includes('/send-transaction')) {
+        return jsonResponse({ error: 'Confirmation timed out', txHash }, 504);
+      }
+      return jsonResponse({ unsignedXdr: 'XDR-1' });
+    });
+
+    await act(async () => {
+      expect(await result.current.execute(CONFIG)).toMatchObject({ status: 'confirmed' });
+    });
+
+    expect(result.current.status).toBe('done');
+    errorSpy.mockRestore();
+  });
 });
