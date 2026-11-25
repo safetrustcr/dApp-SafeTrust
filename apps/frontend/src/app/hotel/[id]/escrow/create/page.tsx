@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { canonicalApartmentRouteId } from "@/lib/stub-apartments";
 
 export default async function RemovedHotelEscrowCreateRoutePage({ params }: { params: Promise<{ id: string }> }) {
-  const apartmentId = canonicalApartmentRouteId((await params).id);
-  redirect(apartmentId ? `/escrow/${apartmentId}/escrow/create` : "/rent");
+  // The hotel booking id for escrow is the reservation id.
+  const { id } = await params;
+  redirect(`/escrow/${encodeURIComponent(id)}/escrow/create?kind=hotel-room`);
 }
