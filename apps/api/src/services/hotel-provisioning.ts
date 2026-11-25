@@ -52,6 +52,8 @@ export interface HotelUserProfileInput {
   firstName?: string;
   lastName?: string;
   phoneNumber?: string;
+  // Firebase email_verified claim; required to link a seeded row by email.
+  emailVerified?: boolean;
 }
 
 const HOTEL_USER_COLUMNS = 'id email first_name last_name phone_number role firebase_uid';
@@ -108,6 +110,30 @@ const INSERT_HOTEL_WALLET = `
   }
 `;
 
+const GET_HOTEL_WALLET = `
+  query GetHotelWallet($address: String!) {
+    users_wallets(where: { wallet_address: { _eq: $address } }, limit: 1) {
+      id
+      user_id
+      wallet_address
+      chain_type
+      is_primary
+    }
+  }
+`;
+
+const SET_HOTEL_WALLET_PRIMARY = `
+  mutation SetHotelWalletPrimary($id: uuid!, $isPrimary: Boolean!) {
+    update_users_wallets_by_pk(pk_columns: { id: $id }, _set: { is_primary: $isPrimary }) {
+      id
+      user_id
+      wallet_address
+      chain_type
+      is_primary
+    }
+  }
+`;
+
 const DEMOTE_HOTEL_WALLETS = `
   mutation DemoteHotelWallets($userId: uuid!) {
     update_users_wallets(
@@ -147,12 +173,18 @@ export async function ensureHotelUser(input: HotelUserProfileInput): Promise<Hot
     throw new Error('ensureHotelUser requires a valid email address');
   }
 
-  const profileColumns: Record<string, string | null> = {
-    email,
+  const supplied: Record<string, string | null> = {
     first_name: input.firstName?.trim() || null,
     last_name: input.lastName?.trim() || null,
     phone_number: input.phoneNumber?.trim() || null,
   };
+  // For existing rows only overwrite profile fields the caller supplied, so a
+  // wallet sync (which carries no names/phone) never clears stored values.
+  const suppliedOnly: Record<string, string | null> = {};
+  for (const [key, value] of Object.entries(supplied)) {
+    if (value !== null) suppliedOnly[key] = value;
+  }
+  const profileColumns: Record<string, string | null> = { email, ...supplied };
 
   const existing = await executeGraphQL<{ hotel_users: HotelUser[] }>(
     GET_HOTEL_USER_BY_FIREBASE_UID,
@@ -160,7 +192,7 @@ export async function ensureHotelUser(input: HotelUserProfileInput): Promise<Hot
   ).then((data) => data.hotel_users[0] ?? null);
 
   if (existing) {
-    return updateHotelUser(existing.id, { firebase_uid: firebaseUid, ...profileColumns });
+    return updateHotelUser(existing.id, { firebase_uid: firebaseUid, email, ...suppliedOnly });
   }
 
   const byEmail = await executeGraphQL<{ hotel_users: HotelUser[] }>(
@@ -169,8 +201,22 @@ export async function ensureHotelUser(input: HotelUserProfileInput): Promise<Hot
   ).then((data) => data.hotel_users[0] ?? null);
 
   if (byEmail) {
+    // Only link seeded rows that have no identity yet, and only for a
+    // verified email, so an account cannot take over someone else's row.
+    if (byEmail.firebase_uid && byEmail.firebase_uid !== firebaseUid) {
+      throw Object.assign(new Error('Hotel user is already linked to a different identity'), {
+        status: 409,
+        code: 'HOTEL_USER_ALREADY_LINKED',
+      });
+    }
+    if (input.emailVerified !== true) {
+      throw Object.assign(new Error('A verified email is required to link an existing hotel user'), {
+        status: 403,
+        code: 'HOTEL_EMAIL_NOT_VERIFIED',
+      });
+    }
     // Link the seeded row to this Firebase identity; keep its role.
-    return updateHotelUser(byEmail.id, { firebase_uid: firebaseUid, ...profileColumns });
+    return updateHotelUser(byEmail.id, { firebase_uid: firebaseUid, email, ...suppliedOnly });
   }
 
   const inserted = await executeGraphQL<{ insert_hotel_users_one: HotelUser | null }>(
@@ -225,6 +271,34 @@ export async function syncHotelWallet(
   }
 
   const hotelUser = await ensureHotelUser(profile);
+
+  // Idempotent re-sync: reuse an already mirrored wallet instead of
+  // demoting it and violating the unique wallet_address constraint.
+  const existingWallet = await executeGraphQL<{ users_wallets: HotelWallet[] }>(
+    GET_HOTEL_WALLET,
+    { address },
+  ).then((data) => data.users_wallets[0] ?? null);
+
+  if (existingWallet) {
+    if (existingWallet.user_id !== hotelUser.id) {
+      throw Object.assign(new Error('Wallet is already linked to a different hotel user'), {
+        status: 409,
+        code: 'HOTEL_WALLET_ALREADY_LINKED',
+      });
+    }
+    if (isPrimary && !existingWallet.is_primary) {
+      await executeGraphQL(DEMOTE_HOTEL_WALLETS, { userId: hotelUser.id });
+      const promoted = await executeGraphQL<{ update_users_wallets_by_pk: HotelWallet | null }>(
+        SET_HOTEL_WALLET_PRIMARY,
+        { id: existingWallet.id, isPrimary: true },
+      );
+      if (!promoted.update_users_wallets_by_pk) {
+        throw new Error('Hasura returned no hotel wallet row for the update');
+      }
+      return promoted.update_users_wallets_by_pk;
+    }
+    return existingWallet;
+  }
 
   if (isPrimary) {
     await executeGraphQL(DEMOTE_HOTEL_WALLETS, { userId: hotelUser.id });

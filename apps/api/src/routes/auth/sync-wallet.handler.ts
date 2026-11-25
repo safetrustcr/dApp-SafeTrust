@@ -109,7 +109,11 @@ req: AuthenticatedRequest & { body: SyncWalletBody; }, res: ApiResponse<SyncWall
     // public.user_wallets is the source of truth for the SafeTrust tenant.
     try {
       await syncHotelWallet(
-        { firebaseUid: uid, email: String((req.user as { email?: unknown })?.email ?? '') },
+        {
+          firebaseUid: uid,
+          email: String((req.user as { email?: unknown })?.email ?? ''),
+          emailVerified: (req.user as { email_verified?: unknown })?.email_verified === true,
+        },
         walletAddress,
         isPrimary,
       );

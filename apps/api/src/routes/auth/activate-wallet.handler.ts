@@ -103,7 +103,7 @@ export const activateWalletHandler = async (
     // hotel tenant is unavailable.
     try {
       await syncHotelWallet(
-        { firebaseUid: uid, email: decodedToken.email ?? '' },
+        { firebaseUid: uid, email: decodedToken.email ?? '', emailVerified: decodedToken.email_verified === true },
         address,
         true,
       );

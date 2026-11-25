@@ -63,6 +63,7 @@ describe('syncUserHandler', () => {
       firstName: 'Ada',
       lastName: 'Lovelace',
       phoneNumber: '+1 555 0100',
+      emailVerified: false,
     });
   });
 

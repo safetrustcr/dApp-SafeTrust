@@ -29,7 +29,7 @@ function hotelQueryCalls() {
 
 describe('ensureHotelUser', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it('creates a GUEST row when neither firebase_uid nor email matches', async () => {
@@ -83,11 +83,51 @@ describe('ensureHotelUser', () => {
     const linked = await ensureHotelUser({
       firebaseUid: 'uid-1',
       email: 'guest@example.com',
+      emailVerified: true,
     });
 
     expect(linked.role).toBe('MANAGER');
     expect(linked.firebase_uid).toBe('uid-1');
     expect(hotelQueryCalls().some((q) => q.includes('insert_hotel_users_one'))).toBe(false);
+  });
+
+  it('refuses the email fallback for an unverified email', async () => {
+    const seeded = { ...USER, id: 'seed-1', role: 'MANAGER' as const, firebase_uid: null };
+    vi.mocked(executeGraphQL)
+      .mockResolvedValueOnce({ hotel_users: [] } as never)
+      .mockResolvedValueOnce({ hotel_users: [seeded] } as never);
+
+    await expect(
+      ensureHotelUser({ firebaseUid: 'uid-1', email: 'guest@example.com' }),
+    ).rejects.toMatchObject({ code: 'HOTEL_EMAIL_NOT_VERIFIED' });
+    expect(hotelQueryCalls().some((q) => q.includes('update_hotel_users_by_pk'))).toBe(false);
+  });
+
+  it('refuses to replace an existing firebase_uid through an email match', async () => {
+    const other = { ...USER, id: 'seed-2', firebase_uid: 'someone-else' };
+    vi.mocked(executeGraphQL)
+      .mockResolvedValueOnce({ hotel_users: [] } as never)
+      .mockResolvedValueOnce({ hotel_users: [other] } as never);
+
+    await expect(
+      ensureHotelUser({ firebaseUid: 'uid-1', email: 'guest@example.com', emailVerified: true }),
+    ).rejects.toMatchObject({ code: 'HOTEL_USER_ALREADY_LINKED' });
+  });
+
+  it('does not clear stored profile fields when the caller omits them', async () => {
+    vi.mocked(executeGraphQL)
+      .mockResolvedValueOnce({ hotel_users: [USER] } as never)
+      .mockResolvedValueOnce({ update_hotel_users_by_pk: USER } as never);
+
+    await ensureHotelUser({ firebaseUid: 'uid-1', email: 'guest@example.com' });
+
+    const update = vi.mocked(executeGraphQL).mock.calls.find(([query]) =>
+      String(query).includes('update_hotel_users_by_pk'),
+    );
+    const set = (update?.[1] as { set: Record<string, unknown> }).set;
+    expect(set).not.toHaveProperty('first_name');
+    expect(set).not.toHaveProperty('last_name');
+    expect(set).not.toHaveProperty('phone_number');
   });
 
   it('rejects a missing uid and a malformed email', async () => {
@@ -102,7 +142,7 @@ describe('ensureHotelUser', () => {
 
 describe('syncHotelWallet', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it('ensures the hotel user and mirrors a primary wallet, demoting the old primary first', async () => {
@@ -116,6 +156,7 @@ describe('syncHotelWallet', () => {
     vi.mocked(executeGraphQL)
       .mockResolvedValueOnce({ hotel_users: [USER] } as never)
       .mockResolvedValueOnce({ update_hotel_users_by_pk: USER } as never)
+      .mockResolvedValueOnce({ users_wallets: [] } as never)
       .mockResolvedValueOnce({ update_users_wallets: { affected_rows: 1 } } as never)
       .mockResolvedValueOnce({ insert_users_wallets_one: wallet } as never);
 
@@ -140,6 +181,7 @@ describe('syncHotelWallet', () => {
     vi.mocked(executeGraphQL)
       .mockResolvedValueOnce({ hotel_users: [USER] } as never)
       .mockResolvedValueOnce({ update_hotel_users_by_pk: USER } as never)
+      .mockResolvedValueOnce({ users_wallets: [] } as never)
       .mockResolvedValueOnce({
         insert_users_wallets_one: { ...USER, is_primary: false },
       } as never);
@@ -147,6 +189,31 @@ describe('syncHotelWallet', () => {
     await syncHotelWallet({ firebaseUid: 'uid-1', email: 'guest@example.com' }, ADDRESS, false);
 
     expect(hotelQueryCalls().some((q) => q.includes('update_users_wallets'))).toBe(false);
+  });
+
+  it('re-syncing an already primary wallet is a no-op instead of a duplicate insert', async () => {
+    const wallet = {
+      id: 'wallet-1',
+      user_id: USER.id,
+      wallet_address: ADDRESS,
+      chain_type: 'STELLAR',
+      is_primary: true,
+    };
+    vi.mocked(executeGraphQL)
+      .mockResolvedValueOnce({ hotel_users: [USER] } as never)
+      .mockResolvedValueOnce({ update_hotel_users_by_pk: USER } as never)
+      .mockResolvedValueOnce({ users_wallets: [wallet] } as never);
+
+    const mirrored = await syncHotelWallet(
+      { firebaseUid: 'uid-1', email: 'guest@example.com' },
+      ADDRESS,
+      true,
+    );
+
+    expect(mirrored).toEqual(wallet);
+    const queries = hotelQueryCalls();
+    expect(queries.some((q) => q.includes('insert_users_wallets_one'))).toBe(false);
+    expect(queries.some((q) => q.includes('DemoteHotelWallets'))).toBe(false);
   });
 
   it('rejects a non-Stellar address', async () => {
@@ -158,7 +225,7 @@ describe('syncHotelWallet', () => {
 
 describe('promoteHotelUserToManager', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it('promotes an existing hotel user and refreshes claims', async () => {

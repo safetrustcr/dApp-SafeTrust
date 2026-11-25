@@ -74,6 +74,7 @@ export const syncUserHandler = async (
         firstName,
         lastName,
         phoneNumber: req.body.phone_number,
+        emailVerified: decodedToken.email_verified === true,
       });
     } catch (hotelError) {
       console.warn(
