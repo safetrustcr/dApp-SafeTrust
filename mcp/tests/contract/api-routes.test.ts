@@ -139,7 +139,11 @@ describe('GET /health', () => {
     const response = await request('/health');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ status: 'ok', firebase: 'configured' });
+    expect(response.body).toEqual({
+      status: 'ok',
+      firebase: 'configured',
+      stellarNetwork: expect.stringMatching(/^(TESTNET|PUBLIC)$/),
+    });
     expect(response.headers.get('x-request-id')).toBeTruthy();
   });
 });
