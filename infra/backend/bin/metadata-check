@@ -13,6 +13,24 @@ INFRA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 HASURA_ENDPOINT="${HASURA_ENDPOINT:-http://localhost:8080}"
 HASURA_ADMIN_SECRET="${HASURA_GRAPHQL_ADMIN_SECRET:-${HASURA_ADMIN_SECRET:-myadminsecretkey}}"
 
+# Static check: every public_*.yaml table file must be included in tables.yaml
+missing=0
+for tables_yaml in "$INFRA_DIR"/metadata/tenants/*/databases/tables/tables.yaml; do
+  [ -f "$tables_yaml" ] || continue
+  dir="$(dirname "$tables_yaml")"
+  for f in "$dir"/public_*.yaml; do
+    [ -f "$f" ] || continue
+    name="$(basename "$f")"
+    if ! grep -qF "!include $name" "$tables_yaml"; then
+      echo "❌ $name is not included in $tables_yaml" >&2
+      missing=1
+    fi
+  done
+done
+if [ "$missing" -ne 0 ]; then
+  exit 1
+fi
+
 echo "🔍 Checking Hasura metadata consistency..."
 echo "   Endpoint: $HASURA_ENDPOINT"
 
