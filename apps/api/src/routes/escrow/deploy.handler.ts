@@ -98,7 +98,20 @@ export const deployEscrowHandler = asyncHandler(async (
   }
   // ── End idempotency check ──────────────────────────────────────────────
 
-  const { platformAddress, usdcIssuer } = requireEscrowStellarConfig();
+  // Missing escrow configuration (PLATFORM_STELLAR_ADDRESS / USDC_TRUSTLINE_ADDRESS)
+  // is reported as ESCROW_NOT_CONFIGURED, not as an auth failure.
+  let platformAddress: string;
+  let usdcIssuer: string;
+  try {
+    ({ platformAddress, usdcIssuer } = requireEscrowStellarConfig());
+  } catch {
+    throw new ApiError(
+      503,
+      'ESCROW_NOT_CONFIGURED',
+      'Escrow payments are not configured on this server.',
+      { retryable: true },
+    );
+  }
 
   // trustlessWorkRequest throws TrustlessWorkRequestError on failure —
   // errorMiddleware maps those automatically; no catch needed here.

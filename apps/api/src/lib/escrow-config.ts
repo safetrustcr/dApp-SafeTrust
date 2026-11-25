@@ -20,7 +20,7 @@ function notConfigured(missing: string[]): ApiError {
   return new ApiError(
     503,
     'ESCROW_NOT_CONFIGURED',
-    'Escrow payments are not configured on this server. Contact the SafeTrust operator.',
+    'Escrow payments are not configured on this server.',
   );
 }
 

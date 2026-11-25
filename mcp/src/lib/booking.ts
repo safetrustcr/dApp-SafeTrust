@@ -5,6 +5,10 @@
  * it builds a deploy transaction:
  *   - apartments: services/apartment-escrow-terms.ts + routes/escrow/deploy.handler.ts
  *   - hotels:     services/hotel-reservation-escrow.ts getHotelReservationEscrowTerms
+ *
+ * When apps/api reports missing escrow configuration it answers
+ * `503 ESCROW_NOT_CONFIGURED` ("Escrow payments are not configured on this
+ * server."), not an auth error. See docs/testnet-booking.md for setup.
  */
 import type { AccountSnapshot } from './horizon.js';
 import type { ApartmentTerms, EscrowRow, HotelReservationRow } from './escrow-data.js';
