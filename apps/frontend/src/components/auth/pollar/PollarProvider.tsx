@@ -6,6 +6,8 @@ import type { SignAndSubmit } from "@/hooks/use-active-wallet";
 
 export type PollarWalletValue = {
   address: string | null;
+  provisioning: string | null;
+  pollarAccessToken: string | null;
   signAndSubmit: SignAndSubmit | null;
   configured: boolean;
   login?: ReturnType<typeof usePollar>['login'];
@@ -13,12 +15,23 @@ export type PollarWalletValue = {
 
 export const PollarWalletContext = createContext<PollarWalletValue>({
   address: null,
+  provisioning: null,
+  pollarAccessToken: null,
   signAndSubmit: null,
   configured: false,
 });
 
 function PollarAddressBridge({ children }: { children: ReactNode }) {
-  const { wallet, signAndSubmitTx, login } = usePollar();
+  const { wallet, signAndSubmitTx, login, verified, getClient } = usePollar();
+  const authState = getClient().getAuthState();
+  const pollarAccessToken =
+    verified && authState.step === 'authenticated'
+      ? authState.session.token.accessToken
+      : null;
+  const provisioning =
+    wallet && 'provisioning' in wallet && typeof wallet.provisioning === 'string'
+      ? wallet.provisioning
+      : null;
 
   const signAndSubmit: SignAndSubmit = async (unsignedXdr) => {
     const result = await signAndSubmitTx(unsignedXdr);
@@ -29,7 +42,14 @@ function PollarAddressBridge({ children }: { children: ReactNode }) {
 
   return (
     <PollarWalletContext.Provider
-      value={{ address: wallet?.address ?? null, signAndSubmit, configured: true, login }}
+      value={{
+        address: wallet?.address ?? null,
+        provisioning,
+        pollarAccessToken,
+        signAndSubmit,
+        configured: true,
+        login,
+      }}
     >
       {children}
     </PollarWalletContext.Provider>
@@ -45,7 +65,15 @@ export function PollarProvider({ children }: { children: ReactNode }) {
 
   if (!apiKey) {
     return (
-      <PollarWalletContext.Provider value={{ address: null, signAndSubmit: null, configured: false }}>
+      <PollarWalletContext.Provider
+        value={{
+          address: null,
+          provisioning: null,
+          pollarAccessToken: null,
+          signAndSubmit: null,
+          configured: false,
+        }}
+      >
         {children}
       </PollarWalletContext.Provider>
     );

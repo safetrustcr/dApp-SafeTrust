@@ -15,10 +15,13 @@ interface MockResponse {
   json(payload: unknown): MockResponse;
 }
 
-function mockReq(token?: string): Request {
+function mockReq(
+  token?: string,
+  body: Record<string, unknown> = {},
+): Request {
   return {
     headers: token ? { authorization: `Bearer ${token}` } : {},
-    body: {},
+    body,
   } as unknown as Request;
 }
 
@@ -44,7 +47,6 @@ describe('activateWalletHandler', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     process.env.POLLAR_SECRET_KEY = 'sk_test_pollar';
-    process.env.POLLAR_ACTIVATE_URL = 'https://sdk.api.pollar.xyz/v2/wallet/activate';
     process.env.HASURA_GRAPHQL_URL = 'http://hasura.test/v1/graphql';
     process.env.HASURA_ADMIN_SECRET = 'secret';
 
@@ -59,6 +61,14 @@ describe('activateWalletHandler', () => {
     await activateWalletHandler(mockReq(), res as unknown as Response);
     expect(res._status).toBe(401);
     expect((res._body as { error: string }).error).toBe('Missing or malformed Bearer token');
+  });
+
+  it('returns 400 when the wallet proof is missing', async () => {
+    const res = mockRes();
+    await activateWalletHandler(mockReq('valid-token'), res as unknown as Response);
+
+    expect(res._status).toBe(400);
+    expect((res._body as { error: string }).error).toBe('A wallet address and Pollar access token are required');
   });
 
   it('returns 401 when the token payload cannot be decoded', async () => {
@@ -78,25 +88,47 @@ describe('activateWalletHandler', () => {
     expect((res._body as { error: string }).error).toBe('Pollar is not configured on this server');
   });
 
-  it('returns 502 when Pollar activation fails', async () => {
+  it('returns 401 when Pollar session verification fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
       ok: false,
       status: 401,
-      text: async () => 'unauthorized',
     }));
 
     const res = mockRes();
-    await activateWalletHandler(mockReq('valid-token'), res as unknown as Response);
+    await activateWalletHandler(
+      mockReq('valid-token', { address: 'GTESTADDRESS', pollarAccessToken: 'pollar-token' }),
+      res as unknown as Response,
+    );
 
-    expect(res._status).toBe(502);
-    expect((res._body as { error: string }).error).toBe('Pollar activation failed');
+    expect(res._status).toBe(401);
+    expect((res._body as { error: string }).error).toBe('Pollar session verification failed');
   });
 
-  it('stores the Pollar G-address and returns it on success', async () => {
+  it('rejects a wallet that does not match the verified Pollar session', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, content: { wallet: { address: 'GOTHERADDRESS' } } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = mockRes();
+    await activateWalletHandler(
+      mockReq('valid-token', { address: 'GTESTADDRESS', pollarAccessToken: 'pollar-token' }),
+      res as unknown as Response,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(res._status).toBe(403);
+  });
+
+  it('stores the matching verified Pollar wallet and returns it', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ address: 'GTESTADDRESS' }),
+        json: async () => ({
+          success: true,
+          content: { wallet: { address: 'GTESTADDRESS' } },
+        }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -109,20 +141,24 @@ describe('activateWalletHandler', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const res = mockRes();
-    await activateWalletHandler(mockReq('valid-token'), res as unknown as Response);
+    await activateWalletHandler(
+      mockReq('valid-token', { address: 'GTESTADDRESS', pollarAccessToken: 'pollar-token' }),
+      res as unknown as Response,
+    );
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      'https://sdk.api.pollar.xyz/v2/wallet/activate',
+      'https://server.api.pollar.xyz/v1/tokens/verify',
       expect.objectContaining({
         method: 'POST',
         redirect: 'error',
         headers: expect.objectContaining({
-          Authorization: 'Bearer sk_test_pollar',
           'x-pollar-api-key': 'sk_test_pollar',
         }),
+        body: JSON.stringify({ token: 'pollar-token' }),
       }),
     );
+    expect(fetchMock.mock.calls[0][1]?.headers).not.toHaveProperty('Authorization');
     const hasuraRequest = JSON.parse(
       fetchMock.mock.calls[1][1]?.body as string,
     ) as { query: string; variables: Record<string, unknown> };
@@ -141,7 +177,10 @@ describe('activateWalletHandler', () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ address: 'GTESTADDRESS' }),
+        json: async () => ({
+          success: true,
+          content: { wallet: { address: 'GTESTADDRESS' } },
+        }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -150,7 +189,10 @@ describe('activateWalletHandler', () => {
     );
 
     const res = mockRes();
-    await activateWalletHandler(mockReq('valid-token'), res as unknown as Response);
+    await activateWalletHandler(
+      mockReq('valid-token', { address: 'GTESTADDRESS', pollarAccessToken: 'pollar-token' }),
+      res as unknown as Response,
+    );
 
     expect(res._status).toBe(500);
     expect((res._body as { error: string }).error).toBe('Database sync failed');
