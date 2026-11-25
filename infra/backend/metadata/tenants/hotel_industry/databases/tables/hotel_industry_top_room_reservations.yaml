@@ -1,0 +1,6 @@
+# Return type of the get_top_rooms_by_reservations function. It holds no rows.
+# No role permissions: the function aggregates every hotel, so it stays
+# admin-only until a hotel-scoped version is needed.
+table:
+  name: top_room_reservations
+  schema: hotel_industry

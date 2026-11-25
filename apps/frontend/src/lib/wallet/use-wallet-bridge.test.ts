@@ -308,8 +308,8 @@ describe('useWalletBridge', () => {
     expect(mockKit.signTransaction).toHaveBeenCalledWith('XDR', { address: 'GKIT', networkPassphrase: 'API_NETWORK' });
   });
 
-  it('normalizes a public network label for callers without API metadata', async () => {
-    vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK', 'PUBLIC');
+  it('falls back to STELLAR_NETWORK_PASSPHRASE for callers without API metadata', async () => {
+    vi.stubEnv('STELLAR_NETWORK_PASSPHRASE', 'Public Global Stellar Network ; September 2015');
     Object.assign(mockStore, { address: 'GFREIGHTER', walletType: 'Freighter', walletProvider: 'freighter' });
     const { result } = renderHook(() => useWalletBridge());
     await result.current.sign('XDR');

@@ -1,0 +1,11 @@
+# Analytics for the escrow dashboard (apps/frontend/src/hooks/use-analytics-data.ts).
+# Returns SETOF public.escrow_analytics_daily, whose select permissions decide
+# which roles can call it; the permissions below say the same thing explicitly.
+- function:
+    schema: public
+    name: get_escrow_analytics_by_day
+  configuration:
+    custom_name: getEscrowAnalyticsByDay
+  permissions:
+    - role: guest
+    - role: host
