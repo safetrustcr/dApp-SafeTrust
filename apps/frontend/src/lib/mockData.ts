@@ -1,4 +1,4 @@
-import { EscrowData, NotificationData } from '@/components/dashboard/RoleEscrowDashboard';
+import type { EscrowData } from '@/components/dashboard/RoleEscrowDashboard';
 
 // Helper function to generate random dates
 const randomDate = (start: Date, end: Date) => {
@@ -121,86 +121,10 @@ export const generateMockEscrows = (count: number = 10): EscrowData[] => {
 };
 
 /**
- * @deprecated RoleEscrowDashboardPage derives notifications from Hasura escrow data.
- */
-export const generateMockNotifications = (escrows: EscrowData[]): NotificationData[] => {
-  const notifications: NotificationData[] = [];
-  
-  escrows.forEach(escrow => {
-    const bookingId = escrow.metadata?.bookingId || 'N/A';
-    const hotelName = escrow.metadata?.hotelName ? `at ${escrow.metadata.hotelName}` : '';
-    
-    // Add notification for current status
-    let message = '';
-    let type: 'milestone' | 'payment' | 'alert' = 'milestone';
-    
-    switch(escrow.status) {
-      case 'funded':
-        message = `Booking #${bookingId} ${hotelName} has been funded`;
-        type = 'payment';
-        break;
-      case 'check_in_approved':
-        message = `Check-in approved for booking #${bookingId} ${hotelName}`;
-        break;
-      case 'check_out_approved':
-        message = `Check-out completed for booking #${bookingId} ${hotelName}`;
-        break;
-      case 'completed':
-        message = `Booking #${bookingId} ${hotelName} has been completed`;
-        type = 'payment';
-        break;
-      case 'cancelled':
-        message = `Booking #${bookingId} ${hotelName} was cancelled`;
-        type = 'alert';
-        break;
-      default:
-        message = `Update for booking #${bookingId} ${hotelName}`;
-    }
-    
-    notifications.push({
-      id: `notif_${escrow.id}`,
-      type,
-      message,
-      timestamp: new Date(escrow.updatedAt).toISOString(),
-      read: Math.random() > 0.5,
-      escrowId: escrow.id
-    });
-    
-    // Add some random notifications for completed milestones
-    if (escrow.milestones) {
-      escrow.milestones.forEach(milestone => {
-        if (milestone.status === 'completed' && milestone.completedAt) {
-          notifications.push({
-            id: `milestone_${escrow.id}_${milestone.id}`,
-            type: 'milestone',
-            message: `${milestone.name} completed for booking #${bookingId} ${hotelName}`,
-            timestamp: milestone.completedAt,
-            read: Math.random() > 0.5,
-            escrowId: escrow.id
-          });
-        }
-      });
-    }
-  });
-  
-  // Sort by timestamp (newest first)
-  return notifications.sort((a, b) => 
-    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
-};
-
-/**
  * @deprecated RoleEscrowDashboardPage now loads escrows with GET_ESCROWS.
  */
 export const fetchMockEscrows = async (): Promise<EscrowData[]> => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
   return generateMockEscrows(15);
-};
-
-export const fetchMockNotifications = async (): Promise<NotificationData[]> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const escrows = generateMockEscrows(5);
-  return generateMockNotifications(escrows);
 };

@@ -22,6 +22,7 @@ import readinessRouter from './routes/escrow/readiness.route.js';
 import conversationsRouter from './routes/messages/conversations.route.js';
 import messagesRouter from './routes/messages/send.route.js';
 import notificationDevicesRouter from './routes/notifications/devices.route.js';
+import notificationsListRouter from './routes/notifications/list.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
@@ -82,6 +83,7 @@ app.use('/api/escrow', readinessRouter);
 app.use('/api/messages', conversationsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/notifications', notificationDevicesRouter);
+app.use('/api/notifications', notificationsListRouter);
 
 // Hotel routes
 app.use('/api/hotels', hotelsRouter);

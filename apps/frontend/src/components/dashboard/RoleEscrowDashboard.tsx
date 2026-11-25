@@ -1,27 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import { DashboardHeader, type EscrowDashboardStats } from "./DashboardHeader";
 import { EscrowsByStatus } from "./EscrowsByStatus";
 import { RecentActivity } from "./RecentActivity";
 import { QuickActions } from "./QuickActions";
 import { EscrowTable } from "./EscrowTable";
 import { AnalyticsDashboard } from "./analytics";
-
-// Placeholder functions for notifications - in a real app, these would be API calls
-async function checkPendingNotifications(): Promise<NotificationData[]> {
-  // In a real implementation, this would fetch from Trustless Work API
-  // const response = await fetch('/api/notifications/pending');
-  // return response.json();
-  return [];
-}
-
-async function checkMilestoneNotifications(): Promise<NotificationData[]> {
-  // In a real implementation, this would fetch from Trustless Work API
-  // const response = await fetch('/api/notifications/milestones');
-  // return response.json();
-  return [];
-}
 
 type EscrowStatus =
   | "pending"
@@ -63,13 +49,11 @@ export interface NotificationData {
   timestamp: string;
   read: boolean;
   escrowId?: string;
+  /** `pending_action` = something the user can do now; `event` = something that happened. */
+  kind?: "event" | "pending_action";
+  href?: string;
+  txUrl?: string;
 }
-
-const sortNotificationsByTimestamp = (notifications: NotificationData[]) =>
-  [...notifications].sort(
-    (a, b) =>
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-  );
 
 const EMPTY_NOTIFICATIONS: NotificationData[] = [];
 
@@ -92,6 +76,8 @@ interface RoleEscrowDashboardProps {
   escrows?: EscrowData[];
   totalEscrows?: number;
   notifications?: NotificationData[];
+  /** Set when the notifications could not be loaded; shown instead of an empty state. */
+  notificationsError?: string | null;
   isLoading?: boolean;
   error?: string | null;
   statsError?: string | null;
@@ -104,7 +90,8 @@ export function RoleEscrowDashboard({
   userRole,
   escrows = [],
   totalEscrows,
-  notifications: initialNotifications = EMPTY_NOTIFICATIONS,
+  notifications = EMPTY_NOTIFICATIONS,
+  notificationsError = null,
   isLoading = false,
   error = null,
   statsError = null,
@@ -112,86 +99,7 @@ export function RoleEscrowDashboard({
   dashboardStats = null,
   isLoadingStats = false,
 }: RoleEscrowDashboardProps) {
-  const [notifications, setNotifications] =
-    useState<NotificationData[]>(initialNotifications);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [isPolling, setIsPolling] = useState(false);
-  const isMountedRef = useRef(true);
-  const isPollingRef = useRef(false);
-
-  useEffect(() => {
-    setNotifications((prev) => {
-      const mergedById = new Map(
-        prev.map((notification) => [notification.id, notification]),
-      );
-
-      initialNotifications.forEach((notification) => {
-        const existing = mergedById.get(notification.id);
-        mergedById.set(notification.id, {
-          ...notification,
-          read: existing?.read ?? notification.read,
-        });
-      });
-
-      return sortNotificationsByTimestamp(Array.from(mergedById.values()));
-    });
-  }, [initialNotifications]);
-
-   // Real-time updates using Trustless Work notifications
-   useEffect(() => {
-     isMountedRef.current = true;
-     if (isLoading) return;
-
-     const checkUpdates = async () => {
-       // Prevent overlapping requests
-       if (isPollingRef.current) return;
-       isPollingRef.current = true;
-
-       try {
-         if (isMountedRef.current) setIsPolling(true);
-         const pendingNotifications = await checkPendingNotifications();
-         const milestoneUpdates = await checkMilestoneNotifications();
-
-         // Combine and deduplicate notifications
-         const allNotifications = [...pendingNotifications, ...milestoneUpdates];
-         const uniqueNotifications = allNotifications.filter(
-           (notif, index, self) =>
-             index === self.findIndex((n) => n.id === notif.id),
-         );
-
-         if (uniqueNotifications.length > 0 && isMountedRef.current) {
-           setNotifications((prev) => {
-             // Merge with existing notifications, avoiding duplicates
-             const existingIds = new Set(prev.map((n) => n.id));
-             const newNotifications = uniqueNotifications.filter(
-               (n) => !existingIds.has(n.id),
-             );
-             return sortNotificationsByTimestamp([...prev, ...newNotifications]);
-           });
-         }
-       } catch (error) {
-         console.error("Error checking for updates:", error);
-       } finally {
-         isPollingRef.current = false;
-         if (isMountedRef.current) {
-           setIsPolling(false);
-         }
-       }
-     };
-
-     // Initial check
-     checkUpdates();
-
-     // Poll every 15 seconds
-     const interval = setInterval(checkUpdates, 15000);
-
-     // Cleanup function
-     return () => {
-       isMountedRef.current = false;
-       isPollingRef.current = false;
-       clearInterval(interval);
-     };
-   }, [isLoading]);
 
   if (isLoading) {
     return (
@@ -352,66 +260,10 @@ export function RoleEscrowDashboard({
                 {notifications.length > 0 ? (
                   <div className="space-y-3">
                     {notifications.slice(0, 3).map((notification) => (
-                      <div
+                      <NotificationRow
                         key={notification.id}
-                        className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                      >
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0 mt-0.5">
-                            {notification.type === "payment" ? (
-                              <svg
-                                className="h-5 w-5 text-blue-500"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                                />
-                              </svg>
-                            ) : notification.type === "milestone" ? (
-                              <svg
-                                className="h-5 w-5 text-green-500"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                />
-                              </svg>
-                            ) : (
-                              <svg
-                                className="h-5 w-5 text-amber-500"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                                />
-                              </svg>
-                            )}
-                          </div>
-                          <div className="ml-3 flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {notification.message}
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              {formatNotificationTimestamp(notification.timestamp)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                        notification={notification}
+                      />
                     ))}
                     {notifications.length > 3 && (
                       <div className="text-center">
@@ -423,8 +275,16 @@ export function RoleEscrowDashboard({
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      No new notifications
+                    <p
+                      className={
+                        notificationsError
+                          ? "text-sm text-red-600 dark:text-red-400"
+                          : "text-sm text-gray-500 dark:text-gray-400"
+                      }
+                    >
+                      {notificationsError
+                        ? "Notifications could not be loaded. Retrying…"
+                        : "No new notifications"}
                     </p>
                   </div>
                 )}
@@ -476,6 +336,84 @@ export function RoleEscrowDashboard({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+const NOTIFICATION_ICON_PATH: Record<NotificationData["type"], string> = {
+  payment:
+    "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z",
+  milestone:
+    "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+  alert:
+    "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+};
+
+const NOTIFICATION_ICON_COLOR: Record<NotificationData["type"], string> = {
+  payment: "text-blue-500",
+  milestone: "text-green-500",
+  alert: "text-amber-500",
+};
+
+function NotificationRow({ notification }: { notification: NotificationData }) {
+  const content = (
+    <div className="flex items-start">
+      <div className="flex-shrink-0 mt-0.5">
+        <svg
+          className={`h-5 w-5 ${NOTIFICATION_ICON_COLOR[notification.type]}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d={NOTIFICATION_ICON_PATH[notification.type]}
+          />
+        </svg>
+      </div>
+      <div className="ml-3 flex-1">
+        {notification.kind === "pending_action" && (
+          <span className="mb-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+            Action needed
+          </span>
+        )}
+        <p className="text-sm font-medium text-gray-900 dark:text-white">
+          {notification.message}
+        </p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {formatNotificationTimestamp(notification.timestamp)}
+        </p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      className={`p-3 rounded-lg ${
+        notification.read ? "bg-gray-50 dark:bg-gray-700" : "bg-blue-50 dark:bg-gray-700/80"
+      }`}
+      data-testid="dashboard-notification"
+    >
+      {notification.href ? (
+        <Link href={notification.href} className="block">
+          {content}
+        </Link>
+      ) : (
+        content
+      )}
+      {notification.txUrl && (
+        <a
+          href={notification.txUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 ml-8 inline-block text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+        >
+          View transaction
+        </a>
+      )}
     </div>
   );
 }
