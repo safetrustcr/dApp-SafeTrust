@@ -8,6 +8,7 @@ export type PollarWalletValue = {
   address: string | null;
   signAndSubmit: SignAndSubmit | null;
   configured: boolean;
+  login?: ReturnType<typeof usePollar>['login'];
 };
 
 export const PollarWalletContext = createContext<PollarWalletValue>({
@@ -17,7 +18,7 @@ export const PollarWalletContext = createContext<PollarWalletValue>({
 });
 
 function PollarAddressBridge({ children }: { children: ReactNode }) {
-  const { wallet, signAndSubmitTx } = usePollar();
+  const { wallet, signAndSubmitTx, login } = usePollar();
 
   const signAndSubmit: SignAndSubmit = async (unsignedXdr) => {
     const result = await signAndSubmitTx(unsignedXdr);
@@ -28,7 +29,7 @@ function PollarAddressBridge({ children }: { children: ReactNode }) {
 
   return (
     <PollarWalletContext.Provider
-      value={{ address: wallet?.address ?? null, signAndSubmit, configured: true }}
+      value={{ address: wallet?.address ?? null, signAndSubmit, configured: true, login }}
     >
       {children}
     </PollarWalletContext.Provider>

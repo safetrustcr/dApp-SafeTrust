@@ -15,8 +15,7 @@ import {
 } from 'lucide-react';
 import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { useMultiWallet } from '@/components/auth/wallet/hooks/multi-wallet.hook';
-import { getWalletKit } from '@/components/auth/wallet/constants/wallet-kit.constant';
-import { useGlobalAuthenticationStore } from '@/core/store/data';
+import { useWalletBridge, PollarSigningUnsupportedError, WalletRejectedError } from '@/lib/wallet/use-wallet-bridge';
 import { postAuthenticatedApi } from '@/lib/api/client';
 import {
   getReadiness,
@@ -42,7 +41,7 @@ export function WalletReadinessChecklist({
 }: WalletReadinessChecklistProps) {
   const { address, isReady } = useActiveWallet();
   const { handleConnect } = useMultiWallet();
-  const stellarWalletId = useGlobalAuthenticationStore((state) => state.stellarWalletId);
+  const bridge = useWalletBridge();
 
   const [readiness, setReadiness] = useState<WalletReadiness | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,33 +128,11 @@ export function WalletReadinessChecklist({
     try {
       const { unsignedXdr } = await buildTrustlineXdr(targetAddress);
 
-      let signedXdr = '';
-      const networkPassphrase =
-        process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'Test SDF Network ; September 2015';
-
-      if (stellarWalletId) {
-        const kit = getWalletKit();
-        kit.setWallet(stellarWalletId);
-        const { signedTxXdr } = await kit.signTransaction(unsignedXdr, {
-          address: targetAddress,
-          networkPassphrase,
-        });
-        signedXdr = signedTxXdr;
-      } else if (typeof window !== 'undefined' && (window as unknown as { freighterApi?: unknown }).freighterApi) {
-        const api = (window as unknown as {
-          freighterApi: {
-            signTransaction: (xdr: string, opts: { networkPassphrase: string }) => Promise<{ signedTransaction?: string; [key: string]: unknown }>;
-          };
-        }).freighterApi;
-        const result = await api.signTransaction(unsignedXdr, { networkPassphrase });
-        signedXdr = (result.signedTransaction ?? (result as unknown as string)) || '';
-      } else {
-        throw new Error('No compatible wallet found to sign trustline transaction.');
+      if (targetAddress !== bridge.address) {
+        setError('Connect the registered wallet that needs this trustline before signing.');
+        return;
       }
-
-      if (!signedXdr) {
-        throw new Error('Signing trustline transaction was cancelled.');
-      }
+      const signedXdr = await bridge.sign(unsignedXdr);
 
       // Submit directly to Horizon
       const horizonUrl = (
@@ -184,7 +161,9 @@ export function WalletReadinessChecklist({
       await fetchReadiness();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('cancelled') || msg.includes('User declined')) {
+      if (err instanceof PollarSigningUnsupportedError) {
+        setError(err.message);
+      } else if (err instanceof WalletRejectedError || msg.includes('cancelled') || msg.includes('User declined')) {
         setError('Trustline transaction signing was cancelled.');
       } else {
         setError("Can't check your wallet right now. Try again.");

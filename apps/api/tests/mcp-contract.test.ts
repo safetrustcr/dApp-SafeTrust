@@ -18,7 +18,10 @@ import { ACTION_SIGNER_ROLE, DEPLOY_ROLES } from '../../../mcp/src/lib/escrow-ro
 
 vi.mock('../src/services/trustlesswork.js', () => ({ trustlessWorkRequest: vi.fn() }));
 vi.mock('../src/services/hasura.js', () => ({ hasuraRequest: vi.fn() }));
-vi.mock('../src/services/idempotency.js', () => ({ checkIdempotency: vi.fn() }));
+vi.mock('../src/services/idempotency.js', () => ({
+  checkIdempotency: vi.fn(),
+  findRentalEscrowForUser: vi.fn().mockResolvedValue({ exists: false }),
+}));
 vi.mock('../src/services/hotel-reservation-escrow.js', () => ({
   getHotelReservationEscrowTerms: vi.fn(),
   getHotelUserWallets: vi.fn(),
@@ -40,7 +43,10 @@ vi.mock('../src/services/pending-actions.js', async (importOriginal) => ({
   findLiveAction: vi.fn(),
   insertPendingAction: vi.fn(),
 }));
-vi.mock('../src/lib/stellar-xdr.js', () => ({ transactionHash: vi.fn(), transactionExpiry: vi.fn() }));
+vi.mock('../src/lib/stellar-xdr.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  transactionHash: vi.fn(), transactionExpiry: vi.fn(),
+}));
 
 import deployRouter from '../src/routes/escrow/deploy.route.js';
 import fundRouter from '../src/routes/escrow/fund.route.js';

@@ -39,7 +39,7 @@ export const MainWalletSelectionModal: React.FC<MainWalletSelectionModalProps> =
 
   if (!isOpen) return null;
 
-  const handleConnect = async (targetProvider: "freighter" | "pollar" | "other") => {
+  const handleConnect = async (targetProvider: "freighter" | "pollar" | "wallets-kit") => {
     if (targetProvider === "freighter" && !hasFreighterExtension) {
       toast.error("Freighter is not available in this browser", {
         action: {
@@ -197,7 +197,7 @@ export const MainWalletSelectionModal: React.FC<MainWalletSelectionModalProps> =
           {/* 3. Other Stellar Wallets (Albedo, LOBSTR, xBull, Here) */}
           <Card
             className="cursor-pointer transition-all duration-200 hover:border-purple-500 hover:shadow-md dark:hover:border-purple-600"
-            onClick={() => handleConnect("other")}
+            onClick={() => handleConnect("wallets-kit")}
           >
             <CardContent className="!p-4">
               <div className="flex items-center justify-between">
@@ -213,7 +213,7 @@ export const MainWalletSelectionModal: React.FC<MainWalletSelectionModalProps> =
                   </div>
                 </div>
 
-                {connectingProvider === "other" && (
+                {connectingProvider === "wallets-kit" && (
                   <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
                 )}
               </div>

@@ -42,13 +42,13 @@ beforeEach(() => { vi.clearAllMocks(); mocks.ready = true; mocks.address = `G${'
 afterEach(cleanup);
 describe('shared hotel payment flow', () => {
   it('deploys by reservation ID, then signs and opens the shared hotel lifecycle', async () => {
-    mocks.post.mockResolvedValue({ engagementId: 'hotel:reservation', contractId: 'CONTRACT', unsignedXDR: 'unsigned' });
+    mocks.post.mockResolvedValue({ engagementId: 'hotel:reservation', contractId: 'CONTRACT', unsignedXDR: 'unsigned', networkPassphrase: 'API_NETWORK' });
     mocks.sign.mockResolvedValue({});
     render(<EscrowPayFlow {...props} />);
     fireEvent.click(screen.getByRole('button', { name: 'Create escrow' }));
     await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/api/escrow/deploy', { reservationId: 'reservation', senderAddress: mocks.address }, expect.any(Object)));
     fireEvent.click(await screen.findByRole('button', { name: 'Sign & Send' }));
-    await waitFor(() => expect(mocks.sign).toHaveBeenCalledWith('unsigned', expect.objectContaining({ action: 'initialize' })));
+    await waitFor(() => expect(mocks.sign).toHaveBeenCalledWith('unsigned', expect.objectContaining({ action: 'initialize', networkPassphrase: 'API_NETWORK' })));
     expect(mocks.push).toHaveBeenCalledWith('/escrow/reservation/escrow/hotel%3Areservation?kind=hotel-room');
   });
   it('opens an existing escrow without signing an empty cached XDR', async () => {

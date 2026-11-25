@@ -1,15 +1,11 @@
 // apps/frontend/src/hooks/use-freighter.ts
-// Thin wrapper — exposes Freighter wallet state for useActiveWallet.
+// Connection detection only; XDR signing belongs to WalletBridge.sign.
 // Full Freighter connect logic lives in auth/wallet/hooks/wallet.hook.ts.
-// This hook provides the shape useActiveWallet expects.
 
 import { useState, useEffect } from 'react';
-import type { SignAndSubmit } from '@/hooks/use-active-wallet';
-import { postEscrowApi } from '@/lib/api/escrow';
 
 export type FreighterWallet = {
   address: string | null;
-  signAndSubmit: SignAndSubmit | null;
 };
 
 /**
@@ -41,23 +37,5 @@ export function useFreighter(): FreighterWallet {
     return () => { cancelled = true; };
   }, []);
 
-  const signAndSubmit: SignAndSubmit | null = address
-    ? async (xdr, submission): Promise<void> => {
-        try {
-          // @ts-expect-error — window.freighterApi
-          const api = window.freighterApi;
-          const { signedTransaction } = await api.signTransaction(xdr, {
-            networkPassphrase: process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'Test SDF Network ; September 2015',
-          });
-          await postEscrowApi('/api/escrow/send-transaction', {
-            signedXdr: signedTransaction,
-            ...submission,
-          });
-        } catch (err) {
-          throw new Error(`Freighter signing failed: ${String(err)}`);
-        }
-      }
-    : null;
-
-  return { address, signAndSubmit };
+  return { address };
 }

@@ -17,7 +17,7 @@ import { authorizeEscrowAction, EscrowAccessError } from '../../../services/escr
 import { findLiveAction, insertPendingAction } from '../../../services/pending-actions.js';
 import { trustlessWorkRequest } from '../../../services/trustlesswork.js';
 import { buildEscrowAction } from '../build-escrow-action.js';
-import { transactionHash } from '../../../lib/stellar-xdr.js';
+import { transactionHash, NETWORK_PASSPHRASE } from '../../../lib/stellar-xdr.js';
 
 const GUEST = Keypair.random().publicKey();
 const escrow = {
@@ -73,6 +73,7 @@ describe('buildEscrowAction', () => {
     expect(result).toMatchObject({
       pendingActionId: 'pa-1',
       unsignedXdr: xdr,
+      networkPassphrase: NETWORK_PASSPHRASE,
       txHash: transactionHash(xdr),
       reused: false,
     });
@@ -102,8 +103,28 @@ describe('buildEscrowAction', () => {
 
     const result = await buildEscrowAction({ uid: 'uid-guest', engagementId: 'eng-1', action: 'release_funds', request });
 
-    expect(result).toMatchObject({ unsignedXdr: 'EXISTING', reused: true });
+    expect(result).toMatchObject({ unsignedXdr: 'EXISTING', reused: true, networkPassphrase: NETWORK_PASSPHRASE });
     expect(trustlessWorkRequest).not.toHaveBeenCalled();
+  });
+
+  it('reports the verifier network for a replay even when the browser uses another network', async () => {
+    vi.resetModules();
+    vi.stubEnv('STELLAR_NETWORK_PASSPHRASE', 'Custom server signing network');
+    try {
+      const { buildEscrowAction: build } = await import('../build-escrow-action.js');
+      vi.mocked(authorizeEscrowAction).mockResolvedValue({ signer: GUEST, escrow, roles: {} as never });
+      vi.mocked(findLiveAction).mockResolvedValue({
+        id: 'pa-network', unsigned_xdr: 'EXISTING', tx_hash: 'h',
+        engagement_id: 'eng-1', built_for_uid: 'uid-guest', status: 'built',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      } as never);
+      const result = await build({ uid: 'uid-guest', engagementId: 'eng-1', action: 'release_funds', request });
+      expect(result.networkPassphrase).toBe('Custom server signing network');
+      expect(trustlessWorkRequest).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 
   it('409 while the same action is submitted and awaiting confirmation', async () => {
