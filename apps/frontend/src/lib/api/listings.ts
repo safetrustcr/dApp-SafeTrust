@@ -41,21 +41,29 @@ function isPublicRentalProperty(value: unknown): value is PublicRentalProperty {
   );
 }
 
+const HOTEL_PAGE_SIZE = 100;
+
 /**
  * Loads a single public hotel with its rooms from the listings endpoint.
+ *
+ * The listings endpoint has no lookup by ID, so every page is requested while
+ * `hasMore` is true until the hotel is found or the catalog is exhausted.
  */
 export async function fetchPublicHotel(
   hotelId: string,
   signal: AbortSignal = new AbortController().signal,
 ): Promise<PublicRentalProperty> {
-  const page = await fetchPublicListings('hotel', 100, 0, signal);
-  const hotel = page.properties.find(
-    (property) => property.kind === 'hotel' && property.id === hotelId,
-  );
-  if (!hotel) {
-    throw new Error('This hotel is no longer available. Pick another hotel from search.');
+  let offset = 0;
+  for (;;) {
+    const page = await fetchPublicListings('hotel', HOTEL_PAGE_SIZE, offset, signal);
+    const hotel = page.properties.find(
+      (property) => property.kind === 'hotel' && property.id === hotelId,
+    );
+    if (hotel) return hotel;
+    if (!page.hasMore || page.properties.length === 0) break;
+    offset += page.properties.length;
   }
-  return hotel;
+  throw new Error('This hotel is no longer available. Pick another hotel from search.');
 }
 
 export async function fetchPublicListings(
