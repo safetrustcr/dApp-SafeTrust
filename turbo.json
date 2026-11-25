@@ -12,6 +12,9 @@
       "dependsOn": [
         "^build"
       ],
+      "env": [
+        "STELLAR_NETWORK_PASSPHRASE"
+      ],
       "outputs": [
         ".next/**",
         "!.next/cache/**",
