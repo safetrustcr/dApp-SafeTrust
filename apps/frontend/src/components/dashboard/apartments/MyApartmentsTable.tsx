@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "@apollo/client";
 import { toast } from "sonner";
 import {
   Plus, Search, Home, MapPin, DollarSign,
-  Trash2, Eye,
+  Trash2, Eye, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -276,6 +276,14 @@ export function MyApartmentsTable() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        title="View offers"
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        onClick={() => router.push(`/dashboard/apartments/${apt.id}/offers`)}
+                      >
+                        <Users className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         title="View details"

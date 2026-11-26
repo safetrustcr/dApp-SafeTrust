@@ -3,3 +3,10 @@
     name: find_nearby_hotels
   configuration:
     custom_name: find_nearby_hotels
+# Top five rooms by reservations across every hotel. No role permissions: the
+# result spans all hotels, so only the admin secret (and admin role) can call it.
+- function:
+    schema: hotel_industry
+    name: get_top_rooms_by_reservations
+  configuration:
+    custom_name: get_top_rooms_by_reservations

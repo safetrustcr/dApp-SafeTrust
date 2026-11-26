@@ -145,8 +145,116 @@ select_permissions:
       filter:
         tenant_id:
           _eq: safetrust
+  - role: guest
+    permission:
+      columns:
+        - id
+        - contract_id
+        - marker
+        - approver
+        - releaser
+        - resolver
+        - escrow_type
+        - status
+        - asset_code
+        - asset_issuer
+        - amount
+        - balance
+        - booking_id
+        - room_id
+        - hotel_id
+        - guest_id
+        - check_in_date
+        - check_out_date
+        - booking_created_at
+        - escrow_metadata
+        - booking_metadata
+        - created_at
+        - updated_at
+        - tenant_id
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - guest_id:
+              _eq: X-Hasura-User-Id
+    comment: Guests can read the escrows they are the guest on
+  - role: host
+    permission:
+      columns:
+        - id
+        - contract_id
+        - marker
+        - approver
+        - releaser
+        - resolver
+        - escrow_type
+        - status
+        - asset_code
+        - asset_issuer
+        - amount
+        - balance
+        - booking_id
+        - room_id
+        - hotel_id
+        - guest_id
+        - check_in_date
+        - check_out_date
+        - booking_created_at
+        - escrow_metadata
+        - booking_metadata
+        - created_at
+        - updated_at
+        - tenant_id
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - _exists:
+              _table:
+                name: user_wallets
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - wallet_address:
+                      _ceq:
+                        - "$"
+                        - marker
+    comment: Hosts can read the escrows they marked
 insert_permissions:
   - role: tenant
+    permission:
+      check:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - guest_id:
+              _eq: X-Hasura-User-Id
+      columns:
+        - contract_id
+        - marker
+        - approver
+        - releaser
+        - resolver
+        - escrow_type
+        - status
+        - asset_code
+        - asset_issuer
+        - amount
+        - booking_id
+        - room_id
+        - hotel_id
+        - check_in_date
+        - check_out_date
+        - escrow_metadata
+        - booking_metadata
+      set:
+        tenant_id: safetrust
+        guest_id: X-Hasura-User-Id
+    comment: Guests can create escrows for themselves
+  - role: guest
     permission:
       check:
         _and:
@@ -197,6 +305,45 @@ update_permissions:
               _eq: X-Hasura-User-Id
     comment: Guests can advance the status of their own escrows
   - role: landlord
+    permission:
+      columns:
+        - status
+        - balance
+        - booking_metadata
+        - escrow_metadata
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - marker:
+              _eq: X-Hasura-User-Id
+      check:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - marker:
+              _eq: X-Hasura-User-Id
+    comment: Hosts can advance the status of escrows they marked
+  - role: guest
+    permission:
+      columns:
+        - status
+        - balance
+        - escrow_metadata
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - guest_id:
+              _eq: X-Hasura-User-Id
+      check:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - guest_id:
+              _eq: X-Hasura-User-Id
+    comment: Guests can advance the status of their own escrows
+  - role: host
     permission:
       columns:
         - status

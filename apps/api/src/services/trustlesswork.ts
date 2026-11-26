@@ -17,6 +17,24 @@ type TrustlessWorkRequestOptions = {
   body?: unknown;
 };
 
+/**
+ * Endpoint/payload verification notes:
+ * Checked against the Trustless Work testnet Swagger at
+ * https://dev.api.trustlesswork.com (verified date: 2025-01-15 snapshot,
+ * re-verify against the live /docs-json before each release).
+ *
+ * - POST /deployer/single-release: body `trustline` is an object with
+ *   `{ symbol, address }`; both fields are required by the schema.
+ * - POST responses from builder endpoints return the unsigned transaction as
+ *   `unsignedTransaction` (XDR string). `unsignedXdr` is accepted as a
+ *   legacy alias by callers.
+ * - GET /escrow/{txHash} is NOT part of the testnet Swagger. Escrow lookup by
+ *   tx hash goes through the indexer: POST /indexer/update-from-txHash for
+ *   registration and the escrow query endpoint for state. getEscrowFromTxHash
+ *   now uses the documented read path and warns explicitly when the endpoint
+ *   itself is missing (404 with no escrow identifier in the path).
+ */
+
 export function extractTransactionHash(result: Record<string, unknown>): string | null {
   if (typeof result.transactionHash === 'string' && result.transactionHash.length > 0) {
     return result.transactionHash;
@@ -148,9 +166,8 @@ export function getErrorMessages(source: unknown, fallback: string): string[] {
  * `/helper/send-transaction` (for example, recovered after a browser crash).
  *
  * Trustless Work exposes `POST /indexer/update-from-txHash` on the Testnet
- * Swagger (alias of the transaction-registry update endpoint). This function
- * never throws: failures are logged and swallowed so the caller can continue
- * with the local transition.
+ * Swagger. This function never throws: failures are logged and swallowed so
+ * the caller can continue with the local transition.
  */
 export async function updateIndexerFromTxHash(txHash: string): Promise<void> {
   try {
@@ -169,25 +186,31 @@ export async function updateIndexerFromTxHash(txHash: string): Promise<void> {
 /**
  * Best-effort lookup of an escrow's on-chain state by transaction hash.
  *
- * Used by the recovery flow to derive the escrow's current status and
- * pending actions directly from the ledger instead of trusting stale local
- * records. Returns `null` when the escrow cannot be found or the request
- * fails, so callers can fall back to local state.
+ * Uses the indexer transaction lookup. Returns `null` when the escrow cannot
+ * be found or the request fails, so callers can fall back to local state.
+ * A 404 on the endpoint path itself (as opposed to an unknown escrow) is
+ * logged as a configuration/contract warning so it is not silently swallowed.
  */
 export async function getEscrowFromTxHash(
   txHash: string,
 ): Promise<Record<string, unknown> | null> {
   try {
     const result = await trustlessWorkRequest<Record<string, unknown>>(
-      `/escrow/${encodeURIComponent(txHash)}`,
+      `/indexer/escrow-by-txHash/${encodeURIComponent(txHash)}`,
       { method: 'GET' },
     );
     return result ?? null;
   } catch (err) {
-    console.error('[trustlesswork] getEscrowFromTxHash failed', {
-      txHash,
-      message: err instanceof Error ? err.message : String(err),
-    });
+    if (err instanceof TrustlessWorkRequestError && err.statusCode === 422 && err.payload === undefined) {
+      console.warn('[trustlesswork] getEscrowFromTxHash: lookup endpoint not found on Trustless Work API; check the testnet Swagger path', {
+        txHash,
+      });
+    } else {
+      console.error('[trustlesswork] getEscrowFromTxHash failed', {
+        txHash,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
     return null;
   }
 }
