@@ -6,6 +6,8 @@ import type { SignAndSubmit } from "@/hooks/use-active-wallet";
 
 export type PollarWalletValue = {
   address: string | null;
+  provisioning: string | null;
+  pollarAccessToken: string | null;
   signAndSubmit: SignAndSubmit | null;
   configured: boolean;
   login?: ReturnType<typeof usePollar>['login'];
@@ -19,6 +21,8 @@ export type PollarWalletValue = {
 
 export const PollarWalletContext = createContext<PollarWalletValue>({
   address: null,
+  provisioning: null,
+  pollarAccessToken: null,
   signAndSubmit: null,
   configured: false,
 });
@@ -76,7 +80,15 @@ export function PollarProvider({ children }: { children: ReactNode }) {
 
   if (!apiKey) {
     return (
-      <PollarWalletContext.Provider value={{ address: null, signAndSubmit: null, configured: false }}>
+      <PollarWalletContext.Provider
+        value={{
+          address: null,
+          provisioning: null,
+          pollarAccessToken: null,
+          signAndSubmit: null,
+          configured: false,
+        }}
+      >
         {children}
       </PollarWalletContext.Provider>
     );

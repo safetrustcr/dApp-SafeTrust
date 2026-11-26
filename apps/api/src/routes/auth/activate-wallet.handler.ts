@@ -2,14 +2,7 @@ import type { Request, Response } from 'express';
 import { getAuth }                 from 'firebase-admin/auth';
 import { executeGraphQL }          from '../../lib/hasura.js';
 
-const rawUrl = process.env.POLLAR_ACTIVATE_URL ?? 'https://sdk.api.pollar.xyz/v2/wallet/activate';
-const pollarUrlObj = new URL(rawUrl);
-
-if (pollarUrlObj.protocol !== 'https:') {
-  throw new Error('POLLAR_ACTIVATE_URL must use HTTPS');
-}
-
-const POLLAR_ACTIVATE_URL = pollarUrlObj.toString();
+const POLLAR_VERIFY_URL = 'https://server.api.pollar.xyz/v1/tokens/verify';
 
 const UPSERT_WALLET = `
   mutation UpsertPollarWallet($userId: String!, $address: String!) {
@@ -64,33 +57,56 @@ export const activateWalletHandler = async (
 
     const uid = decodedToken.uid;
 
-    // ── 2. Activate Pollar embedded wallet ────────────────────────────────
-    const pollarRes = await fetch(POLLAR_ACTIVATE_URL, {
-      method:  'POST',
-      redirect: 'error',
-      headers: {
-        'Content-Type':     'application/json',
-        'Authorization':    `Bearer ${process.env.POLLAR_SECRET_KEY}`,
-        'x-pollar-api-key': process.env.POLLAR_SECRET_KEY,
-      },
-      body: JSON.stringify({ userId: uid }),
-    });
+    const requestBody = req.body as {
+      address?: unknown;
+      pollarAccessToken?: unknown;
+    } | undefined;
+    const address = requestBody?.address;
+    const pollarAccessToken = requestBody?.pollarAccessToken;
 
-    if (!pollarRes.ok) {
-      const details = await pollarRes.text();
-      console.error(`[activate-wallet] Pollar error: ${pollarRes.status} ${details}`);
-      return res.status(502).json({ error: 'Pollar activation failed' });
+    if (
+      typeof address !== 'string' ||
+      !address ||
+      typeof pollarAccessToken !== 'string' ||
+      !pollarAccessToken
+    ) {
+      return res.status(400).json({ error: 'A wallet address and Pollar access token are required' });
     }
 
-    const pollarBody = (await pollarRes.json()) as { address?: string };
-    const address    = pollarBody.address;
+    // ── 2. Verify the SDK session and its wallet with Pollar ───────────────
+    let pollarBody: {
+      success?: boolean;
+      content?: { wallet?: { address?: string | null } };
+    };
 
-    if (!address) {
-      console.error('[activate-wallet] Pollar returned no address for uid:', uid);
-      return res.status(502).json({ error: 'Pollar returned no wallet address' });
+    try {
+      const pollarRes = await fetch(POLLAR_VERIFY_URL, {
+        method:  'POST',
+        redirect: 'error',
+        headers: {
+          'Content-Type':     'application/json',
+          'x-pollar-api-key': process.env.POLLAR_SECRET_KEY,
+        },
+        body: JSON.stringify({ token: pollarAccessToken }),
+      });
+
+      if (!pollarRes.ok) {
+        console.error(`[activate-wallet] Pollar token verification failed: ${pollarRes.status}`);
+        return res.status(pollarRes.status === 401 || pollarRes.status === 403 ? 401 : 502)
+          .json({ error: 'Pollar session verification failed' });
+      }
+
+      pollarBody = await pollarRes.json() as typeof pollarBody;
+    } catch (err) {
+      console.error('[activate-wallet] Pollar verification request failed:', err);
+      return res.status(502).json({ error: 'Pollar session verification failed' });
     }
 
-    // ── 3. Persist wallet address to user_wallets ─────────────────────────
+    if (!pollarBody.success || pollarBody.content?.wallet?.address !== address) {
+      return res.status(403).json({ error: 'Wallet address does not match the authenticated Pollar wallet' });
+    }
+
+    // ── 3. Persist only the verified wallet address ────────────────────────
     const walletData = await executeGraphQL<{
       update_user_wallets: { affected_rows: number };
       insert_user_wallets_one: { id: string; wallet_address: string };

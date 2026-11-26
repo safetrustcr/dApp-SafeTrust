@@ -6,9 +6,9 @@ const router: Router = Router();
 /**
  * POST /api/auth/activate-wallet
  *
- * Activates a Pollar embedded Stellar wallet for LATAM users who cannot use
- * Freighter. Verifies the Firebase token, calls the Pollar SDK, and saves
- * the returned G-address to public.user_wallets (provider: "pollar").
+ * Verifies the Firebase and Pollar sessions and saves the matching Stellar
+ * wallet to public.user_wallets (provider: "pollar").
+ * Expects the browser wallet address and Pollar SDK access token in the body.
  *
  * Prerequisite: POLLAR_SECRET_KEY must be set in apps/api/.env
  */
