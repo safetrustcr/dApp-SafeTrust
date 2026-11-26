@@ -144,6 +144,11 @@ else
       use_prepared_statements: false
   tables: "!include $TENANT/tables/tables.yaml"
 EOF
+    # Keep tracked functions; without this the combined source drops them.
+    if [ -f "$TENANT_BUILD/metadata/databases/functions/functions.yaml" ]; then
+      cp -r "$TENANT_BUILD/metadata/databases/functions" "$COMBINED_DIR/metadata/databases/$TENANT/"
+      echo "  functions: \"!include $TENANT/functions/functions.yaml\"" >> "$COMBINED_DIR/metadata/databases/databases.yaml"
+    fi
   done
   PROJECT_DIR="$COMBINED_DIR"
 fi

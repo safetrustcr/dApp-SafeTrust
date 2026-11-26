@@ -12,6 +12,9 @@
       "dependsOn": [
         "^build"
       ],
+      "env": [
+        "STELLAR_NETWORK_PASSPHRASE"
+      ],
       "outputs": [
         ".next/**",
         "!.next/cache/**",
@@ -47,11 +50,22 @@
         "E2E_PLATFORM_SECRET",
         "E2E_GUEST_EMAIL",
         "E2E_HOST_EMAIL",
-        "E2E_HOST_PASSWORD",
-        "E2E_APARTMENT_ID",
-        "E2E_APARTMENT_NAME",
-        "E2E_HOST_API_TOKEN",
+        "E2E_ADMIN_EMAIL",
+        "E2E_TEST_PASSWORD",
+        "E2E_DEPOSIT_USDC",
+        "E2E_TW_RATE_BUDGET",
+        "E2E_PAYOUT_FEE_TOLERANCE",
         "TRUSTLESS_WORK_API_KEY",
+        "TRUSTLESS_WORK_API_URL",
+        "PLATFORM_STELLAR_ADDRESS",
+        "USDC_TRUSTLINE_ADDRESS",
+        "RECONCILIATION_SECRET",
+        "HASURA_GRAPHQL_URL",
+        "HASURA_ADMIN_SECRET",
+        "STELLAR_HORIZON_URL",
+        "STELLAR_NETWORK_PASSPHRASE",
+        "NEXT_PUBLIC_FIREBASE_API_KEY",
+        "FIREBASE_AUTH_EMULATOR_HOST",
         "PLAYWRIGHT_BASE_URL",
         "API_URL",
         "NEXT_PUBLIC_E2E_WALLET"
