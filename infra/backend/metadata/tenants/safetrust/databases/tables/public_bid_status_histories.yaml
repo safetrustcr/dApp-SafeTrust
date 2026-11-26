@@ -1,0 +1,96 @@
+table:
+  name: bid_status_histories
+  schema: public
+object_relationships:
+  - name: bid_request
+    using:
+      foreign_key_constraint_on: bid_request_id
+  - name: changed_by_user
+    using:
+      foreign_key_constraint_on: changed_by
+insert_permissions:
+  - role: host
+    permission:
+      check:
+        bid_request:
+          apartment:
+            owner_id:
+              _eq: X-Hasura-User-Id
+      set:
+        changed_by: x-hasura-User-Id
+      columns:
+        - bid_request_id
+        - status
+        - notes
+  - role: landlord
+    permission:
+      check:
+        bid_request:
+          apartment:
+            owner_id:
+              _eq: X-Hasura-User-Id
+      set:
+        changed_by: x-hasura-User-Id
+      columns:
+        - bid_request_id
+        - status
+        - notes
+select_permissions:
+  - role: guest
+    permission:
+      columns:
+        - id
+        - bid_request_id
+        - status
+        - notes
+        - changed_by
+        - created_at
+      filter:
+        bid_request:
+          tenant_id:
+            _eq: X-Hasura-User-Id
+      allow_aggregations: true
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - bid_request_id
+        - status
+        - notes
+        - changed_by
+        - created_at
+      filter:
+        bid_request:
+          tenant_id:
+            _eq: X-Hasura-User-Id
+      allow_aggregations: true
+  - role: host
+    permission:
+      columns:
+        - id
+        - bid_request_id
+        - status
+        - notes
+        - changed_by
+        - created_at
+      filter:
+        bid_request:
+          apartment:
+            owner_id:
+              _eq: X-Hasura-User-Id
+      allow_aggregations: true
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - bid_request_id
+        - status
+        - notes
+        - changed_by
+        - created_at
+      filter:
+        bid_request:
+          apartment:
+            owner_id:
+              _eq: X-Hasura-User-Id
+      allow_aggregations: true

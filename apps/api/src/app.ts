@@ -29,6 +29,7 @@ import hotelsRouter from './routes/hotels/hotels.route.js';
 import hotelReservationsRouter from './routes/hotels/reservations.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 import { isTestnet } from './services/wallet-readiness.js';
+import bidsRouter from './routes/bids/bids.route.js';
 
 /**
  * Builds the apps/api Express app without binding a port.
@@ -84,6 +85,9 @@ export function createApp(): express.Express {
   app.use('/api/messages', conversationsRouter);
   app.use('/api/messages', messagesRouter);
   app.use('/api/notifications', notificationDevicesRouter);
+
+  // Bid / rental offer routes
+  app.use('/api/bids', bidsRouter);
 
   // Hotel routes
   app.use('/api/hotels', hotelsRouter);
