@@ -28,6 +28,22 @@ if [[ ${#TENANTS[@]} -eq 0 ]]; then
   else
     mapfile -t TENANTS < <(find "$INFRA_DIR/metadata/tenants" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
   fi
+# Static check: every public_*.yaml table file must be included in tables.yaml
+missing=0
+for tables_yaml in "$INFRA_DIR"/metadata/tenants/*/databases/tables/tables.yaml; do
+  [ -f "$tables_yaml" ] || continue
+  dir="$(dirname "$tables_yaml")"
+  for f in "$dir"/public_*.yaml; do
+    [ -f "$f" ] || continue
+    name="$(basename "$f")"
+    if ! grep -qF "!include $name" "$tables_yaml"; then
+      echo "❌ $name is not included in $tables_yaml" >&2
+      missing=1
+    fi
+  done
+done
+if [ "$missing" -ne 0 ]; then
+  exit 1
 fi
 
 echo "🔍 Checking Hasura metadata consistency..."

@@ -5,8 +5,8 @@ import { MapPin, BedDouble, Bath } from 'lucide-react';
 type PropertySummaryHeaderProps = {
   name: string;
   address: string;
-  bedrooms: number;
-  bathrooms: number;
+  bedrooms?: number;
+  bathrooms?: number;
   price: number;
 };
 
@@ -73,16 +73,20 @@ export function PropertySummaryHeader({
       <div style={styles.meta}>
         <span style={styles.metaItem}>
           <MapPin size={14} color="#f97316" strokeWidth={2} />
-          {address}
+          {address || '—'}
         </span>
-        <span style={styles.metaItem}>
-          <BedDouble size={14} color="#9ca3af" strokeWidth={2} />
-          {bedrooms} bd
-        </span>
-        <span style={styles.metaItem}>
-          <Bath size={14} color="#9ca3af" strokeWidth={2} />
-          {bathrooms} ba
-        </span>
+        {typeof bedrooms === 'number' && bedrooms > 0 && (
+          <span style={styles.metaItem}>
+            <BedDouble size={14} color="#9ca3af" strokeWidth={2} />
+            {bedrooms} bd
+          </span>
+        )}
+        {typeof bathrooms === 'number' && bathrooms > 0 && (
+          <span style={styles.metaItem}>
+            <Bath size={14} color="#9ca3af" strokeWidth={2} />
+            {bathrooms} ba
+          </span>
+        )}
       </div>
     </div>
   );

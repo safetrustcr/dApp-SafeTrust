@@ -1,0 +1,219 @@
+table:
+  name: bid_requests
+  schema: public
+object_relationships:
+  - name: apartment
+    using:
+      foreign_key_constraint_on: apartment_id
+  - name: tenant
+    using:
+      foreign_key_constraint_on: tenant_id
+array_relationships:
+  - name: bid_status_histories
+    using:
+      foreign_key_constraint_on:
+        column: bid_request_id
+        table:
+          name: bid_status_histories
+          schema: public
+insert_permissions:
+  - role: guest
+    permission:
+      check:
+        _and:
+          - tenant_id:
+              _eq: X-Hasura-User-Id
+          - apartment:
+              _and:
+                - is_available:
+                    _eq: true
+                - deleted_at:
+                    _is_null: true
+                - owner_id:
+                    _neq: X-Hasura-User-Id
+      set:
+        tenant_id: x-hasura-User-Id
+      columns:
+        - apartment_id
+        - proposed_price
+        - desired_move_in
+  - role: tenant
+    permission:
+      check:
+        _and:
+          - tenant_id:
+              _eq: X-Hasura-User-Id
+          - apartment:
+              _and:
+                - is_available:
+                    _eq: true
+                - deleted_at:
+                    _is_null: true
+                - owner_id:
+                    _neq: X-Hasura-User-Id
+      set:
+        tenant_id: x-hasura-User-Id
+      columns:
+        - apartment_id
+        - proposed_price
+        - desired_move_in
+select_permissions:
+  - role: guest
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - tenant_id
+        - current_status
+        - proposed_price
+        - desired_move_in
+        - created_at
+        - updated_at
+        - deleted_at
+      filter:
+        _and:
+          - tenant_id:
+              _eq: X-Hasura-User-Id
+          - deleted_at:
+              _is_null: true
+      allow_aggregations: true
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - tenant_id
+        - current_status
+        - proposed_price
+        - desired_move_in
+        - created_at
+        - updated_at
+        - deleted_at
+      filter:
+        _and:
+          - tenant_id:
+              _eq: X-Hasura-User-Id
+          - deleted_at:
+              _is_null: true
+      allow_aggregations: true
+  - role: host
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - tenant_id
+        - current_status
+        - proposed_price
+        - desired_move_in
+        - created_at
+        - updated_at
+        - deleted_at
+      filter:
+        _and:
+          - deleted_at:
+              _is_null: true
+          - apartment:
+              owner_id:
+                _eq: X-Hasura-User-Id
+      allow_aggregations: true
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - apartment_id
+        - tenant_id
+        - current_status
+        - proposed_price
+        - desired_move_in
+        - created_at
+        - updated_at
+        - deleted_at
+      filter:
+        _and:
+          - deleted_at:
+              _is_null: true
+          - apartment:
+              owner_id:
+                _eq: X-Hasura-User-Id
+      allow_aggregations: true
+update_permissions:
+  - role: guest
+    permission:
+      columns:
+        - current_status
+      filter:
+        _and:
+          - tenant_id:
+              _eq: X-Hasura-User-Id
+          - deleted_at:
+              _is_null: true
+          - current_status:
+              _in:
+                - PENDING
+                - VIEWED
+                - APPROVED
+      check:
+        current_status:
+          _eq: CANCELLED
+  - role: tenant
+    permission:
+      columns:
+        - current_status
+      filter:
+        _and:
+          - tenant_id:
+              _eq: X-Hasura-User-Id
+          - deleted_at:
+              _is_null: true
+          - current_status:
+              _in:
+                - PENDING
+                - VIEWED
+                - APPROVED
+      check:
+        current_status:
+          _eq: CANCELLED
+  - role: host
+    permission:
+      columns:
+        - current_status
+      filter:
+        _and:
+          - deleted_at:
+              _is_null: true
+          - current_status:
+              _in:
+                - PENDING
+                - VIEWED
+                - APPROVED
+          - apartment:
+              owner_id:
+                _eq: X-Hasura-User-Id
+      check:
+        current_status:
+          _in:
+            - VIEWED
+            - APPROVED
+            - CANCELLED
+  - role: landlord
+    permission:
+      columns:
+        - current_status
+      filter:
+        _and:
+          - deleted_at:
+              _is_null: true
+          - current_status:
+              _in:
+                - PENDING
+                - VIEWED
+                - APPROVED
+          - apartment:
+              owner_id:
+                _eq: X-Hasura-User-Id
+      check:
+        current_status:
+          _in:
+            - VIEWED
+            - APPROVED
+            - CANCELLED

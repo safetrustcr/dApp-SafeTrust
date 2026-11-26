@@ -16,22 +16,28 @@ import disputeRouter from './routes/escrow/dispute.route.js';
 import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.js';
 import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
 import statusStreamRouter from './routes/escrow/status-stream.route.js';
+import readinessRouter from './routes/escrow/readiness.route.js';
 import conversationsRouter from './routes/messages/conversations.route.js';
 import messagesRouter from './routes/messages/send.route.js';
+import notificationDevicesRouter from './routes/notifications/devices.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
 import { requestIdMiddleware, errorHandler } from './http/error-middleware.js';
 import listingsRouter from './routes/listings/listings.route.js';
 import hotelsRouter from './routes/hotels/hotels.route.js';
+import hotelReservationsRouter from './routes/hotels/reservations.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
+import { isTestnet } from './services/wallet-readiness.js';
+import bidsRouter from './routes/bids/bids.route.js';
 
 /**
  * Builds the apps/api Express app without binding a port.
  *
- * index.ts owns the process lifecycle (env, Firebase init, listen); the MCP
- * contract tests mount this same composition in-process so a response-shape
- * change in a route fails CI instead of only breaking the editor tools.
+ * This is the single place middleware and routers are registered: index.ts owns
+ * only the process lifecycle (env, Firebase init, listen), and the contract
+ * tests mount this same composition in-process so a response-shape change in a
+ * route fails CI instead of only breaking the editor tools.
  */
 export function createApp(): express.Express {
   const app = express();
@@ -44,7 +50,11 @@ export function createApp(): express.Express {
 
   // Health check
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', firebase: 'configured' });
+    res.json({
+      status: 'ok',
+      firebase: 'configured',
+      stellarNetwork: isTestnet() ? 'TESTNET' : 'PUBLIC',
+    });
   });
 
   app.use('/reconciliation', reconciliationRouter);
@@ -69,13 +79,19 @@ export function createApp(): express.Express {
   app.use('/api/escrow', recoverFromTxhashRouter);
   app.use('/api/escrow', sendTransactionRouter);
   app.use('/api/escrow', statusStreamRouter);
+  app.use('/api/escrow', readinessRouter);
 
   // Messages routes
   app.use('/api/messages', conversationsRouter);
   app.use('/api/messages', messagesRouter);
+  app.use('/api/notifications', notificationDevicesRouter);
+
+  // Bid / rental offer routes
+  app.use('/api/bids', bidsRouter);
 
   // Hotel routes
   app.use('/api/hotels', hotelsRouter);
+  app.use('/api/hotel-reservations', hotelReservationsRouter);
   app.use('/api/listings', listingsRouter);
 
   // Global Problem Details error boundary

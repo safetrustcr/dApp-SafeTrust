@@ -14,7 +14,7 @@ vi.mock('@/core/store/data', () => ({
   },
 }));
 
-import { createHotel, updateHotel, deleteHotel, HotelApiError } from './hotels';
+import { createHotel, updateHotel, deleteHotel, createReservation, HotelApiError } from './hotels';
 
 const fetchMock = vi.fn();
 
@@ -126,6 +126,45 @@ describe('hotels API client', () => {
       expect(apiError.code).toBe('HOTEL_HAS_DEPENDENTS');
       expect(apiError.message).toBe("Remove this hotel's 3 rooms first");
     }
+  });
+
+  it('createReservation sends the guest booking to POST /api/hotel-reservations', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          reservationId: 'reservation-uuid-1',
+          total: 240,
+          holdExpiresAt: '2026-11-20T12:00:00.000Z',
+        },
+        201,
+      ),
+    );
+
+    const result = await createReservation({
+      roomId: 'room-uuid-1',
+      checkIn: '2026-12-01',
+      checkOut: '2026-12-03',
+      guests: 2,
+      walletAddress: 'GDUMMYGUESTWALLET',
+    });
+
+    expect(result).toEqual({
+      reservationId: 'reservation-uuid-1',
+      total: 240,
+      holdExpiresAt: '2026-11-20T12:00:00.000Z',
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }];
+    expect(url).toContain('/api/hotel-reservations');
+    expect(init.method).toBe('POST');
+    expect(init.headers['X-Tenant-ID']).toBe('hotel_industry');
+    expect(JSON.parse(String(init.body))).toEqual({
+      roomId: 'room-uuid-1',
+      checkIn: '2026-12-01',
+      checkOut: '2026-12-03',
+      guests: 2,
+      walletAddress: 'GDUMMYGUESTWALLET',
+    });
   });
 
   it('throws HotelApiError on 403 Forbidden', async () => {
