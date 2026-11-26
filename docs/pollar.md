@@ -87,9 +87,11 @@ Account creation on-chain is asynchronous. If an escrow readiness check or trans
 
 ## 4. Troubleshooting Guide
 
-### 1. `readiness: { usdcTrustline: { ok: false } }`
-- **Cause**: The Pollar dashboard has the default mainnet USDC issuer (`GA5Z...`) or has not added the testnet USDC asset.
-- **Fix**: Add asset `USDC` with issuer `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5` in the Pollar Dashboard.
+### 1. `readiness: { usdcTrustline: { ok: false } }` / `fix: 'ADD_TRUSTLINE'`
+- **Cause**: The Pollar dashboard has the default mainnet USDC issuer (`GA5Z...`), has not added the testnet USDC asset, or the wallet was created before the testnet USDC asset was configured (so it missed Pollar's onboarding `changeTrust` step).
+- **Fix**:
+  - **Dashboard**: Add asset `USDC` with issuer `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5` in the Pollar Dashboard so newly onboarded wallets receive the trustline automatically.
+  - **Recovery for existing wallets**: The app exposes `POST /api/escrow/readiness/trustline` (escrow router `/readiness/trustline`), which returns an unsigned `changeTrust` XDR (`{ unsignedXdr }`) for the registered wallet to sign and submit to Horizon. Because client-side XDR signing with Pollar is not yet supported (`PollarSigningUnsupportedError`), an existing Pollar wallet cannot sign this `changeTrust` transaction directly—connect a supported signing wallet (e.g. Freighter) to sign, or re-onboard a wallet after configuring the dashboard trustline.
 
 ### 2. `readiness: { xlmForFees: { ok: false, fix: 'FUND_XLM' } }`
 - **Cause**: The wallet is not identified as a sponsored Pollar wallet in `user_wallets` (`provider: 'pollar'`), or fee sponsorship is disabled in the dashboard.
@@ -101,5 +103,5 @@ Account creation on-chain is asynchronous. If an escrow readiness check or trans
 
 ### 4. `SDK_WALLET_NOT_READY`
 - **Cause**: An escrow action was initiated before Pollar completed account activation and trustline setup on the ledger.
-- **Fix**: Wait 2–5 seconds for ledger confirmation; the readiness checklist will automatically transition to ready.
+- **Fix**: Wait 2–5 seconds for ledger confirmation, then click the checklist's refresh button or reload the page. The readiness checklist does not refresh automatically on its own.
 
