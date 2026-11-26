@@ -15,7 +15,7 @@ function readPrice(value: string | null): number | undefined {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-function RentListingContent() {
+function RentListingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { properties, loading, error, hasMore, loadMore, refetch } =
@@ -191,10 +191,10 @@ function RentListingContent() {
   );
 }
 
-export default function RentListingPage() {
+export default function RentPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background" />}>
-      <RentListingContent />
+    <Suspense fallback={<main className="min-h-screen bg-background" />}>
+      <RentListingPage />
     </Suspense>
   );
 }

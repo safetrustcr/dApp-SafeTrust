@@ -33,7 +33,12 @@ const styles = {
 function fmt(val?: number) { return val !== undefined ? `$${val.toLocaleString('en-US')}` : '—'; }
 
 export default function ReservationSummary({ checkIn, checkOut, guests, nights, price, tax }: ReservationSummaryProps) {
-  const total = price !== undefined && tax !== undefined ? price + tax : undefined;
+  const total =
+    price === undefined
+      ? undefined
+      : nights !== undefined
+        ? price * nights + (tax ?? 0)
+        : price + (tax ?? 0);
 
   return (
     <div style={styles.card}>

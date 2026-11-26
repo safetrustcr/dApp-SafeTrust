@@ -5,14 +5,12 @@ import { useQuery } from '@apollo/client';
 import { GET_ESCROW_BY_ANY_ID } from '@/graphql/queries/escrow-queries';
 import type { EscrowStatus } from '@/components/dashboard/EscrowStatusBadge';
 import { truncateStellarAddress } from '@/lib/utils';
-import { getErrorMessages } from '@/lib/trustlesswork-errors';
-import { getEscrowApi } from '@/lib/api/escrow';
-import { isSplitValid, getSplitDetails, fromStroops } from '@/utils/escrow-utils';
 import { useActiveWallet } from '@/hooks/use-active-wallet';
 import { useState, useCallback, useEffect, type CSSProperties, ReactNode } from 'react';
 import { useEscrowAction } from '@/hooks/use-escrow-action';
 import { useHotelEscrowResource } from '@/hooks/use-hotel-escrow-resource';
 import { useEscrowStream } from '@/hooks/use-escrow-stream';
+import { resolveEscrowWalletRoles } from '@/lib/escrow/roles';
 import Image from '@/components/ui/image';
 import {
   Bell,
@@ -27,6 +25,7 @@ import {
 } from 'lucide-react';
 import { EscrowPendingView } from '@/components/escrow/views/EscrowPendingView';
 import { EscrowStatusView } from '@/components/escrow/views/EscrowStatusView';
+import { WalletSigningStatus } from '@/components/escrow/WalletSigningStatus';
 
 type InvoiceApartment = {
   name: string | null;
@@ -893,20 +892,26 @@ function ReleasedView({ escrow }: { escrow?: EscrowRecord | null }) {
 
 type EscrowAction = 'fund' | 'milestone' | 'approve' | 'release' | 'dispute' | 'resolve';
 
+/** What WalletSigningStatus says is happening for each action. */
+const ACTION_PROGRESS_LABELS: Record<EscrowAction, string> = {
+  fund: 'Funding escrow',
+  milestone: 'Marking milestone completed',
+  approve: 'Approving milestone',
+  release: 'Releasing funds',
+  dispute: 'Opening dispute',
+  resolve: 'Resolving dispute',
+};
+
 function EscrowActionButton({
   action,
   status,
   isLoading,
-  loadingMessage,
-  disabled,
   onClick,
   children,
 }: {
   action: EscrowAction;
   status: EscrowStatus;
   isLoading: boolean;
-  loadingMessage: string;
-  disabled?: boolean;
   onClick: () => void;
   children?: ReactNode;
 }) {
@@ -936,7 +941,8 @@ function EscrowActionButton({
       <button
         type="button"
         onClick={onClick}
-        disabled={isBtnDisabled}
+        disabled={isLoading}
+        aria-busy={isLoading}
         style={{
           border: 'none',
           backgroundColor: isBtnDisabled ? '#9ca3af' : config.color,
@@ -952,14 +958,8 @@ function EscrowActionButton({
           transition: 'all 0.2s',
         }}
       >
-        {isLoading ? (
-          <>
-            <Loader2 size={16} className="animate-spin" />
-            {loadingMessage}
-          </>
-        ) : (
-          config.label
-        )}
+        {isLoading && <Loader2 aria-hidden="true" size={16} className="animate-spin" />}
+        {config.label}
       </button>
     </div>
   );
@@ -972,8 +972,10 @@ export default function EscrowDetailView({
   params: { id: string; escrowId: string };
   bookingKind?: "apartment" | "hotel-room";
 }) {
-  const { address, walletType, isReady, signAndSubmit } = useActiveWallet();
-  const { execute, actioning, phase, actionError, conflict } = useEscrowAction();
+  const { address, walletType, isReady } = useActiveWallet();
+  const { execute, retry, actioning, status: signingStatus, error: signingError, conflict } = useEscrowAction();
+  // Which action WalletSigningStatus is reporting on (the latest one started).
+  const [activeAction, setActiveAction] = useState<EscrowAction | null>(null);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [guestFundsInput, setGuestFundsInput] = useState('');
   const [hostFundsInput, setHostFundsInput] = useState('');
@@ -1070,19 +1072,15 @@ export default function EscrowDetailView({
   const matches = (candidate?: string | null) =>
     Boolean(address && candidate && address.toLowerCase() === candidate.toLowerCase());
 
-  // Authoritative Trustless Work role wins; legacy address is only a fallback.
-  const isApprover = trustlessWorkEscrow?.approver
-    ? matches(trustlessWorkEscrow.approver)
-    : matches(escrow?.sender_address);
-  const isMarker = trustlessWorkEscrow?.marker
-    ? matches(trustlessWorkEscrow.marker)
-    : matches(escrow?.receiver_address);
-  const isReleaseSigner = trustlessWorkEscrow?.releaser
-    ? matches(trustlessWorkEscrow.releaser)
-    : matches(platformAddress);
-  const isResolver = trustlessWorkEscrow?.resolver
-    ? matches(trustlessWorkEscrow.resolver)
-    : isReleaseSigner;
+  const escrowRoleWallets = resolveEscrowWalletRoles(trustlessWorkEscrow, {
+    senderAddress: escrow?.sender_address,
+    receiverAddress: escrow?.receiver_address,
+    platformAddress,
+  });
+  const isApprover = matches(escrowRoleWallets.approver);
+  const isMarker = matches(escrowRoleWallets.serviceProvider);
+  const isReleaseSigner = matches(escrowRoleWallets.releaseSigner);
+  const isResolver = matches(escrowRoleWallets.disputeResolver);
 
   const canFund = status === 'created';
   const canMarkMilestone = status === 'funded';
@@ -1099,21 +1097,6 @@ export default function EscrowDetailView({
   const showDisputeButton = canDispute && (isApprover || isMarker) && !isResolver;
   const showResolveButton = canResolve && isResolver;
 
-  const onChainBalance =
-    trustlessWorkEscrow?.balance != null && Number(trustlessWorkEscrow.balance) > 0
-      ? Number(trustlessWorkEscrow.balance)
-      : (escrow?.amount ?? 0);
-
-  const splitDetails = getSplitDetails(guestFundsInput, hostFundsInput, onChainBalance);
-
-  const phaseMessage = phase === 'building'
-    ? 'Building transaction...'
-    : phase === 'signing'
-      ? 'Awaiting wallet signature...'
-      : phase === 'submitting'
-        ? 'Submitting transaction...'
-        : 'Processing...';
-
   const handleFundEscrow = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.amount || !escrow.receiver_address) {
       setErrorMessages(['Missing required escrow data for funding.']);
@@ -1121,6 +1104,7 @@ export default function EscrowDetailView({
     }
 
     setErrorMessages([]);
+    setActiveAction('fund');
     const result = await execute({
       apiRoute: '/api/escrow/fund',
       apiBody: {
@@ -1148,6 +1132,7 @@ export default function EscrowDetailView({
     }
 
     setErrorMessages([]);
+    setActiveAction('milestone');
     const result = await execute({
       apiRoute: '/api/escrow/milestone-status',
       apiBody: {
@@ -1176,6 +1161,7 @@ export default function EscrowDetailView({
     }
 
     setErrorMessages([]);
+    setActiveAction('approve');
     const result = await execute({
       apiRoute: '/api/escrow/approve-milestone',
       apiBody: {
@@ -1204,6 +1190,7 @@ export default function EscrowDetailView({
     }
 
     setErrorMessages([]);
+    setActiveAction('release');
     const result = await execute({
       apiRoute: '/api/escrow/release-funds',
       apiBody: {
@@ -1243,6 +1230,7 @@ export default function EscrowDetailView({
     }
 
     setErrorMessages([]);
+    setActiveAction('dispute');
     const result = await execute({
       apiRoute: '/api/escrow/dispute',
       apiBody: {
@@ -1276,9 +1264,11 @@ export default function EscrowDetailView({
     }
 
     setErrorMessages([]);
+    setActiveAction('resolve');
     const result = await execute({
       apiRoute: '/api/escrow/resolve-dispute',
       apiBody: {
+        contractId: escrow.contract_id,
         engagementId: escrow.engagement_id,
         distributions: [
           { role: 'approver', amount: Number(guestFundsInput) },
@@ -1294,7 +1284,21 @@ export default function EscrowDetailView({
       },
     });
     if (result) await refetch();
-  }, [escrow, address, execute, refetch, guestFundsInput, hostFundsInput, onChainBalance]);
+  }, [escrow, address, execute, refetch, approverFunds, receiverFunds]);
+
+  // Retry repeats the last action with the same idempotency keys; refresh the
+  // escrow on success exactly as the action handlers do. A dispute resolution
+  // depends on the split inputs, so it is rebuilt from the current values and
+  // validated again: the hook reuses the cached XDR only when the split is
+  // unchanged, and a changed split never signs the old distribution.
+  const handleRetry = useCallback(async () => {
+    if (activeAction === 'resolve') {
+      await handleResolveDispute();
+      return;
+    }
+    const result = await retry();
+    if (result) await refetch();
+  }, [retry, refetch, activeAction, handleResolveDispute]);
 
   if (loading && !escrow) {
     return (
@@ -1400,8 +1404,6 @@ export default function EscrowDetailView({
 
         {errorMessages.length > 0 && <ErrorAlert messages={errorMessages} />}
 
-        {actionError && actionError.length > 0 && <ErrorAlert messages={actionError} />}
-
         <div className="responsive-grid" style={{ ...styles.grid, gridTemplateColumns: 'minmax(0, 1.8fr) minmax(15rem, 0.9fr)' }}>
           <div style={styles.leftPanel}>
             <h2 style={{ marginTop: 0, marginBottom: '0.65rem', fontSize: '1rem', fontWeight: 700 }}>
@@ -1421,7 +1423,6 @@ export default function EscrowDetailView({
                 action="fund"
                 status={status}
                 isLoading={actioning}
-                loadingMessage={phaseMessage}
                 onClick={handleFundEscrow}
               />
             )}
@@ -1431,7 +1432,6 @@ export default function EscrowDetailView({
                 action="milestone"
                 status={status}
                 isLoading={actioning}
-                loadingMessage={phaseMessage}
                 onClick={handleMarkCompleted}
               />
             )}
@@ -1441,7 +1441,6 @@ export default function EscrowDetailView({
                 action="approve"
                 status={status}
                 isLoading={actioning}
-                loadingMessage={phaseMessage}
                 onClick={handleApproveMilestone}
               />
             )}
@@ -1451,7 +1450,6 @@ export default function EscrowDetailView({
                 action="release"
                 status={status}
                 isLoading={actioning}
-                loadingMessage={phaseMessage}
                 onClick={handleReleaseFunds}
               />
             )}
@@ -1461,11 +1459,7 @@ export default function EscrowDetailView({
                 action="dispute"
                 status={status}
                 isLoading={actioning}
-                loadingMessage={phaseMessage}
-                onClick={() => {
-                  setIsDisputeOpen(true);
-                  setDisputeStep('form');
-                }}
+                onClick={handleOpenDispute}
               />
             )}
 
@@ -1640,35 +1634,15 @@ export default function EscrowDetailView({
             )}
 
             {showResolveButton && (
-              <div style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}>
-                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 700, color: '#dc2626' }}>
-                  Dispute Resolution (Platform Resolver)
-                </h3>
-                <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: '#374151' }}>
-                  Split the escrow balance between the guest (approver) and the host (service provider). The total split must equal the current escrow balance exactly ({fromStroops(splitDetails.totalStroops)}).
-                </p>
-
-                {disputeInfo && (disputeInfo.reason || disputeInfo.description) && (
-                  <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '0.375rem', marginBottom: '1rem' }}>
-                    <p style={{ margin: '0 0 0.25rem', fontSize: '0.8rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
-                      Dispute Claim
-                    </p>
-                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#111827' }}>
-                      <strong>Reason:</strong> {disputeInfo.reason || 'None provided'}
-                    </p>
-                    {disputeInfo.description && (
-                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>
-                        <strong>Description:</strong> {disputeInfo.description}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(12rem, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-                  <div>
-                    <label htmlFor="guest-split-input" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#374151', marginBottom: '0.3rem' }}>
-                      Guest Amount (Approver)
-                    </label>
+              <EscrowActionButton
+                action="resolve"
+                status={status}
+                isLoading={actioning}
+                onClick={handleResolveDispute}
+              >
+                <div style={{ display: 'grid', gap: '0.6rem', marginBottom: '0.9rem' }}>
+                  <label style={{ fontSize: '0.82rem', color: '#374151' }}>
+                    Approver funds
                     <input
                       id="guest-split-input"
                       type="number"
@@ -1746,6 +1720,15 @@ export default function EscrowDetailView({
                   )}
                 </button>
               </div>
+            )}
+
+            {activeAction && (
+              <WalletSigningStatus
+                phase={signingStatus}
+                action={ACTION_PROGRESS_LABELS[activeAction]}
+                error={signingError}
+                onRetry={() => void handleRetry()}
+              />
             )}
 
             {!isReady && (canFund || canMarkMilestone || canRelease || canDispute || canResolve) && (

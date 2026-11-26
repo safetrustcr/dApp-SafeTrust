@@ -41,7 +41,9 @@ Before booking on testnet:
 2. **Guest**: also needs testnet USDC (Circle faucet, below) to fund the escrow.
 3. **Platform** (`PLATFORM_STELLAR_ADDRESS`): fund with Friendbot and add the USDC trustline.
 
-`pnpm testnet:provision` does steps 1 and 3 for the e2e accounts.
+`pnpm testnet:provision` does steps 1 and 3 for the e2e accounts. For a full
+walkthrough of a real booking (happy and dispute path, by hand and with the
+Playwright specs) see [docs/testnet-booking.md](../testnet-booking.md).
 
 `FIREBASE_*` admin credentials must also be configured for the API so it can verify browser ID tokens. The escrow detail stream is currently a read-only development endpoint; do not expose it beyond local development until it authenticates a participant for the requested escrow.
 

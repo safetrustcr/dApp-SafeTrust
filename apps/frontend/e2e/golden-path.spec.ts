@@ -1,273 +1,155 @@
 /**
- * SafeTrust golden-path E2E test — register → deploy → fund → complete →
- * approve → release (issue #448)
+ * SafeTrust golden path on Stellar testnet (issues #448, #599):
  *
- * Scenario roles
- * ──────────────
- *  guest    = approver + release signer (new user registration in step 1)
- *  host     = service provider          (pre-provisioned, owns the seeded apartment)
- *  platform = dispute resolver          (address only, not a browser actor here)
+ *   deploy → fund → mark completed → approve → host 403 on release
+ *   → guest release → idempotent re-submit
  *
- * Before running:
- *   make infra
- *   pnpm testnet:provision --check
- *   pnpm run dev
- *   pnpm --filter @safetrust/web test:e2e
+ * Roles (single-release escrow, see apps/api/src/services/escrow-authz.ts)
+ *   guest    = approver + release signer  (guest@safetrust.local)
+ *   host     = service provider + receiver (host@safetrust.local)
+ *   platform = dispute resolver            (not used on this path)
+ *
+ * Each step is checked twice: SafeTrust's escrow row in Hasura, and the
+ * contract state from Trustless Work with validateOnChain=true.
+ *
+ * Runbook and setup: docs/testnet-booking.md
  */
 
-import { test, expect, type Page, chromium } from "@playwright/test";
-import { createUserFixtures } from "./fixtures/users";
+import { test, expect } from "@playwright/test";
+import { e2eConfig } from "./lib/env";
+import { Booking, apiPost, signInActors, type Actor } from "./lib/booking";
+import { createRunApartment, waitForSafeTrustStatus } from "./lib/hasura";
+import { reserveTrustlessWorkCalls, waitForEscrowOnChain } from "./lib/trustless-work";
+import { fromStroops, paidOut, toStroops, usdcBalanceStroops } from "./lib/stellar";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+test.describe.configure({ mode: "serial" });
 
-const BASE = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3001";
-const API_URL = process.env.API_URL ?? "http://localhost:3000";
+test.describe("SafeTrust golden path (testnet)", () => {
+  test("deploy → fund → complete → approve → release", { tag: "@e2e" }, async ({}, testInfo) => {
+    test.setTimeout(12 * 60_000);
+    const cfg = e2eConfig();
+    const amount = cfg.depositUsdc;
+    const amountStroops = toStroops(amount);
 
-/** Wait for the Stellar confirmation spinner to disappear (up to 90 s). */
-async function waitForConfirmation(page: Page): Promise<void> {
-  await expect(page.getByText(/Confirming on Stellar/i)).toBeHidden({
-    timeout: 90_000,
-  });
-}
+    let guest!: Actor;
+    let host!: Actor;
+    let booking!: Booking;
 
-/** Poll the API for an escrow status until it matches the expected value. */
-async function pollEscrowStatus(
-  engagementId: string,
-  expected: string,
-): Promise<void> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
     try {
-      const res = await fetch(
-        `${API_URL}/api/escrow/${engagementId}/status`,
-        { headers: { "Content-Type": "application/json" } },
-      );
-      if (res.ok) {
-        const body = await res.json();
-        if (body.status === expected) return;
+      await test.step("Sign in guest and host; create a fresh apartment for this run", async () => {
+        ({ guest, host } = await signInActors());
+        const apartmentId = await createRunApartment(host.uid, host.address, "golden-path");
+        booking = new Booking("Happy path", apartmentId);
+      });
+
+      const guestBefore = await usdcBalanceStroops(guest.address);
+      const hostBefore = await usdcBalanceStroops(host.address);
+      expect(
+        guestBefore >= amountStroops,
+        `guest needs ≥ ${amount} USDC (has ${fromStroops(guestBefore)}); use https://faucet.circle.com`,
+      ).toBe(true);
+
+      await test.step("Guest: deploy escrow → SafeTrust created, contract on chain", async () => {
+        const res = await booking.run("deploy", guest, "/api/escrow/deploy", {
+          apartmentId: booking.apartmentId,
+          senderAddress: guest.address,
+        });
+        expect(res.action).toBe("initialize");
+        expect(booking.contractId, "send-transaction must return the contract id").toMatch(/^C[A-Z0-9]{55}$/);
+
+        const st = await waitForSafeTrustStatus(booking.engagementId, { status: "created", milestoneStatus: "pending" });
+        expect(st.contractId).toBe(booking.contractId);
+        expect(st.amount).toBe(amount);
+
+        const tw = await waitForEscrowOnChain(booking.contractId, () => true, "deployed");
+        expect(tw.engagementId ?? booking.engagementId).toBe(booking.engagementId);
+        expect(tw.balance ?? 0).toBe(0);
+        expect(tw.flags).toEqual({ disputed: false, released: false, resolved: false });
+      });
+
+      await test.step("Guest: fund → SafeTrust funded, contract holds the deposit", async () => {
+        await booking.run("fund", guest, "/api/escrow/fund", { engagementId: booking.engagementId });
+        await waitForSafeTrustStatus(booking.engagementId, { status: "funded" });
+        await waitForEscrowOnChain(booking.contractId, (e) => e.balance === amount, `balance ${amount}`);
+        expect(await usdcBalanceStroops(guest.address)).toBe(guestBefore - amountStroops);
+      });
+
+      await test.step("Host: mark milestone completed → milestone completed, escrow still funded", async () => {
+        await booking.run("mark completed", host, "/api/escrow/milestone-status", {
+          engagementId: booking.engagementId,
+          milestoneIndex: 0,
+          newEvidence: "E2E: guest checked in",
+        });
+        await waitForSafeTrustStatus(booking.engagementId, { status: "funded", milestoneStatus: "completed" });
+        const tw = await waitForEscrowOnChain(
+          booking.contractId,
+          (e) => e.milestone.status === "completed",
+          "milestone completed",
+        );
+        expect(tw.milestone.approved).toBe(false);
+      });
+
+      await test.step("Guest: approve milestone → SafeTrust milestone_approved", async () => {
+        await booking.run("approve", guest, "/api/escrow/approve-milestone", {
+          engagementId: booking.engagementId,
+          milestoneIndex: 0,
+        });
+        await waitForSafeTrustStatus(booking.engagementId, { status: "milestone_approved", milestoneStatus: "approved" });
+        await waitForEscrowOnChain(booking.contractId, (e) => e.milestone.approved, "milestone approved");
+      });
+
+      await test.step("Host: release-funds is refused (403) — only the release signer may release", async () => {
+        const res = await apiPost(host, "/api/escrow/release-funds", { engagementId: booking.engagementId });
+        expect(res.status, JSON.stringify(res.body)).toBe(403);
+        // Nothing moved.
+        await waitForSafeTrustStatus(booking.engagementId, { status: "milestone_approved" }, 5_000);
+      });
+
+      await test.step("Guest: release → SafeTrust completed, host paid", async () => {
+        await booking.run("release", guest, "/api/escrow/release-funds", { engagementId: booking.engagementId });
+        await waitForSafeTrustStatus(booking.engagementId, { status: "completed", milestoneStatus: "released" });
+        await waitForEscrowOnChain(
+          booking.contractId,
+          (e) => e.flags.released && (e.balance ?? 0) === 0,
+          "released, balance 0",
+        );
+
+        const received = (await usdcBalanceStroops(host.address)) - hostBefore;
+        expect(
+          paidOut(received, amountStroops, cfg.payoutFeeTolerance),
+          `host received ${fromStroops(received)} USDC, expected ${amount}`,
+        ).toBe(true);
+      });
+
+      await test.step("Guest: re-submit the same signed release XDR → 200 replay, no second submit", async () => {
+        const last = booking.signed.get("release_funds");
+        expect(last, "release XDR recorded").toBeTruthy();
+        const releaseTx = booking.txs.find((t) => t.action === "release_funds")!;
+
+        // A replay is answered from escrow_pending_actions without calling
+        // Trustless Work; reserve a slot anyway in case it is not.
+        await reserveTrustlessWorkCalls(1, "replay release");
+        const res = await apiPost<{ replay?: boolean; txHash?: string }>(
+          guest,
+          "/api/escrow/send-transaction",
+          { signedXdr: last!.signedXdr },
+        );
+        expect(res.status, JSON.stringify(res.body)).toBe(200);
+        expect(res.body.replay).toBe(true);
+        expect(res.body.txHash).toBe(releaseTx.txHash);
+        await waitForSafeTrustStatus(booking.engagementId, { status: "completed" }, 5_000);
+      });
+
+      await test.step("Reconciliation keeps the final state", async () => {
+        await booking.reconcile();
+        await waitForSafeTrustStatus(booking.engagementId, { status: "completed" }, 10_000);
+      });
+    } finally {
+      if (booking?.txs.length) {
+        const summary = booking.summary([`Deposit: ${amount} USDC`]);
+        console.log(`\n${summary}`);
+        await testInfo.attach("testnet-transactions.md", { body: summary, contentType: "text/markdown" });
       }
-    } catch {
-      // Swallow transient network errors and retry
     }
-    await new Promise((r) => setTimeout(r, 2_000));
-  }
-  throw new Error(
-    `Timed out waiting for escrow ${engagementId} to reach status '${expected}'`,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Test
-// ---------------------------------------------------------------------------
-
-test.describe("SafeTrust golden-path (testnet)", () => {
-  test(
-    "register → deploy → fund → complete → approve → release",
-    { tag: "@e2e" },
-    async ({}) => {
-      // We manage our own browser contexts for the two actors so they have
-      // completely isolated sessions and cookie jars.
-      const browser = await chromium.launch();
-      const { guest, host } = await createUserFixtures(browser);
-
-      let engagementId: string;
-
-      try {
-        // ── Step 1: Guest registers ──────────────────────────────────────
-        await test.step("Guest: register with email", async () => {
-          await guest.page.goto(`${BASE}/register`);
-          await guest.page.getByLabel(/email/i).fill(guest.email);
-          await guest.page.getByLabel(/password/i).fill("SafeTest2026!");
-          await guest.page.getByRole("button", { name: /register|sign up/i }).click();
-
-          // Should land on dashboard after successful registration
-          await expect(guest.page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
-        });
-
-        // ── Step 2: Host logs in ─────────────────────────────────────────
-        await test.step("Host: log in and see apartment", async () => {
-          await host.page.goto(`${BASE}/login`);
-          await host.page.getByLabel(/email/i).fill(host.email);
-          await host.page.getByLabel(/password/i).fill(
-            process.env.E2E_HOST_PASSWORD ?? "SafeTest2026!",
-          );
-          await host.page.getByRole("button", { name: /log in|sign in/i }).click();
-          await expect(host.page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
-
-          // Navigate to apartments list and confirm seeded apartment is present
-          await host.page.goto(`${BASE}/dashboard/apartments`);
-          await expect(
-            host.page.getByText(process.env.E2E_APARTMENT_NAME ?? /apartment/i),
-          ).toBeVisible({ timeout: 20_000 });
-        });
-
-        // ── Step 3: Guest creates escrow (deploy) ────────────────────────
-        await test.step("Guest: open apartment → create escrow → sign", async () => {
-          const apartmentId =
-            process.env.E2E_APARTMENT_ID ?? "00000000-0000-0000-0000-000000000001";
-
-          await guest.page.goto(`${BASE}/dashboard/escrow/${apartmentId}`);
-
-          // Click whatever CTA initiates the escrow creation
-          await guest.page
-            .getByRole("button", { name: /create escrow|start escrow|book/i })
-            .click();
-
-          // The app will call window.__e2eSign for the deployment XDR
-          await waitForConfirmation(guest.page);
-
-          // Capture the engagement ID from the URL or a data attribute
-          const url = guest.page.url();
-          const match = url.match(/engagement[_-]?id=([^&]+)/i);
-          engagementId =
-            match?.[1] ??
-            (await guest.page
-              .getByTestId("engagement-id")
-              .getAttribute("data-value")) ??
-            "";
-          expect(engagementId, "engagement ID must be set after deploy").toBeTruthy();
-
-          await pollEscrowStatus(engagementId, "created");
-          await expect(guest.page.getByTestId("escrow-status")).toContainText(
-            /created/i,
-          );
-        });
-
-        // ── Step 4: Guest funds the escrow ───────────────────────────────
-        await test.step("Guest: fund escrow → sign → status funded", async () => {
-          await guest.page
-            .getByRole("button", { name: /fund/i })
-            .click();
-
-          await waitForConfirmation(guest.page);
-          await pollEscrowStatus(engagementId, "funded");
-
-          await expect(guest.page.getByTestId("escrow-status")).toContainText(
-            /funded/i,
-          );
-
-          // Both browsers should now show funded — verify host sees it too
-          await host.page.goto(`${BASE}/dashboard/escrow-dashboard`);
-          await expect(host.page.getByTestId("escrow-status")).toContainText(
-            /funded/i,
-            { timeout: 20_000 },
-          );
-        });
-
-        // ── Step 5: Host marks milestone completed ───────────────────────
-        await test.step("Host: mark milestone completed → sign", async () => {
-          await host.page
-            .getByRole("button", { name: /mark.*complete|complete.*milestone/i })
-            .click();
-
-          await waitForConfirmation(host.page);
-
-          // Milestone is completed but escrow should still be 'funded'
-          await expect(
-            host.page.getByTestId("milestone-status"),
-          ).toContainText(/completed/i, { timeout: 20_000 });
-
-          // Escrow status must remain funded (not released yet)
-          await expect(host.page.getByTestId("escrow-status")).toContainText(
-            /funded/i,
-          );
-
-          // Guest should also see the milestone update
-          await guest.page.reload();
-          await expect(
-            guest.page.getByTestId("milestone-status"),
-          ).toContainText(/completed/i, { timeout: 20_000 });
-        });
-
-        // ── Step 6: Guest approves milestone ─────────────────────────────
-        await test.step("Guest: approve milestone → sign → status milestone_approved", async () => {
-          await guest.page
-            .getByRole("button", { name: /approve.*milestone|approve/i })
-            .click();
-
-          await waitForConfirmation(guest.page);
-          await pollEscrowStatus(engagementId, "milestone_approved");
-
-          await expect(guest.page.getByTestId("escrow-status")).toContainText(
-            /milestone.?approved/i,
-          );
-        });
-
-        // ── Step 7: Host cannot call the release endpoint directly (403) ──
-        await test.step("Host: direct release API call returns 403", async () => {
-          const resp = await fetch(
-            `${API_URL}/api/escrow/${engagementId}/release`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                // Provide the host's auth token if available from the page
-                Authorization: `Bearer ${process.env.E2E_HOST_API_TOKEN ?? ""}`,
-              },
-              body: JSON.stringify({ engagementId }),
-            },
-          );
-
-          expect(resp.status).toBe(403);
-        });
-
-        // ── Step 8: Guest releases escrow ────────────────────────────────
-        await test.step("Guest: release → sign → status completed", async () => {
-          await guest.page
-            .getByRole("button", { name: /release/i })
-            .click();
-
-          await waitForConfirmation(guest.page);
-          await pollEscrowStatus(engagementId, "completed");
-
-          await expect(guest.page.getByTestId("escrow-status")).toContainText(
-            /completed/i,
-          );
-        });
-
-        // ── Step 9: Re-submit the same release XDR (idempotency) ─────────
-        await test.step("Guest: re-submit same release XDR → 200 + no second TW call", async () => {
-          // The app should expose the last signed XDR in a data attribute or
-          // via a window property so we can re-submit it programmatically.
-          const lastXDR: string = await guest.page.evaluate(
-            () =>
-              (window as unknown as Record<string, string>).__e2eLastSignedXDR ??
-              "",
-          );
-
-          if (!lastXDR) {
-            // If the app doesn't expose the XDR we skip this step with a note.
-            console.warn(
-              "Step 9 skipped: window.__e2eLastSignedXDR not set by the app.",
-            );
-            return;
-          }
-
-          const resp = await fetch(
-            `${API_URL}/api/escrow/${engagementId}/release`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ engagementId, signedXDR: lastXDR }),
-            },
-          );
-
-          // Must succeed (not 4xx/5xx)
-          expect(resp.status).toBe(200);
-
-          // Status must still be completed — not reset
-          await expect(guest.page.getByTestId("escrow-status")).toContainText(
-            /completed/i,
-          );
-        });
-      } finally {
-        // Always clean up browser contexts to avoid leaking resources
-        await guest.context.close();
-        await host.context.close();
-        await browser.close();
-      }
-    },
-  );
+  });
 });
