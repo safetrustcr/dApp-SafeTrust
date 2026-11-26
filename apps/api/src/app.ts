@@ -28,6 +28,7 @@ import listingsRouter from './routes/listings/listings.route.js';
 import hotelsRouter from './routes/hotels/hotels.route.js';
 import hotelReservationsRouter from './routes/hotels/reservations.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
+import { isTestnet } from './services/wallet-readiness.js';
 import bidsRouter from './routes/bids/bids.route.js';
 
 /**
