@@ -45,3 +45,31 @@ select_permissions:
         user:
           firebase_uid:
             _eq: X-Hasura-User-Id
+  - role: guest
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - created_at
+        - updated_at
+      filter:
+        user:
+          firebase_uid:
+            _eq: X-Hasura-User-Id
+  - role: host
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - created_at
+        - updated_at
+      filter:
+        user:
+          firebase_uid:
+            _eq: X-Hasura-User-Id

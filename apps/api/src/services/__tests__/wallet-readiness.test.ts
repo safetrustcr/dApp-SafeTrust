@@ -47,7 +47,6 @@ describe('wallet-readiness service', () => {
     clearHorizonCache();
     process.env.PLATFORM_STELLAR_ADDRESS = PLATFORM_WALLET;
     process.env.USDC_TRUSTLINE_ADDRESS = USDC_ISSUER;
-    process.env.STELLAR_NETWORK = 'TESTNET';
     delete process.env.STELLAR_NETWORK_PASSPHRASE;
   });
 

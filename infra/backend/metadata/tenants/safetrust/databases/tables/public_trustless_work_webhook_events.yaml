@@ -85,3 +85,49 @@ select_permissions:
               marker:
                 _eq: X-Hasura-User-Id
     comment: Hosts can read webhook events of the escrows they marked
+  - role: guest
+    permission:
+      columns:
+        - id
+        - contract_id
+        - event_type
+        - payload
+        - processed
+        - processed_at
+        - error_message
+        - retry_count
+        - max_retries
+        - next_retry_at
+        - created_at
+        - tenant_id
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - escrow:
+              guest_id:
+                _eq: X-Hasura-User-Id
+    comment: Guests can read webhook events of the escrows they are the guest on
+  - role: host
+    permission:
+      columns:
+        - id
+        - contract_id
+        - event_type
+        - payload
+        - processed
+        - processed_at
+        - error_message
+        - retry_count
+        - max_retries
+        - next_retry_at
+        - created_at
+        - tenant_id
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - escrow:
+              marker:
+                _eq: X-Hasura-User-Id
+    comment: Hosts can read webhook events of the escrows they marked

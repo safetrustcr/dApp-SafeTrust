@@ -43,7 +43,61 @@ select_permissions:
       filter:
         chain_type:
           _eq: STELLAR
+  - role: guest
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - provider
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: host
+    permission:
+      columns:
+        - id
+        - user_id
+        - wallet_address
+        - chain_type
+        - is_primary
+        - provider
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
 insert_permissions:
+  - role: guest
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      columns:
+        - wallet_address
+        - chain_type
+        - is_primary
+        - provider
+      set:
+        user_id: X-Hasura-User-Id
+        created_at: "now()"
+  - role: host
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      columns:
+        - wallet_address
+        - chain_type
+        - is_primary
+        - provider
+      set:
+        user_id: X-Hasura-User-Id
+        created_at: "now()"
   - role: guest
     permission:
       check:
@@ -91,7 +145,37 @@ update_permissions:
       check:
         user_id:
           _eq: X-Hasura-User-Id
+  - role: guest
+    permission:
+      columns:
+        - is_primary
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: host
+    permission:
+      columns:
+        - is_primary
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
 delete_permissions:
+  - role: guest
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: host
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
   - role: guest
     permission:
       filter:

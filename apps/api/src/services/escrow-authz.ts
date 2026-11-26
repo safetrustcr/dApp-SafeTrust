@@ -17,16 +17,20 @@ export type EscrowAction =
   | 'mark_milestone_completed'
   | 'approve_milestone'
   | 'release_funds'
+  | 'dispute'
   | 'resolve_dispute';
 
 export type EscrowRole = 'approver' | 'serviceProvider' | 'releaseSigner' | 'disputeResolver';
 
-export const ACTION_ROLE: Readonly<Record<EscrowAction, EscrowRole>> = {
+export const ACTION_ROLE: Readonly<Record<EscrowAction, EscrowRole | readonly EscrowRole[]>> = {
   initialize: 'approver',
   fund: 'approver',
   mark_milestone_completed: 'serviceProvider',
   approve_milestone: 'approver',
   release_funds: 'releaseSigner',
+  // The Trustless Work contract allows either party to open a dispute; the
+  // dispute resolver (platform) may never open one, only resolve it.
+  dispute: ['approver', 'serviceProvider'],
   resolve_dispute: 'disputeResolver',
 };
 
@@ -82,16 +86,17 @@ export function resolveSigner(
   roles: EscrowRoles,
   action: EscrowAction,
 ): string {
-  const role = ACTION_ROLE[action];
-  const required = roles[role];
-  if (!required || !callerWallets.includes(required)) {
+  const allowedRoles: readonly EscrowRole[] = Array.isArray(ACTION_ROLE[action]) ? ACTION_ROLE[action] : [ACTION_ROLE[action] as EscrowRole];
+  const required = allowedRoles.map((role) => roles[role]).filter((address): address is string => Boolean(address));
+  const signer = callerWallets.find((wallet) => required.includes(wallet));
+  if (!signer) {
     throw new EscrowAccessError(
       403,
       'WALLET_NOT_AUTHORIZED',
-      `Your registered wallet is not the ${role} for this escrow.`,
+      `Your registered wallet is not the ${allowedRoles.join(' or ')} for this escrow.`,
     );
   }
-  return required;
+  return signer;
 }
 
 /** True when any caller wallet holds any role on the escrow. */

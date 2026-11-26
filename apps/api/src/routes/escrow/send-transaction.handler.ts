@@ -75,7 +75,16 @@ export const sendTransactionHandler = asyncHandler(async (req: AuthedRequest, re
       body: { signedXdr },
     });
   } catch (err) {
-    await releaseClaim(pending.id); // let the user retry the same signed XDR
+    // The signed XDR may already be on the ledger (timeout after broadcast).
+    // Keep the claim consistent with the ambiguous outcome by releasing it so
+    // the user can retry or recover via the tx hash, and surface txHash in the
+    // Problem Details body so the client can run recover-from-txhash.
+    await releaseClaim(pending.id);
+    if (err instanceof ApiError) {
+      err.details = { ...(err.details ?? {}), txHash };
+    } else if (err && typeof err === 'object') {
+      (err as Record<string, unknown>).txHash = txHash;
+    }
     throw err;
   }
 

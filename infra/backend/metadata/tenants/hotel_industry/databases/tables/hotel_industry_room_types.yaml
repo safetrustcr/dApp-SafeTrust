@@ -60,3 +60,21 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
+  - role: guest
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - created_at
+        - updated_at
+      filter: {}
+  - role: host
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - created_at
+        - updated_at
+      filter: {}

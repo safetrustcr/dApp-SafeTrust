@@ -5,6 +5,14 @@ object_relationships:
   - name: owner
     using:
       foreign_key_constraint_on: owner_id
+array_relationships:
+  - name: bid_requests
+    using:
+      foreign_key_constraint_on:
+        column: apartment_id
+        table:
+          name: bid_requests
+          schema: public
 select_permissions:
   - role: guest
     permission:
@@ -29,6 +37,7 @@ select_permissions:
               _is_null: true
           - is_available:
               _eq: true
+      allow_aggregations: true
   - role: host
     permission:
       columns:
@@ -66,6 +75,30 @@ select_permissions:
       filter:
         deleted_at:
           _is_null: true
+  # Signed-out visitors use the anonymous role for the public listing feed.
+  - role: anonymous
+    permission:
+      columns:
+        - id
+        - owner_id
+        - name
+        - description
+        - price
+        - warranty_deposit
+        - coordinates
+        - address
+        - is_available
+        - available_from
+        - available_until
+        - image_urls
+        - created_at
+      filter:
+        _and:
+          - deleted_at:
+              _is_null: true
+          - is_available:
+              _eq: true
+      allow_aggregations: true
 insert_permissions:
   - role: host
     permission:

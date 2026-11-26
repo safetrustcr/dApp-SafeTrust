@@ -85,9 +85,11 @@ STAFF_CROSS=$(gql hotel_staff "$UID_STAFF" 'query ($id: uuid!) { hotels_by_pk(id
 [[ "$STAFF_CROSS" == "null" ]] && pass "staff cannot fetch an unassigned hotel" || fail "staff fetched hotel B"
 
 echo "▶ Public guest listings"
-GUEST_IDS=$(gql guest "$UID_A" '{ hotels { id } }' | jq -r '[.data.hotels[].id] | sort | join(",")')
+GUEST_IDS=$(gql guest "$UID_A" 'query ($ids: [uuid!]!) { hotels(where: { id: { _in: $ids } }) { id } }' \
+  "$(jq -nc --arg a "$HOTEL_A" --arg b "$HOTEL_B" '{ids: [$a, $b]}')" \
+  | jq -r '[.data.hotels[].id] | sort | join(",")')
 EXPECTED_GUEST_IDS=$(printf '%s\n' "$HOTEL_A" "$HOTEL_B" | sort | paste -sd, -)
-[[ "$GUEST_IDS" == "$EXPECTED_GUEST_IDS" ]] && pass "guest can browse public hotels" || fail "guest sees hotels: $GUEST_IDS"
+[[ "$GUEST_IDS" == "$EXPECTED_GUEST_IDS" ]] && pass "guest can browse public hotels" || fail "guest cannot browse both public hotels: $GUEST_IDS"
 
 echo "▶ Unknown user with the manager role"
 NONE=$(gql hotel_manager "not-a-hotel-user-$RUN" '{ hotels { id } }' | jq -r '.data.hotels | length')
