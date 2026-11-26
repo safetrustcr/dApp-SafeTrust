@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import { Check, X } from 'lucide-react';
 import type { BidStatus } from '@/lib/api/bids';
 
@@ -152,6 +152,18 @@ function formatDate(iso?: string): string {
   return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function formatCalendarDate(iso?: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 function shortenWallet(addr: string): string {
   if (!addr || addr === '—' || addr.length <= 12) return addr || '—';
   return `${addr.slice(0, 4)}…${addr.slice(-4)}`;
@@ -173,6 +185,12 @@ export function InterestedPeopleTable({
   const showActions = Boolean(onAccept || onReject);
   const colSpan = showActions ? 8 : 7;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  useEffect(() => {
+    if (!isLoading && onPageChange && page > 0 && page >= totalPages) {
+      onPageChange(totalPages - 1);
+    }
+  }, [isLoading, onPageChange, page, totalPages]);
 
   return (
     <div style={styles.wrap}>
@@ -257,7 +275,7 @@ export function InterestedPeopleTable({
                       ? `$${offer.proposed_price.toLocaleString('en-US')}`
                       : '—'}
                   </td>
-                  <td style={styles.td}>{formatDate(offer.desired_move_in)}</td>
+                  <td style={styles.td}>{formatCalendarDate(offer.desired_move_in)}</td>
                   <td style={styles.td}>{formatDate(offer.offer_date)}</td>
                   <td style={styles.td}>
                     <StatusBadge status={offer.bid_status} />
@@ -325,7 +343,7 @@ export function InterestedPeopleTable({
         </table>
       </div>
 
-      {onPageChange && totalCount > pageSize && (
+      {onPageChange && (totalCount > pageSize || page > 0) && (
         <div style={styles.pagination}>
           <span>
             Page {page + 1} of {totalPages}

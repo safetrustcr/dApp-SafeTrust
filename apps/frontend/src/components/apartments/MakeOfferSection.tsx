@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -35,18 +35,30 @@ export function MakeOfferSection({
   const [submitting, setSubmitting] = useState(false);
   const [existingBid, setExistingBid] = useState<BidRequest | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const lookupGenRef = useRef(0);
 
   useEffect(() => {
     setProposedPrice(String(defaultPrice));
   }, [defaultPrice]);
 
   useEffect(() => {
-    if (authLoading || !isAuthenticated || isOwner) return;
+    if (authLoading) return;
 
+    if (!isAuthenticated) {
+      lookupGenRef.current += 1;
+      setExistingBid(null);
+      setIsOpen(false);
+      setFormError(null);
+      return;
+    }
+
+    if (isOwner) return;
+
+    const lookupGen = ++lookupGenRef.current;
     let cancelled = false;
     getMyBids({ apartmentId, limit: 1 })
       .then((res) => {
-        if (!cancelled) {
+        if (!cancelled && lookupGen === lookupGenRef.current) {
           setExistingBid(res.bids[0] ?? null);
         }
       })
@@ -92,6 +104,7 @@ export function MakeOfferSection({
         proposedPrice: numericPrice,
         desiredMoveIn: new Date(`${desiredMoveIn}T00:00:00.000Z`).toISOString(),
       });
+      lookupGenRef.current += 1;
       setExistingBid(bid);
       setIsOpen(false);
       toast.success("Offer submitted");
@@ -107,15 +120,16 @@ export function MakeOfferSection({
     }
   };
 
+  const visibleExistingBid = isAuthenticated ? existingBid : null;
   const hasActiveBid =
-    existingBid &&
-    (existingBid.current_status === "PENDING" ||
-      existingBid.current_status === "VIEWED" ||
-      existingBid.current_status === "APPROVED");
+    visibleExistingBid &&
+    (visibleExistingBid.current_status === "PENDING" ||
+      visibleExistingBid.current_status === "VIEWED" ||
+      visibleExistingBid.current_status === "APPROVED");
 
   return (
     <div style={{ marginTop: "1rem", marginBottom: "1.5rem" }}>
-      {existingBid?.current_status === "APPROVED" && (
+      {visibleExistingBid?.current_status === "APPROVED" && (
         <div
           style={{
             display: "flex",
@@ -132,7 +146,7 @@ export function MakeOfferSection({
           }}
         >
           <span style={{ fontSize: "0.9rem", fontWeight: 600 }}>
-            Your offer of ${Number(existingBid.proposed_price).toLocaleString("en-US")} was accepted!
+            Your offer of ${Number(visibleExistingBid.proposed_price).toLocaleString("en-US")} was accepted!
           </span>
           <Link
             href={`/escrow/${apartmentId}/escrow/create`}
@@ -151,8 +165,8 @@ export function MakeOfferSection({
         </div>
       )}
 
-      {existingBid &&
-        (existingBid.current_status === "PENDING" || existingBid.current_status === "VIEWED") && (
+      {visibleExistingBid &&
+        (visibleExistingBid.current_status === "PENDING" || visibleExistingBid.current_status === "VIEWED") && (
           <div
             style={{
               padding: "0.85rem 1.1rem",
@@ -165,8 +179,8 @@ export function MakeOfferSection({
               marginBottom: "0.75rem",
             }}
           >
-            Your offer of ${Number(existingBid.proposed_price).toLocaleString("en-US")} is{" "}
-            <strong>{existingBid.current_status.toLowerCase()}</strong>.
+            Your offer of ${Number(visibleExistingBid.proposed_price).toLocaleString("en-US")} is{" "}
+            <strong>{visibleExistingBid.current_status.toLowerCase()}</strong>.
           </div>
         )}
 

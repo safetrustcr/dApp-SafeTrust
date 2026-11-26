@@ -49,6 +49,8 @@ function parseNotes(rawNotes: unknown): string | undefined {
   return trimmed || undefined;
 }
 
+const MAX_PROPOSED_PRICE = 99_999_999.99;
+
 export const createBidHandler = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
     const { apartmentId, proposedPrice, desiredMoveIn } = req.body ?? {};
@@ -58,8 +60,13 @@ export const createBidHandler = asyncHandler(
     }
 
     const parsedPrice = Number(proposedPrice);
-    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
-      throw new ApiError(400, 'INVALID_PROPOSED_PRICE', 'proposedPrice must be a positive number.');
+    const normalizedPrice = Math.round(parsedPrice * 100) / 100;
+    if (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0 || normalizedPrice > MAX_PROPOSED_PRICE) {
+      throw new ApiError(
+        400,
+        'INVALID_PROPOSED_PRICE',
+        'proposedPrice must be a positive number up to 99,999,999.99.',
+      );
     }
 
     if (typeof desiredMoveIn !== 'string' || Number.isNaN(Date.parse(desiredMoveIn))) {
@@ -82,7 +89,7 @@ export const createBidHandler = asyncHandler(
     const bid = await createBidRequest({
       apartmentId: apartment.id,
       tenantId: req.user.uid,
-      proposedPrice: Math.round(parsedPrice * 100) / 100,
+      proposedPrice: normalizedPrice,
       desiredMoveIn: new Date(desiredMoveIn).toISOString(),
     });
 

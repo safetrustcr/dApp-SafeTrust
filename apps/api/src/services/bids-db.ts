@@ -382,13 +382,18 @@ export async function updateBidStatus(input: {
   actorId: string;
   notes?: string;
 }): Promise<{ bid: BidRequestRecord; history: BidStatusHistoryRecord }> {
-  const updated = await hasuraRequest<{
+  // Single GraphQL mutation document runs both writes in one Postgres transaction,
+  // so a failure in insert_bid_status_histories_one rolls back the status update.
+  const data = await hasuraRequest<{
     update_bid_requests: { returning: BidRequestRecord[] };
+    insert_bid_status_histories_one: BidStatusHistoryRecord | null;
   }>(
-    `mutation UpdateBidStatus(
+    `mutation UpdateBidStatusWithHistory(
       $bidId: uuid!
       $nextStatus: String!
       $allowedFromStatuses: [String!]!
+      $changedBy: String!
+      $notes: String
     ) {
       update_bid_requests(
         where: {
@@ -409,36 +414,10 @@ export async function updateBidStatus(input: {
           updated_at
         }
       }
-    }`,
-    {
-      bidId: input.bidId,
-      nextStatus: input.nextStatus,
-      allowedFromStatuses: input.allowedFromStatuses,
-    },
-  );
-
-  const bid = updated.update_bid_requests?.returning?.[0];
-  if (!bid) {
-    throw new ApiError(
-      409,
-      'INVALID_BID_TRANSITION',
-      'Offer status has changed and cannot be updated.',
-    );
-  }
-
-  const historyResult = await hasuraRequest<{
-    insert_bid_status_histories_one: BidStatusHistoryRecord | null;
-  }>(
-    `mutation InsertBidStatusHistory(
-      $bidRequestId: uuid!
-      $status: String!
-      $changedBy: String!
-      $notes: String
-    ) {
       insert_bid_status_histories_one(
         object: {
-          bid_request_id: $bidRequestId
-          status: $status
+          bid_request_id: $bidId
+          status: $nextStatus
           changed_by: $changedBy
           notes: $notes
         }
@@ -452,19 +431,29 @@ export async function updateBidStatus(input: {
       }
     }`,
     {
-      bidRequestId: bid.id,
-      status: input.nextStatus,
+      bidId: input.bidId,
+      nextStatus: input.nextStatus,
+      allowedFromStatuses: input.allowedFromStatuses,
       changedBy: input.actorId,
       notes: input.notes ?? null,
     },
   );
 
-  if (!historyResult.insert_bid_status_histories_one) {
+  const bid = data.update_bid_requests?.returning?.[0];
+  if (!bid) {
+    throw new ApiError(
+      409,
+      'INVALID_BID_TRANSITION',
+      'Offer status has changed and cannot be updated.',
+    );
+  }
+
+  if (!data.insert_bid_status_histories_one) {
     throw new Error('Failed to record bid status history');
   }
 
   return {
     bid,
-    history: historyResult.insert_bid_status_histories_one,
+    history: data.insert_bid_status_histories_one,
   };
 }

@@ -76,4 +76,37 @@ describe('InterestedPeopleTable', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(onPageChange).toHaveBeenCalledWith(1);
   });
+
+  it('keeps Previous visible when page > 0 even if totalCount <= pageSize and clamps page', () => {
+    const onPageChange = vi.fn();
+
+    render(
+      <InterestedPeopleTable
+        offers={[]}
+        totalCount={5}
+        page={1}
+        pageSize={10}
+        onPageChange={onPageChange}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeTruthy();
+    expect(onPageChange).toHaveBeenCalledWith(0);
+  });
+
+  it('formats desired_move_in using UTC calendar date', () => {
+    render(
+      <InterestedPeopleTable
+        offers={[
+          {
+            ...SAMPLE_OFFERS[0],
+            desired_move_in: '2026-12-01T00:00:00.000Z',
+          },
+        ]}
+        totalCount={1}
+      />,
+    );
+
+    expect(screen.getByText('Dec 1, 2026')).toBeTruthy();
+  });
 });

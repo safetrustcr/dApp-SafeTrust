@@ -107,6 +107,23 @@ describe('bids handlers', () => {
       expect(err.code).toBe('INVALID_PROPOSED_PRICE');
     });
 
+    it('rejects proposedPrice that rounds to 0 or exceeds DECIMAL(10,2) max with 400', async () => {
+      for (const proposedPrice of [0.001, 100_000_000, 99_999_999.999]) {
+        const req = mockReq({
+          body: { apartmentId: APT_ID, proposedPrice, desiredMoveIn: '2026-12-01T00:00:00Z' },
+        });
+        const res = mockRes();
+        const next = vi.fn() as unknown as NextFunction;
+
+        await createBidHandler(req, res, next);
+
+        const err = vi.mocked(next).mock.calls[0][0] as unknown as ApiError;
+        expect(err.status).toBe(400);
+        expect(err.code).toBe('INVALID_PROPOSED_PRICE');
+      }
+      expect(mockCreateBidRequest).not.toHaveBeenCalled();
+    });
+
     it('rejects bidding on own apartment with 400', async () => {
       mockGetBidApartment.mockResolvedValueOnce({
         id: APT_ID,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -50,6 +50,7 @@ export default function InterestedPeoplePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actingOfferId, setActingOfferId] = useState<string | null>(null);
+  const loadGenRef = useRef(0);
 
   useEffect(() => {
     if (!isValidId) {
@@ -59,9 +60,11 @@ export default function InterestedPeoplePage() {
 
   const loadOffers = useCallback(async () => {
     if (!isValidId || authLoading) return;
+    const gen = ++loadGenRef.current;
+
     if (!user) {
       setIsLoading(false);
-      setErrorMessage("Sign in as the apartment host to view offers.");
+      setErrorMessage("Firebase sign-in as the apartment host is required to view offers.");
       return;
     }
 
@@ -73,17 +76,21 @@ export default function InterestedPeoplePage() {
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
       });
+      if (gen !== loadGenRef.current) return;
       setApartment(response.apartment);
       setOffers(response.offers);
       setTotalCount(response.totalCount);
     } catch (error) {
+      if (gen !== loadGenRef.current) return;
       const message =
         error instanceof ApiClientError
           ? error.message
           : "Error loading offers. Please try again later.";
       setErrorMessage(message);
     } finally {
-      setIsLoading(false);
+      if (gen === loadGenRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [apartmentId, authLoading, isValidId, page, statusFilter, user]);
 

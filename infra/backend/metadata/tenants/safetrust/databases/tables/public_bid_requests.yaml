@@ -20,8 +20,17 @@ insert_permissions:
   - role: guest
     permission:
       check:
-        tenant_id:
-          _eq: X-Hasura-User-Id
+        _and:
+          - tenant_id:
+              _eq: X-Hasura-User-Id
+          - apartment:
+              _and:
+                - is_available:
+                    _eq: true
+                - deleted_at:
+                    _is_null: true
+                - owner_id:
+                    _neq: X-Hasura-User-Id
       set:
         tenant_id: x-hasura-User-Id
       columns:
@@ -31,8 +40,17 @@ insert_permissions:
   - role: tenant
     permission:
       check:
-        tenant_id:
-          _eq: X-Hasura-User-Id
+        _and:
+          - tenant_id:
+              _eq: X-Hasura-User-Id
+          - apartment:
+              _and:
+                - is_available:
+                    _eq: true
+                - deleted_at:
+                    _is_null: true
+                - owner_id:
+                    _neq: X-Hasura-User-Id
       set:
         tenant_id: x-hasura-User-Id
       columns:
@@ -129,6 +147,11 @@ update_permissions:
               _eq: X-Hasura-User-Id
           - deleted_at:
               _is_null: true
+          - current_status:
+              _in:
+                - PENDING
+                - VIEWED
+                - APPROVED
       check:
         current_status:
           _eq: CANCELLED
@@ -142,6 +165,11 @@ update_permissions:
               _eq: X-Hasura-User-Id
           - deleted_at:
               _is_null: true
+          - current_status:
+              _in:
+                - PENDING
+                - VIEWED
+                - APPROVED
       check:
         current_status:
           _eq: CANCELLED
@@ -153,6 +181,11 @@ update_permissions:
         _and:
           - deleted_at:
               _is_null: true
+          - current_status:
+              _in:
+                - PENDING
+                - VIEWED
+                - APPROVED
           - apartment:
               owner_id:
                 _eq: X-Hasura-User-Id
@@ -170,6 +203,11 @@ update_permissions:
         _and:
           - deleted_at:
               _is_null: true
+          - current_status:
+              _in:
+                - PENDING
+                - VIEWED
+                - APPROVED
           - apartment:
               owner_id:
                 _eq: X-Hasura-User-Id

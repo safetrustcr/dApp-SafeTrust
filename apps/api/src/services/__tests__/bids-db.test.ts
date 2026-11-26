@@ -99,9 +99,10 @@ describe('bids-db service', () => {
       created_at: '2026-11-25T10:05:00Z',
     };
 
-    mockHasuraRequest
-      .mockResolvedValueOnce({ update_bid_requests: { returning: [bid] } })
-      .mockResolvedValueOnce({ insert_bid_status_histories_one: history });
+    mockHasuraRequest.mockResolvedValueOnce({
+      update_bid_requests: { returning: [bid] },
+      insert_bid_status_histories_one: history,
+    });
 
     const result = await updateBidStatus({
       bidId: 'bid-1',
@@ -111,13 +112,14 @@ describe('bids-db service', () => {
       notes: 'Accepted by host',
     });
 
-    expect(mockHasuraRequest).toHaveBeenCalledTimes(2);
+    expect(mockHasuraRequest).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ bid, history });
   });
 
   it('throws 409 ApiError when update_bid_requests affects no rows', async () => {
     mockHasuraRequest.mockResolvedValueOnce({
       update_bid_requests: { returning: [] },
+      insert_bid_status_histories_one: null,
     });
 
     await expect(
