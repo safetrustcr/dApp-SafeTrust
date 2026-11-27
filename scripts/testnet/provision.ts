@@ -436,10 +436,11 @@ async function ensureApartmentForHost(hostUserId: string, hostWallet: string): P
       $ownerId: String!
       $name: String!
       $description: String!
-      $price: Int!
-      $warrantyDeposit: Int!
+      $price: numeric!
+      $warrantyDeposit: numeric!
+      $coordinates: point!
       $address: jsonb!
-      $availableFrom: timestamp!
+      $availableFrom: timestamptz!
     ) {
       insert_apartments_one(
         object: {
@@ -448,6 +449,7 @@ async function ensureApartmentForHost(hostUserId: string, hostWallet: string): P
           description: $description
           price: $price
           warranty_deposit: $warrantyDeposit
+          coordinates: $coordinates
           address: $address
           is_available: true
           available_from: $availableFrom
@@ -465,6 +467,8 @@ async function ensureApartmentForHost(hostUserId: string, hostWallet: string): P
     description: 'Demo apartment created by the isolated testnet provisioner.',
     price: 1200,
     warrantyDeposit: 300,
+    // apartments.coordinates is a NOT NULL Postgres point.
+    coordinates: '(-84.0807,9.9282)',
     address: {
       line1: 'Testnet Lane 1',
       city: 'San José',

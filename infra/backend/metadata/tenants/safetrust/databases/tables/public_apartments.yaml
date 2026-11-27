@@ -5,6 +5,14 @@ object_relationships:
   - name: owner
     using:
       foreign_key_constraint_on: owner_id
+array_relationships:
+  - name: bid_requests
+    using:
+      foreign_key_constraint_on:
+        column: apartment_id
+        table:
+          name: bid_requests
+          schema: public
 select_permissions:
   - role: tenant
     permission:

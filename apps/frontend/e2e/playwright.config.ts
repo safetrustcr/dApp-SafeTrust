@@ -1,48 +1,50 @@
 import { defineConfig, devices } from "@playwright/test";
+import { loadE2EEnv } from "./lib/env";
 
 /**
- * E2E configuration for the SafeTrust golden-path test.
+ * E2E configuration for the SafeTrust testnet specs (golden path + dispute).
  *
- * This test suite runs against a live local stack (api + web) connected to
- * Stellar testnet. It is intentionally excluded from the unit-test pipeline
- * (`pnpm test` / turbo test) and only triggered by the nightly + manual CI
- * workflow, or locally with `pnpm test:e2e`.
+ * The specs run against a live local stack (Hasura + api) connected to Stellar
+ * testnet and the Trustless Work testnet API. They are excluded from the
+ * unit-test pipeline (`pnpm test` / turbo test) and run from the nightly +
+ * manual CI workflow, or locally with `pnpm --filter @safetrust/web test:e2e`.
  *
- * Pre-requisites before running:
- *   make infra                           # Hasura + Postgres
- *   pnpm testnet:provision --check       # accounts, trustlines, apartment ready
- *   pnpm run dev                         # api + web
+ * Setup, env and a by-hand walkthrough: docs/testnet-booking.md
  */
+loadE2EEnv();
+
 export default defineConfig({
   testDir: "./",
   testMatch: ["**/*.spec.ts"],
 
-  /* Time each individual test step is allowed before it times out. */
+  /* Per-test default; the testnet specs raise it with test.setTimeout. */
   timeout: 180_000,
 
-  /* Give the full suite 20 minutes — testnet confirmations can be slow. */
-  globalTimeout: 20 * 60 * 1_000,
+  /* Two full testnet bookings plus waits on the Trustless Work rate limit. */
+  globalTimeout: 30 * 60 * 1_000,
 
-  /* Global setup: verifies testnet provisioning before any test runs. */
+  /* Global setup: verifies env and testnet provisioning before any test runs. */
   globalSetup: "./global-setup.ts",
 
-  /* One retry on CI to guard against transient testnet flakiness. */
-  retries: process.env.CI ? 1 : 0,
+  /* Never retry: a retry would book again on testnet and double the spend. */
+  retries: 0,
 
-  /* Run tests sequentially — the scenario has order-dependent state. */
+  /*
+   * One spec at a time. The specs share one Trustless Work API key
+   * (50 requests / 60 s) and the same guest wallet balance.
+   */
   workers: 1,
+  fullyParallel: false,
 
+  /* apps/frontend/test-results and apps/frontend/playwright-report (CI uploads both). */
+  outputDir: "../test-results",
   reporter: process.env.CI
-    ? [["github"], ["html", { open: "never" }]]
-    : [["list"], ["html", { open: "on-failure" }]],
+    ? [["github"], ["list"], ["html", { open: "never", outputFolder: "../playwright-report" }]]
+    : [["list"], ["html", { open: "on-failure", outputFolder: "../playwright-report" }]],
 
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3001",
-    /* Capture trace on first retry so we always have a trace on failure. */
-    trace: "on-first-retry",
-    /* Record video on retry too — invaluable for async testnet debugging. */
-    video: "on-first-retry",
-    /* Generous navigation timeout for heavy Next.js pages on first load. */
+    trace: "retain-on-failure",
     navigationTimeout: 60_000,
     actionTimeout: 30_000,
   },

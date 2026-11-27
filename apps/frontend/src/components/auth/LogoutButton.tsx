@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { endPollarSession, usePollarWallet } from "@/components/auth/pollar/PollarProvider";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { auth } from "@/lib/firebase";
 import { disablePush } from "@/lib/push";
@@ -21,15 +22,19 @@ interface LogoutButtonProps {
 export function LogoutButton({ variant = "sidebar" }: LogoutButtonProps) {
   const router = useRouter();
   const disconnect = useGlobalAuthenticationStore((state) => state.disconnect);
+  const { logout: pollarLogout } = usePollarWallet();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
 
+    // End the Pollar session too, or the next person to sign in on this device
+    // inherits this user's embedded wallet (#587). Started alongside Firebase
+    // sign-out; it never throws and is capped, so it can't block logout.
+    const pollarSessionEnded = endPollarSession(pollarLogout);
+
     try {
-      // Must register the DELETE before the Firebase token is cleared.
-      // Failures are ignored so logout is never blocked.
       // Must register the DELETE before the Firebase token is cleared.
       // Failures are ignored so logout is never blocked.
       await disablePush().catch(() => {});
@@ -41,6 +46,7 @@ export function LogoutButton({ variant = "sidebar" }: LogoutButtonProps) {
       // Since the Firebase token is also cleared, middleware redirects to /login.
       await fetch('/api/auth/role-cookie', { method: 'DELETE' }).catch(() => {});
       disconnect();
+      await pollarSessionEnded;
       router.push("/login");
       router.refresh();
     }

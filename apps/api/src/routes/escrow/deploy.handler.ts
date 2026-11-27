@@ -27,6 +27,11 @@ type DeployResponse = {
   cached?: boolean;
 };
 
+// Trustless Work testnet Swagger (https://dev.api.trustlesswork.com) checked for
+// POST /deployer/single-release. The `trustline` object is { symbol, address }
+// and the response returns the unsigned XDR in `unsignedTransaction`.
+// Verified against the Swagger schema as of 2025-01 (verify again on next bump).
+
 export const deployEscrowHandler = asyncHandler(async (
   req: AuthenticatedRequest & Request<Record<string, never>, DeployResponse | { error: string }, DeployRequestBody>,
   res: Response<DeployResponse | { error: string }>,

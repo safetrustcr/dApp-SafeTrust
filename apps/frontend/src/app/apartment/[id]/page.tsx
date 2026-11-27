@@ -18,6 +18,7 @@ import { use, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 
 import { useAuthUser } from "@/components/auth/hooks/auth.hook";
+import { MakeOfferSection } from "@/components/apartments/MakeOfferSection";
 import { useListing } from "@/features/listings/use-listings";
 import { startConversation } from "@/lib/api/messages";
 
@@ -287,6 +288,14 @@ export default function ApartmentDetailPage({
             {apartment.hostName ? `Host: ${apartment.hostName}` : "Host"}
           </p>
         </div>
+
+        <MakeOfferSection
+          apartmentId={apartment.id}
+          defaultPrice={apartment.price.amount}
+          isOwner={isOwner}
+          isAuthenticated={Boolean(user)}
+          authLoading={authLoading}
+        />
       </main>
     </div>
   );

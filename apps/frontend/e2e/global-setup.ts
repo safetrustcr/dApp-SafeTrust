@@ -1,48 +1,60 @@
 /**
- * Playwright global setup — runs once before any test file.
+ * Playwright global setup — runs once before any spec.
  *
- * Fails fast with a clear human-readable message if the testnet provisioning
- * script reports that accounts, trustlines, or the seeded apartment are not
- * ready. This avoids confusing mid-test failures caused by missing on-chain
- * state.
+ * Fails fast with a readable message when the env, the local API, or the
+ * testnet accounts are not ready, instead of failing halfway through a
+ * booking that has already spent testnet USDC.
  */
 
 import { execSync } from "child_process";
+import { Keypair } from "@stellar/stellar-sdk";
+import { REQUIRED_ENV, loadE2EEnv, repoRoot } from "./lib/env";
 
 export default async function globalSetup(): Promise<void> {
-  console.log("[global-setup] Verifying testnet provisioning…");
+  loadE2EEnv();
+  console.log("[global-setup] Verifying E2E environment…");
 
-  // Require every provisioning secret to be set before we even attempt to run.
-  const required = [
-    "E2E_GUEST_SECRET",
-    "E2E_HOST_SECRET",
-    "E2E_PLATFORM_SECRET",
-    "TRUSTLESS_WORK_API_KEY",
-  ] as const;
-
-  const missing = required.filter((k) => !process.env[k]);
+  const missing: string[] = REQUIRED_ENV.filter((k) => !process.env[k]?.trim());
+  if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY && !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+    missing.push("NEXT_PUBLIC_FIREBASE_API_KEY or FIREBASE_AUTH_EMULATOR_HOST");
+  }
   if (missing.length > 0) {
     throw new Error(
-      `[global-setup] Missing required environment variables: ${missing.join(", ")}.\n` +
-        `Copy apps/frontend/.env.e2e.example and fill in the secrets before running E2E tests.`,
+      `[global-setup] Missing environment variables: ${missing.join(", ")}.\n` +
+        "Put them in apps/frontend/.env.e2e.local, .env.testnet.local or apps/api/.env " +
+        "(see docs/testnet-booking.md).",
     );
   }
 
-  // pnpm testnet:provision --check exits 0 when all accounts/trustlines/apartment
-  // are ready and non-zero when something is missing or stale.
+  const platform = Keypair.fromSecret(process.env.E2E_PLATFORM_SECRET!).publicKey();
+  if (platform !== process.env.PLATFORM_STELLAR_ADDRESS) {
+    throw new Error(
+      `[global-setup] PLATFORM_STELLAR_ADDRESS (${process.env.PLATFORM_STELLAR_ADDRESS}) is not the ` +
+        `E2E_PLATFORM_SECRET wallet (${platform}). The admin could not resolve disputes.`,
+    );
+  }
+
+  const apiUrl = (process.env.API_URL ?? "http://localhost:3002").replace(/\/+$/, "");
   try {
-    execSync("pnpm testnet:provision --check", {
-      cwd: process.cwd(),
-      stdio: "inherit",
-      timeout: 60_000,
-    });
+    const res = await fetch(`${apiUrl}/health`, { signal: AbortSignal.timeout(5_000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) {
+    throw new Error(
+      `[global-setup] apps/api is not reachable at ${apiUrl}/health (${(err as Error).message}). ` +
+        "Start it with `pnpm dev` or set API_URL.",
+    );
+  }
+
+  // Root workspace script: run it from the repo root, not apps/frontend.
+  try {
+    execSync("pnpm testnet:provision --check", { cwd: repoRoot, stdio: "inherit", timeout: 60_000 });
   } catch {
     throw new Error(
       "[global-setup] testnet:provision --check failed.\n" +
-        "Run `pnpm testnet:provision` to set up accounts, trustlines, users, " +
-        "and the seeded apartment, then retry.",
+        "Run `pnpm testnet:provision` to set up accounts, trustlines and users, " +
+        "fund the guest with testnet USDC, then retry.",
     );
   }
 
-  console.log("[global-setup] Testnet ready. Starting tests…");
+  console.log("[global-setup] Testnet ready. Starting specs (one at a time)…");
 }

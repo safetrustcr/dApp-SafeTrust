@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { Suspense, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { PropertyFilter } from '@safetrust/types';
 import { ListingCard } from '@/components/rent/ListingCard';
 import { useRentalProperties } from '@/hooks/use-rental-properties';
@@ -15,7 +15,7 @@ function readPrice(value: string | null): number | undefined {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-export default function RentListingPage() {
+function RentListingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { properties, loading, error, hasMore, loadMore, refetch } =
@@ -188,5 +188,13 @@ export default function RentListingPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function RentPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-background" />}>
+      <RentListingPage />
+    </Suspense>
   );
 }

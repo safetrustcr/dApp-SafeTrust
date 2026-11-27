@@ -61,8 +61,19 @@ constraint can fire.
 | Role | Assigned to | Responsibility |
 |---|---|---|
 | `approver` | Guest (senderAddress) | Signs milestone approval |
+| `marker` | Host (receiverAddress) | Marks the service milestone complete |
 | `serviceProvider` | Host (receiverAddress) | Delivers the service |
 | `receiver` | Host (receiverAddress) | Receives funds on release |
 | `releaseSigner` | Guest (senderAddress) | Authorizes fund release |
 | `disputeResolver` | SafeTrust platform | Resolves disputes |
 | `platformAddress` | SafeTrust treasury | Receives platform fee |
+
+SafeTrust uses **Option B (guest releases)**: the guest approves the milestone
+and then signs the release. When the Trustless Work role record is missing,
+the UI falls back to `escrows.sender_address` for the release signer and
+`NEXT_PUBLIC_PLATFORM_ADDRESS` for the dispute resolver. The alternative of
+having the platform release funds is not chosen; it would require changing the
+deployed release role and adding platform-side transaction signing.
+
+Either the guest (`approver`) or host (`serviceProvider`) may open a dispute.
+Only the platform (`disputeResolver`) may resolve it.

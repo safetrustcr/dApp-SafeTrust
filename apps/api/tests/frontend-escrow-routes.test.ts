@@ -52,6 +52,8 @@ describe('EscrowDetailView build routes', () => {
         '/api/escrow/milestone-status',
         '/api/escrow/approve-milestone',
         '/api/escrow/release-funds',
+        '/api/escrow/dispute',
+        '/api/escrow/resolve-dispute',
       ]),
     );
   });

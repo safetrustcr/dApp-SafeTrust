@@ -1,7 +1,8 @@
-name: E2E Golden-Path (testnet)
+name: E2E testnet booking (golden + dispute path)
 
 # Run nightly on the default branch and on manual dispatch only.
-# Never triggered on every PR — testnet is slow and occasionally flaky.
+# Never triggered on every PR — testnet is slow and spends faucet USDC.
+# Setup and secrets: docs/testnet-booking.md
 on:
   schedule:
     - cron: "0 3 * * *" # 03:00 UTC every night
@@ -10,16 +11,35 @@ on:
       branch:
         description: Branch to run E2E against
         required: false
-        default: consolidation-pattern
+        default: main
 
 permissions:
   contents: read
 
+# One run at a time: the specs share one Trustless Work key (50 req / 60 s)
+# and one guest wallet balance.
+concurrency:
+  group: e2e-testnet
+  cancel-in-progress: false
+
 jobs:
   e2e:
-    name: Playwright golden-path (testnet)
+    name: Playwright testnet booking
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
+
+    env:
+      # Shared by the API process and the specs.
+      HASURA_GRAPHQL_URL: ${{ secrets.E2E_HASURA_GRAPHQL_URL }}
+      HASURA_ADMIN_SECRET: ${{ secrets.E2E_HASURA_ADMIN_SECRET }}
+      TRUSTLESS_WORK_API_URL: https://dev.api.trustlesswork.com
+      TRUSTLESS_WORK_API_KEY: ${{ secrets.TRUSTLESS_WORK_API_KEY }}
+      PLATFORM_STELLAR_ADDRESS: ${{ secrets.E2E_PLATFORM_STELLAR_ADDRESS }}
+      USDC_TRUSTLINE_ADDRESS: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+      STELLAR_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+      STELLAR_HORIZON_URL: https://horizon-testnet.stellar.org
+      RECONCILIATION_SECRET: ${{ secrets.E2E_RECONCILIATION_SECRET }}
+      API_URL: "http://localhost:3002"
 
     steps:
       - uses: actions/checkout@v5
@@ -46,27 +66,15 @@ jobs:
       - name: Start API server
         run: pnpm --filter @safetrust/api dev &
         env:
-          DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
-          HASURA_GRAPHQL_URL: ${{ secrets.E2E_HASURA_GRAPHQL_URL }}
-          HASURA_ADMIN_SECRET: ${{ secrets.E2E_HASURA_ADMIN_SECRET }}
-          TRUSTLESS_WORK_API_KEY: ${{ secrets.TRUSTLESS_WORK_API_KEY }}
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.E2E_FIREBASE_SERVICE_ACCOUNT }}
+          PORT: "3002"
+          FIREBASE_PROJECT_ID: ${{ secrets.E2E_FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.E2E_FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.E2E_FIREBASE_PRIVATE_KEY }}
 
-      - name: Start web app
-        run: pnpm --filter @safetrust/web dev &
-        env:
-          NEXT_PUBLIC_E2E_WALLET: "true"
-          NEXT_PUBLIC_HASURA_URL: ${{ secrets.E2E_HASURA_GRAPHQL_URL }}
-          NEXT_PUBLIC_FIREBASE_CONFIG: ${{ secrets.E2E_FIREBASE_CONFIG }}
+      - name: Wait for the API
+        run: timeout 90 bash -c 'until curl -sf http://localhost:3002/health; do sleep 2; done'
 
-      - name: Wait for servers to be ready
-        run: |
-          echo "Waiting for API (port 3000)…"
-          timeout 60 bash -c 'until curl -sf http://localhost:3000/health; do sleep 2; done'
-          echo "Waiting for web (port 3001)…"
-          timeout 60 bash -c 'until curl -sf http://localhost:3001; do sleep 2; done'
-
-      - name: Run E2E golden-path test
+      - name: Run testnet specs
         working-directory: apps/frontend
         run: pnpm test:e2e
         env:
@@ -74,31 +82,23 @@ jobs:
           E2E_GUEST_SECRET: ${{ secrets.E2E_GUEST_SECRET }}
           E2E_HOST_SECRET: ${{ secrets.E2E_HOST_SECRET }}
           E2E_PLATFORM_SECRET: ${{ secrets.E2E_PLATFORM_SECRET }}
-          E2E_GUEST_EMAIL: ${{ secrets.E2E_GUEST_EMAIL }}
-          E2E_HOST_EMAIL: ${{ secrets.E2E_HOST_EMAIL }}
-          E2E_HOST_PASSWORD: ${{ secrets.E2E_HOST_PASSWORD }}
-          E2E_APARTMENT_ID: ${{ secrets.E2E_APARTMENT_ID }}
-          E2E_APARTMENT_NAME: ${{ secrets.E2E_APARTMENT_NAME }}
-          TRUSTLESS_WORK_API_KEY: ${{ secrets.TRUSTLESS_WORK_API_KEY }}
-          PLAYWRIGHT_BASE_URL: "http://localhost:3001"
-          API_URL: "http://localhost:3000"
-          # Reconciliation secret for idempotency checks
-          RECONCILIATION_SECRET: ${{ secrets.E2E_RECONCILIATION_SECRET }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.E2E_FIREBASE_WEB_API_KEY }}
 
-      # Always upload the Playwright trace and HTML report so failures can be
-      # diagnosed without re-running the test (testnet state changes).
-      - name: Upload Playwright trace
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-trace-${{ github.run_id }}
-          path: apps/frontend/test-results/
-          retention-days: 7
-
+      # The report carries each run's transaction table (testnet-transactions.md)
+      # with explorer links, so upload it on success too.
       - name: Upload Playwright HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ github.run_id }}
           path: apps/frontend/playwright-report/
+          retention-days: 14
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trace-${{ github.run_id }}
+          path: apps/frontend/test-results/
           retention-days: 7

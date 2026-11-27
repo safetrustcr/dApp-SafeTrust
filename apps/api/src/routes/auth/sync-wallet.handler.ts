@@ -1,5 +1,6 @@
 import { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { hasuraRequest } from '../../services/hasura.js';
+import { syncHotelWallet } from '../../services/hotel-provisioning.js';
 
 type ApiResponse<T = unknown> = {
   status(code: number): {
@@ -102,6 +103,26 @@ req: AuthenticatedRequest & { body: SyncWalletBody; }, res: ApiResponse<SyncWall
     );
 
     const wallet = data.insert_user_wallets_one;
+
+    // Mirror the verified wallet into the hotel tenant so hotel escrow can
+    // find the guest's wallet for reservation payments. Best-effort:
+    // public.user_wallets is the source of truth for the SafeTrust tenant.
+    try {
+      await syncHotelWallet(
+        {
+          firebaseUid: uid,
+          email: String((req.user as { email?: unknown })?.email ?? ''),
+          emailVerified: (req.user as { email_verified?: unknown })?.email_verified === true,
+        },
+        walletAddress,
+        isPrimary,
+      );
+    } catch (hotelError) {
+      console.warn(
+        '[auth/sync-wallet] hotel wallet mirror failed — continuing with public wallet only:',
+        hotelError instanceof Error ? hotelError.message : hotelError,
+      );
+    }
 
     console.log(
       `[auth/sync-wallet] ✅ wallet synced — userId: ${uid}, ` +
