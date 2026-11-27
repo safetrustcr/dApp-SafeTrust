@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import Illustration from "@/components/auth/ui/Illustration";
 import {
   AuthMotion,
@@ -27,7 +26,6 @@ import {
 import Cookies from "js-cookie";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { toast } from "sonner";
-import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
 import { useRegisterForm } from "@/hooks/use-register-form";
 import { validateRegisterForm } from "@/lib/auth/register-validation";
 import { registerUser } from "@/lib/auth/register-user";
@@ -257,21 +255,6 @@ export default function Register() {
 
               {error && <AuthMotionError>{error}</AuthMotionError>}
             </form>
-
-            <AuthMotionItem className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <Separator />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground font-medium">
-                  or continue with
-                </span>
-              </div>
-            </AuthMotionItem>
-
-            <AuthMotionItem>
-              <PollarLoginButton onWalletReady={() => router.push("/dashboard")} />
-            </AuthMotionItem>
 
             <AuthMotionItem className="text-center text-xs text-muted-foreground pt-1">
               Already have an account?{" "}

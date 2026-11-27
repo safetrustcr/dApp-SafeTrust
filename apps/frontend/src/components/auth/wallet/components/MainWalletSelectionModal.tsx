@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { X, ExternalLink, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useWalletBridge, WalletRejectedError } from "@/lib/wallet/use-wallet-bridge";
+import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { toast } from "sonner";
 
 /** Wallet family picked in this modal; the specific wallet is chosen in the next step. */
@@ -28,6 +29,7 @@ export const MainWalletSelectionModal: React.FC<MainWalletSelectionModalProps> =
   onWalletConnected,
 }) => {
   const { status, address, provider, isRegistered, connect, disconnect } = useWalletBridge();
+  const token = useGlobalAuthenticationStore((state) => state.token);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [hasFreighterExtension, setHasFreighterExtension] = useState<boolean>(true);
 
@@ -168,31 +170,33 @@ export const MainWalletSelectionModal: React.FC<MainWalletSelectionModalProps> =
             </CardContent>
           </Card>
 
-          {/* 2. Pollar Option */}
-          <Card
-            className="cursor-pointer transition-all duration-200 hover:border-blue-500 hover:shadow-md dark:hover:border-blue-600"
-            onClick={() => handleConnect("pollar")}
-          >
-            <CardContent className="!p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3.5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-950/80 text-blue-600 font-bold text-sm">
-                    P
+          {/* 2. Pollar Option — offered only after Firebase sign-in (#583) */}
+          {token && (
+            <Card
+              className="cursor-pointer transition-all duration-200 hover:border-blue-500 hover:shadow-md dark:hover:border-blue-600"
+              onClick={() => handleConnect("pollar")}
+            >
+              <CardContent className="!p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-950/80 text-blue-600 font-bold text-sm">
+                      P
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">Create a wallet with Pollar</h3>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Create an embedded wallet with Google / Email without seed phrase
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">Pollar</h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      Login with Google / Email without seed phrase
-                    </p>
-                  </div>
-                </div>
 
-                {connectingProvider === "pollar" && (
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  {connectingProvider === "pollar" && (
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* 3. Other Stellar Wallets (Albedo, LOBSTR, xBull, Here) */}
           <Card

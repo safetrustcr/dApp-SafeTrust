@@ -5,6 +5,7 @@ import { usePollar } from "@pollar/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePollarWallet } from "./PollarProvider";
+import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { GoogleIcon } from "@/components/auth/ui/GoogleIcon";
 import { Loader2, Mail } from "lucide-react";
 
@@ -12,9 +13,16 @@ type PollarLoginButtonProps = {
   onWalletReady?: (address: string) => void;
 };
 
+/**
+ * Wallet-only Pollar onboarding button (#583).
+ * Only rendered after the user has signed in with Firebase so that
+ * `auth.currentUser` and the `firebase-token` cookie are present when
+ * `usePollarWalletSync` calls `/api/auth/activate-wallet`.
+ */
 export function PollarLoginButton({ onWalletReady }: PollarLoginButtonProps) {
   const { configured } = usePollarWallet();
-  if (!configured) {
+  const token = useGlobalAuthenticationStore((state) => state.token);
+  if (!configured || !token) {
     return null;
   }
 
@@ -73,7 +81,7 @@ function PollarLoginButtonInner({ onWalletReady }: PollarLoginButtonProps) {
         ) : (
           <GoogleIcon className="mr-2 h-4 w-4" />
         )}
-        <span>Continue with Google</span>
+        <span>Create a wallet with Pollar</span>
       </Button>
 
       {showEmailInput ? (
@@ -103,7 +111,7 @@ function PollarLoginButtonInner({ onWalletReady }: PollarLoginButtonProps) {
           className="flex items-center justify-center gap-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           <Mail className="h-3 w-3" />
-          <span>Or sign in with email OTP</span>
+          <span>Or create with email OTP</span>
         </button>
       )}
     </div>

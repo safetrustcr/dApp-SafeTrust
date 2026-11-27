@@ -21,7 +21,6 @@ import {
   AuthMotionButton,
   AuthMotionError,
 } from "@/components/auth/ui/AuthMotion";
-import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
 import { MainWalletSelectionModal } from "./wallet/components/MainWalletSelectionModal";
 import { Wallet, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -222,10 +221,7 @@ export default function Login() {
             </AuthMotionItem>
 
             <AuthMotionItem className="space-y-2.5">
-              {/* Pollar Web3 Login */}
-              <PollarLoginButton onWalletReady={() => router.push(redirectPath)} />
-
-              {/* Stellar Wallet Connect */}
+              {/* Stellar Wallet Connect (Pollar is wallet-only and offered after Firebase sign-in) */}
               <Button
                 type="button"
                 variant="outline"
