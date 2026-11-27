@@ -22,6 +22,7 @@ import messagesRouter from './routes/messages/send.route.js';
 import notificationDevicesRouter from './routes/notifications/devices.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
+import promoteHotelManagerRouter from './routes/admin/promote-hotel-manager.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
 import { requestIdMiddleware, errorHandler } from './http/error-middleware.js';
 import listingsRouter from './routes/listings/listings.route.js';
@@ -29,6 +30,7 @@ import hotelsRouter from './routes/hotels/hotels.route.js';
 import hotelReservationsRouter from './routes/hotels/reservations.route.js';
 import walletAuthRouter from './routes/auth/wallet-auth.route.js';
 import { isTestnet } from './services/wallet-readiness.js';
+import bidsRouter from './routes/bids/bids.route.js';
 
 /**
  * Builds the apps/api Express app without binding a port.
@@ -65,6 +67,7 @@ export function createApp(): express.Express {
   app.use('/api/auth', promoteToHostRouter);
   app.use('/api/auth', activateWalletRouter);
   app.use('/api/admin', adminUsersRouter);
+  app.use('/api/admin', promoteHotelManagerRouter);
 
   // Escrow routes
   app.use('/api/escrow', deployEscrowRouter);
@@ -84,6 +87,9 @@ export function createApp(): express.Express {
   app.use('/api/messages', conversationsRouter);
   app.use('/api/messages', messagesRouter);
   app.use('/api/notifications', notificationDevicesRouter);
+
+  // Bid / rental offer routes
+  app.use('/api/bids', bidsRouter);
 
   // Hotel routes
   app.use('/api/hotels', hotelsRouter);
