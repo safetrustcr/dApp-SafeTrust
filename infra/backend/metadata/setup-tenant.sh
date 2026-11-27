@@ -151,14 +151,11 @@ else
   tables: "!include $TENANT/tables/tables.yaml"
 EOF
 
-    # Track tenant SQL functions (for example hotel_industry.find_nearby_hotels).
+    # Track tenant SQL functions (for example hotel_industry.find_nearby_hotels);
+    # without this the combined source drops them.
     if [[ -f "$TENANT_BUILD/metadata/databases/functions/functions.yaml" ]]; then
       cp -r "$TENANT_BUILD/metadata/databases/functions" "$TENANT_DB_DIR/"
       echo "  functions: \"!include $TENANT/functions/functions.yaml\"" >> "$DATABASES_YAML"
-    # Keep tracked functions; without this the combined source drops them.
-    if [ -f "$TENANT_BUILD/metadata/databases/functions/functions.yaml" ]; then
-      cp -r "$TENANT_BUILD/metadata/databases/functions" "$COMBINED_DIR/metadata/databases/$TENANT/"
-      echo "  functions: \"!include $TENANT/functions/functions.yaml\"" >> "$COMBINED_DIR/metadata/databases/databases.yaml"
     fi
   done
   PROJECT_DIR="$COMBINED_DIR"

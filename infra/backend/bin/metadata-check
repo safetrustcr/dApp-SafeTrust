@@ -28,6 +28,8 @@ if [[ ${#TENANTS[@]} -eq 0 ]]; then
   else
     mapfile -t TENANTS < <(find "$INFRA_DIR/metadata/tenants" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
   fi
+fi
+
 # Static check: every public_*.yaml table file must be included in tables.yaml
 missing=0
 for tables_yaml in "$INFRA_DIR"/metadata/tenants/*/databases/tables/tables.yaml; do
@@ -87,41 +89,33 @@ if [[ "$rc" -ne 0 ]]; then
   exit "$rc"
 fi
 
-has_jq=false
-command -v jq > /dev/null 2>&1 && has_jq=true
+if ! command -v jq > /dev/null 2>&1; then
+  echo "❌ jq is required to verify tracked sources" >&2
+  exit 1
+fi
 
 missing=0
 for tenant in "${TENANTS[@]}"; do
-  if [[ "$has_jq" == "true" ]]; then
-    summary="$(jq -r --arg t "$tenant" '
-      [.sources[]? | select(.name == $t)] as $s
-      | if ($s | length) == 0 then "missing"
-        else "\($s[0].tables | length) \($s[0].functions // [] | length)"
-        end' <<<"$metadata")"
+  summary="$(jq -r --arg t "$tenant" '
+    [.sources[]? | select(.name == $t)] as $s
+    | if ($s | length) == 0 then "missing"
+      else "\($s[0].tables | length) \($s[0].functions // [] | length)"
+      end' <<<"$metadata")"
 
-    if [[ "$summary" == "missing" ]]; then
-      echo "   ❌ $tenant: source is not tracked" >&2
-      missing=$((missing + 1))
-      continue
-    fi
-
-    read -r table_count function_count <<<"$summary"
-    if [[ "$table_count" -eq 0 ]]; then
-      echo "   ❌ $tenant: source is tracked but has no tracked tables" >&2
-      missing=$((missing + 1))
-      continue
-    fi
-
-    echo "   ✅ $tenant: ${table_count} tables, ${function_count} functions tracked"
-  else
-    if ! grep -Eq "\"name\"[[:space:]]*:[[:space:]]*\"${tenant}\"" <<<"$metadata"; then
-      echo "   ❌ $tenant: source is not tracked" >&2
-      missing=$((missing + 1))
-      continue
-    fi
-
-    echo "   ✅ $tenant: source tracked (install jq for table/function counts)"
+  if [[ "$summary" == "missing" ]]; then
+    echo "   ❌ $tenant: source is not tracked" >&2
+    missing=$((missing + 1))
+    continue
   fi
+
+  read -r table_count function_count <<<"$summary"
+  if [[ "$table_count" -eq 0 ]]; then
+    echo "   ❌ $tenant: source is tracked but has no tracked tables" >&2
+    missing=$((missing + 1))
+    continue
+  fi
+
+  echo "   ✅ $tenant: ${table_count} tables, ${function_count} functions tracked"
 done
 
 if [[ "$missing" -gt 0 ]]; then
