@@ -2,19 +2,25 @@
 
 import { useEffect, useRef } from "react";
 import { usePollarWallet } from "./PollarProvider";
-import { useGlobalAuthenticationStore } from "@/core/store/data";
+import { useAuthUser } from "@/components/auth/hooks/auth.hook";
 
 /**
  * Syncs a Pollar G-address to public.user_wallets via POST /api/auth/activate-wallet.
- * Runs once per address when the guest already has a Firebase session.
+ * Runs once per address when the guest has an active Firebase session, fetching
+ * a fresh ID token directly from the live Firebase user.
  */
 export function usePollarWalletSync() {
   const { address } = usePollarWallet();
-  const token = useGlobalAuthenticationStore((state) => state.token);
+  const { user } = useAuthUser();
   const syncedAddress = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!address || !token || syncedAddress.current === address) {
+    if (!user) {
+      syncedAddress.current = null;
+      return;
+    }
+
+    if (!address || syncedAddress.current === address) {
       return;
     }
 
@@ -22,11 +28,12 @@ export function usePollarWalletSync() {
 
     const syncWallet = async () => {
       try {
+        const freshToken = await user.getIdToken();
         const response = await fetch(`${apiUrl}/api/auth/activate-wallet`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${freshToken}`,
           },
         });
 
@@ -42,5 +49,5 @@ export function usePollarWalletSync() {
     };
 
     void syncWallet();
-  }, [address, token]);
+  }, [address, user]);
 }

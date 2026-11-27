@@ -7,6 +7,7 @@ import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
 import { useMultiWallet } from "@/components/auth/wallet/hooks/multi-wallet.hook";
 import { Button } from "@/components/ui/button";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
+import { useWalletBridge } from "@/lib/wallet/use-wallet-bridge";
 import { Wallet } from "lucide-react";
 import { RoleEscrowDashboardPage } from "@/app/dashboard/escrow-dashboard/RoleEscrowDashboardPage";
 
@@ -25,6 +26,8 @@ export function EscrowDashboard() {
     handleMetaMaskSelected,
   } = useMultiWallet();
   const { address } = useGlobalAuthenticationStore();
+  // Keeps the bridge active so Pollar addresses are committed when selected.
+  useWalletBridge();
 
   return (
     <div className="space-y-6">

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { X, ExternalLink, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useWalletBridge, WalletRejectedError } from "@/lib/wallet/use-wallet-bridge";
-import { useGlobalAuthenticationStore } from "@/core/store/data";
+import { useAuthUser } from "@/components/auth/hooks/auth.hook";
 import { toast } from "sonner";
 
 /** Wallet family picked in this modal; the specific wallet is chosen in the next step. */
@@ -29,7 +29,7 @@ export const MainWalletSelectionModal: React.FC<MainWalletSelectionModalProps> =
   onWalletConnected,
 }) => {
   const { status, address, provider, isRegistered, connect, disconnect } = useWalletBridge();
-  const token = useGlobalAuthenticationStore((state) => state.token);
+  const { user: firebaseUser } = useAuthUser();
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [hasFreighterExtension, setHasFreighterExtension] = useState<boolean>(true);
 
@@ -170,8 +170,8 @@ export const MainWalletSelectionModal: React.FC<MainWalletSelectionModalProps> =
             </CardContent>
           </Card>
 
-          {/* 2. Pollar Option — offered only after Firebase sign-in (#583) */}
-          {token && (
+          {/* 2. Pollar Option — offered only while Firebase session is live (#583) */}
+          {firebaseUser && (
             <Card
               className="cursor-pointer transition-all duration-200 hover:border-blue-500 hover:shadow-md dark:hover:border-blue-600"
               onClick={() => handleConnect("pollar")}

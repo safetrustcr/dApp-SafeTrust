@@ -5,6 +5,7 @@ import { usePollar } from "@pollar/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePollarWallet } from "./PollarProvider";
+import { useAuthUser } from "@/components/auth/hooks/auth.hook";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { GoogleIcon } from "@/components/auth/ui/GoogleIcon";
 import { Loader2, Mail } from "lucide-react";
@@ -15,14 +16,14 @@ type PollarLoginButtonProps = {
 
 /**
  * Wallet-only Pollar onboarding button (#583).
- * Only rendered after the user has signed in with Firebase so that
- * `auth.currentUser` and the `firebase-token` cookie are present when
+ * Only rendered while the user has an active Firebase session so that
+ * `auth.currentUser` and a fresh ID token are available when
  * `usePollarWalletSync` calls `/api/auth/activate-wallet`.
  */
 export function PollarLoginButton({ onWalletReady }: PollarLoginButtonProps) {
   const { configured } = usePollarWallet();
-  const token = useGlobalAuthenticationStore((state) => state.token);
-  if (!configured || !token) {
+  const { user } = useAuthUser();
+  if (!configured || !user) {
     return null;
   }
 
@@ -31,6 +32,7 @@ export function PollarLoginButton({ onWalletReady }: PollarLoginButtonProps) {
 
 function PollarLoginButtonInner({ onWalletReady }: PollarLoginButtonProps) {
   const { isAuthenticated, wallet, login } = usePollar();
+  const selectWalletProvider = useGlobalAuthenticationStore((state) => state.selectWalletProvider);
   const [email, setEmail] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [showEmailInput, setShowEmailInput] = useState(false);
@@ -57,6 +59,9 @@ function PollarLoginButtonInner({ onWalletReady }: PollarLoginButtonProps) {
   const runLogin = async (provider: "google" | "email") => {
     setIsBusy(true);
     try {
+      // Select Pollar in the store before SDK login so useWalletBridge can
+      // commit the asynchronously provisioned address once it arrives.
+      selectWalletProvider("pollar");
       if (provider === "email") {
         await login({ provider: "email", email });
       } else {
