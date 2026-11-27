@@ -197,6 +197,8 @@ export const GET_ESCROW_BY_ANY_ID = gql`
       marker
       releaser
       resolver
+      amount
+      balance
       milestones {
         milestoneId
         status

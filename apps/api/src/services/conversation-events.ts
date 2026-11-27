@@ -23,6 +23,8 @@ type LifecycleContext = {
   apartmentName?: string | null;
   amount?: string | number | null;
   asset?: string | null;
+  reason?: string | null;
+  description?: string | null;
 };
 
 export function buildEventKey(contractId: string, eventType: EscrowLifecycleEvent['event_type']): string {
@@ -47,7 +49,14 @@ export function buildLifecycleEvent(context: LifecycleContext): EscrowLifecycleE
     body = 'The deposit was released to the host.';
   } else if (context.action === 'dispute' || context.toStatus === 'disputed') {
     event_type = 'dispute_opened';
-    body = 'A dispute was opened. The platform will review it.';
+    const lines = ['A dispute was opened. The platform will review it.'];
+    if (context.reason) {
+      lines.push(`Reason: ${context.reason}`);
+    }
+    if (context.description) {
+      lines.push(`Description: ${context.description}`);
+    }
+    body = lines.join('\n');
   } else if (context.action === 'resolve_dispute' || context.toStatus === 'resolved') {
     event_type = 'dispute_resolved';
     body = 'The dispute was resolved.';

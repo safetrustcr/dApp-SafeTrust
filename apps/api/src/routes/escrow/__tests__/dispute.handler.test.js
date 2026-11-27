@@ -7,11 +7,11 @@ vi.mock('../build-escrow-action.js', async (importOriginal) => {
 
 import { ApiError } from '../../../http/api-error.js';
 import { buildEscrowAction } from '../build-escrow-action.js';
-import { disputeHandler } from '../dispute.handler.js';
+import { disputeHandler, getDisputeHandler } from '../dispute.handler.js';
 import { mockNext, mockReq, mockRes } from './helpers.js';
 
 const mockBuildEscrowAction = vi.mocked(buildEscrowAction);
-const authedReq = (body) => ({ ...mockReq(body), user: { uid: 'guest-uid' } });
+const authedReq = (body, query = {}) => ({ ...mockReq(body), query, user: { uid: 'guest-uid' } });
 
 describe('disputeHandler', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -57,5 +57,52 @@ describe('disputeHandler', () => {
     await disputeHandler(authedReq({ engagementId: 'eng-1' }), mockRes(), next);
 
     expect(next.error).toBe(error);
+  });
+
+  it('stores reason and description in payload when provided', async () => {
+    mockBuildEscrowAction.mockResolvedValueOnce({ unsignedXdr: 'XDR', txHash: 'hash-1' });
+
+    await disputeHandler(
+      authedReq({
+        engagementId: 'eng-1',
+        reason: 'Property not as described',
+        description: 'Broken window and heating not working',
+      }),
+      mockRes(),
+      mockNext(),
+    );
+
+    const [options] = mockBuildEscrowAction.mock.calls[0];
+    expect(options.request({ signer: 'GUEST_WALLET', escrow: { contract_id: 'CA1' } })).toEqual({
+      path: '/escrow/single-release/dispute-escrow',
+      body: { contractId: 'CA1', signer: 'GUEST_WALLET' },
+      payload: {
+        signer: 'GUEST_WALLET',
+        reason: 'Property not as described',
+        description: 'Broken window and heating not working',
+      },
+    });
+  });
+
+  it('rejects description longer than 500 characters', async () => {
+    const next = mockNext();
+    await disputeHandler(
+      authedReq({
+        engagementId: 'eng-1',
+        reason: 'Other',
+        description: 'a'.repeat(501),
+      }),
+      mockRes(),
+      next,
+    );
+
+    expect(next.error).toMatchObject({ status: 400, code: 'INVALID_DESCRIPTION' });
+  });
+
+  it('getDisputeHandler requires engagementId or contractId', async () => {
+    const next = mockNext();
+    await getDisputeHandler(authedReq({}, {}), mockRes(), next);
+
+    expect(next.error).toMatchObject({ status: 400, code: 'INVALID_REQUEST' });
   });
 });
