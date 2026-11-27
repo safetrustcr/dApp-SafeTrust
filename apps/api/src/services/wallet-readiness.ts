@@ -144,14 +144,18 @@ export type ReadinessCheck = {
   balance?: string;
   required?: string;
   fix?: string;
+  code?: string;
+  message?: string;
+  sponsored?: boolean;
+  feeCovered?: boolean;
 };
 
 export type GuestChecks = {
   registeredWallet: { ok: boolean; fix?: string };
-  accountExists?: { ok: boolean; fix?: string };
-  xlmForFees?: { ok: boolean; balance: string; required?: string; fix?: string };
-  trustline?: { ok: boolean; fix?: string };
-  assetBalance?: { ok: boolean; balance: string; required: string; fix?: string };
+  accountExists?: ReadinessCheck;
+  xlmForFees?: ReadinessCheck;
+  trustline?: ReadinessCheck;
+  assetBalance?: ReadinessCheck;
 };
 
 export type WalletReadinessResponse = {
@@ -164,6 +168,8 @@ export type WalletReadinessResponse = {
   amount: string;
   guest: {
     wallet: string | null;
+    provider?: string | null;
+    sponsored?: boolean;
     checks: GuestChecks;
   };
   counterparties: {
@@ -172,15 +178,57 @@ export type WalletReadinessResponse = {
   };
 };
 
+export type GuestChecksOptions = {
+  walletProvider?: string | null;
+  isSponsored?: boolean;
+};
+
 export function evaluateGuestChecks(
   account: Horizon.AccountResponse | null,
   amount: number | string,
   assetIssuer: string,
   isTestnetNetwork: boolean,
+  options?: GuestChecksOptions,
 ): GuestChecks {
   const amountStr = Number(amount).toFixed(7);
+  const isPollar = options?.walletProvider === 'pollar';
+  const isSponsored = options?.isSponsored ?? isPollar;
 
   if (!account) {
+    if (isPollar) {
+      return {
+        registeredWallet: { ok: true },
+        accountExists: {
+          ok: false,
+          code: 'SDK_WALLET_NOT_READY',
+          message: 'Wallet still activating on-chain.',
+          fix: 'WAIT_FOR_ACTIVATION',
+        },
+        xlmForFees: isSponsored
+          ? {
+              ok: true,
+              balance: '0',
+              sponsored: true,
+              feeCovered: true,
+            }
+          : {
+              ok: false,
+              balance: '0',
+              ...(isTestnetNetwork ? { fix: 'FUND_XLM' } : {}),
+            },
+        trustline: {
+          ok: false,
+          fix: 'ADD_TRUSTLINE',
+        },
+        assetBalance: {
+          ok: false,
+          balance: '0',
+          required: amountStr,
+          ...(isTestnetNetwork ? { fix: 'GET_TEST_USDC' } : {}),
+        },
+      };
+    }
+
     return {
       registeredWallet: { ok: true },
       accountExists: {
@@ -209,7 +257,7 @@ export function evaluateGuestChecks(
   const xlmThreshold = calculateXlmThreshold(subentries);
   const nativeBalance = getNativeXlmBalance(account);
   const nativeBalanceNum = parseFloat(nativeBalance);
-  const xlmOk = nativeBalanceNum >= xlmThreshold;
+  const xlmOk = isSponsored ? true : nativeBalanceNum >= xlmThreshold;
 
   const trustlineOk = hasUsdcTrustline(account, 'USDC', assetIssuer);
   const usdcBal = trustlineOk ? getUsdcBalance(account, 'USDC', assetIssuer) : '0';
@@ -220,11 +268,18 @@ export function evaluateGuestChecks(
   return {
     registeredWallet: { ok: true },
     accountExists: { ok: true },
-    xlmForFees: {
-      ok: xlmOk,
-      balance: nativeBalance,
-      ...(!xlmOk && isTestnetNetwork ? { fix: 'FUND_XLM' } : {}),
-    },
+    xlmForFees: isSponsored
+      ? {
+          ok: true,
+          balance: nativeBalance,
+          sponsored: true,
+          feeCovered: true,
+        }
+      : {
+          ok: xlmOk,
+          balance: nativeBalance,
+          ...(!xlmOk && isTestnetNetwork ? { fix: 'FUND_XLM' } : {}),
+        },
     trustline: {
       ok: trustlineOk,
       ...(!trustlineOk ? { fix: 'ADD_TRUSTLINE' } : {}),
@@ -238,16 +293,36 @@ export function evaluateGuestChecks(
   };
 }
 
-export async function getGuestPrimaryWallet(uid: string): Promise<string | null> {
-  const data = await hasuraRequest<{ user_wallets: Array<{ wallet_address: string }> }>(
+export type GuestPrimaryWalletInfo = {
+  walletAddress: string;
+  provider: string | null;
+};
+
+export async function getGuestPrimaryWalletInfo(
+  uid: string,
+): Promise<GuestPrimaryWalletInfo | null> {
+  const data = await hasuraRequest<{
+    user_wallets: Array<{ wallet_address: string; provider?: string | null }>;
+  }>(
     `query GuestPrimaryWallet($uid: String!) {
        user_wallets(where: { user_id: { _eq: $uid }, is_primary: { _eq: true } }, limit: 1) {
          wallet_address
+         provider
        }
      }`,
     { uid },
   );
-  return data.user_wallets[0]?.wallet_address ?? null;
+  const wallet = data.user_wallets[0];
+  if (!wallet) return null;
+  return {
+    walletAddress: wallet.wallet_address,
+    provider: wallet.provider ?? null,
+  };
+}
+
+export async function getGuestPrimaryWallet(uid: string): Promise<string | null> {
+  const info = await getGuestPrimaryWalletInfo(uid);
+  return info?.walletAddress ?? null;
 }
 
 export type EscrowReadinessParams = {
@@ -329,8 +404,14 @@ export async function checkWalletReadiness({
   const amountStr = Number(amount).toFixed(7);
 
   // Check guest primary registered wallet
-  let guestWallet = await getGuestPrimaryWallet(uid);
-  if (!guestWallet && hotelGuestWallet) {
+  let guestWallet: string | null = null;
+  let guestProvider: string | null = null;
+
+  const guestWalletInfo = await getGuestPrimaryWalletInfo(uid);
+  if (guestWalletInfo) {
+    guestWallet = guestWalletInfo.walletAddress;
+    guestProvider = guestWalletInfo.provider;
+  } else if (hotelGuestWallet) {
     guestWallet = hotelGuestWallet;
   }
 
@@ -346,7 +427,9 @@ export async function checkWalletReadiness({
     };
   } else {
     const guestAccount = await loadAccountWithCache(horizon, guestWallet);
-    guestChecks = evaluateGuestChecks(guestAccount, amount, usdcIssuer, isTestnetNetwork);
+    guestChecks = evaluateGuestChecks(guestAccount, amount, usdcIssuer, isTestnetNetwork, {
+      walletProvider: guestProvider,
+    });
   }
 
   // Check counterparties (host & platform USDC trustlines)
@@ -370,6 +453,7 @@ export async function checkWalletReadiness({
     Boolean(guestChecks.assetBalance?.ok);
 
   const ready = isGuestReady && hostCanReceiveOk && platformCanReceiveOk;
+  const isPollar = guestProvider === 'pollar';
 
   return {
     ready,
@@ -381,6 +465,8 @@ export async function checkWalletReadiness({
     amount: amountStr,
     guest: {
       wallet: guestWallet,
+      provider: guestProvider,
+      sponsored: isPollar,
       checks: guestChecks,
     },
     counterparties: {

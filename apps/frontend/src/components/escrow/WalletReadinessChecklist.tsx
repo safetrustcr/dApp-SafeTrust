@@ -222,6 +222,10 @@ export function WalletReadinessChecklist({
   const isPlatformOk = Boolean(readiness.counterparties.platformCanReceive.ok);
 
   const isTestnet = readiness.network === 'testnet';
+  const isActivating =
+    !isAccountExistsOk &&
+    (checks.accountExists?.code === 'SDK_WALLET_NOT_READY' ||
+      checks.accountExists?.fix === 'WAIT_FOR_ACTIVATION');
 
   return (
     <div
@@ -338,15 +342,21 @@ export function WalletReadinessChecklist({
         {/* Check 2: XLM for Fees & Account Existence */}
         <li className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2">
-            {isXlmOk ? (
+            {isActivating ? (
+              <Loader2 className="h-4 w-4 animate-spin text-orange-500 shrink-0 mt-0.5" />
+            ) : isXlmOk ? (
               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
             ) : (
               <AlertCircle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
             )}
             <div>
               <p className="font-medium text-foreground">Stellar account & XLM for fees</p>
-              {!isAccountExistsOk ? (
+              {isActivating ? (
+                <p className="text-muted-foreground">Pollar wallet is still activating on-chain.</p>
+              ) : !isAccountExistsOk ? (
                 <p className="text-muted-foreground">Account does not exist on Stellar yet.</p>
+              ) : checks.xlmForFees?.sponsored ? (
+                <p className="text-muted-foreground">Fees sponsored by Pollar.</p>
               ) : !isXlmOk ? (
                 <p className="text-muted-foreground">
                   Balance: {checks.xlmForFees?.balance ?? '0'} XLM (needs base reserve + fees).
@@ -359,7 +369,12 @@ export function WalletReadinessChecklist({
             </div>
           </div>
           <div>
-            {!isXlmOk ? (
+            {isActivating ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-800">
+                <Loader2 className="h-3 w-3 animate-spin text-orange-600" />
+                Activating…
+              </span>
+            ) : !isXlmOk ? (
               isTestnet ? (
                 <button
                   type="button"
@@ -402,7 +417,13 @@ export function WalletReadinessChecklist({
                 type="button"
                 onClick={() => void handleAddTrustline(guestWallet ?? address ?? '')}
                 disabled={actionInProgress === 'trustline' || !isAccountExistsOk}
-                title={!isAccountExistsOk ? 'Fund with Friendbot first' : undefined}
+                title={
+                  !isAccountExistsOk
+                    ? isActivating
+                      ? 'Wait for wallet activation on-chain'
+                      : 'Fund with Friendbot first'
+                    : undefined
+                }
                 className="inline-flex items-center gap-1 rounded-md bg-orange-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
               >
                 {actionInProgress === 'trustline' && <Loader2 className="h-3 w-3 animate-spin" />}

@@ -218,4 +218,75 @@ describe('WalletReadinessChecklist', () => {
       expect(onReadyChange).toHaveBeenCalledWith(true);
     });
   });
+
+  it('renders activating state for Pollar wallet awaiting on-chain confirmation', async () => {
+    mockReadiness.mockResolvedValue({
+      ready: false,
+      network: 'testnet',
+      asset: { code: 'USDC', issuer: ISSUER },
+      amount: '150.0000000',
+      guest: {
+        wallet: GUEST,
+        provider: 'pollar',
+        sponsored: true,
+        checks: {
+          registeredWallet: { ok: true },
+          accountExists: {
+            ok: false,
+            code: 'SDK_WALLET_NOT_READY',
+            message: 'Wallet still activating on-chain.',
+            fix: 'WAIT_FOR_ACTIVATION',
+          },
+          xlmForFees: { ok: true, balance: '0', sponsored: true, feeCovered: true },
+          trustline: { ok: false, fix: 'ADD_TRUSTLINE' },
+          assetBalance: { ok: false, balance: '0', required: '150.0000000', fix: 'GET_TEST_USDC' },
+        },
+      },
+      counterparties: {
+        hostCanReceive: { ok: true },
+        platformCanReceive: { ok: true },
+      },
+    });
+
+    render(<WalletReadinessChecklist apartmentId="apt-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Pollar wallet is still activating on-chain.')).toBeTruthy();
+      expect(screen.getByText('Activating…')).toBeTruthy();
+      expect(screen.queryByText('Fund with Friendbot')).toBeNull();
+    });
+  });
+
+  it('renders sponsored fees for Pollar wallet without requiring XLM deposit', async () => {
+    mockReadiness.mockResolvedValue({
+      ready: false,
+      network: 'testnet',
+      asset: { code: 'USDC', issuer: ISSUER },
+      amount: '150.0000000',
+      guest: {
+        wallet: GUEST,
+        provider: 'pollar',
+        sponsored: true,
+        checks: {
+          registeredWallet: { ok: true },
+          accountExists: { ok: true },
+          xlmForFees: { ok: true, balance: '0', sponsored: true, feeCovered: true },
+          trustline: { ok: false, fix: 'ADD_TRUSTLINE' },
+          assetBalance: { ok: false, balance: '0', required: '150.0000000', fix: 'GET_TEST_USDC' },
+        },
+      },
+      counterparties: {
+        hostCanReceive: { ok: true },
+        platformCanReceive: { ok: true },
+      },
+    });
+
+    render(<WalletReadinessChecklist apartmentId="apt-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Fees sponsored by Pollar.')).toBeTruthy();
+      expect(screen.queryByText('Deposit XLM')).toBeNull();
+      expect(screen.queryByText('Fund with Friendbot')).toBeNull();
+    });
+  });
 });
