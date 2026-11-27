@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/* eslint-disable @next/next/no-img-element */
 /**
  * EscrowDetailView runs every escrow action through the real useEscrowAction
  * hook and reports progress with WalletSigningStatus. Only the network
@@ -10,11 +11,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const ADDRESS = `G${'A'.repeat(55)}`;
 const SENDER = `G${'S'.repeat(55)}`;
 const RECEIVER = `G${'R'.repeat(55)}`;
+const HOST_ADDRESS = `G${'B'.repeat(55)}`;
+const GUEST_ADDRESS = `G${'C'.repeat(55)}`;
 
 const mocks = vi.hoisted(() => ({
   signXDR: vi.fn<(xdr: string, passphrase?: string) => Promise<string>>(),
   refetch: vi.fn(async () => ({})),
   data: null as unknown,
+  hotelData: undefined as unknown,
+  address: `G${'A'.repeat(55)}`,
 }));
 
 vi.mock('@/lib/firebase', () => ({
@@ -24,14 +29,14 @@ vi.mock('@/components/auth/wallet/hooks/wallet.hook', () => ({
   useWallet: () => ({ signXDR: mocks.signXDR }),
 }));
 vi.mock('@/hooks/use-active-wallet', () => ({
-  useActiveWallet: () => ({ address: ADDRESS, walletType: 'freighter', isReady: true }),
+  useActiveWallet: () => ({ address: mocks.address, walletType: 'freighter', isReady: true }),
 }));
 vi.mock('@apollo/client', () => ({
   useQuery: () => ({ data: mocks.data, loading: false, error: undefined, refetch: mocks.refetch }),
 }));
 vi.mock('@/graphql/queries/escrow-queries', () => ({ GET_ESCROW_BY_ANY_ID: {} }));
 vi.mock('@/hooks/use-hotel-escrow-resource', () => ({
-  useHotelEscrowResource: () => ({ data: undefined, loading: false, error: undefined, refetch: vi.fn() }),
+  useHotelEscrowResource: () => ({ data: mocks.hotelData, loading: false, error: undefined, refetch: mocks.refetch }),
 }));
 vi.mock('@/hooks/use-escrow-stream', () => ({ useEscrowStream: () => ({ streamData: null }) }));
 vi.mock('@/components/ui/image', () => ({ default: () => null, Image: () => null }));
@@ -69,6 +74,9 @@ const params = { id: 'apt-1', escrowId: 'eng-1' };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.address = ADDRESS;
+  mocks.data = null;
+  mocks.hotelData = undefined;
   mocks.signXDR.mockResolvedValue('SIGNED_XDR');
   fetchMock.mockImplementation(async (url: string) =>
     String(url).includes('/send-transaction')
@@ -214,5 +222,309 @@ describe('EscrowDetailView signing status', () => {
     );
     expect(screen.getByRole('status').textContent).not.toContain('Refresh and retry');
     await waitFor(() => expect(mocks.refetch).toHaveBeenCalled());
+  });
+});
+
+describe('EscrowDetailView milestone completion flow', () => {
+  beforeEach(() => {
+    mocks.address = HOST_ADDRESS;
+  });
+
+  it('note textarea renders near the milestone button', () => {
+    mocks.data = {
+      escrows: [
+        {
+          id: 'escrow-1',
+          contract_id: 'CONTRACT1',
+          engagement_id: 'eng-1',
+          amount: 500,
+          status: 'funded',
+          sender_address: GUEST_ADDRESS,
+          receiver_address: HOST_ADDRESS,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          apartment: { id: 'apt-1', name: 'Apartment 1', price: 500 },
+        },
+      ],
+      trustlessWorkEscrows: [
+        {
+          approver: GUEST_ADDRESS,
+          marker: HOST_ADDRESS,
+          releaser: 'PLATFORM',
+          resolver: 'PLATFORM',
+          milestones: [{ milestoneId: 'check_in', status: 'pending' }],
+        },
+      ],
+    };
+
+    render(
+      <EscrowDetailView
+        params={{ id: 'apt-1', escrowId: 'eng-1' }}
+        bookingKind="apartment"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /mark stay completed/i })).toBeDefined();
+
+    const textarea = screen.getByLabelText('Completion note');
+    expect(textarea).toBeDefined();
+    expect(textarea.getAttribute('maxLength')).toBe('500');
+    expect(
+      screen.getByText('This does not release funds. The guest still needs to approve.'),
+    ).toBeDefined();
+    expect(screen.getByText('0/500')).toBeDefined();
+  });
+
+  it('character counter updates as user types', () => {
+    mocks.data = {
+      escrows: [
+        {
+          id: 'escrow-1',
+          contract_id: 'CONTRACT1',
+          engagement_id: 'eng-1',
+          amount: 500,
+          status: 'funded',
+          sender_address: GUEST_ADDRESS,
+          receiver_address: HOST_ADDRESS,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          apartment: { id: 'apt-1', name: 'Apartment 1', price: 500 },
+        },
+      ],
+      trustlessWorkEscrows: [
+        {
+          approver: GUEST_ADDRESS,
+          marker: HOST_ADDRESS,
+          releaser: 'PLATFORM',
+          resolver: 'PLATFORM',
+          milestones: [{ milestoneId: 'check_in', status: 'pending' }],
+        },
+      ],
+    };
+
+    render(
+      <EscrowDetailView
+        params={{ id: 'apt-1', escrowId: 'eng-1' }}
+        bookingKind="apartment"
+      />,
+    );
+
+    const textarea = screen.getByLabelText('Completion note') as HTMLTextAreaElement;
+    expect(screen.getByText('0/500')).toBeDefined();
+
+    const note = 'Guest checked out on time and left keys on table.';
+    fireEvent.change(textarea, { target: { value: note } });
+    expect(textarea.value).toBe(note);
+    expect(screen.getByText(`${note.length}/500`)).toBeDefined();
+  });
+
+  it('hotel button hidden before check-out', () => {
+    const futureCheckOut = new Date(Date.now() + 86400000).toISOString();
+    mocks.hotelData = {
+      escrows: [
+        {
+          id: 'res-1',
+          contract_id: 'CONTRACT_HOTEL',
+          engagement_id: 'hotel:res-1',
+          amount: 240,
+          status: 'funded',
+          sender_address: GUEST_ADDRESS,
+          receiver_address: HOST_ADDRESS,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          apartment: { id: 'res-1', name: 'Hotel Room 101', check_out: futureCheckOut },
+        },
+      ],
+      trustlessWorkEscrows: [
+        {
+          approver: GUEST_ADDRESS,
+          marker: HOST_ADDRESS,
+          releaser: 'PLATFORM',
+          resolver: 'PLATFORM',
+          milestones: [{ milestoneId: 'check_in', status: 'pending' }],
+        },
+      ],
+    };
+
+    render(
+      <EscrowDetailView
+        params={{ id: 'res-1', escrowId: 'hotel:res-1' }}
+        bookingKind="hotel-room"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /mark stay completed/i })).toBeNull();
+    expect(screen.queryByLabelText('Completion note')).toBeNull();
+  });
+
+  it('hotel button visible after check-out', () => {
+    const pastCheckOut = new Date(Date.now() - 86400000).toISOString();
+    mocks.hotelData = {
+      escrows: [
+        {
+          id: 'res-1',
+          contract_id: 'CONTRACT_HOTEL',
+          engagement_id: 'hotel:res-1',
+          amount: 240,
+          status: 'funded',
+          sender_address: GUEST_ADDRESS,
+          receiver_address: HOST_ADDRESS,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          apartment: { id: 'res-1', name: 'Hotel Room 101', check_out: pastCheckOut },
+        },
+      ],
+      trustlessWorkEscrows: [
+        {
+          approver: GUEST_ADDRESS,
+          marker: HOST_ADDRESS,
+          releaser: 'PLATFORM',
+          resolver: 'PLATFORM',
+          milestones: [{ milestoneId: 'check_in', status: 'pending' }],
+        },
+      ],
+    };
+
+    render(
+      <EscrowDetailView
+        params={{ id: 'res-1', escrowId: 'hotel:res-1' }}
+        bookingKind="hotel-room"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /mark stay completed/i })).toBeDefined();
+    expect(screen.getByLabelText('Completion note')).toBeDefined();
+  });
+
+  it('apartment button visible when funded regardless of date', () => {
+    const futureCheckOut = new Date(Date.now() + 86400000).toISOString();
+    mocks.data = {
+      escrows: [
+        {
+          id: 'escrow-1',
+          contract_id: 'CONTRACT1',
+          engagement_id: 'eng-1',
+          amount: 500,
+          status: 'funded',
+          sender_address: GUEST_ADDRESS,
+          receiver_address: HOST_ADDRESS,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          apartment: { id: 'apt-1', name: 'Apartment 1', price: 500, available_until: futureCheckOut },
+        },
+      ],
+      trustlessWorkEscrows: [
+        {
+          approver: GUEST_ADDRESS,
+          marker: HOST_ADDRESS,
+          releaser: 'PLATFORM',
+          resolver: 'PLATFORM',
+          milestones: [{ milestoneId: 'check_in', status: 'pending' }],
+        },
+      ],
+    };
+
+    render(
+      <EscrowDetailView
+        params={{ id: 'apt-1', escrowId: 'eng-1' }}
+        bookingKind="apartment"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /mark stay completed/i })).toBeDefined();
+    expect(screen.getByLabelText('Completion note')).toBeDefined();
+  });
+
+  it('surfaces host note evidence to the guest when approving milestone', () => {
+    mocks.address = GUEST_ADDRESS;
+    mocks.data = {
+      escrows: [
+        {
+          id: 'escrow-1',
+          contract_id: 'CONTRACT1',
+          engagement_id: 'eng-1',
+          amount: 500,
+          status: 'funded',
+          sender_address: GUEST_ADDRESS,
+          receiver_address: HOST_ADDRESS,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          apartment: { id: 'apt-1', name: 'Apartment 1', price: 500 },
+        },
+      ],
+      trustlessWorkEscrows: [
+        {
+          approver: GUEST_ADDRESS,
+          marker: HOST_ADDRESS,
+          releaser: 'PLATFORM',
+          resolver: 'PLATFORM',
+          milestones: [
+            { milestoneId: 'check_in', status: 'completed', evidence: 'Guest was excellent and left keys on desk.' },
+          ],
+        },
+      ],
+    };
+
+    render(
+      <EscrowDetailView
+        params={{ id: 'apt-1', escrowId: 'eng-1' }}
+        bookingKind="apartment"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /approve milestone/i })).toBeDefined();
+    expect(screen.getByText('Host note / evidence:')).toBeDefined();
+    expect(screen.getByText('Guest was excellent and left keys on desk.')).toBeDefined();
+  });
+
+  it('sends newEvidence when completing milestone with note', async () => {
+    mocks.data = {
+      escrows: [
+        {
+          id: 'escrow-1',
+          contract_id: 'CONTRACT1',
+          engagement_id: 'eng-1',
+          amount: 500,
+          status: 'funded',
+          sender_address: GUEST_ADDRESS,
+          receiver_address: HOST_ADDRESS,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          apartment: { id: 'apt-1', name: 'Apartment 1', price: 500 },
+        },
+      ],
+      trustlessWorkEscrows: [
+        {
+          approver: GUEST_ADDRESS,
+          marker: HOST_ADDRESS,
+          releaser: 'PLATFORM',
+          resolver: 'PLATFORM',
+          milestones: [{ milestoneId: 'check_in', status: 'pending' }],
+        },
+      ],
+    };
+
+    render(
+      <EscrowDetailView
+        params={{ id: 'apt-1', escrowId: 'eng-1' }}
+        bookingKind="apartment"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Completion note'), {
+      target: { value: 'Inspection passed cleanly.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /mark stay completed/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const [buildUrl, buildInit] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(buildUrl).toContain('/api/escrow/milestone-status');
+    expect(JSON.parse(buildInit.body)).toMatchObject({
+      contractId: 'CONTRACT1',
+      engagementId: 'eng-1',
+      milestoneIndex: 0,
+      newStatus: 'completed',
+      newEvidence: 'Inspection passed cleanly.',
+    });
   });
 });

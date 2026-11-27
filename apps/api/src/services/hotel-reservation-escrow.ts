@@ -106,6 +106,7 @@ export function hotelBookingView(reservation: HotelReservation, amount: number, 
     warranty_deposit: amount,
     available_from: reservation.check_in,
     available_until: reservation.check_out,
+    check_out: reservation.check_out,
     owner: { ...room.hotel.owner, user_wallets: [{ wallet_address: receiverAddress }] },
   };
 }

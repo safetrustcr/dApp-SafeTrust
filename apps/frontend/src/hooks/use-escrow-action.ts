@@ -17,7 +17,7 @@ export type EscrowActionConfig = {
 
 type AttemptKeys = {
   route: string;
-  /** Serialized apiBody, so changed inputs (e.g. a new dispute split) start a new attempt. */
+  /** Serialized apiBody, so changed inputs (e.g. a new dispute split or completion note) start a new attempt. */
   body: string;
   /** Idempotency-Key for the XDR build call. */
   build: string;

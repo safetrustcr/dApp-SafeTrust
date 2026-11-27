@@ -16,6 +16,7 @@ import {
   type EscrowRoles,
 } from '../../services/escrow-authz.js';
 import {
+  expirePendingAction,
   expireStaleActions,
   findLiveAction,
   insertPendingAction,
@@ -82,9 +83,10 @@ export async function buildEscrowAction(opts: {
   engagementId: string;
   action: EscrowAction;
   requireContract?: boolean;
+  requestHash?: string;
   request: (ctx: BuildContext) => BuildRequest | Promise<BuildRequest>;
 }): Promise<BuildResult> {
-  const { uid, engagementId, action, requireContract = true } = opts;
+  const { uid, engagementId, action, requireContract = true, requestHash } = opts;
 
   const ctx = await authorizeEscrowAction(uid, engagementId, action).catch(toApiError);
   if (requireContract && !ctx.escrow.contract_id) {
@@ -101,7 +103,11 @@ export async function buildEscrowAction(opts: {
     if (live.built_for_uid !== uid) {
       throw new ApiError(409, 'ACTION_RESERVED', 'Another participant is already signing this action.');
     }
-    return fromRow(live, true);
+    if (requestHash !== undefined && live.payload?._requestHash !== requestHash) {
+      await expirePendingAction(live.id);
+    } else {
+      return fromRow(live, true);
+    }
   }
 
   const { path, body, payload = {} } = await opts.request(ctx);
@@ -138,7 +144,7 @@ export async function buildEscrowAction(opts: {
       unsigned_xdr: unsignedXdr,
       built_for_uid: uid,
       signer_address: ctx.signer,
-      payload,
+      payload: requestHash !== undefined ? { ...payload, _requestHash: requestHash } : payload,
       expires_at: expiresAt,
     });
     return fromRow(row, false);

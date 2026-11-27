@@ -45,11 +45,12 @@ type ViewConfig = {
 };
 
 type TrustlessWorkEscrowRecord = {
+  contract_id?: string | null;
   approver?: string | null;
   marker?: string | null;
   releaser?: string | null;
   resolver?: string | null;
-  milestones?: Array<{ milestoneId?: string | null; status?: string | null }>;
+  milestones?: Array<{ milestoneId?: string | null; status?: string | null; evidence?: string | null }>;
 };
 
 type EscrowRecord = {
@@ -63,6 +64,7 @@ type EscrowRecord = {
   sender_address?: string | null;
   receiver_address?: string | null;
   resolution_notes?: string | null;
+  check_out?: string | null;
   tenant_wallet?: {
     user?: {
       first_name?: string | null;
@@ -78,6 +80,9 @@ type EscrowRecord = {
     image_urls?: string[] | null;
     description?: string | null;
     price?: number | null;
+    check_out?: string | null;
+    available_from?: string | null;
+    available_until?: string | null;
     owner?: {
       id?: string | null;
       first_name?: string | null;
@@ -893,7 +898,7 @@ function EscrowActionButton({
 }) {
   const buttonConfig: Record<EscrowAction, { label: string; color: string; hoverColor: string }> = {
     fund: { label: 'Fund Escrow', color: '#f97316', hoverColor: '#ea580c' },
-    milestone: { label: 'Mark Completed', color: '#22c55e', hoverColor: '#16a34a' },
+    milestone: { label: 'Mark stay completed', color: '#22c55e', hoverColor: '#16a34a' },
     approve: { label: 'Approve Milestone', color: '#0ea5e9', hoverColor: '#0284c7' },
     release: { label: 'Release Funds', color: '#6366f1', hoverColor: '#4f46e5' },
     dispute: { label: 'Open Dispute', color: '#dc2626', hoverColor: '#b91c1c' },
@@ -954,6 +959,7 @@ export default function EscrowDetailView({
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [approverFunds, setApproverFunds] = useState(0);
   const [receiverFunds, setReceiverFunds] = useState(0);
+  const [completionNote, setCompletionNote] = useState('');
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.escrowId);
 
@@ -1034,8 +1040,16 @@ export default function EscrowDetailView({
   const canResolve = status === 'disputed';
   const checkInMilestone = trustlessWorkEscrow?.milestones?.find((milestone) => milestone.milestoneId === 'check_in');
 
+  const isHotelEscrow =
+    bookingKind === "hotel-room" || Boolean(escrow?.engagement_id?.startsWith('hotel:'));
+  const checkOutDate =
+    escrow?.check_out ?? escrow?.apartment?.check_out ?? escrow?.apartment?.available_until;
+  const isHotelMilestoneReady =
+    !isHotelEscrow || !checkOutDate || new Date() >= new Date(checkOutDate);
+
   const showFundButton = canFund && isApprover;
-  const showMilestoneButton = canMarkMilestone && isMarker && checkInMilestone?.status === 'pending';
+  const showMilestoneButton =
+    canMarkMilestone && isMarker && checkInMilestone?.status === 'pending' && isHotelMilestoneReady;
   const showApproveButton = canMarkMilestone && isApprover && checkInMilestone?.status === 'completed';
   const showReleaseButton = canRelease && isReleaseSigner;
   // Either party may open a dispute; the resolver (platform) never may.
@@ -1078,15 +1092,19 @@ export default function EscrowDetailView({
 
     setErrorMessages([]);
     setActiveAction('milestone');
+    const apiBody: Record<string, unknown> = {
+      contractId: escrow.contract_id,
+      serviceProvider: address,
+      engagementId: escrow.engagement_id,
+      milestoneIndex: 0,
+      newStatus: 'completed',
+    };
+    if (completionNote) {
+      apiBody.newEvidence = completionNote;
+    }
     const result = await execute({
       apiRoute: '/api/escrow/milestone-status',
-      apiBody: {
-        contractId: escrow.contract_id,
-        serviceProvider: address,
-        engagementId: escrow.engagement_id,
-        milestoneIndex: 0,
-        newStatus: 'completed',
-      },
+      apiBody,
       sendTransactionBody: {
         action: 'mark_milestone_completed',
         contractId: escrow.contract_id,
@@ -1097,7 +1115,7 @@ export default function EscrowDetailView({
       },
     });
     if (result) await refetch();
-  }, [escrow, address, execute, refetch]);
+  }, [escrow, address, execute, refetch, completionNote]);
 
   const handleApproveMilestone = useCallback(async () => {
     if (!escrow?.contract_id || !address || !escrow.engagement_id || !escrow.sender_address || !escrow.receiver_address) {
@@ -1361,7 +1379,23 @@ export default function EscrowDetailView({
                 status={status}
                 isLoading={actioning}
                 onClick={handleMarkCompleted}
-              />
+              >
+                <div style={{ marginBottom: '0.9rem' }}>
+                  <textarea
+                    id="escrow-completion-note"
+                    aria-label="Completion note"
+                    maxLength={500}
+                    placeholder="Optional note for the guest (e.g. check-out instructions or comments)"
+                    value={completionNote}
+                    onChange={(event) => setCompletionNote(event.target.value)}
+                    style={{ ...styles.input, minHeight: '4.5rem', marginBottom: '0.35rem' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#6b7280' }}>
+                    <p style={{ margin: 0 }}>This does not release funds. The guest still needs to approve.</p>
+                    <span aria-live="polite">{completionNote.length}/500</span>
+                  </div>
+                </div>
+              </EscrowActionButton>
             )}
 
             {showApproveButton && (
@@ -1370,7 +1404,21 @@ export default function EscrowDetailView({
                 status={status}
                 isLoading={actioning}
                 onClick={handleApproveMilestone}
-              />
+              >
+                {checkInMilestone?.evidence && (
+                  <div style={{ marginBottom: '0.9rem', padding: '0.75rem', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #d1d5db' }}>
+                    <p style={{ margin: '0 0 0.35rem', fontSize: '0.8rem', fontWeight: 700, color: '#374151' }}>Host note / evidence:</p>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>{checkInMilestone.evidence}</p>
+                  </div>
+                )}
+              </EscrowActionButton>
+            )}
+
+            {checkInMilestone?.evidence && !showApproveButton && (
+              <div style={{ marginTop: '1rem', padding: '0.9rem', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #e5e7eb' }}>
+                <p style={{ margin: '0 0 0.35rem', fontSize: '0.8rem', fontWeight: 700, color: '#374151' }}>Host note / evidence:</p>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>{checkInMilestone.evidence}</p>
+              </div>
             )}
 
             {showReleaseButton && (

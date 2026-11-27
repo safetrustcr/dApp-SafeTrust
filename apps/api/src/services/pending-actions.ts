@@ -58,6 +58,19 @@ export async function expireStaleActions(engagementId: string, action: EscrowAct
   );
 }
 
+/** Moves a specific `built` row to `expired` (e.g. when request parameters changed on retry). */
+export async function expirePendingAction(id: string): Promise<void> {
+  await hasuraRequest(
+    `mutation ExpirePendingAction($id: uuid!) {
+       update_escrow_pending_actions(
+         where: { id: { _eq: $id }, status: { _eq: "built" } }
+         _set: { status: "expired" }
+       ) { affected_rows }
+     }`,
+    { id },
+  );
+}
+
 /** The live (built or submitted) row for this escrow + action, if any. */
 export async function findLiveAction(engagementId: string, action: EscrowAction): Promise<PendingAction | null> {
   const data = await hasuraRequest<{ escrow_pending_actions: PendingAction[] }>(
