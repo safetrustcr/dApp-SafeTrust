@@ -153,9 +153,13 @@ export function mapStatusToTimelineSteps(
   transactions: EscrowTransaction[] = [],
   currentStepInput?: number,
 ): TimelineStep[] {
+  const normalizedStatus = statusInput
+    ? statusInput.trim().toLowerCase().replace(/[\s_-]+/g, '_')
+    : null;
+
   const isDispute =
-    statusInput === 'disputed' ||
-    statusInput === 'resolved' ||
+    normalizedStatus === 'disputed' ||
+    normalizedStatus === 'resolved' ||
     transactions.some(
       (t) =>
         t.action === 'dispute' ||
@@ -165,30 +169,28 @@ export function mapStatusToTimelineSteps(
     );
 
   let activeStatus = 'created';
-  if (statusInput) {
-    const s = statusInput.toLowerCase().replace(/[\s_-]+/g, '_');
-    if (['pending', 'pending_signature', 'deploying', 'created'].includes(s)) {
+  if (normalizedStatus) {
+    if (['pending', 'pending_signature', 'deploying', 'created'].includes(normalizedStatus)) {
       activeStatus = 'created';
-    } else if (['paid', 'blocked', 'funded', 'active', 'payment_locked'].includes(s)) {
+    } else if (['paid', 'blocked', 'funded', 'active', 'payment_locked'].includes(normalizedStatus)) {
       activeStatus = 'payment_locked';
-    } else if (['stay_completed', 'milestone_completed'].includes(s)) {
+    } else if (['stay_completed', 'milestone_completed'].includes(normalizedStatus)) {
       activeStatus = 'stay_completed';
-    } else if (['approved', 'milestone_approved'].includes(s)) {
+    } else if (['approved', 'milestone_approved'].includes(normalizedStatus)) {
       activeStatus = 'approved';
-    } else if (['released', 'completed'].includes(s)) {
+    } else if (['released', 'completed'].includes(normalizedStatus)) {
       activeStatus = 'released';
-    } else if (s === 'disputed') {
+    } else if (normalizedStatus === 'disputed') {
       activeStatus = 'disputed';
-    } else if (s === 'resolved') {
+    } else if (normalizedStatus === 'resolved') {
       activeStatus = 'resolved';
     } else {
-      activeStatus = s;
+      activeStatus = normalizedStatus;
     }
   } else if (typeof currentStepInput === 'number') {
     if (currentStepInput <= 1) activeStatus = 'created';
     else if (currentStepInput === 2) activeStatus = 'payment_locked';
     else if (currentStepInput === 3) activeStatus = 'stay_completed';
-    else if (currentStepInput === 4) activeStatus = 'approved';
     else activeStatus = 'released';
   } else if (transactions.length > 0) {
     if (transactions.some((t) => t.action === 'resolve_dispute' || t.to_status === 'resolved')) {

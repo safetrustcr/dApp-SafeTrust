@@ -270,6 +270,20 @@ export const GET_ESCROW_DASHBOARD_STATS = gql`
   }
 `;
 
+export const GET_ESCROW_BY_APARTMENT_ID = gql`
+  query GetEscrowByApartmentId($apartment_id: uuid!) {
+    escrows(
+      where: { apartment_id: { _eq: $apartment_id } }
+      order_by: { created_at: desc }
+      limit: 1
+    ) {
+      id
+      engagement_id
+      status
+    }
+  }
+`;
+
 export const GET_ESCROW_TRANSACTIONS = gql`
   query GetEscrowTransactions($engagement_id: String!) {
     escrow_transactions(

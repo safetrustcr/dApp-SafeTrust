@@ -28,7 +28,9 @@ describe('ProcessStepper', () => {
     vi.unstubAllEnvs();
   });
 
-  const sampleDate = '2026-11-24T05:00:00.000Z';
+  // Construct in the host's local calendar so formatDate always formats as November 24, 2026
+  // across UTC and US time zones.
+  const sampleDate = new Date(2026, 10, 24, 12, 0, 0).toISOString();
   const sampleTxHash = '4ef13e4f16b2084c718b958c2876a39498d578b80b2a8d67c5e2195f087da23a';
 
   describe('Every escrow state', () => {
@@ -413,6 +415,25 @@ describe('ProcessStepper', () => {
       expect(statusToStep('paid')).toBe(2);
       expect(statusToStep('blocked')).toBe(3);
       expect(statusToStep('released')).toBe(4);
+    });
+
+    it('maps numeric currentStep={4} to Released', () => {
+      const { container } = render(<ProcessStepper currentStep={4} />);
+      const currentLi = container.querySelector('[aria-current="step"]');
+      expect(currentLi).not.toBeNull();
+      expect(currentLi?.textContent).toContain('Released');
+    });
+
+    it('normalizes capitalized Disputed and Resolved statuses without transactions', () => {
+      const disputed = render(<ProcessStepper status="Disputed" />);
+      const disputedCurrent = disputed.container.querySelector('[aria-current="step"]');
+      expect(disputedCurrent?.textContent).toContain('Disputed');
+      disputed.unmount();
+
+      const resolved = render(<ProcessStepper status="Resolved" />);
+      const resolvedCurrent = resolved.container.querySelector('[aria-current="step"]');
+      expect(resolvedCurrent?.textContent).toContain('Resolved');
+      resolved.unmount();
     });
   });
 });

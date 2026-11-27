@@ -10,6 +10,7 @@ type EscrowDetailLayoutProps = {
   children: ReactNode;
   invoiceNumber: string;
   status: EscrowDetailStatus;
+  engagementId?: string | null;
   paidAt?: string;
   notes?: string;
   defaultNotes?: string;
@@ -20,6 +21,7 @@ export function EscrowDetailLayout({
   children,
   invoiceNumber,
   status,
+  engagementId,
   paidAt,
   notes,
   defaultNotes,
@@ -33,7 +35,7 @@ export function EscrowDetailLayout({
         <main>{children}</main>
         <aside className="grid content-start gap-4 pt-4 lg:px-3">
           <NotesPanel notes={notes} defaultNotes={defaultNotes} onNotesChange={onNotesChange} />
-          <ProcessStepper status={status} />
+          <ProcessStepper status={status} engagementId={engagementId ?? undefined} />
         </aside>
       </div>
     </>

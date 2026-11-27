@@ -8,6 +8,7 @@ import { ApartmentPropertyCard } from "@/components/escrow/ApartmentPropertyCard
 import { EscrowDetailLayout } from "@/components/escrow/EscrowDetailLayout";
 import { EscrowPayFlow } from "@/components/escrow/EscrowPayFlow";
 import { GET_APARTMENT_BY_ID } from "@/graphql/queries/apartment-queries";
+import { GET_ESCROW_BY_APARTMENT_ID } from "@/graphql/queries/escrow-queries";
 
 const styles = {
   page: {
@@ -73,13 +74,23 @@ export default function EscrowCreatePage({
     GET_APARTMENT_BY_ID,
     { variables: { id } }
   );
+  const { data: escrowData } = useQuery<{
+    escrows: Array<{ id: string; engagement_id?: string | null; status?: string | null }>;
+  }>(GET_ESCROW_BY_APARTMENT_ID, {
+    variables: { apartment_id: id },
+  });
 
   const apartment = data?.apartments[0] ?? null;
   const ownerWallet = apartment ? resolveOwnerWallet(apartment) : null;
+  const engagementId = escrowData?.escrows?.[0]?.engagement_id ?? undefined;
 
   return (
     <div style={styles.page}>
-      <EscrowDetailLayout invoiceNumber="INV4257-09-012" status="pending">
+      <EscrowDetailLayout
+        invoiceNumber="INV4257-09-012"
+        status="pending"
+        engagementId={engagementId}
+      >
         <div style={{ ...styles.panel, display: "grid", gap: "1rem" }}>
           {loading && (
             <p style={styles.mutedText}>Loading property details…</p>

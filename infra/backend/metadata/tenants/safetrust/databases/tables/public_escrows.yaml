@@ -5,6 +5,23 @@ object_relationships:
   - name: apartment
     using:
       foreign_key_constraint_on: apartment_id
+array_relationships:
+  - name: sender_wallets
+    using:
+      manual_configuration:
+        remote_table:
+          name: user_wallets
+          schema: public
+        column_mapping:
+          sender_address: wallet_address
+  - name: receiver_wallets
+    using:
+      manual_configuration:
+        remote_table:
+          name: user_wallets
+          schema: public
+        column_mapping:
+          receiver_address: wallet_address
 select_permissions:
   - role: tenant
     permission:
