@@ -12,12 +12,15 @@ vi.mock('@apollo/client', async () => ({
 
 describe('EscrowDetailLayout', () => {
   beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_STELLAR_NETWORK', 'testnet');
+    vi.stubEnv('STELLAR_NETWORK_PASSPHRASE', 'Test SDF Network ; September 2015');
     query.mockReset();
     query.mockReturnValue({ data: undefined, loading: false });
   });
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllEnvs();
   });
 
   it('passes engagementId to ProcessStepper so GET_ESCROW_TRANSACTIONS is queried and renders transaction details', () => {

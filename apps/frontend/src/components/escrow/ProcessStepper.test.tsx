@@ -436,4 +436,24 @@ describe('ProcessStepper', () => {
       resolved.unmount();
     });
   });
+
+  describe('Transaction history error handling', () => {
+    it('shows an error alert with retry when GET_ESCROW_TRANSACTIONS fails', () => {
+      const refetch = vi.fn();
+      query.mockReturnValue({
+        data: undefined,
+        loading: false,
+        error: new Error('Network error'),
+        refetch,
+      });
+
+      render(<ProcessStepper engagementId="eng-1" status="funded" />);
+
+      const alert = screen.getByRole('alert');
+      expect(alert.textContent).toContain('Unable to load confirmed transaction history');
+      const retryBtn = screen.getByRole('button', { name: 'Retry' });
+      retryBtn.click();
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+  });
 });

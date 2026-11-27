@@ -362,7 +362,7 @@ export function ProcessStepper({
   engagementId,
   transactions: propTransactions,
 }: ProcessStepperProps) {
-  const { data } = useQuery<{ escrow_transactions: EscrowTransaction[] }>(
+  const { data, error, refetch } = useQuery<{ escrow_transactions: EscrowTransaction[] }>(
     GET_ESCROW_TRANSACTIONS,
     {
       variables: { engagement_id: engagementId },
@@ -370,13 +370,29 @@ export function ProcessStepper({
     },
   );
 
-  const transactions = propTransactions ?? data?.escrow_transactions ?? [];
+  const hasHistoryError = !propTransactions && Boolean(error);
+  const transactions = propTransactions ?? (hasHistoryError ? [] : data?.escrow_transactions ?? []);
   const steps = mapStatusToTimelineSteps(status, transactions, currentStep);
   const currentIndex = steps.findIndex((s) => s.isCurrent);
 
   return (
     <div className="border-t border-border pt-5">
       <h3 className="mt-0 mb-4 text-sm font-semibold text-foreground">Process</h3>
+      {hasHistoryError && (
+        <div
+          role="alert"
+          className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive flex items-center justify-between gap-2"
+        >
+          <span>Unable to load confirmed transaction history. Showing status overview only.</span>
+          <button
+            type="button"
+            onClick={() => void refetch?.()}
+            className="shrink-0 font-semibold underline hover:no-underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <ol className="grid gap-1 list-none p-0 m-0">
         {steps.map((step, index) => {
           const isCompleted = currentIndex !== -1 && index < currentIndex;

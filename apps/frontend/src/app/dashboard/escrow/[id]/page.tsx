@@ -82,13 +82,16 @@ export default function EscrowCreatePage({
 
   const apartment = data?.apartments[0] ?? null;
   const ownerWallet = apartment ? resolveOwnerWallet(apartment) : null;
-  const engagementId = escrowData?.escrows?.[0]?.engagement_id ?? undefined;
+  const escrow = escrowData?.escrows?.[0] ?? null;
+  const engagementId = escrow?.engagement_id ?? undefined;
+  const escrowStatus = escrow?.status ?? undefined;
 
   return (
     <div style={styles.page}>
       <EscrowDetailLayout
         invoiceNumber="INV4257-09-012"
         status="pending"
+        timelineStatus={escrowStatus}
         engagementId={engagementId}
       >
         <div style={{ ...styles.panel, display: "grid", gap: "1rem" }}>
