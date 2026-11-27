@@ -111,11 +111,13 @@ export async function buildEscrowAction(opts: {
   }
 
   const { path, body, payload = {} } = await opts.request(ctx);
+  // Trustless Work builder endpoints return `unsignedTransaction` per the testnet
+  // Swagger; `unsignedXdr` is accepted as a fallback for older responses.
   const result = await trustlessWorkRequest<{ unsignedXdr?: string; unsignedTransaction?: string }>(path, {
     method: 'POST',
     body,
   });
-  const unsignedXdr = result.unsignedXdr ?? result.unsignedTransaction;
+  const unsignedXdr = result.unsignedTransaction ?? result.unsignedXdr;
   if (!unsignedXdr) {
     throw new ApiError(502, 'TRUSTLESS_WORK_EMPTY_RESPONSE', 'Unable to build the transaction. Try again.', {
       retryable: true,
