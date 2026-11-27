@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { InvoiceHeader } from '@/components/escrow/InvoiceHeader';
 import { NotesPanel } from '@/components/escrow/NotesPanel';
-import { ProcessStepper } from '@/components/escrow/ProcessStepper';
+import { ProcessStepper, type ExtendedEscrowStatus } from '@/components/escrow/ProcessStepper';
 
 export type EscrowDetailStatus = 'pending' | 'paid' | 'blocked' | 'released';
 
@@ -10,6 +10,8 @@ type EscrowDetailLayoutProps = {
   children: ReactNode;
   invoiceNumber: string;
   status: EscrowDetailStatus;
+  timelineStatus?: ExtendedEscrowStatus | null;
+  engagementId?: string | null;
   paidAt?: string;
   notes?: string;
   defaultNotes?: string;
@@ -20,6 +22,8 @@ export function EscrowDetailLayout({
   children,
   invoiceNumber,
   status,
+  timelineStatus,
+  engagementId,
   paidAt,
   notes,
   defaultNotes,
@@ -33,7 +37,10 @@ export function EscrowDetailLayout({
         <main>{children}</main>
         <aside className="grid content-start gap-4 pt-4 lg:px-3">
           <NotesPanel notes={notes} defaultNotes={defaultNotes} onNotesChange={onNotesChange} />
-          <ProcessStepper status={status} />
+          <ProcessStepper
+            status={timelineStatus ?? status}
+            engagementId={engagementId ?? undefined}
+          />
         </aside>
       </div>
     </>

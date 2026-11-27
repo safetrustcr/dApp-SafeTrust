@@ -3,7 +3,120 @@
 table:
   name: escrow_transactions
   schema: public
+object_relationships:
+  - name: escrow
+    using:
+      manual_configuration:
+        remote_table:
+          name: escrows
+          schema: public
+        column_mapping:
+          engagement_id: engagement_id
 select_permissions:
+  - role: tenant
+    permission:
+      columns:
+        - id
+        - engagement_id
+        - contract_id
+        - action
+        - from_status
+        - to_status
+        - tx_hash
+        - actor_uid
+        - created_at
+        - source
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - _or:
+              - actor_uid:
+                  _eq: X-Hasura-User-Id
+              - escrow:
+                  sender_wallets:
+                    user_id:
+                      _eq: X-Hasura-User-Id
+  - role: guest
+    permission:
+      columns:
+        - id
+        - engagement_id
+        - contract_id
+        - action
+        - from_status
+        - to_status
+        - tx_hash
+        - actor_uid
+        - created_at
+        - source
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - _or:
+              - actor_uid:
+                  _eq: X-Hasura-User-Id
+              - escrow:
+                  sender_wallets:
+                    user_id:
+                      _eq: X-Hasura-User-Id
+  - role: landlord
+    permission:
+      columns:
+        - id
+        - engagement_id
+        - contract_id
+        - action
+        - from_status
+        - to_status
+        - tx_hash
+        - actor_uid
+        - created_at
+        - source
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - _or:
+              - actor_uid:
+                  _eq: X-Hasura-User-Id
+              - escrow:
+                  _or:
+                    - apartment:
+                        owner_id:
+                          _eq: X-Hasura-User-Id
+                    - receiver_wallets:
+                        user_id:
+                          _eq: X-Hasura-User-Id
+  - role: host
+    permission:
+      columns:
+        - id
+        - engagement_id
+        - contract_id
+        - action
+        - from_status
+        - to_status
+        - tx_hash
+        - actor_uid
+        - created_at
+        - source
+      filter:
+        _and:
+          - tenant_id:
+              _eq: safetrust
+          - _or:
+              - actor_uid:
+                  _eq: X-Hasura-User-Id
+              - escrow:
+                  _or:
+                    - apartment:
+                        owner_id:
+                          _eq: X-Hasura-User-Id
+                    - receiver_wallets:
+                        user_id:
+                          _eq: X-Hasura-User-Id
   - role: mcp_reader
     permission:
       columns:
