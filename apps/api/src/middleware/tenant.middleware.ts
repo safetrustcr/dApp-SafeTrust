@@ -20,7 +20,7 @@ declare global {
  *   req.tenant === 'safetrust'       → query public.apartments, public.escrows
  *   req.tenant === 'hotel_industry'  → query hotel_industry.hotels, hotel_industry.reservations
  *
- * Register globally in app.ts BEFORE route handlers:
+ * Register globally in index.ts BEFORE route handlers:
  *   app.use(tenantMiddleware);
  */
 export function tenantMiddleware(

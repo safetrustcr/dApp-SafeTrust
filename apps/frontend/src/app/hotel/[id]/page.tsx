@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
+import { canonicalApartmentRouteId } from "@/lib/stub-apartments";
 
 export default async function RemovedHotelDetailRoutePage({ params }: { params: Promise<{ id: string }> }) {
-  // Preserve old /hotel/:id links by opening the hotel booking details page.
-  const { id } = await params;
-  redirect(`/dashboard/hotel/details?hotelId=${encodeURIComponent(id)}`);
+  // The public rental detail domain is apartment. Preserve old /hotel/:id links.
+  const apartmentId = canonicalApartmentRouteId((await params).id);
+  redirect(apartmentId ? `/apartment/${apartmentId}` : "/rent");
 }

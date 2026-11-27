@@ -2,16 +2,16 @@
   "name": "dapp-safetrust",
   "private": true,
   "scripts": {
-    "dev": "turbo run dev --filter=@safetrust/web --filter=@safetrust/api",
-    "build": "turbo run build",
+    "dev": "node init && turbo run dev --filter=@safetrust/web --filter=@safetrust/api",
+    "build": "node init && turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "testnet:provision": "tsx scripts/testnet/provision.ts",
     "security:guard": "node scripts/security/repository-security-guard.mjs",
     "codegen": "turbo run codegen",
-    "dev:full": "turbo run dev",
-    "dev:mcp": "turbo run dev --filter=@safetrust/mcp"
+    "dev:full": "node init && turbo run dev",
+    "dev:mcp": "node init && turbo run dev --filter=@safetrust/mcp"
   },
   "devDependencies": {
     "@stellar/stellar-sdk": "^15.0.1",

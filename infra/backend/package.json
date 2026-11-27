@@ -5,8 +5,8 @@
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "start": "node init && node src/server.js",
+    "dev": "node init && node --watch src/server.js"
   },
   "engines": {
     "node": ">=20.13"
@@ -14,7 +14,7 @@
   "dependencies": {
     "axios": "^1.18.0",
     "dotenv": "^16.6.1",
-    "express": "^4.22.3",
+    "express": "^4.22.2",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.16.3"
   }

@@ -30,8 +30,8 @@ export async function createUserFixtures(browser: Browser): Promise<{
 }> {
   const guestSecret = process.env.E2E_GUEST_SECRET!;
   const hostSecret = process.env.E2E_HOST_SECRET!;
-  const guestEmail = process.env.E2E_GUEST_EMAIL ?? "guest@safetrust.local";
-  const hostEmail = process.env.E2E_HOST_EMAIL ?? "host@safetrust.local";
+  const guestEmail = process.env.E2E_GUEST_EMAIL ?? "guest@safetrust-e2e.test";
+  const hostEmail = process.env.E2E_HOST_EMAIL ?? "host@safetrust-e2e.test";
 
   // Separate browser contexts → separate sessions
   const guestContext = await browser.newContext();

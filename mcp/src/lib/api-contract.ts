@@ -10,7 +10,7 @@ export const API_CONTRACT = {
     method: 'POST',
     mount: '/api/escrow',
     path: '/deploy',
-    /** Identifier apps/api/src/app.ts mounts the router under. */
+    /** Identifier apps/api/src/index.ts mounts the router under. */
     router: 'deployEscrowRouter',
     /** Exactly one of apartmentId / reservationId, plus the guest wallet. */
     request: ['apartmentId', 'reservationId', 'senderAddress'],
