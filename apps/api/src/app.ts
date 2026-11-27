@@ -22,6 +22,7 @@ import messagesRouter from './routes/messages/send.route.js';
 import notificationDevicesRouter from './routes/notifications/devices.route.js';
 import syncWalletRouter from './routes/auth/sync-wallet.route.js';
 import adminUsersRouter from './routes/admin/users.route.js';
+import promoteHotelManagerRouter from './routes/admin/promote-hotel-manager.route.js';
 import reconciliationRouter from './routes/reconciliation/sync-escrows.route.js';
 import { requestIdMiddleware, errorHandler } from './http/error-middleware.js';
 import listingsRouter from './routes/listings/listings.route.js';
@@ -66,6 +67,7 @@ export function createApp(): express.Express {
   app.use('/api/auth', promoteToHostRouter);
   app.use('/api/auth', activateWalletRouter);
   app.use('/api/admin', adminUsersRouter);
+  app.use('/api/admin', promoteHotelManagerRouter);
 
   // Escrow routes
   app.use('/api/escrow', deployEscrowRouter);
