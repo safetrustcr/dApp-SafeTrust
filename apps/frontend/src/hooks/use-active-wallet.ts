@@ -102,9 +102,7 @@ export function useActiveWallet(): ActiveWallet {
   return {
     address: bridge.address ?? null,
     walletType: bridge.provider === 'wallets-kit' ? 'stellar-kit' : bridge.provider ?? null,
-    // Pollar may provision a G-address, but its SDK currently cannot return a
-    // signed XDR for SafeTrust's server-verified submission path.
-    isReady: bridge.status === 'connected' && Boolean(bridge.provider) && bridge.provider !== 'pollar',
+    isReady: bridge.status === 'connected' && Boolean(bridge.provider),
     signAndSubmit,
   };
 }

@@ -39,6 +39,7 @@ const mockKit = {
   signTransaction: vi.fn(async () => ({ signedTxXdr: 'SIGNED_TX_XDR_KIT' })),
 };
 const mockSignTransaction = vi.fn(async (..._args: unknown[]) => ({ signedTransaction: 'SIGNED_TX_XDR_FREIGHTER', signedTxXdr: 'SIGNED_TX_XDR_FREIGHTER' }));
+const mockPollarSignTx = vi.fn(async (..._args: unknown[]) => ({ status: 'signed', signedXdr: 'SIGNED_TX_XDR_POLLAR' }));
 const mockGetAuthenticatedApi = vi.fn();
 const mockAuth = {
   currentUser: { uid: 'user-123', getIdToken: vi.fn(async () => 'mock-token') } as any,
@@ -72,6 +73,10 @@ vi.mock('@/lib/firebase', () => ({
 
 vi.mock('@stellar/freighter-api', () => ({
   signTransaction: (...args: any[]) => mockSignTransaction(...args),
+}));
+
+vi.mock('@pollar/core', () => ({
+  signTx: (...args: any[]) => mockPollarSignTx(...args),
 }));
 
 import { useWalletBridge, WalletRejectedError, PollarSigningUnsupportedError } from './use-wallet-bridge';
@@ -235,14 +240,16 @@ describe('useWalletBridge', () => {
     expect(mockSignTransaction).not.toHaveBeenCalled();
   });
 
-  it('rejects Pollar without calling either signing SDK, even with other wallets connected', async () => {
+  it('signs with Pollar without calling either other signing SDK, even with other wallets connected', async () => {
     mockPollar.isAuthenticated = true;
     mockPollar.wallet.address = 'GPOLLAR';
     mockFreighter.address = 'GFREIGHTER';
     (window as any).freighterApi = {};
     const { result } = renderHook(() => useWalletBridge());
     expect(result.current.provider).toBe('pollar');
-    await expect(result.current.sign('XDR')).rejects.toThrow(PollarSigningUnsupportedError);
+    const signed = await result.current.sign('XDR');
+    expect(signed).toBe('SIGNED_TX_XDR_POLLAR');
+    expect(mockPollarSignTx).toHaveBeenCalledWith('XDR');
     expect(mockSignTransaction).not.toHaveBeenCalled();
     expect(mockKit.signTransaction).not.toHaveBeenCalled();
   });
@@ -252,7 +259,9 @@ describe('useWalletBridge', () => {
     mockStore.walletType = 'Pollar';
     mockStore.stellarWalletId = 'freighter';
     const { result } = renderHook(() => useWalletBridge());
-    await expect(result.current.sign('XDR')).rejects.toThrow(PollarSigningUnsupportedError);
+    const signed = await result.current.sign('XDR');
+    expect(signed).toBe('SIGNED_TX_XDR_POLLAR');
+    expect(mockPollarSignTx).toHaveBeenCalledWith('XDR');
     expect(mockKit.setWallet).not.toHaveBeenCalled();
     expect(mockKit.signTransaction).not.toHaveBeenCalled();
     expect(mockSignTransaction).not.toHaveBeenCalled();
@@ -282,7 +291,9 @@ describe('useWalletBridge', () => {
     expect(result.current.provider).toBe('pollar');
     expect(result.current.address).toBe('GPOLLAR');
     expect(mockStore.stellarWalletId).toBeNull();
-    await expect(result.current.sign('XDR')).rejects.toThrow(PollarSigningUnsupportedError);
+    const signed = await result.current.sign('XDR');
+    expect(signed).toBe('SIGNED_TX_XDR_POLLAR');
+    expect(mockPollarSignTx).toHaveBeenCalledWith('XDR');
     expect(mockKit.signTransaction).not.toHaveBeenCalled();
     expect(mockSignTransaction).not.toHaveBeenCalled();
   });
