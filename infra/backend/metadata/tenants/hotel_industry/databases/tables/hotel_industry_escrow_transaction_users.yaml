@@ -20,34 +20,6 @@ object_relationships:
     using:
       foreign_key_constraint_on: user_email
 select_permissions:
-  - role: tenant
-    permission:
-      columns:
-        - id
-        - user_email
-        - escrow_transaction_id
-        - role
-        - status
-        - is_primary
-        - funded_at
-        - funding_status
-        - created_at
-        - updated_at
-      filter: {}
-  - role: landlord
-    permission:
-      columns:
-        - id
-        - user_email
-        - escrow_transaction_id
-        - role
-        - status
-        - is_primary
-        - funded_at
-        - funding_status
-        - created_at
-        - updated_at
-      filter: {}
   - role: guest
     permission:
       columns:
@@ -61,7 +33,10 @@ select_permissions:
         - funding_status
         - created_at
         - updated_at
-      filter: {}
+      filter:
+        user:
+          firebase_uid:
+            _eq: X-Hasura-User-Id
   - role: host
     permission:
       columns:
@@ -75,4 +50,7 @@ select_permissions:
         - funding_status
         - created_at
         - updated_at
-      filter: {}
+      filter:
+        user:
+          firebase_uid:
+            _eq: X-Hasura-User-Id

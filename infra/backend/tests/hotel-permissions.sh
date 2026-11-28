@@ -84,11 +84,12 @@ STAFF_CROSS=$(gql hotel_staff "$UID_STAFF" 'query ($id: uuid!) { hotels_by_pk(id
   "$(jq -nc --arg id "$HOTEL_B" '{id: $id}')" | jq -r '.data.hotels_by_pk')
 [[ "$STAFF_CROSS" == "null" ]] && pass "staff cannot fetch an unassigned hotel" || fail "staff fetched hotel B"
 
-echo "▶ Roles without hotel permissions"
-for role in guest host; do
-  OUT=$(gql "$role" "$UID_A" '{ hotels { id } }')
-  if echo "$OUT" | jq -e '.errors' >/dev/null; then pass "role '$role' cannot query hotels"; else fail "role '$role' got: $OUT"; fi
-done
+echo "▶ Public guest listings"
+GUEST_IDS=$(gql guest "$UID_A" 'query ($ids: [uuid!]!) { hotels(where: { id: { _in: $ids } }) { id } }' \
+  "$(jq -nc --arg a "$HOTEL_A" --arg b "$HOTEL_B" '{ids: [$a, $b]}')" \
+  | jq -r '[.data.hotels[].id] | sort | join(",")')
+EXPECTED_GUEST_IDS=$(printf '%s\n' "$HOTEL_A" "$HOTEL_B" | sort | paste -sd, -)
+[[ "$GUEST_IDS" == "$EXPECTED_GUEST_IDS" ]] && pass "guest can browse public hotels" || fail "guest cannot browse both public hotels: $GUEST_IDS"
 
 echo "▶ Unknown user with the manager role"
 NONE=$(gql hotel_manager "not-a-hotel-user-$RUN" '{ hotels { id } }' | jq -r '.data.hotels | length')

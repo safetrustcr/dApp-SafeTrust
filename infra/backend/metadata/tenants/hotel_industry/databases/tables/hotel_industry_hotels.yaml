@@ -86,6 +86,20 @@ select_permissions:
               - role:
                   _eq: STAFF
       allow_aggregations: true
+  # Hotels have no publication flag; all hotel records are public listings.
+  - role: guest
+    permission:
+      columns:
+        - id
+        - name
+        - description
+        - address
+        - location_area
+        - coordinates
+        - created_at
+        - updated_at
+      filter: {}
+      allow_aggregations: true
   - role: mcp_reader
     permission:
       columns:

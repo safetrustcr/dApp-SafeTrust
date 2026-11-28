@@ -9,48 +9,6 @@ object_relationships:
     using:
       foreign_key_constraint_on: sender_id
 select_permissions:
-  - role: tenant
-    permission:
-      columns:
-        - id
-        - conversation_id
-        - sender_id
-        - body
-        - is_automated
-        - event_type
-        - created_at
-      filter:
-        _and:
-          - tenant_id:
-              _eq: safetrust
-          - conversation:
-              _or:
-                - host_id:
-                    _eq: X-Hasura-User-Id
-                - guest_id:
-                    _eq: X-Hasura-User-Id
-      allow_aggregations: true
-  - role: landlord
-    permission:
-      columns:
-        - id
-        - conversation_id
-        - sender_id
-        - body
-        - is_automated
-        - event_type
-        - created_at
-      filter:
-        _and:
-          - tenant_id:
-              _eq: safetrust
-          - conversation:
-              _or:
-                - host_id:
-                    _eq: X-Hasura-User-Id
-                - guest_id:
-                    _eq: X-Hasura-User-Id
-      allow_aggregations: true
   - role: guest
     permission:
       columns:

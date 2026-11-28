@@ -55,7 +55,7 @@ array_relationships:
         column_mapping:
           contract_id: contract_id
 select_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
@@ -89,7 +89,7 @@ select_permissions:
           - guest_id:
               _eq: X-Hasura-User-Id
     comment: Guests can read the escrows they are the guest on
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id
@@ -224,7 +224,7 @@ select_permissions:
                         - marker
     comment: Hosts can read the escrows they marked
 insert_permissions:
-  - role: tenant
+  - role: guest
     permission:
       check:
         _and:
@@ -285,7 +285,7 @@ insert_permissions:
         guest_id: X-Hasura-User-Id
     comment: Guests can create escrows for themselves
 update_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - status
@@ -304,7 +304,7 @@ update_permissions:
           - guest_id:
               _eq: X-Hasura-User-Id
     comment: Guests can advance the status of their own escrows
-  - role: landlord
+  - role: host
     permission:
       columns:
         - status

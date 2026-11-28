@@ -81,6 +81,22 @@ select_permissions:
                 - role:
                     _eq: STAFF
       allow_aggregations: true
+  - role: guest
+    permission:
+      columns:
+        - room_id
+        - hotel_id
+        - room_number
+        - room_type_id
+        - price_night
+        - capacity
+        - is_available
+        - created_at
+        - updated_at
+      filter:
+        is_available:
+          _eq: true
+      allow_aggregations: true
   - role: mcp_reader
     permission:
       columns:

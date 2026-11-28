@@ -6,7 +6,7 @@ object_relationships:
     using:
       foreign_key_constraint_on: apartment_id
 select_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
@@ -34,7 +34,7 @@ select_permissions:
                   _ceq:
                     - "$"
                     - sender_address
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id

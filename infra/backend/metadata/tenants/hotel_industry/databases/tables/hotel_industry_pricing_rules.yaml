@@ -13,7 +13,7 @@ configuration:
     delete: delete_pricing_rules
     delete_by_pk: delete_pricing_rules_by_pk
 select_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
@@ -32,7 +32,7 @@ select_permissions:
         - created_at
         - updated_at
       filter: {}
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id

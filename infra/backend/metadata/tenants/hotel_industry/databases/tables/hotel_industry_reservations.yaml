@@ -76,6 +76,35 @@ select_permissions:
                   - role:
                       _eq: STAFF
       allow_aggregations: true
+  - role: guest
+    permission:
+      columns:
+        - id
+        - reservation_id
+        - wallet_address
+        - room_id
+        - check_in
+        - check_out
+        - capacity
+        - reservation_status
+        - total_amount
+        - created_at
+        - updated_at
+      filter:
+        _exists:
+          _table:
+            name: users_wallets
+            schema: hotel_industry
+          _where:
+            _and:
+              - wallet_address:
+                  _ceq:
+                    - "$"
+                    - wallet_address
+              - user:
+                  firebase_uid:
+                    _eq: X-Hasura-User-Id
+      allow_aggregations: true
   - role: mcp_reader
     permission:
       columns:

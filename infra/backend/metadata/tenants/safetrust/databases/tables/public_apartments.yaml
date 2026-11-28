@@ -14,66 +14,6 @@ array_relationships:
           name: bid_requests
           schema: public
 select_permissions:
-  - role: tenant
-    permission:
-      columns:
-        - id
-        - owner_id
-        - name
-        - description
-        - price
-        - warranty_deposit
-        - coordinates
-        - address
-        - is_available
-        - available_from
-        - available_until
-        - image_urls
-        - created_at
-        - updated_at
-      filter:
-        _and:
-          - deleted_at:
-              _is_null: true
-          - is_available:
-              _eq: true
-  - role: landlord
-    permission:
-      columns:
-        - id
-        - owner_id
-        - name
-        - description
-        - price
-        - warranty_deposit
-        - coordinates
-        - address
-        - is_available
-        - available_from
-        - available_until
-        - image_urls
-        - created_at
-        - updated_at
-        - deleted_at
-      filter:
-        owner_id:
-          _eq: X-Hasura-User-Id
-  - role: mcp_reader
-    permission:
-      columns:
-        - id
-        - owner_id
-        - name
-        - price
-        - warranty_deposit
-        - is_available
-        - available_from
-        - available_until
-        - created_at
-        - updated_at
-      filter:
-        deleted_at:
-          _is_null: true
   - role: guest
     permission:
       columns:
@@ -119,9 +59,23 @@ select_permissions:
       filter:
         owner_id:
           _eq: X-Hasura-User-Id
-  # Signed-out visitors (HASURA_GRAPHQL_UNAUTHORIZED_ROLE=anonymous, #553):
-  # the public listing feed only. No owner relationship access — the listing
-  # adapter falls back to "Host" when owner is not visible.
+  - role: mcp_reader
+    permission:
+      columns:
+        - id
+        - owner_id
+        - name
+        - price
+        - warranty_deposit
+        - is_available
+        - available_from
+        - available_until
+        - created_at
+        - updated_at
+      filter:
+        deleted_at:
+          _is_null: true
+  # Signed-out visitors use the anonymous role for the public listing feed.
   - role: anonymous
     permission:
       columns:
@@ -145,3 +99,42 @@ select_permissions:
           - is_available:
               _eq: true
       allow_aggregations: true
+insert_permissions:
+  - role: host
+    permission:
+      check:
+        owner_id:
+          _eq: X-Hasura-User-Id
+      columns:
+        - owner_id
+        - name
+        - description
+        - price
+        - warranty_deposit
+        - coordinates
+        - address
+        - is_available
+        - available_from
+        - available_until
+        - image_urls
+update_permissions:
+  - role: host
+    permission:
+      columns:
+        - name
+        - description
+        - price
+        - warranty_deposit
+        - coordinates
+        - address
+        - is_available
+        - available_from
+        - available_until
+        - image_urls
+        - deleted_at
+      filter:
+        owner_id:
+          _eq: X-Hasura-User-Id
+      check:
+        owner_id:
+          _eq: X-Hasura-User-Id

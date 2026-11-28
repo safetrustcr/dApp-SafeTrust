@@ -46,22 +46,6 @@ select_permissions:
                       _eq: X-Hasura-User-Id
                   - role:
                       _eq: STAFF
-  - role: tenant
-    permission:
-      columns:
-        - id
-        - room_id
-        - image_url
-        - uploaded_at
-      filter: {}
-  - role: landlord
-    permission:
-      columns:
-        - id
-        - room_id
-        - image_url
-        - uploaded_at
-      filter: {}
   - role: guest
     permission:
       columns:
@@ -69,7 +53,10 @@ select_permissions:
         - room_id
         - image_url
         - uploaded_at
-      filter: {}
+      filter:
+        room:
+          is_available:
+            _eq: true
   - role: host
     permission:
       columns:
@@ -77,4 +64,7 @@ select_permissions:
         - room_id
         - image_url
         - uploaded_at
-      filter: {}
+      filter:
+        room:
+          is_available:
+            _eq: true

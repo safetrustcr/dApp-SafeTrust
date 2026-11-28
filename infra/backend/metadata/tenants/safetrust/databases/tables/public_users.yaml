@@ -10,7 +10,7 @@ array_relationships:
           name: user_wallets
           schema: public
 select_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - id
@@ -24,7 +24,7 @@ select_permissions:
       filter:
         id:
           _eq: X-Hasura-User-Id
-  - role: landlord
+  - role: host
     permission:
       columns:
         - id
@@ -72,7 +72,7 @@ select_permissions:
         id:
           _eq: X-Hasura-User-Id
 update_permissions:
-  - role: tenant
+  - role: guest
     permission:
       columns:
         - first_name
@@ -86,7 +86,7 @@ update_permissions:
       check:
         id:
           _eq: X-Hasura-User-Id
-  - role: landlord
+  - role: host
     permission:
       columns:
         - first_name
