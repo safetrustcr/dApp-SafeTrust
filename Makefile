@@ -5,10 +5,6 @@ TENANTS ?=
 ## infra : Start Docker infra for one or two tenants: make infra TENANTS="safetrust hotel_industry"
 infra:
 	@tenants="$$(infra/backend/bin/validate-tenants $(TENANTS))" || exit $$?; \
-	if [ "$$(echo "$$tenants" | wc -w)" -gt 1 ]; then \
-		echo "warning: combined start applies metadata per tenant; only the last tenant may stay tracked."; \
-		echo "         See docs/architecture/multi-tenant.md (#___). Run \`bin/metadata-check\` after startup."; \
-	fi; \
 	echo "Starting tenants: $$tenants"; \
 	cd infra/backend && bin/start $$tenants
 
@@ -19,15 +15,11 @@ testnet:
 ## infra-reset : Tear down volumes and restart infra: make infra-reset TENANTS=safetrust
 infra-reset:
 	@tenants="$$(infra/backend/bin/validate-tenants $(TENANTS))" || exit $$?; \
-	if [ "$$(echo "$$tenants" | wc -w)" -gt 1 ]; then \
-		echo "warning: combined start applies metadata per tenant; only the last tenant may stay tracked."; \
-		echo "         See docs/architecture/multi-tenant.md (#___). Run \`bin/metadata-check\` after startup."; \
-	fi; \
 	cd infra/backend && docker compose down -v && bin/start $$tenants
 
-## metadata-check : Verify Hasura metadata consistency
+## metadata-check : Verify Hasura metadata consistency and tracked sources
 metadata-check:
-	cd infra/backend && bin/metadata-check
+	cd infra/backend && bin/metadata-check $(TENANTS)
 
 ## stop : Stop Docker infra
 stop:
