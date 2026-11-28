@@ -82,6 +82,12 @@ Forged tokens are rejected with `401 Unauthorized`.
 
 ## Pollar wallet flow (LATAM users)
 
+Pollar is a **wallet-only** provider, not a SafeTrust identity provider. Users
+must sign in with Firebase first (email/password); Pollar is offered only after
+authentication as **"Create a wallet with Pollar"** so that `auth.currentUser`,
+the `firebase-token` cookie, and the Bearer token required by
+`POST /api/auth/activate-wallet` are always present.
+
 Users in regions where Freighter is not available use Pollar — an embedded
 Stellar wallet provisioned server-side:
 
@@ -93,7 +99,8 @@ sequenceDiagram
     participant Pollar
     participant Hasura
 
-    User->>Frontend: Click "Connect Pollar Wallet"
+    Note over User,Frontend: Prerequisite: user is signed in with Firebase
+    User->>Frontend: Click "Create a wallet with Pollar"
     Frontend->>API: POST /api/auth/activate-wallet\nBearer {idToken}
     API->>Pollar: POST /v2/wallet/activate { userId }
     Pollar-->>API: { address: "G..." }

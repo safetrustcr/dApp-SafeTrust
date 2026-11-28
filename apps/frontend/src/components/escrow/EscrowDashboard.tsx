@@ -3,9 +3,11 @@
 import { MainWalletSelectionModal } from "@/components/auth/wallet/components/MainWalletSelectionModal";
 import { MetaMaskWalletModal } from "@/components/auth/wallet/components/MetaMaskWalletModal";
 import { WalletSelectionModal } from "@/components/auth/wallet/components/WalletSelectionModal";
+import { PollarLoginButton } from "@/components/auth/pollar/PollarLoginButton";
 import { useMultiWallet } from "@/components/auth/wallet/hooks/multi-wallet.hook";
 import { Button } from "@/components/ui/button";
 import { useGlobalAuthenticationStore } from "@/core/store/data";
+import { useWalletBridge } from "@/lib/wallet/use-wallet-bridge";
 import { Wallet } from "lucide-react";
 import { RoleEscrowDashboardPage } from "@/app/dashboard/escrow-dashboard/RoleEscrowDashboardPage";
 
@@ -24,6 +26,8 @@ export function EscrowDashboard() {
     handleMetaMaskSelected,
   } = useMultiWallet();
   const { address } = useGlobalAuthenticationStore();
+  // Keeps the bridge active so Pollar addresses are committed when selected.
+  useWalletBridge();
 
   return (
     <div className="space-y-6">
@@ -37,12 +41,17 @@ export function EscrowDashboard() {
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">No wallet connected</p>
-            <Button onClick={handleConnect} className="w-fit">
-              <Wallet className="mr-2 h-4 w-4" />
-              Connect Wallet
-            </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={handleConnect} className="w-fit">
+                <Wallet className="mr-2 h-4 w-4" />
+                Connect Wallet
+              </Button>
+              <div className="w-full max-w-xs">
+                <PollarLoginButton />
+              </div>
+            </div>
           </div>
         )}
       </div>

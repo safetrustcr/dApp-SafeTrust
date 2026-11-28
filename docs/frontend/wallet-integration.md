@@ -44,6 +44,12 @@ POST /api/auth/sync-wallet
 
 ## Pollar integration
 
+Pollar is a **wallet-only** provider (not a SafeTrust identity provider). It is
+offered only after the user has signed in with Firebase, as **"Create a wallet
+with Pollar"** (both in `PollarLoginButton` and `MainWalletSelectionModal`), so
+that `auth.currentUser` and the `firebase-token` cookie are always present when
+`usePollarWalletSync` calls `POST /api/auth/activate-wallet`.
+
 Pollar provisions an embedded Stellar wallet server-side for users who
 cannot install browser extensions (mobile, restricted environments).
 
@@ -54,7 +60,8 @@ sequenceDiagram
     participant API
     participant Pollar
 
-    User->>Frontend: "Connect Pollar Wallet"
+    Note over User,Frontend: User already signed in with Firebase
+    User->>Frontend: "Create a wallet with Pollar"
     Frontend->>API: POST /api/auth/activate-wallet\nBearer {idToken}
     API->>Pollar: POST /v2/wallet/activate { userId }
     Pollar-->>API: { address: "G..." }

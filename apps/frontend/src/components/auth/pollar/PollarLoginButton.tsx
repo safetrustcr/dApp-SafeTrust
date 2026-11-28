@@ -5,6 +5,8 @@ import { usePollar } from "@pollar/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePollarWallet } from "./PollarProvider";
+import { useAuthUser } from "@/components/auth/hooks/auth.hook";
+import { useGlobalAuthenticationStore } from "@/core/store/data";
 import { GoogleIcon } from "@/components/auth/ui/GoogleIcon";
 import { Loader2, Mail } from "lucide-react";
 
@@ -12,9 +14,16 @@ type PollarLoginButtonProps = {
   onWalletReady?: (address: string) => void;
 };
 
+/**
+ * Wallet-only Pollar onboarding button (#583).
+ * Only rendered while the user has an active Firebase session so that
+ * `auth.currentUser` and a fresh ID token are available when
+ * `usePollarWalletSync` calls `/api/auth/activate-wallet`.
+ */
 export function PollarLoginButton({ onWalletReady }: PollarLoginButtonProps) {
   const { configured } = usePollarWallet();
-  if (!configured) {
+  const { user } = useAuthUser();
+  if (!configured || !user) {
     return null;
   }
 
@@ -23,6 +32,7 @@ export function PollarLoginButton({ onWalletReady }: PollarLoginButtonProps) {
 
 function PollarLoginButtonInner({ onWalletReady }: PollarLoginButtonProps) {
   const { isAuthenticated, wallet, login } = usePollar();
+  const selectWalletProvider = useGlobalAuthenticationStore((state) => state.selectWalletProvider);
   const [email, setEmail] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [showEmailInput, setShowEmailInput] = useState(false);
@@ -49,6 +59,9 @@ function PollarLoginButtonInner({ onWalletReady }: PollarLoginButtonProps) {
   const runLogin = async (provider: "google" | "email") => {
     setIsBusy(true);
     try {
+      // Select Pollar in the store before SDK login so useWalletBridge can
+      // commit the asynchronously provisioned address once it arrives.
+      selectWalletProvider("pollar");
       if (provider === "email") {
         await login({ provider: "email", email });
       } else {
@@ -73,7 +86,7 @@ function PollarLoginButtonInner({ onWalletReady }: PollarLoginButtonProps) {
         ) : (
           <GoogleIcon className="mr-2 h-4 w-4" />
         )}
-        <span>Continue with Google</span>
+        <span>Create a wallet with Pollar</span>
       </Button>
 
       {showEmailInput ? (
@@ -103,7 +116,7 @@ function PollarLoginButtonInner({ onWalletReady }: PollarLoginButtonProps) {
           className="flex items-center justify-center gap-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           <Mail className="h-3 w-3" />
-          <span>Or sign in with email OTP</span>
+          <span>Or create with email OTP</span>
         </button>
       )}
     </div>
