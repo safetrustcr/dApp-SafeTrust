@@ -1,0 +1,6 @@
+# Replay store for the Idempotency-Key header on escrow endpoints.
+# Written and read by the API with the Hasura admin secret only —
+# deliberately no client role permissions.
+table:
+  name: api_idempotency_keys
+  schema: public

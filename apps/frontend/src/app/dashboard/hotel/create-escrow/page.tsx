@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import { BookingEscrowWrapper } from "@/components/booking";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +16,6 @@ import { Label } from "@/components/ui/label";
  * In production, users would typically arrive here from the booking flow.
  */
 export default function CreateEscrowPage() {
-  const router = useRouter();
   const [bookingId, setBookingId] = useState("");
   const [showForm, setShowForm] = useState(false);
 
@@ -44,10 +42,7 @@ export default function CreateEscrowPage() {
               ← Back
             </Button>
           </div>
-          <BookingEscrowWrapper
-            bookingId={bookingId}
-            onComplete={() => router.push("/dashboard")}
-          />
+          <BookingEscrowWrapper bookingId={bookingId} />
         </div>
       </div>
     );

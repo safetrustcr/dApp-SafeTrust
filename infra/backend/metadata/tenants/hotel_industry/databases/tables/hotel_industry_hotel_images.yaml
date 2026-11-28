@@ -1,0 +1,42 @@
+table:
+  name: hotel_images
+  schema: hotel_industry
+configuration:
+  custom_root_fields:
+    select: hotel_images
+    select_by_pk: hotel_images_by_pk
+    select_aggregate: hotel_images_aggregate
+    insert: insert_hotel_images
+    insert_one: insert_hotel_images_one
+    update: update_hotel_images
+    update_by_pk: update_hotel_images_by_pk
+    delete: delete_hotel_images
+    delete_by_pk: delete_hotel_images_by_pk
+object_relationships:
+  - name: hotel
+    using:
+      foreign_key_constraint_on: hotel_id
+select_permissions:
+  - role: hotel_manager
+    permission:
+      columns: [id, hotel_id, image_url, position, uploaded_at]
+      filter:
+        hotel:
+          owner:
+            _and:
+              - firebase_uid:
+                  _eq: X-Hasura-User-Id
+              - role:
+                  _eq: MANAGER
+  - role: hotel_staff
+    permission:
+      columns: [id, hotel_id, image_url, position, uploaded_at]
+      filter:
+        hotel:
+          staff_memberships:
+            user:
+              _and:
+                - firebase_uid:
+                    _eq: X-Hasura-User-Id
+                - role:
+                    _eq: STAFF

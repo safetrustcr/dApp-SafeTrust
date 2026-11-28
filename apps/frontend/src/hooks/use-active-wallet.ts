@@ -1,67 +1,110 @@
-'use client';
+import { useCallback } from 'react';
+import { useWalletBridge } from '@/lib/wallet/use-wallet-bridge';
+import { postEscrowApi } from '@/lib/api/escrow';
 
-import { usePollar } from '@pollar/react';
-import { useWallet } from '@/components/auth/wallet/hooks/wallet.hook';
+// ---------------------------------------------------------------------------
+// E2E wallet provider (gated — never active in production builds)
+// ---------------------------------------------------------------------------
+//
+// When NEXT_PUBLIC_E2E_WALLET=true the app reads the injected window.__e2eAddress
+// and signs through window.__e2eSign, which is exposed by the Playwright process.
+// The secret key lives only in the Playwright Node.js process and never enters
+// the browser bundle.
+//
+// SAFETY: next.config.mjs must ensure that a production build (NODE_ENV=production,
+// NEXT_PUBLIC_VERCEL_ENV=production) cannot be built with E2E_WALLET=true.
+// See scripts/check-client-secrets.sh for the enforcement check.
 
-type ActiveWalletResult = {
-  address: string | null;
-  walletType: 'freighter' | 'pollar' | null;
-  isReady: boolean;
-  signAndSubmit: (unsignedXdr: string) => Promise<{ txHash: string }>;
+const IS_E2E =
+  typeof window !== 'undefined' &&
+  process.env.NEXT_PUBLIC_E2E_WALLET === 'true';
+
+type E2EWindow = Window & {
+  __e2eAddress?: string;
+  __e2eSign?: (xdr: string) => string;
+  __e2eLastSignedXDR?: string;
 };
 
-export function useActiveWallet(): ActiveWalletResult {
-  const { address: freighterAddress, signXDR } = useWallet();
-  const pollarContext = (() => {
-    try {
-      return usePollar();
-    } catch {
-      return {
-        isAuthenticated: false,
-        wallet: null,
-        getClient: () => null,
-      };
-    }
-  })();
-  const { isAuthenticated, wallet: pollarWallet, getClient } = pollarContext;
+function useE2EWallet() {
+  const win = typeof window !== 'undefined' ? (window as E2EWindow) : null;
+  const address = win?.__e2eAddress ?? null;
 
-  const pollarAddress = isAuthenticated ? pollarWallet?.address ?? null : null;
-
-  const address = freighterAddress || pollarAddress;
-  const walletType = freighterAddress ? 'freighter' : pollarAddress ? 'pollar' : null;
-
-  const signAndSubmit = async (unsignedXdr: string): Promise<{ txHash: string }> => {
-    if (walletType === 'freighter') {
-      const { signedXdr } = await signXDR(unsignedXdr);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
-      const res = await fetch(`${apiUrl}/api/escrow/send-transaction`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signedXdr }),
-      });
-
-      if (!res.ok) {
-        throw new Error('failed to submit transaction via backend');
+  const signAndSubmit = useCallback(
+    async (unsignedXDR: string): Promise<void> => {
+      if (!win?.__e2eSign) {
+        throw new Error('[e2e] window.__e2eSign is not installed — did you call wallet.install(page)?');
       }
+      const signed = win.__e2eSign(unsignedXDR);
+      // Store the last signed XDR so the idempotency test (step 9) can re-submit it.
+      win.__e2eLastSignedXDR = signed;
+      // Submit through the same server-verified path real wallets use.
+      await postEscrowApi('/api/escrow/send-transaction', { signedXdr: signed });
+    },
+    [win],
+  );
 
-      const data = await res.json();
-      return { txHash: data.transactionHash };
-    }
+  return { address, signAndSubmit };
+}
 
-    if (walletType === 'pollar') {
-      const client = getClient();
-      const built = await client.buildTx({ xdr: unsignedXdr });
-      const result = await client.signAndSubmitTx(built);
-      return { txHash: result.hash };
-    }
+export type WalletType = 'stellar-kit' | 'freighter' | 'pollar' | null;
 
-    throw new Error('no wallet connected');
-  };
+export type TransactionSubmission = {
+  /** Network returned alongside this XDR by the API that verifies it. */
+  networkPassphrase?: string;
+  contractId: string;
+  engagementId: string;
+  senderAddress: string;
+  receiverAddress: string;
+  amount?: number;
+  action?: 'initialize' | 'fund' | 'mark_milestone_completed' | 'approve_milestone' | 'release_funds' | 'dispute' | 'resolve_dispute';
+  propertyId?: string;
+  milestoneId?: string;
+  approver?: string;
+  releaseSigner?: string;
+};
+
+export type SignAndSubmit = (
+  unsignedXDR: string,
+  submission: TransactionSubmission,
+) => Promise<void>;
+
+export type ActiveWallet = {
+  address: string | null;
+  walletType: WalletType;
+  isReady: boolean;
+  signAndSubmit: SignAndSubmit;
+};
+
+/** Escrow XDR always goes through the server's pending-action verification. */
+export function useActiveWallet(): ActiveWallet {
+  const bridge = useWalletBridge();
+  const { sign } = bridge;
+  const e2e = useE2EWallet();
+  const signAndSubmit = useCallback<SignAndSubmit>(
+    async (unsignedXDR, submission) => {
+      const signedXdr = await sign(unsignedXDR, submission.networkPassphrase);
+      await postEscrowApi('/api/escrow/send-transaction', { signedXdr });
+    },
+    [sign],
+  );
+
+  // Short-circuit to the e2e provider when the flag is set.
+  // This path is only reachable in test environments — see IS_E2E guard above.
+  if (IS_E2E) {
+    return {
+      address: e2e.address,
+      walletType: 'freighter', // presented as 'freighter' so existing UI guards pass
+      isReady: Boolean(e2e.address),
+      signAndSubmit: e2e.signAndSubmit as SignAndSubmit,
+    };
+  }
 
   return {
-    address,
-    walletType,
-    isReady: !!address,
+    address: bridge.address ?? null,
+    walletType: bridge.provider === 'wallets-kit' ? 'stellar-kit' : bridge.provider ?? null,
+    // Pollar may provision a G-address, but its SDK currently cannot return a
+    // signed XDR for SafeTrust's server-verified submission path.
+    isReady: bridge.status === 'connected' && Boolean(bridge.provider) && bridge.provider !== 'pollar',
     signAndSubmit,
   };
 }

@@ -1,0 +1,104 @@
+name: E2E testnet booking (golden + dispute path)
+
+# Run nightly on the default branch and on manual dispatch only.
+# Never triggered on every PR — testnet is slow and spends faucet USDC.
+# Setup and secrets: docs/testnet-booking.md
+on:
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC every night
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to run E2E against
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+# One run at a time: the specs share one Trustless Work key (50 req / 60 s)
+# and one guest wallet balance.
+concurrency:
+  group: e2e-testnet
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: Playwright testnet booking
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    env:
+      # Shared by the API process and the specs.
+      HASURA_GRAPHQL_URL: ${{ secrets.E2E_HASURA_GRAPHQL_URL }}
+      HASURA_ADMIN_SECRET: ${{ secrets.E2E_HASURA_ADMIN_SECRET }}
+      TRUSTLESS_WORK_API_URL: https://dev.api.trustlesswork.com
+      TRUSTLESS_WORK_API_KEY: ${{ secrets.TRUSTLESS_WORK_API_KEY }}
+      PLATFORM_STELLAR_ADDRESS: ${{ secrets.E2E_PLATFORM_STELLAR_ADDRESS }}
+      USDC_TRUSTLINE_ADDRESS: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+      STELLAR_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+      STELLAR_HORIZON_URL: https://horizon-testnet.stellar.org
+      RECONCILIATION_SECRET: ${{ secrets.E2E_RECONCILIATION_SECRET }}
+      API_URL: "http://localhost:3002"
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.5.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: apps/frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start API server
+        run: pnpm --filter @safetrust/api dev &
+        env:
+          PORT: "3002"
+          FIREBASE_PROJECT_ID: ${{ secrets.E2E_FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.E2E_FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.E2E_FIREBASE_PRIVATE_KEY }}
+
+      - name: Wait for the API
+        run: timeout 90 bash -c 'until curl -sf http://localhost:3002/health; do sleep 2; done'
+
+      - name: Run testnet specs
+        working-directory: apps/frontend
+        run: pnpm test:e2e
+        env:
+          # Testnet keypairs — stored as repo secrets, never in code
+          E2E_GUEST_SECRET: ${{ secrets.E2E_GUEST_SECRET }}
+          E2E_HOST_SECRET: ${{ secrets.E2E_HOST_SECRET }}
+          E2E_PLATFORM_SECRET: ${{ secrets.E2E_PLATFORM_SECRET }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.E2E_FIREBASE_WEB_API_KEY }}
+
+      # The report carries each run's transaction table (testnet-transactions.md)
+      # with explorer links, so upload it on success too.
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: apps/frontend/playwright-report/
+          retention-days: 14
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trace-${{ github.run_id }}
+          path: apps/frontend/test-results/
+          retention-days: 7

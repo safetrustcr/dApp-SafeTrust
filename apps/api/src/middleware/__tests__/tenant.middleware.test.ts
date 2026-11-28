@@ -1,60 +1,84 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { tenantMiddleware } from '../tenant.middleware.js';
+import type { Request, Response, NextFunction } from 'express';
 
-import type { NextFunction, Request, Response } from 'express';
-
-import { tenantMiddleware, type TenantRequest } from '../tenant.middleware.js';
-
-function mockRes() {
-  const res = {
-    _status: null as number | null,
-    _body: undefined as unknown,
-    status(code: number) {
-      this._status = code;
-      return this;
-    },
-    json(payload: unknown) {
-      this._body = payload;
-      return this;
-    },
-  };
-  return res as unknown as Response & { _status: number | null; _body: unknown };
+function mockReq(headers: Record<string, string> = {}): Partial<Request> {
+  return { headers, body: {} } as Partial<Request>;
 }
 
-function mockReq(tenantHeader?: string) {
-  return { headers: tenantHeader ? { 'x-tenant-id': tenantHeader } : {} } as Request;
+function mockRes(): { status: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn>; _status: number; _body: unknown } {
+  const res = {
+    _status: 200,
+    _body: null as unknown,
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn().mockImplementation((body) => { res._body = body; return res; }),
+  };
+  res.status.mockImplementation((code: number) => { res._status = code; return res; });
+  return res;
+}
+
+function mockNext(): NextFunction {
+  return vi.fn() as unknown as NextFunction;
 }
 
 describe('tenantMiddleware', () => {
-  it('attaches the tenant from the X-Tenant-ID header and calls next', () => {
-    const req = mockReq('hotel_industry');
-    const next = vi.fn() as unknown as NextFunction;
 
-    tenantMiddleware(req, mockRes(), next);
-
-    expect(next).toHaveBeenCalledOnce();
-    expect((req as TenantRequest).tenant).toBe('hotel_industry');
-  });
-
-  it('defaults to safetrust when the header is absent', () => {
-    const req = mockReq();
-    const next = vi.fn() as unknown as NextFunction;
-
-    tenantMiddleware(req, mockRes(), next);
-
-    expect((req as TenantRequest).tenant).toBe('safetrust');
-    expect(next).toHaveBeenCalledOnce();
-  });
-
-  it('400s on an invalid tenant id', () => {
+  it('defaults to safetrust when X-Tenant-ID header is absent', () => {
+    const req = mockReq({});
     const res = mockRes();
-    const next = vi.fn() as unknown as NextFunction;
+    const next = mockNext();
 
-    tenantMiddleware(mockReq('not-a-tenant'), res, next);
+    tenantMiddleware(req as Request, res as unknown as Response, next);
+
+    expect((req as Request).tenant).toBe('safetrust');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('sets req.tenant to safetrust when header is safetrust', () => {
+    const req = mockReq({ 'x-tenant-id': 'safetrust' });
+    const res = mockRes();
+    const next = mockNext();
+
+    tenantMiddleware(req as Request, res as unknown as Response, next);
+
+    expect((req as Request).tenant).toBe('safetrust');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('sets req.tenant to hotel_industry when header is hotel_industry', () => {
+    const req = mockReq({ 'x-tenant-id': 'hotel_industry' });
+    const res = mockRes();
+    const next = mockNext();
+
+    tenantMiddleware(req as Request, res as unknown as Response, next);
+
+    expect((req as Request).tenant).toBe('hotel_industry');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('returns 400 for an invalid tenant value', () => {
+    const req = mockReq({ 'x-tenant-id': 'invalid_tenant' });
+    const res = mockRes();
+    const next = mockNext();
+
+    tenantMiddleware(req as Request, res as unknown as Response, next);
 
     expect(res._status).toBe(400);
-    expect(res._body).toEqual({
-      error: 'Invalid X-Tenant-ID. Must be one of: safetrust, hotel_industry',
+    expect(res._body).toMatchObject({
+      error: 'Invalid X-Tenant-ID',
+      received: 'invalid_tenant',
     });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for empty string tenant value', () => {
+    const req = mockReq({ 'x-tenant-id': '' });
+    const res = mockRes();
+    const next = mockNext();
+
+    tenantMiddleware(req as Request, res as unknown as Response, next);
+
+    expect(res._status).toBe(400);
     expect(next).not.toHaveBeenCalled();
   });
 });

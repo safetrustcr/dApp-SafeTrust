@@ -135,6 +135,18 @@ describe("toListingFromApartment", () => {
     ).toBeUndefined();
   });
 
+  it("surfaces owner_id for the message-host flow, undefined when absent", () => {
+    expect(toListingFromApartment(APARTMENT_ROW).ownerId).toBe(
+      "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7X2BC",
+    );
+    expect(
+      toListingFromApartment({ ...APARTMENT_ROW, owner_id: null }).ownerId,
+    ).toBeUndefined();
+    expect(
+      toListingFromApartment({ ...APARTMENT_ROW, owner_id: "  " }).ownerId,
+    ).toBeUndefined();
+  });
+
   it("normalises images: null → [], blank/non-string entries dropped", () => {
     expect(toListingFromApartment({ ...APARTMENT_ROW, image_urls: null }).images).toEqual([]);
     expect(
@@ -210,6 +222,7 @@ describe("toListingFromHotel", () => {
     expect(listing.images).toEqual([]);
     expect(listing.deposit).toBeUndefined();
     expect(listing.hostName).toBeUndefined();
+    expect(listing.ownerId).toBeUndefined();
     expect(listing.province).toBeUndefined();
   });
 

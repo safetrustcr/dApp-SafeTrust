@@ -1,15 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  IconButton,
-} from "@chakra-ui/react";
+import React from "react";
 import { HiDotsVertical } from "react-icons/hi";
-import { Apartment } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Apartment } from "../../types/types";
 
 interface Props {
   apartment: Apartment;
@@ -24,8 +23,6 @@ export default function ApartmentActionsMenu({
   onDelete,
   onView,
 }: Props) {
-  const [isOpen, setIsOpen] = useState(false);
-
   const handleView = () => {
     if (onView) onView(apartment);
   };
@@ -39,20 +36,32 @@ export default function ApartmentActionsMenu({
   };
 
   return (
-    <Menu isOpen={isOpen} onClose={() => setIsOpen(false)}>
-      <MenuButton
-        as={IconButton}
-        icon={<HiDotsVertical />}
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsOpen(!isOpen)}
-        aria-label="Apartment actions"
-      />
-      <MenuList>
-        {onView && <MenuItem onClick={handleView}>View</MenuItem>}
-        {onEdit && <MenuItem onClick={handleEdit}>Edit</MenuItem>}
-        {onDelete && <MenuItem onClick={handleDelete}>Delete</MenuItem>}
-      </MenuList>
-    </Menu>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Apartment actions"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 32,
+            height: 32,
+            border: "none",
+            borderRadius: 6,
+            background: "transparent",
+            cursor: "pointer",
+            color: "#2D3748",
+          }}
+        >
+          <HiDotsVertical size={18} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" style={{ minWidth: 140 }}>
+        {onView && <DropdownMenuItem onSelect={handleView}>View</DropdownMenuItem>}
+        {onEdit && <DropdownMenuItem onSelect={handleEdit}>Edit</DropdownMenuItem>}
+        {onDelete && <DropdownMenuItem onSelect={handleDelete}>Delete</DropdownMenuItem>}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

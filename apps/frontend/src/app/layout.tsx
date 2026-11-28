@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { TrustlessWorkProvider } from "@/providers/TrustlessWorkProvider";
-import { Toaster } from "@/components/ui/sonner"
+import { Toaster } from "@/components/ui/sonner";
+import { HasuraDownBanner } from "@/components/ui/HasuraDownBanner";
+import { LazyMotionProvider } from "@/components/ui/LazyMotionProvider";
 
 // @ts-ignore: allow side-effect import of global css
 import "./globals.css";
@@ -14,6 +15,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "SafeTrust",
   description: "Decentralized P2P Escrow on Stellar Blockchain",
+  icons: {
+    icon: "/img/logo.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,12 +25,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <ClientProviders>
-            <TrustlessWorkProvider>
+          <LazyMotionProvider>
+            <ClientProviders>
               {children}
               <Toaster richColors position="top-right" />
-            </TrustlessWorkProvider>
-          </ClientProviders>
+              {process.env.NODE_ENV !== "production" && <HasuraDownBanner />}
+            </ClientProviders>
+          </LazyMotionProvider>
         </ThemeProvider>
       </body>
     </html>

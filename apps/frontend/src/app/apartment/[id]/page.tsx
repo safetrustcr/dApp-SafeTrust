@@ -5,14 +5,22 @@
 // Fields the API doesn't have (bedrooms, bathrooms, pets, amenities,
 // description…) stay hidden — never invented. The gallery shows real
 // image_urls or an honest "No photos" placeholder.
+//
+// Message-host flow preserved from main (upstream), rewired from the stub
+// owner id to the listing's real owner_id: without an owner id the button
+// stays hidden — never a stub fallback.
 
 "use client";
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import type { CSSProperties } from "react";
+import { notFound, useRouter } from "next/navigation";
+import { use, useState, type CSSProperties } from "react";
+import { toast } from "sonner";
 
+import { useAuthUser } from "@/components/auth/hooks/auth.hook";
+import { MakeOfferSection } from "@/components/apartments/MakeOfferSection";
 import { useListing } from "@/features/listings/use-listings";
+import { startConversation } from "@/lib/api/messages";
 
 const styles = {
   page: {
@@ -63,6 +71,10 @@ const styles = {
     gap: "1rem",
     marginBottom: "1rem",
   } satisfies CSSProperties,
+  actions: {
+    display: "flex",
+    gap: "0.5rem",
+  } satisfies CSSProperties,
   button: {
     display: "inline-block",
     backgroundColor: "#f97316",
@@ -70,6 +82,16 @@ const styles = {
     fontWeight: 700,
     padding: "0.75rem 1.5rem",
     borderRadius: "0.75rem",
+  } satisfies CSSProperties,
+  messageButton: {
+    display: "inline-block",
+    backgroundColor: "#ffffff",
+    color: "#f97316",
+    fontWeight: 700,
+    padding: "0.75rem 1.5rem",
+    borderRadius: "0.75rem",
+    border: "2px solid #f97316",
+    cursor: "pointer",
   } satisfies CSSProperties,
   metaRow: {
     display: "flex",
@@ -99,9 +121,13 @@ function formatAmount(amount: number): string {
 export default function ApartmentDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const listing = useListing("apartment", params.id);
+  const { id } = use(params);
+  const listing = useListing("apartment", id);
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuthUser();
+  const [isMessaging, setIsMessaging] = useState(false);
 
   if (listing.status === "not_found") {
     notFound();
@@ -139,6 +165,39 @@ export default function ApartmentDetailPage({
 
   const apartment = listing.item;
   const [mainImage, ...restImages] = apartment.images;
+  const isOwner =
+    user != null && apartment.ownerId != null && apartment.ownerId === user.uid;
+  const canMessageHost =
+    !authLoading && !isOwner && typeof apartment.ownerId === "string";
+
+  const handleMessageHost = async () => {
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.href)}`);
+      return;
+    }
+
+    if (isOwner) {
+      return;
+    }
+
+    setIsMessaging(true);
+
+    try {
+      const response = await startConversation(apartment.id);
+      router.push(`/dashboard/messages/${response.conversationId}`);
+    } catch (error) {
+      console.error("Failed to start conversation:", error);
+      toast.error("Failed to start conversation", {
+        description: "Please try again",
+        action: {
+          label: "Retry",
+          onClick: handleMessageHost,
+        },
+      });
+    } finally {
+      setIsMessaging(false);
+    }
+  };
 
   return (
     <div style={styles.page}>
@@ -187,12 +246,27 @@ export default function ApartmentDetailPage({
             </p>
           </div>
 
-          <Link
-            href={`/apartment/${params.id}/escrow/create`}
-            style={styles.button}
-          >
-            BOOK
-          </Link>
+          <div style={styles.actions}>
+            <Link
+              href={`/apartment/${id}/escrow/create`}
+              style={styles.button}
+            >
+              BOOK
+            </Link>
+            {canMessageHost && (
+              <button
+                onClick={handleMessageHost}
+                disabled={isMessaging}
+                style={{
+                  ...styles.messageButton,
+                  opacity: isMessaging ? 0.5 : 1,
+                  cursor: isMessaging ? "not-allowed" : "pointer",
+                }}
+              >
+                {isMessaging ? "Loading..." : "Message host"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div
@@ -214,6 +288,14 @@ export default function ApartmentDetailPage({
             {apartment.hostName ? `Host: ${apartment.hostName}` : "Host"}
           </p>
         </div>
+
+        <MakeOfferSection
+          apartmentId={apartment.id}
+          defaultPrice={apartment.price.amount}
+          isOwner={isOwner}
+          isAuthenticated={Boolean(user)}
+          authLoading={authLoading}
+        />
       </main>
     </div>
   );

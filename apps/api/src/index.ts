@@ -1,61 +1,21 @@
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import { tenantMiddleware } from './middleware/tenant.middleware.js';
-import authRouter from './routes/auth/sync-user.route.js';
-import promoteToHostRouter from './routes/auth/promote-to-host.route.js';
-import activateWalletRouter from './routes/auth/activate-wallet.route.js';
-import deployEscrowRouter from './routes/escrow/deploy.route.js';
-import fundEscrowRouter from './routes/escrow/fund.route.js';
-import milestoneStatusRouter from './routes/escrow/milestone-status.route.js';
-import releaseFundsRouter from './routes/escrow/release-funds.route.js';
-import recoverFromTxhashRouter from './routes/escrow/recover-from-txhash.route.js';
-import sendTransactionRouter from './routes/escrow/send-transaction.route.js';
-import statusStreamRouter from './routes/escrow/status-stream.route.js';
-import messagesRouter from './routes/messages/send.route.js';
+import './config/env.js';
+import { createApp } from './app.js';
+import { initFirebaseAdmin } from './lib/firebase-admin.js';
 
-const app = express();
+initFirebaseAdmin();
+
+const app = createApp();
 const PORT = process.env.PORT || 3002;
 
-// CORS configuration - restrict to trusted frontend origins
-const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(',')
-  : ['http://localhost:3001'];
-
-app.use(cors({
-  origin: allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-}));
-app.use(express.json());
-app.use(tenantMiddleware);
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+const server = app.listen(PORT, () => {
+  console.log(`[api] Server running on http://localhost:${PORT}`);
 });
 
-// Auth routes
-app.use('/api/auth', authRouter);
-app.use('/api/auth', promoteToHostRouter);
-app.use('/api/auth', activateWalletRouter);
-
-// Escrow routes
-app.use('/api/escrow', deployEscrowRouter);
-app.use('/api/escrow', fundEscrowRouter);
-app.use('/api/escrow', milestoneStatusRouter);
-app.use('/api/escrow', releaseFundsRouter);
-app.use('/api/escrow', recoverFromTxhashRouter);
-app.use('/api/escrow', sendTransactionRouter);
-app.use('/api/escrow', statusStreamRouter);
-
-// Messages routes (router registered when available)
-app.use('/api/messages', messagesRouter);
-
-// Messages routes
-app.use('/api/messages', messagesRouter);
-
-app.listen(PORT, () => {
-  console.log(`[api] Server running on http://localhost:${PORT}`);
+server.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`[api] Port ${PORT} is already occupied. Stop the existing API before restarting. Run one dev stack: pnpm dev.`);
+  } else {
+    console.error('[api] Server could not start:', error.message);
+  }
+  process.exitCode = 1;
 });

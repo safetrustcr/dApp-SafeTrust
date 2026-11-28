@@ -1,16 +1,16 @@
 'use client';
 
-import { useSubscription, useMutation } from '@apollo/client';
+import { useSubscription, useMutation } from '@apollo/client/react';
 import { useEffect, useRef } from 'react';
 import { useAuthUser } from '@/components/auth/hooks/auth.hook';
 import {
   SUBSCRIBE_CONVERSATION_MESSAGES,
   MARK_MESSAGES_READ,
 } from '@/graphql/queries/messages-queries';
+import { markRead as markReadApi } from '@/lib/api/messages';
 import { MessageBubble } from './MessageBubble';
 import { AutomatedEventMessage } from './AutomatedEventMessage';
 import { MessageComposer } from './MessageComposer';
-import type { CSSProperties } from 'react';
 
 type Message = {
   id: string;
@@ -33,7 +33,7 @@ const styles = {
     flexDirection: 'column' as const,
     height: '100%',
     maxHeight: 'calc(100vh - 12rem)',
-  } satisfies CSSProperties,
+  },
   messageList: {
     flex: 1,
     overflowY: 'auto' as const,
@@ -41,7 +41,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '0.75rem',
-  } satisfies CSSProperties,
+  },
 } as const;
 
 export function ConversationThread({
@@ -60,8 +60,11 @@ export function ConversationThread({
 
   // Mark messages as read when thread opens
   useEffect(() => {
-    if (user?.uid) {
-      markRead({ variables: { conversationId, userId: user.uid } });
+    if (user?.uid && conversationId) {
+      markReadApi(conversationId).catch((err) => {
+        console.error('Failed to mark conversation read via API:', err);
+      });
+      markRead({ variables: { conversationId, userId: user.uid } }).catch(() => {});
     }
   }, [conversationId, user?.uid, markRead]);
 

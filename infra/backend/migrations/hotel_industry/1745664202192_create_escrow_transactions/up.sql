@@ -1,25 +1,22 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-CREATE TABLE escrow_transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    -- Foreign key relationships will be added later when related tables are ready
-    reservation_id UUID,
-    contract_id TEXT UNIQUE, 
-    escrow_status VARCHAR(200) DEFAULT 'PENDING',
-    signer_address VARCHAR(200),
-    transaction_type VARCHAR(150),
-    escrow_transaction_type VARCHAR(150),
-    http_status_code INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS hotel_industry.escrow_transactions (
+    id                       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reservation_id           UUID REFERENCES hotel_industry.reservations(id) ON DELETE RESTRICT,
+    contract_id              TEXT UNIQUE,
+    escrow_status            VARCHAR(200) NOT NULL DEFAULT 'PENDING',
+    signer_address           VARCHAR(200),
+    transaction_type         VARCHAR(150),
+    escrow_transaction_type  VARCHAR(150),
+    http_status_code         INTEGER,
+    escrow_payload           JSONB,
+    created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_escrow_transactions_reservation ON escrow_transactions(reservation_id);
-CREATE INDEX idx_escrow_transactions_status ON escrow_transactions(escrow_status);
-CREATE INDEX idx_escrow_transactions_type ON escrow_transactions(transaction_type);
-CREATE INDEX idx_escrow_transactions_created_at ON escrow_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_escrow_transactions_reservation ON hotel_industry.escrow_transactions (reservation_id);
+CREATE INDEX IF NOT EXISTS idx_escrow_transactions_status      ON hotel_industry.escrow_transactions (escrow_status);
+CREATE INDEX IF NOT EXISTS idx_escrow_transactions_type        ON hotel_industry.escrow_transactions (transaction_type);
+CREATE INDEX IF NOT EXISTS idx_escrow_transactions_created_at  ON hotel_industry.escrow_transactions (created_at);
 
-ALTER TABLE escrow_transactions ADD CONSTRAINT fk_reservation FOREIGN KEY (reservation_id) REFERENCES reservations(id);
-
-ALTER TABLE escrow_transactions
-ADD COLUMN escrow_payload JSONB;
+CREATE TRIGGER escrow_transactions_set_updated_at
+  BEFORE UPDATE ON hotel_industry.escrow_transactions
+  FOR EACH ROW EXECUTE FUNCTION hotel_industry.set_updated_at();

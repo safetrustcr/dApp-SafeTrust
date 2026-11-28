@@ -38,6 +38,11 @@ export type ListingView = {
   province?: string;
   /** Undefined when the owner isn't resolvable — the UI falls back to "Host". */
   hostName?: string;
+  /**
+   * Auth uid of the owner (apartments only — hotels have no owner source).
+   * Drives the message-host flow: without it, messaging actions stay hidden.
+   */
+  ownerId?: string;
 };
 
 // ── Source row types ─────────────────────────────────────────────────────────

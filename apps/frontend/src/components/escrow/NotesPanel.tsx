@@ -4,24 +4,23 @@ import type { CSSProperties } from 'react';
 
 const styles = {
   panel: {
-    border: '1px solid #fed7aa',
-    borderRadius: '1rem',
-    backgroundColor: '#ffffff',
-    padding: '1.5rem',
+    backgroundColor: 'transparent',
+    padding: 0,
   } satisfies CSSProperties,
   label: {
     display: 'block',
-    marginBottom: '0.5rem',
-    fontWeight: 600,
+    marginBottom: '0.6rem',
+    fontWeight: 700,
+    fontSize: '0.85rem',
   } satisfies CSSProperties,
   input: {
     width: '100%',
     border: '1px solid #d1d5db',
-    borderRadius: '0.75rem',
-    padding: '0.75rem',
+    borderRadius: '0.2rem',
+    padding: '0.7rem',
     font: 'inherit',
     resize: 'vertical',
-    minHeight: '6rem',
+    minHeight: '5.15rem',
   } satisfies CSSProperties,
 } as const;
 

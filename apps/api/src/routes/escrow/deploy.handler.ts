@@ -1,122 +1,217 @@
-import { Request, Response } from 'express';
-import { trustlessWorkRequest, TrustlessWorkRequestError, getErrorMessages } from '../../services/trustlesswork.js';
-import crypto from 'node:crypto';
+import type { Request, Response } from 'express';
+import { checkIdempotency, findRentalEscrowForUser } from '../../services/idempotency.js';
+import { hasuraRequest } from '../../services/hasura.js';
+import { trustlessWorkRequest } from '../../services/trustlesswork.js';
+import { ApiError } from '../../http/api-error.js';
+import { asyncHandler } from '../../http/async-handler.js';
+import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
+import { findLiveAction, insertPendingAction } from '../../services/pending-actions.js';
+import { transactionExpiry, transactionHash, NETWORK_PASSPHRASE } from '../../lib/stellar-xdr.js';
+import { requireEscrowStellarConfig } from '../../lib/escrow-config.js';
+import { toBookingReference, resolveBookingEscrowTerms } from '../../services/booking-escrow-terms.js';
 
 type DeployRequestBody = {
   apartmentId?: string;
+  reservationId?: string;
+  /** The connected wallet chosen by the guest. It must already belong to them. */
   senderAddress?: string;
-  receiverAddress?: string;
-  amount?: number;
-};
-
-type InitializeSingleReleaseEscrowResponse = {
-  status: 'SUCCESS' | 'FAILED';
-  contractId: string;
-  unsignedTransaction?: string;
-  message: string;
 };
 
 type DeployResponse = {
   status: string;
-  contractId: string;
+  contractId?: string;
   unsignedXDR: string;
-  message: string;
+  networkPassphrase?: string;
   engagementId: string;
+  pendingActionId?: string;
+  cached?: boolean;
 };
 
-export const deployEscrowHandler = async (
-  req: Request<{}, DeployResponse | { error: string; payload?: unknown; messages?: string[] }, DeployRequestBody>,
-  res: Response<DeployResponse | { error: string; payload?: unknown; messages?: string[] }>
-): Promise<Response> => {
+// Trustless Work testnet Swagger (https://dev.api.trustlesswork.com) checked for
+// POST /deployer/single-release. The `trustline` object is { symbol, address }
+// and the response returns the unsigned XDR in `unsignedTransaction`.
+// Verified against the Swagger schema as of 2025-01 (verify again on next bump).
+
+export const deployEscrowHandler = asyncHandler(async (
+  req: AuthenticatedRequest & Request<Record<string, never>, DeployResponse | { error: string }, DeployRequestBody>,
+  res: Response<DeployResponse | { error: string }>,
+) => {
+  const { senderAddress } = req.body;
+  const uid = req.user?.uid;
+
+  if (!senderAddress) {
+    res.status(400).json({
+      error: 'Provide exactly one apartmentId or reservationId, and senderAddress',
+    });
+    return;
+  }
+
+  let bookingRef;
   try {
-    const { apartmentId, senderAddress, receiverAddress, amount } = req.body || {};
+    bookingRef = toBookingReference(req.body);
+  } catch {
+    res.status(400).json({
+      error: 'Provide exactly one apartmentId or reservationId, and senderAddress',
+    });
+    return;
+  }
 
-    if (!apartmentId || !senderAddress || !receiverAddress) {
-      return res.status(400).json({
-        error: 'Missing required escrow deployment fields.',
+  if (!uid) {
+    throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in first.');
+  }
+
+  const terms = await resolveBookingEscrowTerms(bookingRef, uid, senderAddress);
+  let resolvedEngagementId = terms.engagementId;
+  const propertyId = terms.bookingId;
+  const tenantId = terms.tenantId;
+
+  // ── Idempotency check ──────────────────────────────────────────────────
+  let idempotencyResult = await checkIdempotency(resolvedEngagementId);
+  // An escrow created under an older engagement id (any casing of the apartment
+  // UUID) is still the same booking: resume it instead of opening a second one.
+  if (!idempotencyResult.exists && bookingRef.kind === 'apartment') {
+    idempotencyResult = await findRentalEscrowForUser(terms.bookingId, uid);
+    if (idempotencyResult.exists) resolvedEngagementId = idempotencyResult.result.engagement_id;
+  }
+
+  if (idempotencyResult.exists) {
+    const pending = await findLiveAction(resolvedEngagementId, 'initialize');
+    if (pending?.status === 'built') {
+      res.status(200).json({
+        status: 'PENDING_SIGNATURE',
+        engagementId: resolvedEngagementId,
+        contractId: pending.contract_id ?? undefined,
+        unsignedXDR: pending.unsigned_xdr,
+        networkPassphrase: NETWORK_PASSPHRASE,
+        pendingActionId: pending.id,
+        cached: true,
       });
+      return;
     }
+    console.log(
+      `[escrow/deploy] idempotent hit — engagementId: ${resolvedEngagementId}, ` +
+      `contractId: ${idempotencyResult.result.contract_id}`,
+    );
+    res.status(200).json({
+      status: 'CACHED',
+      engagementId: resolvedEngagementId,
+      contractId: idempotencyResult.result.contract_id ?? undefined,
+      unsignedXDR: '',
+      cached: true,
+    });
+    return;
+  }
+  // ── End idempotency check ──────────────────────────────────────────────
 
-    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({
-        error: 'Invalid amount: must be a positive number.',
-      });
-    }
+  const { platformAddress, usdcIssuer } = requireEscrowStellarConfig();
 
-    const engagementId = crypto.randomUUID();
-
-    const platformAddress = process.env.PLATFORM_STELLAR_ADDRESS || process.env.NEXT_PUBLIC_PLATFORM_ADDRESS;
-    const trustlineAddress = process.env.USDC_TRUSTLINE_ADDRESS || process.env.NEXT_PUBLIC_USDC_ADDRESS;
-
-    if (!platformAddress) {
-      return res.status(500).json({
-        error: 'Missing platform address for escrow role configuration.',
-      });
-    }
-
-    if (!trustlineAddress) {
-      return res.status(500).json({
-        error: 'Missing trustline address for escrow configuration.',
-      });
-    }
-
-    const payload = {
+  // trustlessWorkRequest throws TrustlessWorkRequestError on failure —
+  // errorMiddleware maps those automatically; no catch needed here.
+  const twData = await trustlessWorkRequest<{
+    status: string;
+    contractId?: string;
+    unsignedTransaction?: string;
+    message?: string;
+  }>('/deployer/single-release', {
+    method: 'POST',
+    body: {
+      engagementId: resolvedEngagementId,
+      title: terms.title,
+      description: terms.description,
       signer: senderAddress,
-      engagementId,
-      title: `Security deposit for apartment ${apartmentId}`,
-      description: `Security deposit escrow for apartment ${apartmentId}`,
-      amount,
+      amount: terms.amount,
       platformFee: 0,
       roles: {
         approver: senderAddress,
-        serviceProvider: receiverAddress,
+        serviceProvider: terms.receiverAddress,
+        receiver: terms.receiverAddress,
         platformAddress,
-        releaseSigner: platformAddress,
+        releaseSigner: senderAddress,
         disputeResolver: platformAddress,
-        receiver: receiverAddress,
       },
+      milestones: [{ description: terms.milestoneDescription }],
       trustline: {
         symbol: 'USDC',
-        address: trustlineAddress,
+        address: usdcIssuer,
       },
-      milestones: [{ description: `Release security deposit for apartment ${apartmentId}` }],
-    };
+    },
+  });
 
-    const result = await trustlessWorkRequest<InitializeSingleReleaseEscrowResponse>(
-      '/deployer/single-release',
-      {
-        method: 'POST',
-        body: payload,
-      },
-    );
-
-    if (result.status !== 'SUCCESS' || !result.unsignedTransaction) {
-      return res.status(502).json({
-        error: result.message ?? 'TrustlessWork escrow deploy failed.',
-        payload: result,
-      });
-    }
-
-    return res.status(200).json({
-      status: result.status,
-      contractId: result.contractId,
-      unsignedXDR: result.unsignedTransaction,
-      message: result.message,
-      engagementId,
-    });
-  } catch (error) {
-    if (error instanceof TrustlessWorkRequestError) {
-      return res.status(error.statusCode).json({
-        error: error.message,
-        messages: error.messages,
-        payload: error.payload,
-      });
-    }
-
-    const messages = getErrorMessages(error, 'Failed to deploy escrow.');
-    return res.status(500).json({
-      error: messages[0],
-      messages,
-    });
+  const unsignedXdr = twData.unsignedTransaction ?? '';
+  let txHash: string;
+  let expiresAt: Date;
+  try {
+    txHash = transactionHash(unsignedXdr);
+    expiresAt = transactionExpiry(unsignedXdr);
+  } catch {
+    throw new ApiError(502, 'TRUSTLESS_WORK_INVALID_XDR', 'The escrow provider returned an unreadable transaction.', { retryable: true });
   }
-};
+
+  // Persist pending escrow to DB — HasuraRequestError thrown on failure,
+  // errorMiddleware maps it to DATABASE_ERROR automatically.
+  await hasuraRequest(
+    `mutation InsertEscrow(
+      $contractId: String!
+      $engagementId: String!
+      $apartmentId: uuid
+      $propertyId: String!
+      $tenantId: String!
+      $senderAddress: String!
+      $receiverAddress: String!
+      $amount: numeric!
+      $unsignedXdr: String
+    ) {
+      insert_escrows_one(object: {
+        contract_id: $contractId
+        engagement_id: $engagementId
+        apartment_id: $apartmentId
+        property_id: $propertyId
+        sender_address: $senderAddress
+        receiver_address: $receiverAddress
+        amount: $amount
+        status: "pending_signature"
+        unsigned_xdr: $unsignedXdr
+        tenant_id: $tenantId
+      }) { id }
+    }`,
+    {
+      contractId: twData.contractId ?? resolvedEngagementId,
+      engagementId: resolvedEngagementId,
+      apartmentId: bookingRef.kind === 'apartment' ? terms.bookingId : null,
+      propertyId,
+      tenantId,
+      senderAddress,
+      receiverAddress: terms.receiverAddress,
+      amount: terms.amount,
+      unsignedXdr: twData.unsignedTransaction ?? '',
+    },
+  );
+
+  const pendingAction = await insertPendingAction({
+    engagement_id: resolvedEngagementId,
+    contract_id: twData.contractId ?? null,
+    action: 'initialize',
+    tx_hash: txHash,
+    unsigned_xdr: unsignedXdr,
+    built_for_uid: uid,
+    signer_address: senderAddress,
+    payload: {
+      ...(bookingRef.kind === 'apartment' ? { apartmentId: terms.bookingId } : {}),
+      tenantId,
+      ...(bookingRef.kind === 'hotel-reservation' ? { reservationId: bookingRef.reservationId, booking: terms.reservation } : {}),
+      receiverAddress: terms.receiverAddress,
+      amount: terms.amount,
+      releaser: senderAddress,
+    },
+    expires_at: expiresAt,
+  });
+
+  res.status(200).json({
+    status: twData.status,
+    contractId: twData.contractId,
+    unsignedXDR: unsignedXdr,
+    networkPassphrase: NETWORK_PASSPHRASE,
+    engagementId: resolvedEngagementId,
+    pendingActionId: pendingAction.id,
+  });
+});

@@ -6,10 +6,11 @@ import { useQuery, useMutation } from "@apollo/client";
 import { toast } from "sonner";
 import {
   Plus, Search, Home, MapPin, DollarSign,
-  Trash2, Eye,
+  Trash2, Eye, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Image } from "@/components/ui/image";
 import {
   Table, TableBody, TableCell,
   TableHead, TableHeader, TableRow,
@@ -221,14 +222,12 @@ export function MyApartmentsTable() {
                       {/* Image thumbnail */}
                       <div className="w-10 h-10 rounded-md overflow-hidden bg-muted shrink-0 border border-border">
                         {apt.image_urls && apt.image_urls.length > 0 ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <Image
                             src={apt.image_urls[0]}
                             alt={apt.name}
+                            width={40}
+                            height={40}
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = "none";
-                            }}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -277,6 +276,14 @@ export function MyApartmentsTable() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        title="View offers"
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        onClick={() => router.push(`/dashboard/apartments/${apt.id}/offers`)}
+                      >
+                        <Users className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         title="View details"

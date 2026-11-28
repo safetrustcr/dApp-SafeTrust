@@ -24,3 +24,17 @@ select_permissions:
         - name
         - description
       filter: {}
+  - role: guest
+    permission:
+      columns:
+        - id
+        - name
+        - description
+      filter: {}
+  - role: host
+    permission:
+      columns:
+        - id
+        - name
+        - description
+      filter: {}

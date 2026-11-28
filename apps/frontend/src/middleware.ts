@@ -18,8 +18,10 @@ const HOST_ONLY_ROUTES = [
   '/dashboard/apartments',
   '/dashboard/escrow-dashboard',
   '/dashboard/manager',
-  '/dashboard/users',
 ];
+
+/** The controller workspace is limited to the system administrator. */
+const ADMIN_ONLY_ROUTES = ['/dashboard/users'];
 
 /**
  * Routes reserved for guests.
@@ -60,9 +62,7 @@ function decodeUid(token: string): string {
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
-  const token =
-    request.cookies.get('firebase-token')?.value ||
-    request.cookies.get('auth-token')?.value;
+  const token = request.cookies.get("firebase-token")?.value;
 
   const isProtectedRoute = pathname.startsWith('/dashboard');
   const isAuthRoute      = pathname === '/login' || pathname === '/register';
@@ -133,6 +133,18 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       const blockedUrl = new URL(GUEST_HOME, request.url);
       blockedUrl.searchParams.set('blocked', 'true');
       return setRoleCookie(NextResponse.redirect(blockedUrl));
+    }
+
+    // User provisioning and role assignment are controller-only operations.
+    if (ADMIN_ONLY_ROUTES.some((p) => pathname.startsWith(p)) && role !== 'admin') {
+      if (role === 'guest') {
+        const blockedUrl = new URL(GUEST_HOME, request.url);
+        blockedUrl.searchParams.set('blocked', 'true');
+        return setRoleCookie(NextResponse.redirect(blockedUrl));
+      }
+      return setRoleCookie(
+        NextResponse.redirect(new URL(dashboardHomeForRole(role), request.url)),
+      );
     }
 
     // Host hitting guest-only route → redirect to escrow dashboard

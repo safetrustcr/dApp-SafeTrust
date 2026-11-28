@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { HASURA_GRAPHQL_URL, SAFETRUST_API_URL, repoRoot } from '../config.js';
+import { repoRoot } from '../config.js';
 import { escrowRolesDoc } from '../lib/escrow-roles.js';
 
 type DocFile = {
@@ -26,6 +26,14 @@ const DOC_FILES: DocFile[] = [
     path: 'mcp/README.md',
     title: 'SafeTrust MCP server README',
     description: 'Setup and tool reference for this MCP server.',
+  },
+  {
+    name: 'safetrust-mcp-trust-boundary',
+    path: 'docs/mcp/README.md',
+    title: 'SafeTrust MCP trust boundary and runbook',
+    description:
+      'What this server is and is not, client setup, the tool safety catalogue, ' +
+      'and incident steps for exposed credentials.',
   },
   {
     name: 'safetrust-frontend-readme',
@@ -61,31 +69,47 @@ fulfilment, or returned on dispute.
 |---|---|
 | \`apps/frontend\` | Next.js 14 app — wallet UI, Freighter signing, its own /api routes |
 | \`apps/api\` | Express escrow/auth API (port 3002) — holds the TrustlessWork API key |
-| \`services/webhook\` | Receives TrustlessWork webhooks and updates escrow rows |
-| \`infra/backend\` | Hasura metadata + migrations, multi-tenant (safetrust, hotel_industry) |
+| \`infra/backend\` | Hasura metadata + migrations, multi-tenant (safetrust, hotel_industry); event triggers and actions route webhooks to apps/api |
 | \`packages/graphql\`, \`packages/types\` | Generated GraphQL types and shared TS types |
 | \`mcp\` | This MCP server |
 
 ## Escrow lifecycle
 
-1. Tenant picks an apartment — \`public.apartments\`, \`warranty_deposit\` is the escrow amount.
-2. Deploy — \`POST ${SAFETRUST_API_URL}/api/escrow/deploy\` calls TrustlessWork
-   \`/deployer/single-release\` and returns an unsigned XDR. \`engagementId\` is the
-   idempotency key (see \`apps/api/src/services/idempotency.ts\`).
-3. Tenant signs the XDR with Freighter and submits it via the frontend route
-   \`POST /api/escrow/send-transaction\`.
-4. Fund — \`POST ${SAFETRUST_API_URL}/api/escrow/fund\` → another XDR to sign.
-5. Milestone — \`POST /api/escrow/milestone-status\` (serviceProvider marks it done).
-6. Release — \`POST /api/escrow/release-funds\` sends funds to the owner.
-7. Webhooks land in \`services/webhook\` and update escrow status rows.
+Two booking kinds share one escrow model: apartment deposits
+(engagement id \`rental:<apartmentId>:<guestUid>\`) and hotel reservations
+(\`hotel:<reservationId>\`). Every step goes through \`apps/api\` at the
+configured \`SAFETRUST_API_URL\`, signed in with Firebase.
 
-## Tables that matter (Hasura at ${HASURA_GRAPHQL_URL})
+1. Terms — apps/api derives amount and host wallet server-side: the apartment's
+   \`warranty_deposit\` and the owner's primary wallet, or the reservation's
+   \`total_amount\` and the hotel owner's primary wallet
+   (\`GET /api/escrow/hotel-reservations/:id\` shows them to the guest).
+2. Build — \`POST /api/escrow/deploy\` (\`apartmentId\` or \`reservationId\` +
+   the guest's registered wallet), then \`/fund\`, \`/milestone-status\`,
+   \`/approve-milestone\`, \`/release-funds\`, \`/resolve-dispute\`. Each checks that
+   the caller's registered wallet holds the signing role
+   (\`services/escrow-authz.ts\`) and records the unsigned XDR in
+   \`escrow_pending_actions\` under its transaction hash (status \`built\`).
+3. Sign and submit — the signer signs in their wallet in the browser and the
+   frontend calls \`POST /api/escrow/send-transaction\`, which only accepts a
+   signed XDR whose hash matches a row built for the same user (→ \`submitted\`).
+4. Transition — each status change is checked against
+   \`escrow_status_transitions\` and logged, append-only, in
+   \`escrow_transactions\` (source \`submit\`, \`reconciler\` or \`admin\`).
+5. Reconcile — \`POST /reconciliation/sync-escrows\` (cron, secret header) asks
+   Horizon about submitted transactions and applies the ones that landed.
 
-- \`public.escrows\` — current single-release rental deposits.
-  \`contract_id\`, \`engagement_id\` (unique), \`apartment_id\`, \`sender_address\` (tenant),
-  \`receiver_address\` (owner), \`amount\`, \`status\`, \`unsigned_xdr\`, \`tenant_id\`.
-  Status is constrained to: deploying, pending_signature, funded, completed, disputed,
-  resolved, cancelled.
+## Tables that matter (configured local Hasura)
+
+- \`public.escrows\` — one row per escrow, apartments and hotel reservations alike.
+  \`contract_id\`, \`engagement_id\` (unique), \`apartment_id\`, \`property_id\`,
+  \`sender_address\` (guest), \`receiver_address\` (host), \`amount\`, \`status\`,
+  \`tenant_id\` (\`safetrust\` or \`hotel_industry\`). Statuses move along
+  \`escrow_status_transitions\`: pending_signature → created → funded →
+  milestone_approved → completed, with disputed/resolved/cancelled branches.
+- \`public.escrow_pending_actions\` — every built transaction: action, \`tx_hash\`,
+  signer, status (built, submitted, confirmed, failed, expired), \`expires_at\`.
+- \`public.escrow_transactions\` — append-only transition audit log.
 - \`public.trustless_work_escrows\` — TrustlessWork mirror, exposed as
   \`trustlessWorkEscrows\` with camelCase fields. Role columns: \`marker\`, \`approver\`,
   \`releaser\`, \`resolver\`. Carries the legacy hotel-booking fields.
@@ -94,8 +118,9 @@ fulfilment, or returned on dispute.
 - \`public.escrow_milestones\`, \`public.trustless_work_webhook_events\` — milestone and
   webhook history.
 
-Every SafeTrust row carries \`tenant_id = 'safetrust'\`; the same database also serves
-the \`hotel_industry\` tenant.
+Hotel data lives in the \`hotel_industry\` source of the same Hasura
+(\`reservations\`, \`rooms\`, \`hotels\`, \`users_wallets\`); hotel escrows still land in
+\`public.escrows\` with \`tenant_id = 'hotel_industry'\`.
 
 ${escrowRolesDoc()}`;
 }
