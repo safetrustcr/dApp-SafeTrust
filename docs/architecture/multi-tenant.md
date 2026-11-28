@@ -92,13 +92,25 @@ bin/start hotel_industry
 ```
 
 Passing multiple tenants to `bin/start` (`bin/start safetrust hotel_industry`)
-is a separate, pre-existing limitation and out of scope for this document:
-`hasura metadata apply` fully replaces Hasura's metadata (all sources) on
-every call, and each tenant's build directory only contains that tenant's
-own source, so the last tenant deployed is the only one left tracked. Fixing
-combined-tenant startup means changing how `metadata/build-metadata.sh` and
-`metadata/deploy-tenant.sh` assemble and apply metadata, not the
-hotel_industry schema itself.
+tracks both sources in one shot. `metadata/setup-tenant.sh` builds every
+selected tenant with `metadata/build-metadata.sh`, assembles a single
+combined project under `metadata/build/combined` whose `databases.yaml`
+declares one source per tenant (including each tenant's `functions`), then
+runs `hasura metadata apply` **once**. A single apply matters because it
+fully replaces Hasura's metadata: applying per tenant would leave only the
+last tenant tracked. The shared base metadata — including the
+`reconciliation_sync_escrows` cron trigger — is copied once from the first
+tenant's build, and `hotel_industry`'s `find_nearby_hotels` function is
+carried into the combined project.
+
+After applying, the script writes the tracked source names to
+`metadata/build/applied-tenants`, which `bin/metadata-check` uses to confirm
+each source is present and inconsistent metadata is empty.
+
+```bash
+bin/start safetrust hotel_industry
+bin/metadata-check safetrust hotel_industry
+```
 
 ## GraphQL root field names
 

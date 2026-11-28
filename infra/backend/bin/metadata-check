@@ -5,6 +5,13 @@ set -eo pipefail
 # metadata-check
 # Verifies Hasura metadata consistency and fails CI/local execution if
 # any metadata object (table, relationship, permission, trigger) is inconsistent.
+# Also confirms that every expected source is tracked — by default the tenants
+# recorded by the last metadata apply (metadata/build/applied-tenants), falling
+# back to every tenant directory when that file is absent.
+#
+# Usage:
+#   bin/metadata-check
+#   bin/metadata-check safetrust hotel_industry
 # ─────────────────────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,6 +19,16 @@ INFRA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 HASURA_ENDPOINT="${HASURA_ENDPOINT:-http://localhost:8080}"
 HASURA_ADMIN_SECRET="${HASURA_GRAPHQL_ADMIN_SECRET:-${HASURA_ADMIN_SECRET:-myadminsecretkey}}"
+
+TENANTS=("$@")
+if [[ ${#TENANTS[@]} -eq 0 ]]; then
+  APPLIED_FILE="$INFRA_DIR/metadata/build/applied-tenants"
+  if [[ -f "$APPLIED_FILE" ]]; then
+    mapfile -t TENANTS < <(grep -v '^[[:space:]]*$' "$APPLIED_FILE")
+  else
+    mapfile -t TENANTS < <(find "$INFRA_DIR/metadata/tenants" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+  fi
+fi
 
 # Static check: every public_*.yaml table file must be included in tables.yaml
 missing=0
@@ -51,3 +68,61 @@ fi
 
 echo "$out"
 echo "✅ Hasura metadata is consistent"
+
+if [[ ${#TENANTS[@]} -eq 0 ]]; then
+  echo "ℹ️  No tenants to verify."
+  exit 0
+fi
+
+echo ""
+echo "🔎 Verifying tracked sources: ${TENANTS[*]}"
+
+rc=0
+metadata="$(curl -sf -X POST "${HASURA_ENDPOINT}/v1/metadata" \
+  -H "X-Hasura-Admin-Secret: ${HASURA_ADMIN_SECRET}" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "export_metadata", "args": {}}' 2>&1)" || rc=$?
+
+if [[ "$rc" -ne 0 ]]; then
+  echo "$metadata"
+  echo "❌ Failed to export metadata from $HASURA_ENDPOINT (exit $rc)" >&2
+  exit "$rc"
+fi
+
+if ! command -v jq > /dev/null 2>&1; then
+  echo "❌ jq is required to verify tracked sources" >&2
+  exit 1
+fi
+
+missing=0
+for tenant in "${TENANTS[@]}"; do
+  summary="$(jq -r --arg t "$tenant" '
+    [.sources[]? | select(.name == $t)] as $s
+    | if ($s | length) == 0 then "missing"
+      else "\($s[0].tables | length) \($s[0].functions // [] | length)"
+      end' <<<"$metadata")"
+
+  if [[ "$summary" == "missing" ]]; then
+    echo "   ❌ $tenant: source is not tracked" >&2
+    missing=$((missing + 1))
+    continue
+  fi
+
+  read -r table_count function_count <<<"$summary"
+  if [[ "$table_count" -eq 0 ]]; then
+    echo "   ❌ $tenant: source is tracked but has no tracked tables" >&2
+    missing=$((missing + 1))
+    continue
+  fi
+
+  echo "   ✅ $tenant: ${table_count} tables, ${function_count} functions tracked"
+done
+
+if [[ "$missing" -gt 0 ]]; then
+  echo ""
+  echo "❌ $missing of ${#TENANTS[@]} expected sources are not tracked" >&2
+  exit 1
+fi
+
+echo ""
+echo "✅ All expected sources are tracked"
