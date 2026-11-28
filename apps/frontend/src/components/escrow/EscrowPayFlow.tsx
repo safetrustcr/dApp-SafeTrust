@@ -11,6 +11,7 @@ import { getErrorMessages } from '@/lib/trustlesswork-errors';
 import { truncateStellarAddress } from '@/lib/utils';
 import { postEscrowApi, getReadiness } from '@/lib/api/escrow';
 import { WalletReadinessChecklist } from './WalletReadinessChecklist';
+import { signingButtonStyle as buttonStyle } from './signing-styles';
 
 type EscrowPayFlowProps = {
   apartmentId: string;
@@ -235,15 +236,3 @@ export function EscrowPayFlow({
     </div>
   );
 }
-
-const buttonStyle = {
-  border: '1px solid #f97316',
-  backgroundColor: '#f97316',
-  color: '#ffffff',
-  fontWeight: 700,
-  padding: '0.5rem 1.75rem',
-  borderRadius: '0.75rem',
-  fontSize: '0.95rem',
-  letterSpacing: '0.03em',
-  lineHeight: 1,
-} as const;

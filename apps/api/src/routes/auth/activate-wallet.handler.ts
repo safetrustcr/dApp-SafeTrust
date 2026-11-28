@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { getAuth }                 from 'firebase-admin/auth';
 import { executeGraphQL }          from '../../lib/hasura.js';
+import { syncHotelWallet }         from '../../services/hotel-provisioning.js';
 
 const rawUrl = process.env.POLLAR_ACTIVATE_URL ?? 'https://sdk.api.pollar.xyz/v2/wallet/activate';
 const pollarUrlObj = new URL(rawUrl);
@@ -95,6 +96,23 @@ export const activateWalletHandler = async (
       update_user_wallets: { affected_rows: number };
       insert_user_wallets_one: { id: string; wallet_address: string };
     }>(UPSERT_WALLET, { userId: uid, address });
+
+    // Mirror the Pollar-provisioned wallet into the hotel tenant so hotel
+    // escrow can pay this guest. Best-effort; public.user_wallets remains
+    // the source of truth and the activation must not fail because the
+    // hotel tenant is unavailable.
+    try {
+      await syncHotelWallet(
+        { firebaseUid: uid, email: decodedToken.email ?? '', emailVerified: decodedToken.email_verified === true },
+        address,
+        true,
+      );
+    } catch (hotelError) {
+      console.warn(
+        '[activate-wallet] hotel wallet mirror failed — continuing with public wallet only:',
+        hotelError instanceof Error ? hotelError.message : hotelError,
+      );
+    }
 
     console.log(`[activate-wallet] ✅ wallet activated — uid: ${uid}, address: ${address.slice(0, 8)}...`);
 
