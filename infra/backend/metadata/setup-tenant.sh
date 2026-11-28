@@ -112,28 +112,34 @@ if [[ ${#TENANTS[@]} -eq 1 ]]; then
   TENANT="${TENANTS[0]}"
   bash "$SCRIPT_DIR/build-metadata.sh" "$TENANT"
   PROJECT_DIR="$BUILD_DIR/$TENANT"
+  rm -rf "$BUILD_DIR/combined"
 else
   # Build each tenant metadata first
   for TENANT in "${TENANTS[@]}"; do
     bash "$SCRIPT_DIR/build-metadata.sh" "$TENANT"
   done
 
-  # Combine into one metadata project
+  # Combine into one metadata project so a single `hasura metadata apply`
+  # tracks every source at once.
   COMBINED_DIR="$BUILD_DIR/combined"
   rm -rf "$COMBINED_DIR"
-  mkdir -p "$COMBINED_DIR/metadata"
+  mkdir -p "$COMBINED_DIR/metadata/databases"
 
-  # Copy base and config from first tenant build
+  # Start from the first tenant build: it already contains the shared base
+  # metadata (actions, cron triggers, ...) merged with that tenant's tree.
   cp -r "$BUILD_DIR/${TENANTS[0]}"/* "$COMBINED_DIR/"
   rm -rf "$COMBINED_DIR/metadata/databases"
   mkdir -p "$COMBINED_DIR/metadata/databases"
 
-  > "$COMBINED_DIR/metadata/databases/databases.yaml"
+  DATABASES_YAML="$COMBINED_DIR/metadata/databases/databases.yaml"
+  : > "$DATABASES_YAML"
   for TENANT in "${TENANTS[@]}"; do
     TENANT_BUILD="$BUILD_DIR/$TENANT"
-    mkdir -p "$COMBINED_DIR/metadata/databases/$TENANT"
-    cp -r "$TENANT_BUILD/metadata/databases/tables" "$COMBINED_DIR/metadata/databases/$TENANT/"
-    cat >> "$COMBINED_DIR/metadata/databases/databases.yaml" <<EOF
+    TENANT_DB_DIR="$COMBINED_DIR/metadata/databases/$TENANT"
+    mkdir -p "$TENANT_DB_DIR"
+    cp -r "$TENANT_BUILD/metadata/databases/tables" "$TENANT_DB_DIR/"
+
+    cat >> "$DATABASES_YAML" <<EOF
 - name: $TENANT
   kind: postgres
   configuration:
@@ -144,10 +150,12 @@ else
       use_prepared_statements: false
   tables: "!include $TENANT/tables/tables.yaml"
 EOF
-    # Keep tracked functions; without this the combined source drops them.
-    if [ -f "$TENANT_BUILD/metadata/databases/functions/functions.yaml" ]; then
-      cp -r "$TENANT_BUILD/metadata/databases/functions" "$COMBINED_DIR/metadata/databases/$TENANT/"
-      echo "  functions: \"!include $TENANT/functions/functions.yaml\"" >> "$COMBINED_DIR/metadata/databases/databases.yaml"
+
+    # Track tenant SQL functions (for example hotel_industry.find_nearby_hotels);
+    # without this the combined source drops them.
+    if [[ -f "$TENANT_BUILD/metadata/databases/functions/functions.yaml" ]]; then
+      cp -r "$TENANT_BUILD/metadata/databases/functions" "$TENANT_DB_DIR/"
+      echo "  functions: \"!include $TENANT/functions/functions.yaml\"" >> "$DATABASES_YAML"
     fi
   done
   PROJECT_DIR="$COMBINED_DIR"
@@ -164,6 +172,11 @@ hasura metadata apply \
   --skip-update-check
 echo "✅ Metadata apply complete"
 echo ""
+
+# Record which sources this apply tracked so bin/metadata-check can verify
+# exactly them (build/ is gitignored).
+mkdir -p "$BUILD_DIR"
+printf '%s\n' "${TENANTS[@]}" > "$BUILD_DIR/applied-tenants"
 
 echo "════════════════════════════════════════"
 echo "  ✅ All tenants ready: ${TENANTS[*]}"

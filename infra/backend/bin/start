@@ -132,7 +132,7 @@ echo ""
 # ── 6b. Verify metadata consistency ─────────────────────────────────────────
 echo "🔍 Verifying metadata consistency..."
 SCRIPT_DIR_START="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-"$SCRIPT_DIR_START/metadata-check"
+"$SCRIPT_DIR_START/metadata-check" "${TENANTS[@]}"
 
 echo ""
 
